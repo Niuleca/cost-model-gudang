@@ -28,7 +28,7 @@ export default function GudangManager() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     muat();
-    sb.from('umk').select('provinsi, kab_kota').order('provinsi').order('kab_kota').then(({ data }) => setProv(data ?? []));
+    sb.from('umk').select('provinsi, kab_kota').order('provinsi').order('kab_kota').then(({ data }: { data: { provinsi: string; kab_kota: string }[] | null }) => setProv(data ?? []));
   }, [muat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tampil = useMemo(() => rows.filter(w => !q || `${w.nama} ${w.kab_kota} ${w.provinsi} ${w.pemilik ?? ''}`.toLowerCase().includes(q.toLowerCase())), [rows, q]);

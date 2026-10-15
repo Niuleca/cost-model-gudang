@@ -444,12 +444,14 @@ alter table public.price_items
   add column if not exists tinggi_angkat_m numeric(6,2),
   add column if not exists spesifikasi text;
 
--- View status harga dibuat ulang supaya kolom MHE baru ikut (p.* dibekukan saat view dibuat)
-drop view if exists public.price_items_status;
-create view public.price_items_status with (security_invoker = true) as
-select p.*,
+-- View status harga diperluas dengan kolom MHE (create or replace, kolom baru di akhir — tanpa drop)
+create or replace view public.price_items_status with (security_invoker = true) as
+select p.id, p.kategori, p.item, p.satuan, p.harga_beli, p.harga_sewa_bulan, p.umur_ekonomis_bulan, p.daya_watt,
+       p.vendor, p.sumber, p.tanggal_harga, p.berlaku_sampai, p.owner_role, p.status, p.approved_by, p.approved_at,
+       p.created_by, p.updated_at,
        case when p.status = 'approved' and p.berlaku_sampai is not null and p.berlaku_sampai < current_date
-            then 'expired' else p.status::text end as status_efektif
+            then 'expired' else p.status::text end as status_efektif,
+       p.mhe_tipe, p.kapasitas_ton, p.sumber_tenaga, p.tinggi_angkat_m, p.spesifikasi
 from public.price_items p;
 
 -- ---------- Master gudang (Procurement) ----------
@@ -1558,3 +1560,20 @@ insert into public.it_catalog (kelompok, item, cost_type, basis, harga, urutan, 
  ('Connection','Firewall & WAN – instalasi','OTC','Sekali',8360000,40,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
  ('Connection','Firewall & WAN – bulanan','Monthly/Site','Bulanan',12000000,41,'BAP-71/02/2019 Nabati Majalengka','2019-02-01')
 on conflict (kelompok, item) do nothing;
+-- Pengamanan fungsi (hasil Supabase security advisor)
+alter function public.touch_updated_at() set search_path = public;
+revoke execute on function public.guard_price_approval(), public.guard_quotation_approval(), public.guard_quotation_insert(),
+  public.guard_status_approval(), public.handle_new_user(), public.log_tender_status(), public.tulis_audit()
+  from public, anon, authenticated;
+revoke execute on function public.current_role_is(variadic public.app_role[]), public.my_role() from public, anon;
+grant execute on function public.current_role_is(variadic public.app_role[]), public.my_role() to authenticated;
+revoke execute on function public.buat_checklist_implementasi(uuid, date) from public, anon;
+grant execute on function public.buat_checklist_implementasi(uuid, date) to authenticated;
+
+-- Isi tipe/tonase MHE dari nama item seed
+update public.price_items set
+  mhe_tipe = case when item ilike 'Counterbalance%' then 'Counter Balance' when item ilike 'Reach Truck%' then 'Reach Truck' when item ilike 'Pallet Mover%' then 'Pallet Mover' when item ilike 'Hand Pallet%' then 'Hand Pallet' end,
+  kapasitas_ton = case when item ilike '%10 Ton%' then 10 when item ilike '%5 Ton%' and item not ilike '%2.5 Ton%' and item not ilike '%1.5%' then 5 when item ilike '% 3 Ton%' then 3 when item ilike '%2.5 Ton%' then 2.5 when item ilike '%1.5-2 Ton%' then 2 end,
+  sumber_tenaga = case when item ilike '%Electric%' or item ilike 'Pallet Mover%' then 'Electric' when item ilike '%Manual%' then 'Manual' end,
+  tinggi_angkat_m = case when item ilike '%11m%' then 11 end
+where kategori = 'MHE' and mhe_tipe is null;

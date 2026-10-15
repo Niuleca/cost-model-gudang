@@ -23,7 +23,7 @@ export default function Perbandingan() {
   const [f, setF] = useState({ industri: '', provinsi: '', tipe: '', hasil: '' });
   useEffect(() => {
     supabaseBrowser().from('tender_overview').select('*').not('biaya_bulan', 'is', null).order('created_at', { ascending: false })
-      .then(({ data }) => setRows((data ?? []) as Ov[]));
+      .then(({ data }: { data: unknown }) => setRows((data ?? []) as Ov[]));
   }, []);
 
   const ref = rows.find(r => r.id === acuan) ?? null;

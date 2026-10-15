@@ -96,7 +96,7 @@ Keamanan ditegakkan di database (RLS + trigger), bukan hanya di tampilan.
 
 ```bash
 cp .env.example .env.local   # isi URL & anon key
-npm install
+npm install     # di sandbox Claude: tambahkan --proxy=$HTTPS_PROXY --https-proxy=$HTTPS_PROXY --noproxy=localhost
 npm test        # uji mesin hitung + konversi IT
 npm run dev     # http://localhost:3000
 ```

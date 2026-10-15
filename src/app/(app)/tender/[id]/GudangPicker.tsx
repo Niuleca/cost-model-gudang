@@ -14,7 +14,7 @@ export default function GudangPicker({ provinsi, terpilih, kebutuhanM2, onPilih 
   const [rows, setRows] = useState<Warehouse[]>([]);
   const [semua, setSemua] = useState(false);
   useEffect(() => {
-    sb.from('warehouses').select('*').order('provinsi').order('kab_kota').then(({ data }) => setRows((data ?? []) as Warehouse[]));
+    sb.from('warehouses').select('*').order('provinsi').order('kab_kota').then(({ data }: { data: unknown }) => setRows((data ?? []) as Warehouse[]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const daftar = useMemo(() => rows.filter(w => semua || w.provinsi === provinsi), [rows, semua, provinsi]);

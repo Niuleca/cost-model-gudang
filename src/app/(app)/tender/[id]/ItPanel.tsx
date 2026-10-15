@@ -14,7 +14,7 @@ export default function ItPanel({ sheet, onChange }: { sheet: ItSheet; onChange:
   const [pilih, setPilih] = useState('');
   useEffect(() => {
     sb.from('it_catalog').select('id, kelompok, item, deskripsi, cost_type, harga, slab_min, slab_max, status, berlaku_sampai').order('urutan').order('item')
-      .then(({ data }) => setKatalog((data ?? []) as Katalog[]));
+      .then(({ data }: { data: unknown }) => setKatalog((data ?? []) as Katalog[]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const r = useMemo(() => ringkasIt(sheet), [sheet]);

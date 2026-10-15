@@ -23,7 +23,7 @@ export default function Dashboard() {
   useEffect(() => {
     supabaseBrowser().from('tender_overview').select('id, kode, customer, industri, provinsi, kab_kota, status, created_at, tanggal_keputusan, alasan_hasil, pendapatan_bulan, gp_persen, durasi_kontrak_bulan')
       .order('created_at', { ascending: false })
-      .then(({ data, error }) => { if (error) setErr(error.message); else setRows((data ?? []) as Ov[]); });
+      .then(({ data, error }: { data: unknown; error: { message: string } | null }) => { if (error) setErr(error.message); else setRows((data ?? []) as Ov[]); });
   }, []);
 
   const tahunList = useMemo(() => Array.from(new Set(rows.map(r => r.created_at.slice(0, 4)))).sort().reverse(), [rows]);

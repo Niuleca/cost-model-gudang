@@ -17,12 +17,14 @@ alter table public.price_items
   add column if not exists tinggi_angkat_m numeric(6,2),
   add column if not exists spesifikasi text;
 
--- View status harga dibuat ulang supaya kolom MHE baru ikut (p.* dibekukan saat view dibuat)
-drop view if exists public.price_items_status;
-create view public.price_items_status with (security_invoker = true) as
-select p.*,
+-- View status harga diperluas dengan kolom MHE (create or replace, kolom baru di akhir — tanpa drop)
+create or replace view public.price_items_status with (security_invoker = true) as
+select p.id, p.kategori, p.item, p.satuan, p.harga_beli, p.harga_sewa_bulan, p.umur_ekonomis_bulan, p.daya_watt,
+       p.vendor, p.sumber, p.tanggal_harga, p.berlaku_sampai, p.owner_role, p.status, p.approved_by, p.approved_at,
+       p.created_by, p.updated_at,
        case when p.status = 'approved' and p.berlaku_sampai is not null and p.berlaku_sampai < current_date
-            then 'expired' else p.status::text end as status_efektif
+            then 'expired' else p.status::text end as status_efektif,
+       p.mhe_tipe, p.kapasitas_ton, p.sumber_tenaga, p.tinggi_angkat_m, p.spesifikasi
 from public.price_items p;
 
 -- ---------- Master gudang (Procurement) ----------
