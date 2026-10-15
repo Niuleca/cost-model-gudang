@@ -5,7 +5,8 @@ import { INDUSTRI } from '@/lib/format';
 import { COST_TYPES, KELOMPOK_IT } from '@/lib/it';
 
 export const KAT_HARGA = ['Gudang','MHE','Racking','Palet','Office','ATK','Seragam','Konsumsi','Printer','Rental Office','IT','Software','HSE','Konstruksi','Pest Control','Asuransi','Security','Cleaning','Utilitas','Lainnya'];
-const KAT_KEBUTUHAN = KAT_HARGA.filter(k => !['Gudang', 'MHE', 'IT', 'Software'].includes(k));
+export const KAT_KANTOR = ['Office', 'ATK', 'Printer', 'Konsumsi', 'Rental Office'];
+export const KAT_GUDANG = ['Palet', 'Racking', 'HSE', 'Seragam', 'Pest Control', 'Asuransi', 'Security', 'Cleaning', 'Utilitas', 'Konstruksi', 'Lainnya'];
 const ROLES: AppRole[] = ['procurement','it','engineering','operations','hr','finance','commercial','solution_design','admin'];
 
 export interface Tab {
@@ -77,12 +78,24 @@ export const TABS: Tab[] = [
       { key: 'vendor', label: 'Vendor' }, { key: 'spesifikasi', label: 'Spesifikasi' },
       { key: 'tanggal_harga', label: 'Tgl harga', type: 'date' }, { key: 'berlaku_sampai', label: 'Berlaku s.d.', type: 'date' }, { key: 'sumber', label: 'Sumber' },
     ] },
-  { id: 'kebutuhan', label: 'Kebutuhan kantor & gudang', pemilik: 'Procurement / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'engineering'],
-    approval: true, filter: { kategori: KAT_KEBUTUHAN }, defaults: { owner_role: 'procurement' },
+  { id: 'kantor', label: 'Kebutuhan kantor', pemilik: 'Procurement / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'engineering'],
+    approval: true, filter: { kategori: KAT_KANTOR }, defaults: { owner_role: 'procurement', kategori: 'Office' },
     orderBy: [{ col: 'kategori' }, { col: 'item' }], cari: ['kategori', 'item', 'vendor', 'sumber'],
-    catatan: 'ATK, printer (termasuk dot matrix), seragam, konsumsi/air minum, palet, racking, office, pest control, asuransi, security, cleaning. Harga lewat masa berlaku otomatis expired dan jadi red flag di tender.',
+    catatan: 'Kebutuhan ruang kantor: furnitur & elektronik office, ATK, printer (termasuk dot matrix), konsumsi/air minum, sewa ruang kantor. Harga lewat masa berlaku otomatis expired dan jadi red flag di tender.',
     kolom: [
-      { key: 'kategori', label: 'Kategori', type: 'select', options: KAT_KEBUTUHAN }, { key: 'item', label: 'Item', width: 240 },
+      { key: 'kategori', label: 'Kategori', type: 'select', options: KAT_KANTOR }, { key: 'item', label: 'Item', width: 240 },
+      { key: 'satuan', label: 'Satuan', width: 90 },
+      { key: 'harga_beli', label: 'Harga beli', type: 'number' }, { key: 'harga_sewa_bulan', label: 'Sewa/bln', type: 'number' },
+      { key: 'umur_ekonomis_bulan', label: 'Umur (bln)', type: 'number', width: 70 }, { key: 'daya_watt', label: 'Watt', type: 'number', width: 70 },
+      { key: 'vendor', label: 'Vendor' }, { key: 'tanggal_harga', label: 'Tgl harga', type: 'date' }, { key: 'berlaku_sampai', label: 'Berlaku s.d.', type: 'date' },
+      { key: 'owner_role', label: 'Pemilik', type: 'select', options: ['procurement', 'engineering'] }, { key: 'sumber', label: 'Sumber', width: 220 },
+    ] },
+  { id: 'gudangkeb', label: 'Kebutuhan gudang', pemilik: 'Procurement / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'engineering'],
+    approval: true, filter: { kategori: KAT_GUDANG }, defaults: { owner_role: 'procurement', kategori: 'Palet' },
+    orderBy: [{ col: 'kategori' }, { col: 'item' }], cari: ['kategori', 'item', 'vendor', 'sumber'],
+    catatan: 'Kebutuhan area gudang: palet, racking, HSE/APD, seragam, pest control, asuransi, security, cleaning, utilitas, konstruksi. Harga lewat masa berlaku otomatis expired dan jadi red flag di tender.',
+    kolom: [
+      { key: 'kategori', label: 'Kategori', type: 'select', options: KAT_GUDANG }, { key: 'item', label: 'Item', width: 240 },
       { key: 'satuan', label: 'Satuan', width: 90 },
       { key: 'harga_beli', label: 'Harga beli', type: 'number' }, { key: 'harga_sewa_bulan', label: 'Sewa/bln', type: 'number' },
       { key: 'umur_ekonomis_bulan', label: 'Umur (bln)', type: 'number', width: 70 }, { key: 'daya_watt', label: 'Watt', type: 'number', width: 70 },

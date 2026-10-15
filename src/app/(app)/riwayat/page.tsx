@@ -1,4 +1,5 @@
 'use client';
+import ExportButton from '@/components/ExportButton';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -76,7 +77,9 @@ export default function Riwayat() {
       {tab === 'audit' && <>
         <div className="row"><select aria-label="Data" value={fTabel} onChange={e => setFTabel(e.target.value)} style={{ maxWidth: 220 }}>
           <option value="">Semua data</option>{Object.entries(TABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-          <span className="small muted">500 perubahan terakhir</span></div>
+          <span className="small muted">500 perubahan terakhir</span>
+          <ExportButton nama="Log_Perubahan" rows={audit.filter(a => (!fTabel || a.tabel === fTabel) && (!fTender || a.row_id === fTender)).map(a => ({ ...a, data: TABEL[a.tabel] ?? a.tabel, oleh: nama(a.oleh), waktu: waktu(a.waktu) }))}
+            kolom={[{ key: 'waktu', label: 'Waktu' }, { key: 'data', label: 'Data' }, { key: 'aksi', label: 'Aksi' }, { key: 'ringkas', label: 'Ringkas' }, { key: 'oleh', label: 'Oleh' }]} /></div>
         <div className="tablewrap"><table>
           <thead><tr><th>Waktu</th><th>Data</th><th>Aksi</th><th>Ringkas</th><th>Oleh</th></tr></thead>
           <tbody>{audit.filter(a => (!fTabel || a.tabel === fTabel) && (!fTender || a.row_id === fTender)).map(a => (

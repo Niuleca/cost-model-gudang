@@ -11,9 +11,13 @@ export interface Warehouse {
   berlaku_sampai: string | null; status: string; updated_at: string;
 }
 
-export const fotoUrl = (sb: SupabaseClient, path: string) => sb.storage.from(BUCKET_FOTO).getPublicUrl(path).data.publicUrl;
+/** Foto = path di Storage, atau URL/path statis (foto hasil import database gudang ada di /warehouses/...). */
+export const fotoUrl = (sb: SupabaseClient, path: string) =>
+  path.startsWith('/') || path.startsWith('http') ? path : sb.storage.from(BUCKET_FOTO).getPublicUrl(path).data.publicUrl;
+export const fotoDiStorage = (path: string) => !path.startsWith('/') && !path.startsWith('http');
 
 /** Tarif sewa per m² efektif: pakai harga per m² kalau ada, kalau tidak harga per bulan ÷ luas. */
+export const adaHarga = (w: Pick<Warehouse, 'harga_sewa_m2_bulan' | 'harga_per_bulan'>) => w.harga_sewa_m2_bulan != null || w.harga_per_bulan != null;
 export const tarifM2 = (w: Pick<Warehouse, 'harga_sewa_m2_bulan' | 'harga_per_bulan' | 'luas_m2'>) =>
   w.harga_sewa_m2_bulan != null ? Number(w.harga_sewa_m2_bulan) : w.harga_per_bulan != null ? Number(w.harga_per_bulan) / Number(w.luas_m2) : 0;
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Profile } from '@/lib/useProfile';
 import type { AppRole } from '@/lib/format';
+import { exportExcel, importExcel, type KolomExcel } from '@/lib/excel';
 
 export interface Kolom {
   key: string;
@@ -26,6 +27,7 @@ interface Props {
   cari?: string[];             // kolom yang dicari
   catatan?: string;
   filter?: Record<string, string | string[]>;   // eq / in pada sumber baca
+  namaExport?: string;         // nama file & sheet Excel
 }
 
 type Row = Record<string, unknown>;
@@ -45,6 +47,8 @@ export default function TableEditor(p: Props) {
   const [q, setQ] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [impor, setImpor] = useState<{ baru: Row[]; ubah: { id: string; row: Row }[]; diabaikan: string[]; file: string } | null>(null);
+  const [sibuk, setSibuk] = useState<string | null>(null);
 
   const bolehEdit = !!p.profile && (p.profile.role === 'admin' || p.editorRoles.includes(p.profile.role));
   const bolehApprove = !!p.profile && (p.profile.role === 'admin' || p.profile.role === 'solution_design');
@@ -111,6 +115,54 @@ export default function TableEditor(p: Props) {
     const { error } = await sb.from(p.table).delete().eq(idKey, id);
     if (error) setErr(error.message); else muat();
   }
+  // ---- Excel ----
+  const kolomExcel: KolomExcel[] = p.kolom.map(k => ({ key: k.key, label: k.label, width: k.width,
+    type: k.type === 'number' || k.type === 'percent' || k.type === 'date' || k.type === 'bool' ? k.type : 'text' }));
+  const idSendiri = idKey !== 'id' && p.kolom.some(k => k.key === idKey);   // kunci alami (mis. key, tanggal) sudah jadi kolom
+  async function unduh() {
+    setErr(null); setSibuk('Menyiapkan Excel…');
+    try {
+      const extra = p.approval ? [...kolomExcel, { key: 'status', label: 'Status (hanya info)', type: 'text' as const }] : kolomExcel;
+      await exportExcel(p.namaExport ?? p.table, p.namaExport ?? p.table, extra, tampil, idSendiri ? undefined : idKey);
+    } catch (e) { setErr(`Export gagal: ${(e as Error).message}`); }
+    setSibuk(null);
+  }
+  async function bacaFile(f: File | undefined) {
+    if (!f) return;
+    setErr(null); setSibuk('Membaca file…');
+    try {
+      const { rows: isi, diabaikan } = await importExcel(f, kolomExcel, idSendiri ? undefined : idKey);
+      const ada = new Map(rows.map(r => [String(r[idKey]), r]));
+      const baruR: Row[] = [], ubahR: { id: string; row: Row }[] = [];
+      for (const r of isi) {
+        const id = r[idKey] == null ? null : String(r[idKey]);
+        if (id && ada.has(id)) ubahR.push({ id, row: r }); else baruR.push(r);
+      }
+      setImpor({ baru: baruR, ubah: ubahR, diabaikan, file: f.name });
+    } catch (e) { setErr(`Import gagal: ${(e as Error).message}`); }
+    setSibuk(null);
+  }
+  async function terapkanImpor() {
+    if (!impor) return;
+    setErr(null); setSibuk('Menyimpan…');
+    const gagal: string[] = [];
+    const isiBaru = impor.baru.map(r => ({ ...(p.defaults ?? {}), ...bersihkan(r), ...(idSendiri && r[idKey] != null ? { [idKey]: r[idKey] } : {}) }));
+    for (let i = 0; i < isiBaru.length; i += 300) {
+      const { error } = await sb.from(p.table).insert(isiBaru.slice(i, i + 300));
+      if (error) gagal.push(`baris baru ${i + 1}–${Math.min(i + 300, isiBaru.length)}: ${error.message}`);
+    }
+    for (let i = 0; i < impor.ubah.length; i += 10) {
+      const res = await Promise.all(impor.ubah.slice(i, i + 10).map(u => {
+        const asal = rows.find(r => String(r[idKey]) === u.id) ?? {};
+        return sb.from(p.table).update(bersihkan(u.row, asal)).eq(idKey, u.id);
+      }));
+      res.forEach((r, j) => { if (r.error) gagal.push(`ID ${impor.ubah[i + j].id}: ${r.error.message}`); });
+    }
+    setSibuk(null);
+    if (gagal.length) setErr(`Sebagian gagal (${gagal.length}): ${gagal.slice(0, 3).join(' · ')}`);
+    setImpor(null); muat();
+  }
+
   async function setStatus(id: string, status: string) {
     setErr(null);
     const { error } = await sb.from(p.table).update({ status }).eq(idKey, id);
@@ -147,9 +199,23 @@ export default function TableEditor(p: Props) {
         <input aria-label="Cari" placeholder="Cari…" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 280, background: 'var(--surface)' }} />
         <span className="small muted">{tampil.length} baris</span>
         {bolehEdit && !baru && <button onClick={() => setBaru({})}>Tambah baris</button>}
+        <button className="ghost" onClick={unduh} disabled={!!sibuk}>Export Excel</button>
+        {bolehEdit && <label className="btn ghost" style={{ cursor: 'pointer' }}>Import Excel
+          <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={e => { bacaFile(e.target.files?.[0]); e.target.value = ''; }} /></label>}
+        {sibuk && <span className="small" role="status">{sibuk}</span>}
         {!bolehEdit && <span className="small muted">Hanya baca untuk role Anda.</span>}
       </div>
       {p.catatan && <p className="small muted">{p.catatan}</p>}
+      {impor && (
+        <div className="notice row" style={{ justifyContent: 'space-between' }}>
+          <span className="small">
+            <b>{impor.file}</b>: {impor.baru.length} baris baru, {impor.ubah.length} baris diperbarui (dicocokkan lewat kolom {idSendiri ? p.kolom.find(k => k.key === idKey)?.label : 'ID'}).
+            {impor.diabaikan.length > 0 && ` Kolom diabaikan: ${impor.diabaikan.join(', ')}.`}
+            {p.approval && ' Data baru masuk sebagai draft dan perlu di-approve.'}
+          </span>
+          <span className="row"><button onClick={terapkanImpor} disabled={!!sibuk}>Terapkan</button><button className="ghost" onClick={() => setImpor(null)}>Batal</button></span>
+        </div>
+      )}
       {err && <p className="error small" role="alert">{err}</p>}
       <div className="tablewrap" style={{ maxHeight: '65vh' }}>
         <table>

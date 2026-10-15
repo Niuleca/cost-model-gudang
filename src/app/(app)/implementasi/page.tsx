@@ -1,4 +1,5 @@
 'use client';
+import ExportButton from '@/components/ExportButton';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -73,6 +74,9 @@ export default function Implementasi() {
         <div className="row">
           <select aria-label="Departemen" value={dept} onChange={e => setDept(e.target.value)} style={{ maxWidth: 200 }}>
             <option value="">Semua departemen</option>{(Object.keys(ROLE_LABEL) as AppRole[]).map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select>
+          <ExportButton nama="List_Implementasi" rows={tampil.map(t => ({ ...t, project: tenders.find(x => x.id === t.tender_id)?.customer ?? '', dept: t.departemen ? ROLE_LABEL[t.departemen] : '', status: efektif(t), progress: t.progress / 100 }))}
+            kolom={[{ key: 'project', label: 'Project' }, { key: 'fase', label: 'Fase' }, { key: 'tugas', label: 'Tugas' }, { key: 'dept', label: 'Departemen' }, { key: 'pic', label: 'PIC' },
+              { key: 'target', label: 'Target', type: 'date' }, { key: 'selesai', label: 'Selesai', type: 'date' }, { key: 'status', label: 'Status' }, { key: 'progress', label: 'Progress', type: 'percent' }, { key: 'catatan', label: 'Catatan' }]} />
         </div>
       </div>
       {err && <p className="error small" role="alert">{err}</p>}

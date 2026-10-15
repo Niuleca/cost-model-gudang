@@ -1,4 +1,5 @@
 'use client';
+import ExportButton from '@/components/ExportButton';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -49,6 +50,10 @@ export default function DaftarTender() {
         <select aria-label="Industri" value={fil.industri} onChange={e => setFil({ ...fil, industri: e.target.value })} style={{ maxWidth: 180 }}><option value="">Semua industri</option>{INDUSTRI.map(i => <option key={i}>{i}</option>)}</select>
         <select aria-label="Tahun" value={fil.tahun} onChange={e => setFil({ ...fil, tahun: e.target.value })} style={{ maxWidth: 120 }}><option value="">Semua tahun</option>{tahunList.map(t => <option key={t}>{t}</option>)}</select>
         <span className="small muted">{tampil.length} dari {rows.length} tender</span>
+        <ExportButton nama="Daftar_Tender" rows={tampil.map(r => ({ ...r, status: labelStatus(r.status), biaya: r.hasil?.totalBiayaBulan ?? null, gp: r.hasil?.simulasi?.[0]?.gpPersen ?? null }))}
+          kolom={[{ key: 'kode', label: 'Kode' }, { key: 'customer', label: 'Customer' }, { key: 'industri', label: 'Industri' }, { key: 'provinsi', label: 'Provinsi' },
+            { key: 'kab_kota', label: 'Kabupaten/kota' }, { key: 'pic', label: 'PIC' }, { key: 'status', label: 'Status' }, { key: 'versi', label: 'Versi', type: 'number' },
+            { key: 'biaya', label: 'Biaya per bulan (Rp)', type: 'number' }, { key: 'gp', label: 'GP volume komitmen', type: 'percent' }, { key: 'created_at', label: 'Dibuat', type: 'date' }, { key: 'updated_at', label: 'Diubah', type: 'date' }]} />
       </div>
       <div className="tablewrap">
         <table>

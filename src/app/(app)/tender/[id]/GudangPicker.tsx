@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { fotoUrl, gmapsLink, kedaluwarsa, sewaBulanPenuh, tarifM2, type Warehouse } from '@/lib/warehouse';
+import { adaHarga, fotoUrl, gmapsLink, kedaluwarsa, sewaBulanPenuh, tarifM2, type Warehouse } from '@/lib/warehouse';
 import type { GudangTerpilih } from '@/lib/tender';
 import { angka, rp } from '@/lib/format';
 
@@ -49,14 +49,14 @@ export default function GudangPicker({ provinsi, terpilih, kebutuhanM2, onPilih 
               : <div className="muted small" style={{ aspectRatio: '16/9', display: 'grid', placeItems: 'center', background: 'var(--surface-2)' }}>Belum ada foto</div>}
             <b>{w.nama}</b>
             <span className="small muted">{w.kab_kota}, {w.provinsi} · {w.tipe}</span>
-            <span className="small">{angka(w.luas_m2)} m² · {rp(tarifM2(w))}/m²/bln · {rp(sewaBulanPenuh(w))}/bln utuh</span>
+            <span className="small">{angka(w.luas_m2)} m² · {adaHarga(w) ? `${rp(tarifM2(w))}/m²/bln · ${rp(sewaBulanPenuh(w))}/bln utuh` : 'harga belum ada'}</span>
             <span className="small">
               <span className={`pill ${w.status === 'approved' && !kedaluwarsa(w) ? 'ok' : 'warn'}`}>{kedaluwarsa(w) ? 'expired' : w.status}</span>{' '}
               <a href={gmapsLink(w)} target="_blank" rel="noreferrer">Maps</a>
             </span>
             <div className="row">
-              <button className="ghost" onClick={() => pilih(w, false)}>Pakai per m²</button>
-              <button className="ghost" onClick={() => pilih(w, true)}>Sewa utuh</button>
+              <button className="ghost" onClick={() => pilih(w, false)} disabled={!adaHarga(w)}>Pakai per m²</button>
+              <button className="ghost" onClick={() => pilih(w, true)} disabled={!adaHarga(w)}>Sewa utuh</button>
             </div>
           </div>
         ))}

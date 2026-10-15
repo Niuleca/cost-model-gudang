@@ -1,4 +1,5 @@
 'use client';
+import ExportButton from '@/components/ExportButton';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -50,7 +51,13 @@ export default function Perbandingan() {
 
   return (
     <>
-      <div className="head"><div><div className="eyebrow">Menu 10 · Perbandingan harga</div><h1>Bandingkan dengan project sebelumnya</h1></div></div>
+      <div className="head"><div><div className="eyebrow">Menu 10 · Perbandingan harga</div><h1>Bandingkan dengan project sebelumnya</h1></div>
+        <ExportButton nama="Perbandingan_Harga" rows={(ref ? [ref, ...pembanding] : pembanding).map(r => ({ ...r, status: labelStatus(r.status), biaya_m2: biayaM2(r) }))}
+          kolom={[{ key: 'kode', label: 'Kode' }, { key: 'customer', label: 'Customer' }, { key: 'industri', label: 'Industri' }, { key: 'kab_kota', label: 'Lokasi' },
+            { key: 'status', label: 'Status' }, { key: 'jumlah_shift', label: 'Shift', type: 'number' }, { key: 'luas_m2', label: 'Luas (m²)', type: 'number' },
+            { key: 'headcount', label: 'Headcount', type: 'number' }, { key: 'tarif_storage', label: 'Tarif storage', type: 'number' }, { key: 'uom_storage', label: 'UoM storage' },
+            { key: 'tarif_handling_in', label: 'Tarif handling in', type: 'number' }, { key: 'tarif_handling_out', label: 'Tarif handling out', type: 'number' },
+            { key: 'uom_handling', label: 'UoM handling' }, { key: 'biaya_m2', label: 'Biaya per m² per bulan', type: 'number' }, { key: 'gp_persen', label: 'GP', type: 'percent' }]} /></div>
       <div className="card">
         <div className="grid3">
           <label className="f" htmlFor="acuan">Tender acuan
