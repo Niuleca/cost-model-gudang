@@ -24,3 +24,6 @@ export const TIM_TENDER: AppRole[] = ['admin', 'solution_design', 'commercial', 
 export const BUCKET_LABEL: Record<string, string> = {
   storage: 'Storage', handling_in: 'Handling In', handling_out: 'Handling Out', vas: 'VAS', manajemen: 'Manajemen',
 };
+
+// Industri untuk benchmark produktivitas (kolom benchmark di tabel productivity)
+export const INDUSTRI = ['Retail-Consumer', 'Tech', 'Fashion Retail', 'Healthcare', 'Healthcare + Cold Chain', 'E-Commerce', 'FMCG', 'Bahan bangunan', 'Otomotif', 'Kimia'];

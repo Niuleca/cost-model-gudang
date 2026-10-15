@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   TenderInput, MasterData, KategoriRisiko, VolumeInput, AktivitasInput, PeranTetap, SpaceInput, MheInput, CostLineInput, ListrikInput,
 } from './engine/index.ts';
+import { itKeCostLines, IT_SHEET_DEFAULT, type ItSheet } from './it.ts';
 
 export interface TenderRow {
   id: string; kode: string | null; customer: string; industri: string | null; provinsi: string; kab_kota: string;
@@ -10,6 +11,14 @@ export interface TenderRow {
   skenario_aset: 'Rental' | 'Own Asset' | 'Built-to-Suit'; durasi_kontrak_bulan: number; tanggal_go_live: string | null;
   jumlah_shift: number; jam_kerja_per_shift: number; jam_efektif_per_shift: number; hari_kerja_per_minggu: 5 | 6 | 7;
   payment_term_hari: number; asumsi: Asumsi; hasil: unknown; status: string; versi: number; updated_at: string;
+  warehouse_id: string | null; pic: string | null; alasan_hasil: string | null; tanggal_keputusan: string | null; created_at?: string;
+}
+
+/** Snapshot gudang terpilih (disalin dari master gudang saat dipilih, supaya tender tetap utuh walau master berubah). */
+export interface GudangTerpilih {
+  id: string; nama: string; alamat: string | null; kab_kota: string; provinsi: string; gmaps_url: string | null;
+  luas_m2: number; harga_sewa_m2_bulan: number | null; harga_per_bulan: number | null; tinggi_bersih_m: number | null;
+  jumlah_dock: number | null; tipe: string; foto: string[]; sewaUtuh: boolean;
 }
 
 // Bagian input yang disimpan di tenders.asumsi
@@ -31,6 +40,8 @@ export interface Asumsi {
   advanceSewaBulan: number;
   depositBulan: number;
   stokTon?: number; stokCbm?: number; stokLiter?: number;
+  it: ItSheet;
+  gudang?: GudangTerpilih | null;
 }
 
 export const ASUMSI_DEFAULT: Asumsi = {
@@ -46,6 +57,7 @@ export const ASUMSI_DEFAULT: Asumsi = {
     sequencePerShift: 2, fasilitasM2: 60, allowancePersen: 0.1, tarifSewaM2Bulan: 0, hargaRakPerPosisi: 0, umurRakBulan: 120 },
   mhe: [], costLines: [], listrik: [],
   golonganListrik: 'B-2/TR', tarifListrikKwh: 1444.70, advanceSewaBulan: 0, depositBulan: 0,
+  it: IT_SHEET_DEFAULT, gudang: null,
 };
 
 export function keInput(t: TenderRow): TenderInput {
@@ -57,7 +69,10 @@ export function keInput(t: TenderRow): TenderInput {
     hariKerjaPerMinggu: t.hari_kerja_per_minggu, cutiTahunanHari: a.cutiTahunanHari, skenarioAset: t.skenario_aset,
     paymentTermHari: t.payment_term_hari, volumes: a.volumes, aktivitas: a.aktivitas, peranTetap: a.peranTetap,
     spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, faktorProduktivitas: a.faktorProduktivitas,
-    efisiensi: a.efisiensi, space: a.space, mhe: a.mhe, costLines: a.costLines, listrik: a.listrik,
+    efisiensi: a.efisiensi, mhe: a.mhe, listrik: a.listrik,
+    space: a.gudang ? { ...a.space, luasTersediaM2: Number(a.gudang.luas_m2), namaGudang: a.gudang.nama,
+      sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
+    costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: a.advanceSewaBulan, depositBulan: a.depositBulan,
     stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter,
   };
@@ -66,7 +81,7 @@ export function keInput(t: TenderRow): TenderInput {
 /** Ambil master data yang dibutuhkan mesin hitung untuk satu tender. */
 export async function muatMaster(sb: SupabaseClient, t: TenderRow): Promise<{ master: MasterData; catatan: string[] }> {
   const tahun = t.tanggal_go_live ? new Date(t.tanggal_go_live).getFullYear() : new Date().getFullYear();
-  const [upah, jab, libur, pay, fin, mar, harga] = await Promise.all([
+  const [upah, jab, libur, pay, fin, mar, harga, itc] = await Promise.all([
     sb.from('upah_minimum_berlaku').select('upah_berlaku, status_verifikasi, tahun').eq('provinsi', t.provinsi).eq('kab_kota', t.kab_kota).order('tahun', { ascending: false }).limit(1),
     sb.from('job_levels').select('role_name, klasifikasi, faktor_umk, tunjangan_bulan, is_outsourcing, status'),
     sb.from('holidays').select('tanggal, nama').gte('tanggal', `${tahun}-01-01`).lte('tanggal', `${tahun}-12-31`),
@@ -74,6 +89,7 @@ export async function muatMaster(sb: SupabaseClient, t: TenderRow): Promise<{ ma
     sb.from('finance_params').select('key, nilai'),
     sb.from('margin_policy').select('kategori_risiko, margin'),
     sb.from('price_items_status').select('id, item, status_efektif'),
+    sb.from('it_catalog').select('id, item, status, berlaku_sampai'),
   ]);
   const catatan: string[] = [];
   const u = upah.data?.[0];
@@ -91,6 +107,14 @@ export async function muatMaster(sb: SupabaseClient, t: TenderRow): Promise<{ ma
   const kedaluwarsa = hargaBermasalah.filter(h => h.status_efektif === 'expired').map(h => h.item);
   const hargaDraft = hargaBermasalah.filter(h => h.status_efektif !== 'expired').map(h => h.item);
   if (hargaDraft.length) catatan.push(`Harga belum di-approve: ${hargaDraft.join(', ')}.`);
+  const itDipakai = new Set((t.asumsi?.it?.lines ?? []).map(l => l.catalogId).filter(Boolean));
+  const hariIni = new Date().toISOString().slice(0, 10);
+  for (const c of itc.data ?? []) {
+    if (!itDipakai.has(c.id)) continue;
+    if (c.berlaku_sampai && c.berlaku_sampai < hariIni) kedaluwarsa.push(`IT ${c.item}`);
+    else if (c.status !== 'approved') catatan.push(`Harga IT belum di-approve: ${c.item}.`);
+  }
+  if (t.asumsi?.gudang && t.warehouse_id == null) catatan.push('Gudang terpilih tidak tertaut ke master gudang.');
 
   const margin = Object.fromEntries((mar.data ?? []).map(r => [r.kategori_risiko, Number(r.margin)])) as Record<KategoriRisiko, number>;
   return {

@@ -129,3 +129,14 @@ test('2 shift: headcount operator ≈ 2× per shift, unit forklift tidak dikali 
   const h1 = hitungTender(contohTender, contohMaster);
   assert.ok(h.mhe[0].unit <= h1.mhe[0].unit);
 });
+
+test('gudang terpilih: sewa utuh, luas kurang → red flag kritis', () => {
+  const t = structuredClone(contohTender);
+  t.space = { ...t.space, sewaTetapBulan: 50000000, luasTersediaM2: 600, namaGudang: 'Gudang A' };
+  const h = hitungTender(t, contohMaster);
+  const sewa = h.biaya.find(b => b.deskripsi.startsWith('Sewa gudang'))!;
+  assert.equal(sewa.biayaBulan, 50000000);
+  assert.ok(h.redFlags.some(f => f.kode === 'GUDANG_KURANG'));
+  t.space.luasTersediaM2 = 2000;
+  assert.ok(hitungTender(t, contohMaster).redFlags.some(f => f.kode === 'GUDANG_LONGGAR'));
+});

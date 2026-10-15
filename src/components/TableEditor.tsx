@@ -25,9 +25,16 @@ interface Props {
   profile: Profile | null;
   cari?: string[];             // kolom yang dicari
   catatan?: string;
+  filter?: Record<string, string | string[]>;   // eq / in pada sumber baca
 }
 
 type Row = Record<string, unknown>;
+const ambil = (r: Row, key: string): unknown => {
+  const titik = key.indexOf('.');
+  if (titik <= 0) return r[key];
+  const induk = r[key.slice(0, titik)] as Record<string, unknown> | null | undefined;
+  return induk?.[key.slice(titik + 1)];
+};
 
 export default function TableEditor(p: Props) {
   const sb = supabaseBrowser();
@@ -45,11 +52,12 @@ export default function TableEditor(p: Props) {
   const muat = useCallback(async () => {
     setLoading(true);
     let query = sb.from(p.view ?? p.table).select('*');
+    for (const [k, v] of Object.entries(p.filter ?? {})) query = Array.isArray(v) ? query.in(k, v) : query.eq(k, v);
     for (const o of p.orderBy ?? []) query = query.order(o.col, { ascending: o.asc ?? true });
     const { data, error } = await query.limit(2000);
     if (error) setErr(error.message); else setRows((data ?? []) as Row[]);
     setLoading(false);
-  }, [p.table, p.view]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [p.table, p.view, JSON.stringify(p.filter)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { muat(); }, [muat]);
 
@@ -57,27 +65,36 @@ export default function TableEditor(p: Props) {
     if (!q.trim()) return rows;
     const s = q.toLowerCase();
     const cols = p.cari ?? p.kolom.map(k => k.key);
-    return rows.filter(r => cols.some(c => String(r[c] ?? '').toLowerCase().includes(s)));
+    return rows.filter(r => cols.some(c => String(ambil(r, c) ?? '').toLowerCase().includes(s)));
   }, [rows, q, p.cari, p.kolom]);
 
   const ubah = (id: string, key: string, val: unknown) =>
     setDraft(d => ({ ...d, [id]: { ...(d[id] ?? {}), [key]: val } }));
 
-  const bersihkan = (obj: Row) => {
+  // Kolom "a.b" = kunci b di dalam kolom jsonb a (mis. benchmark.Retail-Consumer)
+  const bersihkan = (obj: Row, asal: Row = {}) => {
     const out: Row = {};
     for (const k of p.kolom) {
       if (k.readonly || !(k.key in obj)) continue;
       let v = obj[k.key];
       if (v === '') v = null;
       if ((k.type === 'number' || k.type === 'percent') && v != null) v = Number(v);
-      out[k.key] = v;
+      const titik = k.key.indexOf('.');
+      if (titik > 0) {
+        const induk = k.key.slice(0, titik), anak = k.key.slice(titik + 1);
+        const dasar = (out[induk] ?? asal[induk] ?? {}) as Record<string, unknown>;
+        const baru = { ...dasar };
+        if (v == null) delete baru[anak]; else baru[anak] = v;
+        out[induk] = baru;
+      } else out[k.key] = v;
     }
     return out;
   };
 
   async function simpan(id: string) {
     setErr(null);
-    const { error } = await sb.from(p.table).update(bersihkan(draft[id])).eq(idKey, id);
+    const asal = rows.find(r => String(r[idKey]) === id) ?? {};
+    const { error } = await sb.from(p.table).update(bersihkan(draft[id], asal)).eq(idKey, id);
     if (error) { setErr(error.message); return; }
     setDraft(d => { const n = { ...d }; delete n[id]; return n; });
     muat();
@@ -101,7 +118,7 @@ export default function TableEditor(p: Props) {
   }
 
   const sel = (row: Row, k: Kolom, id: string | null) => {
-    const nilai = id ? (draft[id]?.[k.key] ?? row[k.key]) : row[k.key];
+    const nilai = id ? (draft[id]?.[k.key] ?? ambil(row, k.key)) : row[k.key];
     const set = (v: unknown) => id ? ubah(id, k.key, v) : setBaru(b => ({ ...(b ?? {}), [k.key]: v }));
     const editable = bolehEdit && !k.readonly;
     if (!editable) {

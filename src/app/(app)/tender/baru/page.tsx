@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT } from '@/lib/tender';
-import { rp } from '@/lib/format';
+import { rp, INDUSTRI } from '@/lib/format';
 
 interface Upah { provinsi: string; kab_kota: string; upah_berlaku: number; status_verifikasi: string }
 
@@ -43,7 +43,8 @@ export default function TenderBaru() {
       <form className="card" onSubmit={buat}>
         <div className="grid3">
           <label className="f" htmlFor="customer">Customer<input id="customer" required value={f.customer} onChange={e => set('customer', e.target.value)} /></label>
-          <label className="f" htmlFor="industri">Industri<input id="industri" placeholder="FMCG, semen, farmasi…" value={f.industri} onChange={e => set('industri', e.target.value)} /></label>
+          <label className="f" htmlFor="industri">Industri (untuk benchmark produktivitas)<input id="industri" list="industri-list" placeholder="Retail-Consumer, Healthcare…" value={f.industri} onChange={e => set('industri', e.target.value)} />
+            <datalist id="industri-list">{INDUSTRI.map(i => <option key={i} value={i} />)}</datalist></label>
           <label className="f" htmlFor="tipe">Tipe gudang
             <select id="tipe" value={f.tipe_gudang} onChange={e => set('tipe_gudang', e.target.value)}>
               {['Ambient', 'Chiller', 'Freezer', 'Hazmat/B3', 'Bonded'].map(x => <option key={x}>{x}</option>)}

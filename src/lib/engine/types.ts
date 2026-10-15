@@ -49,6 +49,9 @@ export interface SpaceInput {
   hargaRakPerPosisi?: number;     // beli rak (CAPEX) kalau metode rak
   umurRakBulan?: number;
   luasCadM2?: number;             // untuk rekonsiliasi dengan layout CAD
+  luasTersediaM2?: number;        // luas gudang terpilih (master gudang Procurement)
+  sewaTetapBulan?: number;        // sewa gudang utuh per bulan (bila disewa per unit, bukan per m²)
+  namaGudang?: string;
 }
 
 export interface MheInput {

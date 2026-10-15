@@ -5,16 +5,21 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
-import { rp, angka, persen, BUCKET_LABEL } from '@/lib/format';
+import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { useProfile } from '@/lib/useProfile';
 import QuotationPanel from './QuotationPanel';
+import GudangPicker from './GudangPicker';
+import ItPanel from './ItPanel';
+import StatusControl from '@/components/StatusControl';
+import { labelStatus } from '@/lib/status';
+import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
 
-interface Prod { id: number; aktivitas: string; tahap: string; tool: string; role_name: string; uom: string; kelas_berat: string; industri: string; prod_per_jam: number; status: string }
-interface Item { id: number; kategori: string; item: string; satuan: string; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; daya_watt: number | null; status_efektif: string }
+interface Prod { id: number; aktivitas: string; tahap: string; tool: string; role_name: string; uom: string; kelas_berat: string; industri: string; prod_per_jam: number; status: string; benchmark: Record<string, string> | null }
+interface Item { id: number; kategori: string; item: string; satuan: string; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; daya_watt: number | null; status_efektif: string; mhe_tipe: string | null; kapasitas_ton: number | null; sumber_tenaga: string | null }
 interface Tarif { golongan: string; tarif_kwh: number }
 interface Jab { role_name: string }
 
-const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Space & MHE', 'Biaya lain', 'Hasil', 'Quotation'] as const;
+const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const UOM = ['palet', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'order', 'line', 'lokasi'];
 const KELOMPOK: Kelompok[] = ['IT', 'Office', 'Consumable', 'HSE', 'Asuransi', 'Startup', 'Fasilitas', 'Utilitas', 'Racking', 'Lainnya'];
@@ -26,7 +31,7 @@ const ALOKASI: Record<string, Partial<Record<Bucket, number>>> = {
 };
 const KAT_KE_KELOMPOK: Record<string, Kelompok> = {
   IT: 'IT', Software: 'IT', Office: 'Office', ATK: 'Consumable', 'Rental Office': 'Office', HSE: 'HSE', Konstruksi: 'Startup',
-  'Pest Control': 'HSE', Asuransi: 'Asuransi', Palet: 'Consumable', Racking: 'Racking', Security: 'Lainnya', Cleaning: 'Lainnya', Utilitas: 'Utilitas', Gudang: 'Fasilitas',
+  'Pest Control': 'HSE', Asuransi: 'Asuransi', Palet: 'Consumable', Racking: 'Racking', Security: 'Lainnya', Cleaning: 'Lainnya', Utilitas: 'Utilitas', Gudang: 'Fasilitas', Seragam: 'Consumable', Konsumsi: 'Consumable', Printer: 'Office',
 };
 const namaAlokasi = (a?: Partial<Record<Bucket, number>>) =>
   Object.entries(ALOKASI).find(([, v]) => JSON.stringify(v) === JSON.stringify(a ?? ALOKASI.Merata))?.[0] ?? 'Merata';
@@ -49,14 +54,15 @@ export default function TenderPage() {
   const muat = useCallback(async () => {
     const [tr, p, it, tf, jb] = await Promise.all([
       sb.from('tenders').select('*').eq('id', id).single(),
-      sb.from('productivity').select('id, aktivitas, tahap, tool, role_name, uom, kelas_berat, industri, prod_per_jam, status').order('tahap').order('aktivitas'),
-      sb.from('price_items_status').select('id, kategori, item, satuan, harga_beli, harga_sewa_bulan, umur_ekonomis_bulan, daya_watt, status_efektif').order('kategori').order('item'),
+      sb.from('productivity').select('id, aktivitas, tahap, tool, role_name, uom, kelas_berat, industri, prod_per_jam, status, benchmark').order('tahap').order('aktivitas'),
+      sb.from('price_items_status').select('id, kategori, item, satuan, harga_beli, harga_sewa_bulan, umur_ekonomis_bulan, daya_watt, status_efektif, mhe_tipe, kapasitas_ton, sumber_tenaga').order('kategori').order('item'),
       sb.from('electricity_tariffs').select('golongan, tarif_kwh').order('golongan'),
       sb.from('job_levels').select('role_name').order('role_name'),
     ]);
     if (tr.error) { setPesan(tr.error.message); return; }
     const row = tr.data as TenderRow;
     row.asumsi = { ...ASUMSI_DEFAULT, ...(row.asumsi ?? {}) };
+    row.asumsi.it = { ...IT_SHEET_DEFAULT, ...(row.asumsi.it ?? {}) };
     setT(row); setProds((p.data ?? []) as Prod[]); setItems((it.data ?? []) as Item[]); setTarif((tf.data ?? []) as Tarif[]);
     setJabatan(((jb.data ?? []) as Jab[]).map(j => j.role_name));
     if (row.hasil) setHasil(row.hasil as HasilTender);
@@ -104,7 +110,7 @@ export default function TenderPage() {
     <>
       <div className="head">
         <div>
-          <div className="eyebrow">{t.kode} · v{t.versi} · {t.status.replace('_', ' ')}</div>
+          <div className="eyebrow">{t.kode} · v{t.versi} · {labelStatus(t.status)}</div>
           <h1>{t.customer}</h1>
           <p className="muted">{t.kab_kota}, {t.provinsi} · {t.skenario_aset} · {t.jumlah_shift} shift · kontrak {t.durasi_kontrak_bulan} bln</p>
         </div>
@@ -114,6 +120,7 @@ export default function TenderPage() {
           <button onClick={hitung}>Hitung</button>
         </div>
       </div>
+      <StatusControl tender={t} onBerubah={st => setT(x => x && ({ ...x, status: st }))} />
 
       <div className="tabs" role="tablist">
         {TABS.map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}
@@ -124,7 +131,8 @@ export default function TenderPage() {
           <h2>Key assumption</h2>
           <div className="grid3">
             <Txt id="cust" label="Customer" value={t.customer} onChange={v => setKol('customer', v)} />
-            <Txt id="ind" label="Industri" value={t.industri ?? ''} onChange={v => setKol('industri', v)} />
+            <Sel id="ind" label="Industri (benchmark produktivitas)" value={t.industri ?? ''} options={Array.from(new Set(['', ...INDUSTRI, t.industri ?? ''])).map(v => ({ v, l: v || '—' }))} onChange={v => setKol('industri', v || null)} />
+            <Txt id="pic" label="PIC / account" value={t.pic ?? ''} onChange={v => setKol('pic', v)} />
             <Txt id="alamat" label="Alamat / site" value={t.alamat_lokasi ?? ''} onChange={v => setKol('alamat_lokasi', v)} />
             <Sel id="skema" label="Skema" value={t.skema} options={[{ v: 'Dedicated', l: 'Dedicated' }, { v: 'Shared', l: 'Shared' }]} onChange={v => setKol('skema', v)} />
             <Sel id="aset" label="Skenario aset" value={t.skenario_aset} options={(['Rental', 'Own Asset', 'Built-to-Suit'] as const).map(v => ({ v, l: v }))} onChange={v => setKol('skenario_aset', v)} />
@@ -173,7 +181,7 @@ export default function TenderPage() {
         <div className="card">
           <h2>Aktivitas (VSM) & manpower</h2>
           <p className="small muted">Pilih aktivitas dari database produktivitas (Operations). Jam per shift = volume peak per shift × % ÷ (produktivitas × faktor) ÷ efisiensi. Headcount = ROUNDUP(jam ÷ jam efektif) × shift × faktor pengganti cuti.</p>
-          <TambahAktivitas prods={prods} onTambah={p => setA({ aktivitas: [...a.aktivitas, {
+          <TambahAktivitas prods={prods} industri={t.industri} onTambah={p => setA({ aktivitas: [...a.aktivitas, {
             productivityId: p.id, aktivitas: p.aktivitas, tahap: p.tahap, tool: p.tool, roleName: p.role_name, uom: p.uom,
             prodPerJam: Number(p.prod_per_jam), arus: p.tahap.toLowerCase().startsWith('outbound') ? 'outbound' : p.tahap.toLowerCase().startsWith('inventory') ? 'storage' : 'inbound',
             persenVolume: 1, pengaliUom: 1 }] })} />
@@ -210,7 +218,11 @@ export default function TenderPage() {
         </div>
       )}
 
-      {tab === 'Space & MHE' && (
+      {tab === 'Gudang, space & MHE' && (<>
+        <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
+          setKol('warehouse_id', g?.id ?? null);
+          setA({ gudang: g, space: { ...a.space, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
+        }} />
         <div className="card">
           <h2>Space</h2>
           <div className="grid3">
@@ -237,7 +249,7 @@ export default function TenderPage() {
                 <td><select aria-label="Item MHE" value={m.priceItemId ?? ''} onChange={e => {
                   const it = items.find(x => x.id === Number(e.target.value));
                   if (it) setA({ mhe: ubahArray(a.mhe, i, { priceItemId: it.id, nama: it.item, harga: Number((m.mode === 'sewa' ? it.harga_sewa_bulan : it.harga_beli) ?? 0), umurBulan: it.umur_ekonomis_bulan ?? 60 }) });
-                }}><option value="">Pilih…</option>{items.filter(x => x.kategori === 'MHE').map(x => <option key={x.id} value={x.id}>{x.item}{x.status_efektif !== 'approved' ? ` (${x.status_efektif})` : ''}</option>)}</select></td>
+                }}><option value="">Pilih…</option>{items.filter(x => x.kategori === 'MHE').map(x => <option key={x.id} value={x.id}>{x.mhe_tipe ? `${x.mhe_tipe} ${x.kapasitas_ton ?? ''}T${x.sumber_tenaga ? ' ' + x.sumber_tenaga : ''} · ` : ''}{x.item}{x.status_efektif !== 'approved' ? ` (${x.status_efektif})` : ''}</option>)}</select></td>
                 <td><select aria-label="Mode" value={m.mode} onChange={e => {
                   const mode = e.target.value as 'sewa' | 'beli'; const it = items.find(x => x.id === m.priceItemId);
                   setA({ mhe: ubahArray(a.mhe, i, { mode, harga: it ? Number((mode === 'sewa' ? it.harga_sewa_bulan : it.harga_beli) ?? 0) : m.harga }) });
@@ -251,11 +263,14 @@ export default function TenderPage() {
           <datalist id="tools">{toolsDipakai.map(x => <option key={x} value={x} />)}</datalist>
           <div className="row"><button className="ghost" onClick={() => setA({ mhe: [...a.mhe, { tool: toolsDipakai[0] ?? 'CBT', nama: '', mode: 'sewa', harga: 0, ketersediaan: 0.85, sparePersen: 0 }] })}>Tambah MHE</button></div>
         </div>
-      )}
+      </>)}
+
+      {tab === 'IT' && <ItPanel sheet={a.it} onChange={it => setA({ it })} />}
 
       {tab === 'Biaya lain' && (
         <div className="card">
-          <h2>Biaya lain (IT, office, HSE, asuransi, pest control, startup)</h2>
+          <h2>Biaya lain (office, ATK, seragam, konsumsi, HSE, asuransi, pest control, startup)</h2>
+          {a.it.lines.length > 0 && <p className="small notice">IT dari tab IT ikut dihitung otomatis: {rp(ringkasIt(a.it).setaraBulan)}/bln + OTC {rp(ringkasIt(a.it).sekali)}. Jangan diinput dua kali di sini.</p>}
           <p className="small muted">Harga ditarik dari database. Mode beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak.</p>
           <div className="tablewrap"><table>
             <thead><tr><th>Item</th><th>Kelompok</th><th>Mode</th><th className="num">Qty</th><th className="num">Harga satuan</th><th className="num">Umur</th><th>Risiko</th><th>Alokasi</th><th></th></tr></thead>
@@ -314,7 +329,7 @@ export default function TenderPage() {
   );
 }
 
-function TambahAktivitas({ prods, onTambah }: { prods: Prod[]; onTambah: (p: Prod) => void }) {
+function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industri: string | null; onTambah: (p: Prod) => void }) {
   const [q, setQ] = useState('');
   const [pilih, setPilih] = useState('');
   const daftar = prods.filter(p => !q || `${p.tahap} ${p.aktivitas} ${p.tool} ${p.role_name} ${p.uom}`.toLowerCase().includes(q.toLowerCase()));
@@ -323,7 +338,7 @@ function TambahAktivitas({ prods, onTambah }: { prods: Prod[]; onTambah: (p: Pro
       <input aria-label="Cari aktivitas" placeholder="Cari aktivitas, tool, role…" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 240 }} />
       <select aria-label="Aktivitas" value={pilih} onChange={e => setPilih(e.target.value)} style={{ maxWidth: 460 }}>
         <option value="">Pilih aktivitas ({daftar.length})</option>
-        {daftar.map(p => <option key={p.id} value={p.id}>{p.tahap} · {p.aktivitas} · {p.tool} · {p.prod_per_jam} {p.uom}/jam{p.status !== 'approved' ? ' (draft)' : ''}</option>)}
+        {daftar.map(p => <option key={p.id} value={p.id}>{p.tahap} · {p.aktivitas} · {p.tool} · {p.prod_per_jam} {p.uom}/jam{industri && p.benchmark?.[industri] ? ` · ${industri}: ${p.benchmark[industri]}` : ''}{p.status !== 'approved' ? ' (draft)' : ''}</option>)}
       </select>
       <button disabled={!pilih} onClick={() => { const p = prods.find(x => x.id === Number(pilih)); if (p) { onTambah(p); setPilih(''); } }}>Tambah</button>
     </div>

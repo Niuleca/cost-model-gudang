@@ -199,8 +199,14 @@ export function hitungTender(t: TenderInput, m: MasterData) {
 
   // Fasilitas
   const alokStorage = normalisasi({ storage: 1 }, { storage: 1 });
-  const sewaBulan = t.skenarioAset === 'Rental' ? space.totalM2 * s.tarifSewaM2Bulan : 0;
-  tambah('Sewa gudang', 'Fasilitas', sewaBulan, alokStorage, `${space.totalM2} m² × Rp${s.tarifSewaM2Bulan.toLocaleString('id-ID')}`);
+  const sewaTetap = t.skenarioAset === 'Rental' && (s.sewaTetapBulan ?? 0) > 0;
+  const sewaBulan = t.skenarioAset !== 'Rental' ? 0 : sewaTetap ? s.sewaTetapBulan! : space.totalM2 * s.tarifSewaM2Bulan;
+  tambah(s.namaGudang ? `Sewa gudang — ${s.namaGudang}` : 'Sewa gudang', 'Fasilitas', sewaBulan, alokStorage,
+    sewaTetap ? `sewa utuh Rp${s.sewaTetapBulan!.toLocaleString('id-ID')}/bln (${s.luasTersediaM2 ?? '?'} m²)` : `${space.totalM2} m² × Rp${s.tarifSewaM2Bulan.toLocaleString('id-ID')}`);
+  if (s.luasTersediaM2 && space.totalM2 > s.luasTersediaM2)
+    flags.push({ level: 'kritis', kode: 'GUDANG_KURANG', pesan: `Kebutuhan ${space.totalM2} m² melebihi luas gudang terpilih ${s.luasTersediaM2} m².` });
+  else if (s.luasTersediaM2 && sewaTetap && space.totalM2 < s.luasTersediaM2 * 0.7)
+    flags.push({ level: 'peringatan', kode: 'GUDANG_LONGGAR', pesan: `Gudang disewa utuh ${s.luasTersediaM2} m² tetapi kebutuhan hanya ${space.totalM2} m² (<70%) — biaya sewa idle dibebankan ke customer.` });
   if (s.metodeSimpan !== 'block' && s.hargaRakPerPosisi)
     investasi += capex('Racking', 'Racking', space.posisiRak * s.hargaRakPerPosisi, s.umurRakBulan, alokStorage);
 

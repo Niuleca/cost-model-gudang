@@ -110,7 +110,7 @@ create table public.payroll_params (
 create type public.price_category as enum (
   'Gudang', 'MHE', 'Racking', 'Palet', 'Office', 'ATK', 'Rental Office',
   'IT', 'Software', 'HSE', 'Konstruksi', 'Pest Control', 'Asuransi',
-  'Security', 'Cleaning', 'Utilitas', 'Lainnya'
+  'Security', 'Cleaning', 'Utilitas', 'Seragam', 'Konsumsi', 'Printer', 'Lainnya'
 );
 
 create table public.price_items (
@@ -194,7 +194,7 @@ create table public.finance_params (
 -- =====================================================================
 -- TENDER (UC10–UC16)
 -- =====================================================================
-create type public.tender_status as enum ('draft','dihitung','review','approved','quotation_terkirim','menang','kalah','batal');
+create type public.tender_status as enum ('draft','dihitung','review','approved','quotation_terkirim','negosiasi','menang','kalah','drop','batal','implementasi','go_live','selesai');
 
 create table public.tenders (
   id                uuid primary key default gen_random_uuid(),

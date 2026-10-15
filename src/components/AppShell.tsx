@@ -3,14 +3,41 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useProfile } from '@/lib/useProfile';
-import { ROLE_LABEL, TIM_TENDER } from '@/lib/format';
+import { ROLE_LABEL, TIM_TENDER, type AppRole } from '@/lib/format';
+
+type Item = { href: string; label: string; roles: AppRole[] | 'semua' };
+const MENU: { grup: string; item: Item[] }[] = [
+  { grup: 'Ringkasan', item: [
+    { href: '/', label: 'Dashboard', roles: TIM_TENDER },
+    { href: '/status', label: 'Status project', roles: TIM_TENDER },
+  ] },
+  { grup: 'Solution design', item: [
+    { href: '/tender', label: 'Tender & cost model', roles: TIM_TENDER },
+    { href: '/tender/baru', label: 'Tender baru', roles: TIM_TENDER },
+    { href: '/perbandingan', label: 'Perbandingan harga', roles: TIM_TENDER },
+    { href: '/riwayat', label: 'Riwayat', roles: TIM_TENDER },
+  ] },
+  { grup: 'Eksekusi', item: [
+    { href: '/implementasi', label: 'Implementasi', roles: 'semua' },
+  ] },
+  { grup: 'Input departemen', item: [
+    { href: '/procurement', label: 'Procurement', roles: 'semua' },
+    { href: '/it', label: 'IT', roles: 'semua' },
+    { href: '/produktivitas', label: 'Operations', roles: 'semua' },
+    { href: '/hr', label: 'HR · UMK', roles: 'semua' },
+    { href: '/master', label: 'Master lainnya', roles: 'semua' },
+  ] },
+  { grup: 'Akun', item: [
+    { href: '/admin', label: 'Pengguna', roles: ['admin'] },
+    { href: '/akun', label: 'Ganti password', roles: 'semua' },
+  ] },
+];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const { profile } = useProfile();
-  const on = (p: string) => (p === '/' ? path === '/' : path.startsWith(p)) ? 'on' : '';
-  const timTender = profile ? TIM_TENDER.includes(profile.role) : false;
+  const on = (p: string) => (p === '/' || p === '/tender' ? path === p || (p === '/tender' && /^\/tender\/(?!baru)/.test(path)) : path.startsWith(p)) ? 'on' : '';
 
   async function keluar() {
     await supabaseBrowser().auth.signOut();
@@ -21,11 +48,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <aside className="side">
         <div className="brand">Cost Model<br />Gudang</div>
-        <nav>
-          {timTender && <Link className={on('/')} href="/">Tender</Link>}
-          {timTender && <Link className={on('/tender/baru')} href="/tender/baru">Tender baru</Link>}
-          <Link className={on('/master')} href="/master">Master data</Link>
-          {profile?.role === 'admin' && <Link className={on('/admin')} href="/admin">Pengguna</Link>}
+        <nav aria-label="Menu utama">
+          {MENU.map(g => {
+            const isi = g.item.filter(i => !profile || i.roles === 'semua' || i.roles.includes(profile.role) || profile.role === 'admin');
+            if (!isi.length) return null;
+            return (
+              <div key={g.grup} className="navgrup">
+                <span className="navjudul">{g.grup}</span>
+                {isi.map(i => <Link key={i.href} className={on(i.href)} href={i.href}>{i.label}</Link>)}
+              </div>);
+          })}
         </nav>
         <div className="who">
           <span>{profile?.full_name || profile?.email || '…'}</span>
