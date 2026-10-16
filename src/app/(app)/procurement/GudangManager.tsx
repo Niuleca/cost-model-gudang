@@ -194,30 +194,24 @@ export default function GudangManager() {
       <section key={judul} style={{ display: 'grid', gap: 10 }}>
         <h2 style={{ margin: '6px 0 0', borderBottom: '2px solid var(--line)', paddingBottom: 4 }}>{judul}
           <span className="small muted" style={{ fontWeight: 400 }}> · {isi.length} gudang · {angka(isi.reduce((a, w) => a + Number(w.luas_m2 || 0), 0))} m²</span></h2>
-      <div className="grid2">
+      <div className="gudang-grid">
         {isi.map(w => (
-          <article key={w.id} className="card" style={{ gap: 8 }}>
-            {w.foto?.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: w.foto.length > 1 ? '2fr 1fr' : '1fr', gap: 4 }}>
-                <img src={fotoUrl(sb, w.foto[0])} alt={`Foto ${w.nama}`} style={{ width: '100%', height: 170, objectFit: 'cover' }} />
-                {w.foto.length > 1 && <div style={{ display: 'grid', gap: 4 }}>{w.foto.slice(1, 3).map(p => <img key={p} src={fotoUrl(sb, p)} alt="" style={{ width: '100%', height: 83, objectFit: 'cover' }} />)}</div>}
-              </div>
-            ) : <div className="small muted" style={{ height: 110, display: 'grid', placeItems: 'center', background: 'var(--surface-2)' }}>Belum ada foto</div>}
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <h3>{w.nama}</h3>
+          <article key={w.id} className="card gudang-kartu">
+            <FotoGudang fotos={(w.foto ?? []).map(p => fotoUrl(sb, p))} nama={w.nama} />
+            <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap', gap: 8 }}>
+              <h3 className="satu-baris" title={w.nama}>{w.nama}</h3>
               <span className={`pill ${kedaluwarsa(w) ? 'bad' : w.status === 'approved' ? 'ok' : 'warn'}`}>{kedaluwarsa(w) ? 'expired' : w.status}</span>
             </div>
-            <span className="small muted">{w.alamat ? `${w.alamat}, ` : ''}{w.kab_kota}, {w.provinsi} · {w.tipe}{w.pemilik ? ` · ${w.pemilik}` : ''}</span>
+            <span className="small muted dua-baris" title={`${w.alamat ?? ''} ${w.kab_kota}, ${w.provinsi}`}>{w.alamat ? `${w.alamat}, ` : ''}{w.kab_kota}, {w.provinsi} · {w.tipe}{w.pemilik ? ` · ${w.pemilik}` : ''}</span>
             <table><tbody>
               <tr><td>Luas</td><td className="num">{angka(w.luas_m2)} m²</td></tr>
               <tr><td>Sewa per m²/bulan</td><td className="num">{adaHarga(w) ? rp(tarifM2(w)) : <span className="pill warn">harga belum ada</span>}</td></tr>
-              {adaHarga(w) && <tr><td>Sewa utuh per bulan</td><td className="num">{rp(sewaBulanPenuh(w))}</td></tr>}
-              {w.tinggi_bersih_m != null && <tr><td>Tinggi bersih</td><td className="num">{w.tinggi_bersih_m} m</td></tr>}
-              {w.jumlah_dock != null && <tr><td>Dock</td><td className="num">{w.jumlah_dock}</td></tr>}
+              <tr><td>Sewa utuh per bulan</td><td className="num">{adaHarga(w) ? rp(sewaBulanPenuh(w)) : '—'}</td></tr>
+              <tr><td>Tinggi bersih · dock</td><td className="num">{w.tinggi_bersih_m != null ? `${w.tinggi_bersih_m} m` : '—'} · {w.jumlah_dock ?? '—'}</td></tr>
               <tr><td>Harga per</td><td className="num">{tanggal(w.tanggal_harga)}{w.berlaku_sampai ? ` · s.d. ${tanggal(w.berlaku_sampai)}` : ''}</td></tr>
             </tbody></table>
-            {w.sumber && <span className="small muted">Sumber: {w.sumber}</span>}
-            <div className="row">
+            <span className="small muted satu-baris" title={w.sumber ?? ''}>{w.sumber ? `Sumber: ${w.sumber}` : '\u00a0'}</span>
+            <div className="row" style={{ marginTop: 'auto' }}>
               <a className="btn ghost" href={gmapsLink(w)} target="_blank" rel="noreferrer">Google Maps</a>
               {bolehEdit && <button className="ghost" onClick={() => { setForm({ ...w }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Ubah</button>}
               {bolehApprove && w.status !== 'approved' && <button onClick={() => setStatus(w, 'approved')}>Approve</button>}
@@ -229,4 +223,20 @@ export default function GudangManager() {
       </section>))}
     </div>
   );
+}
+
+/** Foto gudang ukuran seragam (tinggi tetap); lebih dari satu foto bisa digeser. */
+function FotoGudang({ fotos, nama }: { fotos: string[]; nama: string }) {
+  const [i, setI] = useState(0);
+  if (!fotos.length) return <div className="gudang-foto kosong small muted">Belum ada foto</div>;
+  const k = i % fotos.length;
+  return (
+    <div className="gudang-foto">
+      <img src={fotos[k]} alt={`Foto ${nama} ${k + 1}`} loading="lazy" />
+      {fotos.length > 1 && <>
+        <button className="geser kiri" aria-label="Foto sebelumnya" onClick={() => setI(k - 1 + fotos.length)}>‹</button>
+        <button className="geser kanan" aria-label="Foto berikutnya" onClick={() => setI(k + 1)}>›</button>
+        <span className="hitung">{k + 1}/{fotos.length}</span>
+      </>}
+    </div>);
 }
