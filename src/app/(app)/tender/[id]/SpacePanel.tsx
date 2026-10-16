@@ -82,14 +82,14 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
 
   // ---- Visual komposisi luas ----
   const komp = [
-    { l: 'SPR', v: h.sd.footprint, c: 'var(--accent)' },
-    { l: 'DDR', v: h.dd.footprint, c: '#5b8fc7' },
-    { l: 'Block stack', v: h.block.footprint, c: '#8a6bb8' },
-    { l: 'Pallet floor', v: h.floor.footprint, c: '#a0765a' },
-    { l: 'Receiving & staging', v: h.inbound.footprint, c: 'var(--ok)' },
-    { l: 'Outbound & staging', v: h.outbound.footprint, c: 'var(--warn)' },
-    { l: 'Fasilitas', v: h.fasilitasM2, c: 'var(--floor)' },
-    { l: 'Pembulatan', v: h.spaceRent - h.subtotal, c: 'var(--line)' },
+    { l: 'SPR', v: h.sd.footprint, c: '#1f1f1f' },
+    { l: 'DDR', v: h.dd.footprint, c: '#4a4a4a' },
+    { l: 'Block stack', v: h.block.footprint, c: '#6b6b6b' },
+    { l: 'Pallet floor', v: h.floor.footprint, c: '#8a8a8a' },
+    { l: 'Receiving & staging', v: h.inbound.footprint, c: '#a0a0a0' },
+    { l: 'Outbound & staging', v: h.outbound.footprint, c: '#b0b0b0' },
+    { l: 'Fasilitas', v: h.fasilitasM2, c: '#d9d9d9' },
+    { l: 'Pembulatan', v: h.spaceRent - h.subtotal, c: '#f0f0f0' },
   ].filter(k => k.v > 0.05);
 
   return (
@@ -191,14 +191,14 @@ function VisualRak({ x, lv }: { x: SpaceExcel; lv: ReturnType<typeof import('@/l
       <line x1={kiri - 10} x2={kanan + 10} y1={dasar} y2={dasar} stroke="var(--ink)" strokeWidth={2} />
       {rakX.map((rx, k) => (
         <g key={k}>
-          <rect x={rx} y={dasar - lv.tinggi * sk} width={44} height={lv.tinggi * sk} fill="none" stroke="var(--accent)" strokeWidth={1.5} />
+          <rect x={rx} y={dasar - lv.tinggi * sk} width={44} height={lv.tinggi * sk} fill="none" stroke="#6b6b6b" strokeWidth={1.2} />
           {Array.from({ length: lv.level }, (_, i) => {
             const y0 = dasar - tinggiLevel(i) * sk;
             const tProd = x.rak.productMm * sk, tPal = x.rak.palletMm * sk, tBeam = i === 0 ? 0 : x.rak.beamMm * sk;
             return <g key={i}>
-              {i > 0 && <rect x={rx} y={y0 - tBeam} width={44} height={Math.max(1, tBeam)} fill="var(--warn)" />}
-              <rect x={rx + 3} y={y0 - tBeam - tPal} width={38} height={Math.max(1, tPal)} fill="#a0765a" />
-              <rect x={rx + 4} y={y0 - tBeam - tPal - tProd} width={36} height={Math.max(1, tProd)} fill="var(--floor)" opacity={0.85} />
+              {i > 0 && <rect x={rx} y={y0 - tBeam} width={44} height={Math.max(1, tBeam)} fill="#4a4a4a" />}
+              <rect x={rx + 3} y={y0 - tBeam - tPal} width={38} height={Math.max(1, tPal)} fill="#a0a0a0" />
+              <rect x={rx + 4} y={y0 - tBeam - tPal - tProd} width={36} height={Math.max(1, tProd)} fill="#d9d9d9" stroke="#b0b0b0" strokeWidth={0.5} />
             </g>;
           })}
         </g>))}

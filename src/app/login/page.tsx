@@ -2,6 +2,7 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
+import LecaMark from '@/components/LecaMark';
 
 function LoginForm() {
   const router = useRouter();
@@ -44,8 +45,9 @@ function LoginForm() {
   return (
     <div className="login">
       <form className="card" onSubmit={submit}>
-        <div className="eyebrow">Cost Model Gudang</div>
-        <h1>{mode === 'masuk' ? 'Masuk' : mode === 'daftar' ? 'Buat akun' : 'Reset password'}</h1>
+        <div className="login-brand"><LecaMark size={40} /><div><div className="nama">Leca</div><div className="oleh">by esapanghegar</div></div></div>
+        <p className="login-tagline">Cost model, tender &amp; quotation gudang dalam satu tempat.</p>
+        <h1 style={{ fontSize: 20 }}>{mode === 'masuk' ? 'Masuk' : mode === 'daftar' ? 'Buat akun' : 'Reset password'}</h1>
         {mode === 'daftar' && (
           <label className="f" htmlFor="nama">Nama lengkap
             <input id="nama" value={nama} onChange={e => setNama(e.target.value)} required />
@@ -68,6 +70,7 @@ function LoginForm() {
           {mode !== 'lupa' && <button type="button" className="ghost" onClick={() => setMode('lupa')}>Lupa password</button>}
         </div>
       </form>
+      <p className="small" style={{ color: 'var(--g400)', marginTop: 16 }}>Leca · dibuat oleh esapanghegar</p>
     </div>
   );
 }

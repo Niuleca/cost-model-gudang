@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import LecaMark from './LecaMark';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -83,7 +84,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="shell">
       <header className="topbar">
-        <Link href="/" className="brand">Cost Model <span>Gudang</span></Link>
+        <Link href="/" className="brand" aria-label="Leca — beranda"><LecaMark /><span className="brand-nama">Leca</span><span className="brand-oleh">by esapanghegar</span></Link>
         <nav aria-label="Menu utama" ref={navRef} className="topnav">
           {MENU.map(m => <Dropdown key={m.id} {...m} />)}
           <div className="sela" />
@@ -92,6 +93,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
       <main className="main">{children}</main>
+      <footer className="app-foot"><span><b>Leca</b> · cost model, tender & quotation gudang</span><span>Dibuat oleh <b>esapanghegar</b> · © {new Date().getFullYear()}</span></footer>
     </div>
   );
 }
