@@ -10,6 +10,7 @@ import { useProfile } from '@/lib/useProfile';
 import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
+import BiayaLainPanel from './BiayaLainPanel';
 import ProcessDesignPanel from './ProcessDesignPanel';
 import SpacePanel from './SpacePanel';
 import MhePanel from './MhePanel';
@@ -322,33 +323,10 @@ export default function TenderPage() {
 
       {tab === 'Biaya lain' && (
         <div className="card">
-          <h2>Biaya lain (office, ATK, seragam, konsumsi, HSE, asuransi, pest control, startup)</h2>
+          <h2>Biaya lain</h2>
           {a.it.lines.length > 0 && <p className="small notice">IT dari tab IT ikut dihitung otomatis: ±{rp(ringkasIt(a.it, { kontrakBulan: t.durasi_kontrak_bulan, bungaTahun: 0.1 }).totalBulan)}/bln (termasuk depresiasi/amortisasi OTC {rp(ringkasIt(a.it).sekali)}). Jangan diinput dua kali di sini.</p>}
-          <p className="small muted">Harga ditarik dari database. Mode beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak.</p>
-          <div className="tablewrap"><table>
-            <thead><tr><th>Item</th><th>Kelompok</th><th>Mode</th><th className="num">Qty</th><th className="num">Harga satuan</th><th className="num">Umur</th><th>Risiko</th><th>Alokasi</th><th></th></tr></thead>
-            <tbody>{a.costLines.map((c, i) => (
-              <tr key={i}>
-                <td style={{ minWidth: 220 }}>
-                  <select aria-label="Item" value={c.priceItemId ?? ''} onChange={e => {
-                    const it = items.find(x => x.id === Number(e.target.value)); if (!it) return;
-                    const mode = it.harga_sewa_bulan && !it.harga_beli ? 'sewa' : c.mode;
-                    setA({ costLines: ubahArray(a.costLines, i, { priceItemId: it.id, deskripsi: it.item, kelompok: KAT_KE_KELOMPOK[it.kategori] ?? 'Lainnya', mode,
-                      hargaSatuan: Number((mode === 'sewa' || mode === 'bulanan' ? it.harga_sewa_bulan ?? it.harga_beli : it.harga_beli ?? it.harga_sewa_bulan) ?? 0), umurBulan: it.umur_ekonomis_bulan ?? undefined }) });
-                  }}><option value="">Manual / pilih item…</option>{items.filter(x => !['MHE', 'Racking', 'Gudang'].includes(x.kategori)).map(x => <option key={x.id} value={x.id}>{x.kategori} · {x.item}{x.status_efektif !== 'approved' ? ` (${x.status_efektif})` : ''}</option>)}</select>
-                  <input aria-label="Deskripsi" value={c.deskripsi} onChange={e => setA({ costLines: ubahArray(a.costLines, i, { deskripsi: e.target.value }) })} style={{ marginTop: 4 }} />
-                </td>
-                <td><select aria-label="Kelompok" value={c.kelompok} onChange={e => setA({ costLines: ubahArray(a.costLines, i, { kelompok: e.target.value as Kelompok }) })}>{KELOMPOK.map(k => <option key={k}>{k}</option>)}</select></td>
-                <td><select aria-label="Mode" value={c.mode} onChange={e => setA({ costLines: ubahArray(a.costLines, i, { mode: e.target.value as 'bulanan' | 'sewa' | 'beli' | 'sekali' }) })}>
-                  <option value="bulanan">Bulanan</option><option value="sewa">Sewa/bln</option><option value="beli">Beli</option><option value="sekali">Sekali (startup)</option></select></td>
-                <td className="num"><input aria-label="Qty" type="number" step="any" value={c.qty} onChange={e => setA({ costLines: ubahArray(a.costLines, i, { qty: Number(e.target.value) }) })} /></td>
-                <td className="num db"><input aria-label="Harga satuan" type="number" value={c.hargaSatuan} onChange={e => setA({ costLines: ubahArray(a.costLines, i, { hargaSatuan: Number(e.target.value) }) })} /></td>
-                <td className="num"><input aria-label="Umur" type="number" value={c.umurBulan ?? ''} disabled={c.mode !== 'beli'} onChange={e => setA({ costLines: ubahArray(a.costLines, i, { umurBulan: Number(e.target.value) }) })} /></td>
-                <td><select aria-label="Risiko" value={c.kategoriRisiko ?? ''} onChange={e => setA({ costLines: ubahArray(a.costLines, i, { kategoriRisiko: (e.target.value || undefined) as KategoriRisiko | undefined }) })}><option value="">Default</option>{RISIKO.map(r => <option key={r}>{r}</option>)}</select></td>
-                <td><select aria-label="Alokasi" value={namaAlokasi(c.alokasi)} onChange={e => setA({ costLines: ubahArray(a.costLines, i, { alokasi: ALOKASI[e.target.value] }) })}>{Object.keys(ALOKASI).map(k => <option key={k}>{k}</option>)}</select></td>
-                <td><button className="danger" onClick={() => setA({ costLines: a.costLines.filter((_, j) => j !== i) })}>Hapus</button></td>
-              </tr>))}</tbody></table></div>
-          <div className="row"><button className="ghost" onClick={() => setA({ costLines: [...a.costLines, { deskripsi: '', kelompok: 'Lainnya', mode: 'bulanan', qty: 1, hargaSatuan: 0 }] })}>Tambah baris biaya</button></div>
+          <p className="small muted">Dipisah per klasifikasi sesuai Price Inquiry; pilihan item di tiap bagian hanya dari kategorinya. Bulanan/sewa = qty × harga per bulan. Beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak + bunga modal.</p>
+          <BiayaLainPanel lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan} onChange={costLines => setA({ costLines })} />
 
           <h2>Listrik (Engineering)</h2>
           <div className="grid3">

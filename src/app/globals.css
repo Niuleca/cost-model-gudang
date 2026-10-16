@@ -165,3 +165,6 @@ td input, td select { padding: 4px 6px; font-size: 13px; }
 .pd-dua { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 @media (max-width: 900px) { .pd-dua { grid-template-columns: 1fr; } }
 .pd-sum tr.pd-sub td { background: var(--surface-2); font-size: 13px; }
+
+.bl-seksi { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+.bl-seksi h3 { margin: 0; }

@@ -35,7 +35,7 @@ export interface Asumsi {
   alatSupervisor?: string[];
   space: SpaceInput;
   mhe: (MheInput & { priceItemId?: number })[];
-  costLines: (CostLineInput & { priceItemId?: number })[];
+  costLines: (CostLineInput & { priceItemId?: number; seksi?: string })[];
   listrik: ListrikInput[];
   golonganListrik: string;
   tarifListrikKwh: number;
