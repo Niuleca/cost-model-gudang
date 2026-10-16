@@ -90,6 +90,9 @@ export function keInput(t: TenderRow): TenderInput {
     spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, faktorProduktivitas: a.faktorProduktivitas,
     efisiensi: a.efisiensi, mhe: a.mhe, listrik: a.listrik,
     space: a.gudang ? { ...a.space, luasTersediaM2: Number(a.gudang.luas_m2), namaGudang: a.gudang.nama,
+      // tarif sewa mengikuti database gudang kecuali diubah manual
+      tarifSewaM2Bulan: a.space.tarifManual ? a.space.tarifSewaM2Bulan
+        : Math.round(Number(a.gudang.harga_sewa_m2_bulan ?? (a.gudang.harga_per_bulan ?? 0) / Math.max(1, Number(a.gudang.luas_m2)))),
       sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: a.advanceSewaBulan, depositBulan: a.depositBulan,

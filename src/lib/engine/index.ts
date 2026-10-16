@@ -237,8 +237,11 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     flags.push({ level: 'kritis', kode: 'GUDANG_KURANG', pesan: `Kebutuhan ${space.totalM2} m² melebihi luas gudang terpilih ${s.luasTersediaM2} m².` });
   else if (s.luasTersediaM2 && sewaTetap && space.totalM2 < s.luasTersediaM2 * 0.7)
     flags.push({ level: 'peringatan', kode: 'GUDANG_LONGGAR', pesan: `Gudang disewa utuh ${s.luasTersediaM2} m² tetapi kebutuhan hanya ${space.totalM2} m² (<70%) — biaya sewa idle dibebankan ke customer.` });
-  if (s.metodeSimpan !== 'block' && s.hargaRakPerPosisi)
-    investasi += capex('Racking', 'Racking', space.posisiRak * s.hargaRakPerPosisi, s.umurRakBulan, alokStorage);
+  // Racking: posisi SPR & DDR dari sheet Space × harga per jenis (Price Inquiry Racking). Data lama: satu harga untuk semua posisi.
+  const posSpr = Math.ceil(sx.sd.ppReq - 1e-9), posDdr = Math.ceil(sx.dd.ppReq - 1e-9);
+  const rakLama = { harga: s.hargaRakPerPosisi ?? 0, umurBulan: s.umurRakBulan ?? 120 };
+  for (const [label, pos, h] of [['SPR', posSpr, s.rak?.spr ?? rakLama], ['DDR', posDdr, s.rak?.ddr ?? rakLama]] as const)
+    if (pos > 0 && h.harga > 0) investasi += capex(`Racking ${label} (${pos} posisi)`, 'Racking', pos * h.harga, h.umurBulan, alokStorage);
 
   // Listrik
   const kwhBulan = t.listrik.reduce((sum, l) => sum + l.watt * l.qty * l.jamPerHari, 0) * kal.hariOperasionalBulan / 1000;

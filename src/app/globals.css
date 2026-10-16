@@ -168,3 +168,6 @@ td input, td select { padding: 4px 6px; font-size: 13px; }
 
 .bl-seksi { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
 .bl-seksi h3 { margin: 0; }
+.bs-rak { display: grid; gap: 6px; padding: 8px; border-bottom: 1px solid var(--line); }
+.bs-rak select { width: 100%; }
+.bs-rak label { display: inline-flex; gap: 4px; align-items: center; }

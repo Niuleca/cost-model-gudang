@@ -56,7 +56,11 @@ export interface SpaceInput {
   sewaTetapBulan?: number;        // sewa gudang utuh per bulan (bila disewa per unit, bukan per m²)
   namaGudang?: string;
   excel?: import('./space').SpaceExcel;   // kebutuhan space format Excel (dipakai mesin hitung)
+  /** Harga rak per jenis (dari Price Inquiry kategori Racking); posisi diambil dari sheet Space (SPR / DDR). */
+  rak?: { spr?: RakHarga; ddr?: RakHarga };
+  tarifManual?: boolean;          // true = tarif sewa diisi manual, tidak mengikuti database gudang
 }
+export interface RakHarga { priceItemId?: number; nama?: string; harga: number; umurBulan: number }
 
 export interface MheInput {
   tool: string;                   // harus sama dengan AktivitasInput.tool

@@ -14,6 +14,8 @@ import BiayaLainPanel from './BiayaLainPanel';
 import ProcessDesignPanel from './ProcessDesignPanel';
 import SpacePanel from './SpacePanel';
 import MhePanel from './MhePanel';
+import BiayaSpacePanel from './BiayaSpacePanel';
+import { hitungSpaceExcel, lengkapiSpaceExcel } from '@/lib/engine/space';
 import { hitungProcessDesign, PD_DEFAULT } from '@/lib/engine/processDesign';
 import HistorisPanel from './HistorisPanel';
 import StatusControl from '@/components/StatusControl';
@@ -130,6 +132,11 @@ export default function TenderPage() {
   const bisaEdit = !!t && !!profile && (profile.role === 'admin' || t.created_by === profile.id || !STATUS_DRAFT.includes(t.status));
 
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
+  const spaceH = useMemo(() => {
+    if (!t) return null;
+    const v = (ar: Arus) => t.asumsi.volumes.find(x => x.arus === ar)?.peakBulan ?? 0;
+    return hitungSpaceExcel(lengkapiSpaceExcel(t.asumsi.space.excel), v('storage'), v('inbound'), v('outbound'), t.jumlah_shift);
+  }, [t]);
   const pdMhe = useMemo(() => t ? hitungProcessDesign(t.asumsi.aktivitas, t.asumsi.volumes, { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
     t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift,
     { spanOfControl: t.asumsi.spanOfControl, roleSupervisor: t.asumsi.roleSupervisor, alatSupervisor: t.asumsi.alatSupervisor, peranTetap: t.asumsi.peranTetap }).mhe : [], [t]);
@@ -297,22 +304,17 @@ export default function TenderPage() {
       {tab === 'Gudang, space & MHE' && (<>
         <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
           setKol('warehouse_id', g?.id ?? null);
-          setA({ gudang: g, space: { ...a.space, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
+          setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
         }} />
         <SpacePanel excel={a.space.excel} ppTotal={a.volumes.find(v => v.arus === 'storage')?.peakBulan ?? 0}
           inboundBulan={a.volumes.find(v => v.arus === 'inbound')?.peakBulan ?? 0} outboundBulan={a.volumes.find(v => v.arus === 'outbound')?.peakBulan ?? 0}
           uomIn={a.volumes.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={a.volumes.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
           jumlahShift={t.jumlah_shift} onChange={excel => setA({ space: { ...a.space, excel } })}
-          komersial={<div className="card" style={{ gap: 8, padding: 12 }}>
-            <h3>Biaya space & racking</h3>
-            <div className="grid2">
-              <Num id="sewa" label="Tarif sewa gudang" suffix="Rp/m²/bln" value={a.space.tarifSewaM2Bulan} onChange={v => setA({ space: { ...a.space, tarifSewaM2Bulan: v } })} />
-              <Num id="rak" label="Harga rak per posisi (beli)" suffix="Rp" value={a.space.hargaRakPerPosisi} onChange={v => setA({ space: { ...a.space, hargaRakPerPosisi: v } })} />
-              <Num id="umurrak" label="Umur ekonomis rak" suffix="bulan" value={a.space.umurRakBulan} onChange={v => setA({ space: { ...a.space, umurRakBulan: v } })} />
-              <Sel id="metode" label="Penyimpanan" value={a.space.metodeSimpan} options={[{ v: 'spr', l: 'Racking (SD/DD)' }, { v: 'block', l: 'Block stacking (tanpa rak)' }]} onChange={v => setA({ space: { ...a.space, metodeSimpan: v } })} />
-            </div>
-            <p className="small muted">Luas sewa = Space Rent. Harga rak × posisi palet jadi CAPEX racking bila penyimpanan = racking.</p>
-          </div>} />
+          komersial={<BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+            posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
+            posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
+            skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
+            onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />} />
         <MhePanel mhe={a.mhe} items={items} metodeExcel={(a.metodeManpower ?? 'excel') === 'excel'} onChange={mhe => setA({ mhe })}
           kebutuhan={(a.metodeManpower ?? 'excel') === 'excel'
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
