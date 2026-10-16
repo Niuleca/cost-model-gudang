@@ -5,6 +5,7 @@ import { useProfile } from '@/lib/useProfile';
 import { BUCKET_FOTO, adaHarga, fotoDiStorage, fotoUrl, gmapsLink, kedaluwarsa, sewaBulanPenuh, tarifM2, type Warehouse } from '@/lib/warehouse';
 import { exportExcel, importExcel, type KolomExcel } from '@/lib/excel';
 import { angka, rp, tanggal } from '@/lib/format';
+import GroupChips from '@/components/GroupChips';
 
 type Form = Partial<Warehouse>;
 const KOSONG: Form = { tipe: 'Ambient', foto: [] };
@@ -46,8 +47,14 @@ export default function GudangManager() {
     sb.from('umk').select('provinsi, kab_kota').order('provinsi').order('kab_kota').then(({ data }: { data: { provinsi: string; kab_kota: string }[] | null }) => setProv(data ?? []));
   }, [muat]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tampil = useMemo(() => rows.filter(w => (!fProv || w.provinsi === fProv) && (!q || `${w.nama} ${w.kab_kota} ${w.provinsi} ${w.pemilik ?? ''}`.toLowerCase().includes(q.toLowerCase()))), [rows, q, fProv]);
-  const provDiData = useMemo(() => Array.from(new Set(rows.map(w => w.provinsi))).sort(), [rows]);
+  const dicari = useMemo(() => rows.filter(w => (!q || `${w.nama} ${w.kab_kota} ${w.provinsi} ${w.pemilik ?? ''}`.toLowerCase().includes(q.toLowerCase()))), [rows, q]);
+  const tampil = useMemo(() => dicari.filter(w => !fProv || w.provinsi === fProv), [dicari, fProv]);
+  // Dibagi per provinsi; kalau satu provinsi dipilih, dibagi lagi per kabupaten/kota
+  const grupGudang = useMemo(() => {
+    const m = new Map<string, Warehouse[]>();
+    for (const w of tampil) { const k = fProv ? w.kab_kota : w.provinsi; m.set(k, [...(m.get(k) ?? []), w]); }
+    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0], 'id'));
+  }, [tampil, fProv]);
   const provinsiList = useMemo(() => Array.from(new Set(prov.map(p => p.provinsi))), [prov]);
   const kotaList = useMemo(() => prov.filter(p => p.provinsi === form?.provinsi).map(p => p.kab_kota), [prov, form?.provinsi]);
 
@@ -126,14 +133,13 @@ export default function GudangManager() {
       <div className="row">
         <input aria-label="Cari gudang" placeholder="Cari nama, kota, pemilik…" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 280, background: 'var(--surface)' }} />
         <span className="small muted">{tampil.length} gudang</span>
-        <select aria-label="Filter provinsi" value={fProv} onChange={e => setFProv(e.target.value)} style={{ maxWidth: 200, background: 'var(--surface)' }}>
-          <option value="">Semua provinsi</option>{provDiData.map(p => <option key={p}>{p}</option>)}</select>
         {bolehEdit && !form && <button onClick={() => setForm({ ...KOSONG })}>Tambah gudang</button>}
         <button className="ghost" onClick={unduh} disabled={!!sibuk}>Export Excel</button>
         {bolehEdit && <label className="btn ghost" style={{ cursor: 'pointer' }}>Import Excel
           <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={e => { bacaFile(e.target.files?.[0]); e.target.value = ''; }} /></label>}
         {sibuk && <span className="small" role="status">{sibuk}</span>}
       </div>
+      <GroupChips nilai={dicari.map(w => w.provinsi)} pilih={fProv} onPilih={setFProv} label="Provinsi" />
       {err && <p className="error small" role="alert">{err}</p>}
       {impor && (
         <div className="notice row" style={{ justifyContent: 'space-between' }}>
@@ -183,8 +189,13 @@ export default function GudangManager() {
         </div>
       )}
 
+      {tampil.length === 0 && <p className="muted">Belum ada gudang.</p>}
+      {grupGudang.map(([judul, isi]) => (
+      <section key={judul} style={{ display: 'grid', gap: 10 }}>
+        <h2 style={{ margin: '6px 0 0', borderBottom: '2px solid var(--line)', paddingBottom: 4 }}>{judul}
+          <span className="small muted" style={{ fontWeight: 400 }}> · {isi.length} gudang · {angka(isi.reduce((a, w) => a + Number(w.luas_m2 || 0), 0))} m²</span></h2>
       <div className="grid2">
-        {tampil.map(w => (
+        {isi.map(w => (
           <article key={w.id} className="card" style={{ gap: 8 }}>
             {w.foto?.length ? (
               <div style={{ display: 'grid', gridTemplateColumns: w.foto.length > 1 ? '2fr 1fr' : '1fr', gap: 4 }}>
@@ -214,8 +225,8 @@ export default function GudangManager() {
             </div>
           </article>
         ))}
-        {tampil.length === 0 && <p className="muted">Belum ada gudang.</p>}
       </div>
+      </section>))}
     </div>
   );
 }

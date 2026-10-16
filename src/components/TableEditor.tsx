@@ -1,9 +1,10 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Profile } from '@/lib/useProfile';
 import type { AppRole } from '@/lib/format';
 import { exportExcel, importExcel, type KolomExcel } from '@/lib/excel';
+import GroupChips from '@/components/GroupChips';
 
 export interface Kolom {
   key: string;
@@ -28,6 +29,7 @@ interface Props {
   catatan?: string;
   filter?: Record<string, string | string[]>;   // eq / in pada sumber baca
   namaExport?: string;         // nama file & sheet Excel
+  kelompok?: string;           // kolom pembagi: tombol per nilai + judul grup di tabel
 }
 
 type Row = Record<string, unknown>;
@@ -49,6 +51,8 @@ export default function TableEditor(p: Props) {
   const [loading, setLoading] = useState(true);
   const [impor, setImpor] = useState<{ baru: Row[]; ubah: { id: string; row: Row }[]; diabaikan: string[]; file: string } | null>(null);
   const [sibuk, setSibuk] = useState<string | null>(null);
+  const [grup, setGrup] = useState('');
+  const nilaiGrup = (r: Row) => (p.kelompok ? String(ambil(r, p.kelompok) ?? '') : '') || 'Tanpa kategori';
 
   const bolehEdit = !!p.profile && (p.profile.role === 'admin' || p.editorRoles.includes(p.profile.role));
   const bolehApprove = !!p.profile && (p.profile.role === 'admin' || p.profile.role === 'solution_design');
@@ -65,12 +69,18 @@ export default function TableEditor(p: Props) {
 
   useEffect(() => { muat(); }, [muat]);
 
-  const tampil = useMemo(() => {
+  const dicari = useMemo(() => {
     if (!q.trim()) return rows;
     const s = q.toLowerCase();
     const cols = p.cari ?? p.kolom.map(k => k.key);
     return rows.filter(r => cols.some(c => String(ambil(r, c) ?? '').toLowerCase().includes(s)));
   }, [rows, q, p.cari, p.kolom]);
+  const tampil = useMemo(() => {
+    if (!p.kelompok) return dicari;
+    const xs = grup ? dicari.filter(r => nilaiGrup(r) === grup) : dicari;
+    return [...xs].sort((a, b) => nilaiGrup(a).localeCompare(nilaiGrup(b), 'id'));   // stabil: urutan orderBy dipertahankan di dalam grup
+  }, [dicari, grup, p.kelompok]); // eslint-disable-line react-hooks/exhaustive-deps
+  const kolomGrup = p.kolom.find(k => k.key === p.kelompok);
 
   const ubah = (id: string, key: string, val: unknown) =>
     setDraft(d => ({ ...d, [id]: { ...(d[id] ?? {}), [key]: val } }));
@@ -181,7 +191,7 @@ export default function TableEditor(p: Props) {
     }
     const fid = `${p.table}-${id ?? 'baru'}-${k.key}`;
     if (k.type === 'select') return (
-      <select id={fid} aria-label={k.label} value={String(nilai ?? '')} onChange={e => set(e.target.value)}>
+      <select id={fid} aria-label={k.label} value={String(nilai ?? '')} onChange={e => set(e.target.value)} style={{ minWidth: k.width ?? 140 }}>
         <option value="">—</option>{k.options?.map(o => <option key={o} value={o}>{o}</option>)}
       </select>);
     if (k.type === 'bool') return <input id={fid} aria-label={k.label} type="checkbox" checked={!!nilai} onChange={e => set(e.target.checked)} style={{ width: 'auto' }} />;
@@ -198,13 +208,14 @@ export default function TableEditor(p: Props) {
       <div className="row">
         <input aria-label="Cari" placeholder="Cari…" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 280, background: 'var(--surface)' }} />
         <span className="small muted">{tampil.length} baris</span>
-        {bolehEdit && !baru && <button onClick={() => setBaru({})}>Tambah baris</button>}
+        {bolehEdit && !baru && <button onClick={() => setBaru(grup && p.kelompok && grup !== 'Tanpa kategori' ? { [p.kelompok]: grup } : {})}>Tambah baris{grup ? ` (${grup})` : ''}</button>}
         <button className="ghost" onClick={unduh} disabled={!!sibuk}>Export Excel</button>
         {bolehEdit && <label className="btn ghost" style={{ cursor: 'pointer' }}>Import Excel
           <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={e => { bacaFile(e.target.files?.[0]); e.target.value = ''; }} /></label>}
         {sibuk && <span className="small" role="status">{sibuk}</span>}
         {!bolehEdit && <span className="small muted">Hanya baca untuk role Anda.</span>}
       </div>
+      {p.kelompok && <GroupChips nilai={dicari.map(nilaiGrup)} pilih={grup} onPilih={setGrup} label={kolomGrup?.label ?? 'Kelompok'} />}
       {p.catatan && <p className="small muted">{p.catatan}</p>}
       {impor && (
         <div className="notice row" style={{ justifyContent: 'space-between' }}>
@@ -234,11 +245,17 @@ export default function TableEditor(p: Props) {
             )}
             {loading && <tr><td colSpan={p.kolom.length + 2} className="muted">Memuat…</td></tr>}
             {!loading && tampil.length === 0 && <tr><td colSpan={p.kolom.length + 2} className="muted">Belum ada data.</td></tr>}
-            {tampil.map(r => {
+            {tampil.map((r, i) => {
               const id = String(r[idKey]);
               const status = String(r.status_efektif ?? r.status ?? '');
+              const g = nilaiGrup(r);
+              const judul = !!p.kelompok && (i === 0 || nilaiGrup(tampil[i - 1]) !== g);
               return (
-                <tr key={id}>
+                <Fragment key={id}>
+                {judul && <tr className="grup"><td colSpan={p.kolom.length + (p.approval ? 1 : 0) + (bolehEdit ? 1 : 0)}
+                  style={{ background: 'var(--surface-2)', fontWeight: 600, position: 'sticky', left: 0 }}>
+                  {g} <span className="small muted">· {tampil.filter(x => nilaiGrup(x) === g).length} item</span></td></tr>}
+                <tr>
                   {p.kolom.map(k => <td key={k.key} className={k.type === 'number' || k.type === 'percent' ? 'num' : ''}>{sel(r, k, id)}</td>)}
                   {p.approval && (
                     <td>
@@ -254,6 +271,7 @@ export default function TableEditor(p: Props) {
                     </td>
                   )}
                 </tr>
+                </Fragment>
               );
             })}
           </tbody>

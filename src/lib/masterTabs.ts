@@ -13,6 +13,7 @@ export interface Tab {
   id: string; label: string; pemilik: string; table: string; view?: string; idKey?: string;
   kolom: Kolom[]; editorRoles: AppRole[]; approval?: boolean; orderBy?: { col: string; asc?: boolean }[];
   cari?: string[]; catatan?: string; defaults?: Record<string, unknown>; filter?: Record<string, string | string[]>;
+  kelompok?: string;
 }
 
 export const TABS: Tab[] = [
@@ -63,7 +64,7 @@ export const TABS: Tab[] = [
       { key: 'vendor', label: 'Vendor' }, { key: 'tanggal_harga', label: 'Tgl harga', type: 'date' }, { key: 'berlaku_sampai', label: 'Berlaku s.d.', type: 'date' },
       { key: 'owner_role', label: 'Pemilik', type: 'select', options: ROLES }, { key: 'sumber', label: 'Sumber', width: 220 },
     ] },
-  { id: 'mhe', label: 'MHE / forklift', pemilik: 'Procurement', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement'],
+  { id: 'mhe', kelompok: 'mhe_tipe', label: 'MHE / forklift', pemilik: 'Procurement', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement'],
     approval: true, filter: { kategori: 'MHE' }, defaults: { kategori: 'MHE', owner_role: 'procurement', satuan: 'unit' },
     orderBy: [{ col: 'mhe_tipe' }, { col: 'kapasitas_ton' }], cari: ['item', 'mhe_tipe', 'vendor', 'sumber_tenaga'],
     catatan: 'Isi tipe & tonase supaya Solution Design bisa memilih unit yang sesuai beban (2,5 / 3 / 5 / 10 ton). Sewa/bln untuk skema sewa, harga beli + umur untuk skema beli.',
@@ -78,7 +79,7 @@ export const TABS: Tab[] = [
       { key: 'vendor', label: 'Vendor' }, { key: 'spesifikasi', label: 'Spesifikasi' },
       { key: 'tanggal_harga', label: 'Tgl harga', type: 'date' }, { key: 'berlaku_sampai', label: 'Berlaku s.d.', type: 'date' }, { key: 'sumber', label: 'Sumber' },
     ] },
-  { id: 'kantor', label: 'Kebutuhan kantor', pemilik: 'Procurement / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'engineering'],
+  { id: 'kantor', kelompok: 'kategori', label: 'Kebutuhan kantor', pemilik: 'Procurement / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'engineering'],
     approval: true, filter: { kategori: KAT_KANTOR }, defaults: { owner_role: 'procurement', kategori: 'Office' },
     orderBy: [{ col: 'kategori' }, { col: 'item' }], cari: ['kategori', 'item', 'vendor', 'sumber'],
     catatan: 'Kebutuhan ruang kantor: furnitur & elektronik office, ATK, printer (termasuk dot matrix), konsumsi/air minum, sewa ruang kantor. Harga lewat masa berlaku otomatis expired dan jadi red flag di tender.',
@@ -90,7 +91,7 @@ export const TABS: Tab[] = [
       { key: 'vendor', label: 'Vendor' }, { key: 'tanggal_harga', label: 'Tgl harga', type: 'date' }, { key: 'berlaku_sampai', label: 'Berlaku s.d.', type: 'date' },
       { key: 'owner_role', label: 'Pemilik', type: 'select', options: ['procurement', 'engineering'] }, { key: 'sumber', label: 'Sumber', width: 220 },
     ] },
-  { id: 'gudangkeb', label: 'Kebutuhan gudang', pemilik: 'Procurement / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'engineering'],
+  { id: 'gudangkeb', kelompok: 'kategori', label: 'Kebutuhan gudang', pemilik: 'Procurement / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'engineering'],
     approval: true, filter: { kategori: KAT_GUDANG }, defaults: { owner_role: 'procurement', kategori: 'Palet' },
     orderBy: [{ col: 'kategori' }, { col: 'item' }], cari: ['kategori', 'item', 'vendor', 'sumber'],
     catatan: 'Kebutuhan area gudang: palet, racking, HSE/APD, seragam, pest control, asuransi, security, cleaning, utilitas, konstruksi. Harga lewat masa berlaku otomatis expired dan jadi red flag di tender.',
@@ -102,7 +103,7 @@ export const TABS: Tab[] = [
       { key: 'vendor', label: 'Vendor' }, { key: 'tanggal_harga', label: 'Tgl harga', type: 'date' }, { key: 'berlaku_sampai', label: 'Berlaku s.d.', type: 'date' },
       { key: 'owner_role', label: 'Pemilik', type: 'select', options: ['procurement', 'engineering'] }, { key: 'sumber', label: 'Sumber', width: 220 },
     ] },
-  { id: 'itkatalog', label: 'Katalog IT', pemilik: 'IT', table: 'it_catalog', editorRoles: ['it'], approval: true,
+  { id: 'itkatalog', kelompok: 'kelompok', label: 'Katalog IT', pemilik: 'IT', table: 'it_catalog', editorRoles: ['it'], approval: true,
     orderBy: [{ col: 'kelompok' }, { col: 'urutan' }, { col: 'item' }], cari: ['kelompok', 'item', 'cost_type', 'deskripsi'],
     catatan: 'Format BAP KLOG. Basis menentukan cara masuk cost model: Bulanan (PUPM, PDPM, Cost/Month, Monthly/Site), Transaksi (slab per bulan), Tahunan (÷12), Sekali (OTC, OTC/Unit, Cost/Mandays). Harga slab diisi satu baris per slab dengan rentang min–maks.',
     defaults: { basis: 'Bulanan' },
