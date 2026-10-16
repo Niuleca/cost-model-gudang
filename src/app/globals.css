@@ -138,3 +138,5 @@ td input, td select { padding: 4px 6px; font-size: 13px; }
 .pd-sum { table-layout: fixed; width: 100%; }
 .pd-sum th:nth-child(1) { width: 44%; } .pd-sum th:nth-child(2) { width: 22%; } .pd-sum th:nth-child(3), .pd-sum th:nth-child(4) { width: 17%; }
 .pd-sum td { height: 34px; }
+.pd-tiga { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+@media (max-width: 1100px) { .pd-tiga { grid-template-columns: 1fr; } }

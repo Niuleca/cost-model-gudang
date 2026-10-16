@@ -9,8 +9,9 @@ const f0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 /** Process Design & Resource Calculation (format Excel): kalender kerja MP/MHE, shift, rincian per task, ringkasan MP & MHE. */
-export default function ProcessDesignPanel({ bagian, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift }: {
+export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift }: {
   bagian: 'ringkasan' | 'rincian' | 'desain';
+  indirect?: { spanOfControl: number; roleSupervisor: string; peranTetap: { roleName: string; qty: number }[] };
   aktivitas: AktivitasInput[]; volumes: VolumeInput[]; pd?: ProcessDesignInput; faktorProduktivitas: number; efisiensi: number;
   jumlahShift: number;
   onPd: (pd: ProcessDesignInput) => void; onFaktor: (patch: { faktorProduktivitas?: number; efisiensi?: number }) => void; onShift: (n: number) => void;
@@ -71,11 +72,38 @@ export default function ProcessDesignPanel({ bagian, aktivitas, volumes, pd: pdI
   const setBeban = (i: number, v: number) => { const b = [...pd.bebanShift]; while (b.length < 3) b.push(0); b[i] = v / 100; onPd({ ...pd, bebanShift: b }); };
 
   if (bagian === 'ringkasan') {
-    const n = Math.max(h.mp.length, h.mhe.length, 1);
+    // Indirect: supervisor dari span of control (sama dengan mesin hitung) + peran tetap
+    const shiftAktif = h.beban.filter(w => w > 0).length || 1;
+    const directPerShift = h.mp.reduce((t, r) => t + Math.ceil(r.resources / shiftAktif - 1e-9), 0);
+    const spv = indirect && indirect.spanOfControl > 0 && directPerShift > 0 ? Math.ceil(directPerShift / indirect.spanOfControl) * shiftAktif : 0;
+    const ind = [
+      ...(spv ? [{ nama: indirect!.roleSupervisor, ket: `Span 1:${indirect!.spanOfControl}`, qty: spv }] : []),
+      ...(indirect?.peranTetap ?? []).map(r => ({ nama: r.roleName, ket: 'Peran tetap', qty: Number(r.qty) || 0 })),
+    ];
+    const totInd = ind.reduce((t, r) => t + r.qty, 0);
+    const n = Math.max(h.mp.length, h.mhe.length, ind.length, 1);
     return (
-      <div className="card pd-dua">
-        <Ringkas judul="Man Power Summary" rows={h.mp} remark="Head Count" tFte={h.totalFteMp} tRes={h.totalMp} pad={n} />
-        <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={n} />
+      <div className="card" style={{ gap: 10 }}>
+        <div className="pd-tiga">
+          <Ringkas judul="Man Power Summary" rows={h.mp} remark="Head Count" tFte={h.totalFteMp} tRes={h.totalMp} pad={n} />
+          <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={n} />
+          <div style={{ minWidth: 0 }}>
+            <h3>Indirect & peran tetap</h3>
+            <div className="tablewrap"><table className="pd-sum">
+              <thead><tr><th>Description</th><th>Remarks</th><th className="num">Basis</th><th className="num">Resources</th></tr></thead>
+              <tbody>
+                {ind.length === 0 && <tr><td colSpan={4} className="muted">–</td></tr>}
+                {ind.map((r, i) => <tr key={i}><td>{r.nama}</td><td className="small muted">Head Count</td><td className="num small muted">{r.ket}</td><td className="num"><b>{r.qty || '–'}</b></td></tr>)}
+                {Array.from({ length: Math.max(0, n - Math.max(1, ind.length)) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={4}>&nbsp;</td></tr>)}
+                <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>Head Count</b></td><td></td><td className="num"><b>{totInd}</b></td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        </div>
+        <div className="row small" style={{ justifyContent: 'flex-end' }}>
+          <span className="pill ok">Total manpower: {h.totalMp} direct + {totInd} indirect/tetap = <b>{h.totalMp + totInd} orang</b></span>
+          <span className="pill info">Total equipment: <b>{h.totalMhe} unit</b></span>
+        </div>
       </div>);
   }
 
