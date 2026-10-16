@@ -211,7 +211,10 @@ export const PROD_PAGES: { slug: string; label: string; uom: string[] }[] = [
   { slug: 'pail', label: 'Pail', uom: ['pail'] },
   { slug: 'pack', label: 'Pack', uom: ['pack'] },
   { slug: 'roll', label: 'Roll', uom: ['roll'] },
-  { slug: 'lainnya', label: 'Pallet, order & line', uom: ['palet', 'order', 'line', 'lokasi'] },
+  { slug: 'pallet', label: 'Pallet', uom: ['palet'] },
+  { slug: 'order', label: 'Order', uom: ['order'] },
+  { slug: 'line', label: 'Line', uom: ['line'] },
+  { slug: 'lokasi', label: 'Lokasi', uom: ['lokasi'] },
 ];
 export const tabProduktivitas = (uom: string[], label: string): Tab => {
   const dasar = TABS.find(t => t.id === 'produktivitas')!;

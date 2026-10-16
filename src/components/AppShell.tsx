@@ -23,7 +23,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
   ] },
   { id: 'price', label: 'Price Inquiry', item: PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' })) },
   { id: 'prod', label: 'Productivity', item: [
-    ...PROD_PAGES.map(p => ({ href: `/produktivitas/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'lainnya' })),
+    ...PROD_PAGES.map(p => ({ href: `/produktivitas/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: false })),
     { href: '/produktivitas', label: 'Semua UoM', roles: 'semua' },
   ] },
 ];
