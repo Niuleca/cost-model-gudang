@@ -54,8 +54,14 @@ export function bebanAktif(beban: number[], jumlahShift: number) {
   return tot > 0 ? b.map(x => x / tot) : b.map(() => 1 / b.length);
 }
 
+/** Indirect (supervisor dari span of control) & peran tetap, beserta alat pendukungnya. */
+export interface IndirectInput {
+  spanOfControl: number; roleSupervisor: string; alatSupervisor?: string[];
+  peranTetap: { roleName: string; qty: number; alat?: string[] }[];
+}
+
 export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: VolumeInput[], pd: ProcessDesignInput,
-  faktorProduktivitas: number, efisiensi: number, jumlahShift: number) {
+  faktorProduktivitas: number, efisiensi: number, jumlahShift: number, indirect?: IndirectInput) {
   const kalMp = hitungKalenderResource(pd.mp), kalMhe = hitungKalenderResource(pd.mhe);
   const beban = bebanAktif(pd.bebanShift, jumlahShift);
   const baris: BarisPD[] = [];
@@ -87,7 +93,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
       x.fte += b.fte; x.manHour += b.manHour; x.jamPerArus[b.arus] += b.manHour; m.set(b.resource, x);
     }
     return Array.from(m.values()).map(x => ({
-      ...x,
+      ...x, unitIndirect: 0,
       // Man power: dibulatkan per shift aktif (orang tidak bisa dibagi antar shift); alat: dipakai bergantian antar shift.
       resources: x.fte <= 0 ? 0 : jenis === 'Man Power'
         ? beban.reduce((s, w) => s + (w > 0 ? Math.ceil(x.fte * w - 1e-9) : 0), 0)
@@ -95,8 +101,23 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
     }));
   };
   const mp = ringkas('Man Power'), mhe = ringkas('Equipment');
+
+  // Indirect: supervisor per shift aktif dari span of control + peran tetap; alat pendukung 1 unit per orang
+  const shiftAktif = beban.filter(w => w > 0).length || 1;
+  const directPerShift = mp.reduce((t, r) => t + Math.ceil(r.resources / shiftAktif - 1e-9), 0);
+  const spv = indirect && indirect.spanOfControl > 0 && directPerShift > 0 ? Math.ceil(directPerShift / indirect.spanOfControl) * shiftAktif : 0;
+  const indirectRows = indirect ? [
+    ...(spv ? [{ nama: indirect.roleSupervisor, ket: `Span 1:${indirect.spanOfControl}`, qty: spv, alat: (indirect.alatSupervisor ?? []).filter(Boolean) }] : []),
+    ...indirect.peranTetap.map(r => ({ nama: r.roleName, ket: 'Peran tetap', qty: Number(r.qty) || 0, alat: (r.alat ?? []).filter(Boolean) })),
+  ] : [];
+  for (const r of indirectRows) for (const nama of r.alat) {
+    let e = mhe.find(x => x.nama === nama);
+    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0 }; mhe.push(e); }
+    e.unitIndirect += r.qty; e.resources += r.qty;
+  }
   return {
     kalender: { mp: kalMp, mhe: kalMhe }, beban, baris, mp, mhe,
+    indirect: { spv, directPerShift, rows: indirectRows, total: indirectRows.reduce((t, r) => t + r.qty, 0) },
     totalFteMp: mp.reduce((s, x) => s + x.fte, 0), totalMp: mp.reduce((s, x) => s + x.resources, 0),
     totalFteMhe: mhe.reduce((s, x) => s + x.fte, 0), totalMhe: mhe.reduce((s, x) => s + x.resources, 0),
   };

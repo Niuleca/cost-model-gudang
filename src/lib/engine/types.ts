@@ -34,6 +34,7 @@ export interface AktivitasInput {
 export interface PeranTetap {
   roleName: string;
   qty: number;              // headcount total (bukan per shift)
+  alat?: string[];          // alat pendukung per orang (mis. PC, HT) — masuk MHE Summary: unit = headcount
   alokasi?: Partial<Record<Bucket, number>>;
 }
 
@@ -101,6 +102,7 @@ export interface TenderInput {
   volumes: VolumeInput[];
   aktivitas: AktivitasInput[];
   peranTetap: PeranTetap[];
+  alatSupervisor?: string[];   // alat pendukung per supervisor (unit = jumlah supervisor)
   spanOfControl: number;            // 1 supervisor per N direct per shift
   roleSupervisor: string;
   faktorProduktivitas: number;      // 0.95

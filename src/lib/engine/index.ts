@@ -85,15 +85,16 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const ppDesain = volArus('storage')?.peakBulan ?? 0;
   // Metode Excel: selective / double deep per bay + staging per sequence + fasilitas → dibulatkan (space rent)
   const sx = hitungSpaceExcel(lengkapiSpaceExcel(s.excel), ppDesain, volArus('inbound')?.peakBulan ?? 0, volArus('outbound')?.peakBulan ?? 0, t.jumlahShift);
-  const storageM2 = sx.sd.footprint + sx.dd.footprint;
+  const storageM2 = sx.sd.footprint + sx.dd.footprint + sx.block.footprint + sx.floor.footprint;
   const totalM2 = sx.spaceRent;
   const space = {
     ppDesain, m2PerPP: bulat(ppDesain > 0 ? storageM2 / ppDesain : 0, 3), storageM2: bulat(storageM2, 1),
     stagingInM2: bulat(sx.inbound.footprint, 1), stagingOutM2: bulat(sx.outbound.footprint, 1),
     fasilitasM2: bulat(sx.fasilitasM2, 1), allowanceM2: bulat(totalM2 - sx.subtotal, 1), totalM2,
-    posisiRak: Math.ceil(ppDesain), levelRak: sx.level.level, excel: sx,
+    posisiRak: sx.posisiRak, levelRak: sx.level.level, excel: sx,
   };
-  if (!sx.level.ok) flags.push({ level: 'kritis', kode: 'RAK_TERLALU_TINGGI', pesan: `Tinggi rak ${sx.level.tinggi} mm melebihi tinggi sisi gudang ${s.excel?.rak.sideMm ?? '-'} mm.` });
+  if (!sx.porsiOk) flags.push({ level: 'kritis', kode: 'PORSI_SPACE', pesan: `Porsi SPR + DDR + block stack + pallet floor = ${(sx.totalPorsi * 100).toFixed(1)}% (harus 100%).` });
+  if (!sx.level.ok && sx.posisiRak > 0) flags.push({ level: 'kritis', kode: 'RAK_TERLALU_TINGGI', pesan: `Tinggi rak ${sx.level.tinggi} mm melebihi tinggi sisi gudang ${s.excel?.rak.sideMm ?? '-'} mm.` });
   if (sx.cadTotal > 0 && Math.abs(totalM2 - sx.cadTotal) / sx.cadTotal > 0.05)
     flags.push({ level: 'peringatan', kode: 'CAD_GAP', pesan: `Luas hitung ${totalM2} m² berbeda >5% dari CAD ${sx.cadTotal} m².` });
 
@@ -121,7 +122,8 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   type MpBaris = { roleName: string; jenis: 'Direct' | 'Indirect' | 'Tetap'; jamPerShift: number; mpPerShift: number; headcount: number; utilisasi: number; alokasi: Record<Bucket, number> };
   const manpower: MpBaris[] = [];
   const metodeExcel = (t.metodeManpower ?? 'excel') === 'excel';
-  const pd = metodeExcel ? hitungProcessDesign(t.aktivitas, t.volumes, t.processDesign ?? PD_DEFAULT, t.faktorProduktivitas, t.efisiensi, t.jumlahShift) : null;
+  const pd = metodeExcel ? hitungProcessDesign(t.aktivitas, t.volumes, t.processDesign ?? PD_DEFAULT, t.faktorProduktivitas, t.efisiensi, t.jumlahShift,
+    { spanOfControl: t.spanOfControl, roleSupervisor: t.roleSupervisor, alatSupervisor: t.alatSupervisor, peranTetap: t.peranTetap }) : null;
   let directPerShift = 0;
   if (pd) {
     // ---- 4b. Manpower direct metode Process Design: FTE per bulan → ROUNDUP per shift aktif ----
@@ -174,8 +176,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   // ---- 5. MHE ---- (metode Process Design: unit = ROUNDUP(FTE alat); jam tersedia sudah memperhitungkan hari repair)
   const mhe = t.mhe.map(x => {
     const jam = perTool.get(x.tool)?.jamPerShift ?? 0;
-    const fteAlat = pd?.mhe.find(r => r.nama === x.tool)?.fte;
-    const unitDasar = pd ? Math.ceil((fteAlat ?? 0) - 1e-9) : Math.ceil(jam / (t.jamEfektifPerShift * x.ketersediaan) - 1e-9);   // alat dipakai bergantian antar shift
+    const unitDasar = pd ? (pd.mhe.find(r => r.nama === x.tool)?.resources ?? 0) : Math.ceil(jam / (t.jamEfektifPerShift * x.ketersediaan) - 1e-9);   // alat dipakai bergantian antar shift
     const spare = unitDasar > 0 ? Math.ceil(unitDasar * x.sparePersen - 1e-9) : 0;
     const arusJam = perTool.get(x.tool)?.jamPerArus ?? { inbound: 0, outbound: 0, storage: 0, vas: 0 };
     const alok = kosongAlokasi();

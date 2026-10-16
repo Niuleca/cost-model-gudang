@@ -16,7 +16,7 @@ import MhePanel from './MhePanel';
 import { hitungProcessDesign, PD_DEFAULT } from '@/lib/engine/processDesign';
 import HistorisPanel from './HistorisPanel';
 import StatusControl from '@/components/StatusControl';
-import { labelStatus } from '@/lib/status';
+import { labelStatus, STATUS_DRAFT } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
 
 interface Prod { id: number; aktivitas: string; tahap: string; tool: string; role_name: string; uom: string; kelas_berat: string; industri: string; prod_per_jam: number; status: string; benchmark: Record<string, string> | null }
@@ -27,7 +27,7 @@ interface Jab { role_name: string }
 const TAB_EXCEL = 'Data project (Excel)' as const;
 const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
-const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Scanner RDT', 'RF', 'Wrapping Machine'];
+const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM = ['palet', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pail', 'pack', 'roll', 'order', 'line', 'lokasi'];
 const KELOMPOK: Kelompok[] = ['IT', 'Office', 'Consumable', 'HSE', 'Asuransi', 'Startup', 'Fasilitas', 'Utilitas', 'Racking', 'Lainnya'];
 const RISIKO: KategoriRisiko[] = ['Rendah', 'Sedang', 'Tinggi'];
@@ -40,6 +40,12 @@ const KAT_KE_KELOMPOK: Record<string, Kelompok> = {
   IT: 'IT', Software: 'IT', Office: 'Office', ATK: 'Consumable', 'Rental Office': 'Office', HSE: 'HSE', Konstruksi: 'Startup',
   'Pest Control': 'HSE', Asuransi: 'Asuransi', Palet: 'Consumable', Racking: 'Racking', Security: 'Lainnya', Cleaning: 'Lainnya', Utilitas: 'Utilitas', Gudang: 'Fasilitas', Seragam: 'Consumable', Konsumsi: 'Consumable', Printer: 'Office',
 };
+/** Input daftar alat dipisah koma (datalist equipment). Di level modul supaya fokus tidak hilang. */
+function AlatInput({ value, onChange, ...rest }: { value: string[]; onChange: (v: string[]) => void; id?: string; 'aria-label'?: string }) {
+  return <input {...rest} list="dl-tool" placeholder="mis. PC, HT" value={value.join(', ')} style={{ minWidth: 160 }}
+    onChange={e => onChange(e.target.value.split(',').map(x => x.trimStart()))}
+    onBlur={e => onChange(e.target.value.split(',').map(x => x.trim()).filter(Boolean))} />;
+}
 /** Isi satu baris aktivitas dari database produktivitas (dipakai saat tambah & saat ganti pilihan aktivitas). */
 const dariProd = (p: Prod) => ({ productivityId: p.id, aktivitas: p.aktivitas, tahap: p.tahap, tool: p.tool, roleName: p.role_name, uom: p.uom,
   prodPerJam: Number(p.prod_per_jam), arus: (p.tahap.toLowerCase().startsWith('outbound') ? 'outbound' : p.tahap.toLowerCase().startsWith('inventory') ? 'storage' : 'inbound') as Arus });
@@ -60,6 +66,7 @@ export default function TenderPage() {
   const [catatanMaster, setCatatanMaster] = useState<string[]>([]);
   const [pesan, setPesan] = useState<string | null>(null);
   const [kotor, setKotor] = useState(false);
+  const [pembuat, setPembuat] = useState<string | null>(null);
 
   const muat = useCallback(async () => {
     const [tr, p, it, tf, jb] = await Promise.all([
@@ -77,6 +84,10 @@ export default function TenderPage() {
     setJabatan(((jb.data ?? []) as Jab[]).map(j => j.role_name));
     if (row.hasil) setHasil(row.hasil as HasilTender);
     if (row.asumsi.historis) setTab(TAB_EXCEL);
+    if (row.created_by) {
+      const { data: pc } = await sb.from('profiles').select('full_name, email').eq('id', row.created_by).maybeSingle();
+      setPembuat(pc ? (pc.full_name || pc.email) : null);
+    }
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { muat(); }, [muat]);
@@ -87,8 +98,10 @@ export default function TenderPage() {
   async function simpan(extra: Partial<TenderRow> = {}) {
     if (!t) return false;
     const { id: _id, updated_at: _u, ...rest } = { ...t, ...extra };
-    const { error } = await sb.from('tenders').update(rest).eq('id', t.id);
+    if (!bisaEdit) { setPesan('Draft ini milik akun lain — hanya bisa dilihat.'); return false; }
+    const { data: upd, error } = await sb.from('tenders').update(rest).eq('id', t.id).select('id');
     if (error) { setPesan(`Gagal menyimpan: ${error.message}`); return false; }
+    if (!upd?.length) { setPesan('Tidak tersimpan: draft ini hanya bisa diedit oleh pembuatnya.'); return false; }
     setKotor(false); setPesan('Tersimpan.'); setTimeout(() => setPesan(null), 2500);
     return true;
   }
@@ -112,9 +125,13 @@ export default function TenderPage() {
     setPesan(`Hasil disimpan sebagai versi ${versi}.`);
   }
 
+  // Draft tender hanya bisa diedit pembuatnya (atau admin/master); akun lain hanya melihat. Aturan sama dipasang di database.
+  const bisaEdit = !!t && !!profile && (profile.role === 'admin' || t.created_by === profile.id || !STATUS_DRAFT.includes(t.status));
+
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
   const pdMhe = useMemo(() => t ? hitungProcessDesign(t.asumsi.aktivitas, t.asumsi.volumes, { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
-    t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift).mhe : [], [t]);
+    t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift,
+    { spanOfControl: t.asumsi.spanOfControl, roleSupervisor: t.asumsi.roleSupervisor, alatSupervisor: t.asumsi.alatSupervisor, peranTetap: t.asumsi.peranTetap }).mhe : [], [t]);
 
   if (!t) return <p className="muted">{pesan ?? 'Memuat tender…'}</p>;
   const a = t.asumsi;
@@ -129,11 +146,12 @@ export default function TenderPage() {
         </div>
         <div className="row">
           {pesan && <span className="small" role="status">{pesan}</span>}
-          <button className="ghost" onClick={() => simpan()} disabled={!kotor}>Simpan input</button>
+          {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor}>Simpan input</button>}
           <button onClick={hitung}>Hitung</button>
         </div>
       </div>
-      <StatusControl tender={t} onBerubah={st => setT(x => x && ({ ...x, status: st }))} />
+      {profile && !bisaEdit && <div className="ro-banner" role="note"><b>Hanya lihat</b> · Draft ini dibuat oleh {pembuat ?? 'akun lain'}. Anda bisa melihat isi dan menjalankan Hitung untuk simulasi, tetapi tidak bisa menyimpan perubahan, mengubah status, atau membuat quotation.</div>}
+      {bisaEdit && <StatusControl tender={t} onBerubah={st => setT(x => x && ({ ...x, status: st }))} />}
 
       <div className="tabs" role="tablist">
         {([...(a.historis ? [TAB_EXCEL] : []), ...TABS] as ((typeof TABS)[number] | typeof TAB_EXCEL)[]).map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}
@@ -141,6 +159,7 @@ export default function TenderPage() {
 
       {tab === TAB_EXCEL && a.historis && <HistorisPanel h={a.historis} nama={(t.kode ?? t.customer).replace(/[^\w]+/g, '_')} />}
 
+      <fieldset className="ro-fieldset" disabled={!bisaEdit}>
       {tab === 'Key assumption' && (
         <div className="card">
           <h2>Key assumption</h2>
@@ -194,7 +213,7 @@ export default function TenderPage() {
 
       {tab === 'Aktivitas & manpower' && (<>
         {(a.metodeManpower ?? 'excel') === 'excel' && <>
-          <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, peranTetap: a.peranTetap }} aktivitas={a.aktivitas} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={a.aktivitas} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
           <ProcessDesignPanel bagian="rincian" aktivitas={a.aktivitas} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
@@ -206,13 +225,17 @@ export default function TenderPage() {
           <div className="grid3">
             <Num id="span" label="Span of control" suffix="direct per supervisor" value={a.spanOfControl} onChange={v => setA({ spanOfControl: v })} />
             <Sel id="spv" label="Role supervisor" value={a.roleSupervisor} options={jabatan.map(j => ({ v: j, l: j }))} onChange={v => setA({ roleSupervisor: v })} />
+            <label className="f" htmlFor="alat-spv">Alat pendukung supervisor
+              <AlatInput id="alat-spv" value={a.alatSupervisor ?? []} onChange={v => setA({ alatSupervisor: v })} /></label>
           </div>
+          <p className="small muted">Alat pendukung (mis. PC, HT, Scanner RDT) dihitung 1 unit per orang dan masuk ke MHE Summary serta Kebutuhan MHE. Pisahkan dengan koma.</p>
           <div className="tablewrap"><table>
-            <thead><tr><th>Role</th><th className="num">Headcount</th><th>Alokasi</th><th></th></tr></thead>
+            <thead><tr><th>Role</th><th className="num">Headcount</th><th>Alat pendukung</th><th>Alokasi</th><th></th></tr></thead>
             <tbody>{a.peranTetap.map((r, i) => (
               <tr key={i}>
                 <td><select aria-label="Role" value={r.roleName} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { roleName: e.target.value }) })}>{jabatan.map(j => <option key={j}>{j}</option>)}</select></td>
                 <td className="num"><input aria-label="Headcount" type="number" min={0} value={r.qty} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { qty: Number(e.target.value) }) })} /></td>
+                <td><AlatInput aria-label={`Alat pendukung ${r.roleName}`} value={r.alat ?? []} onChange={v => setA({ peranTetap: ubahArray(a.peranTetap, i, { alat: v }) })} /></td>
                 <td><select aria-label="Alokasi" value={namaAlokasi(r.alokasi)} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { alokasi: ALOKASI[e.target.value] }) })}>{Object.keys(ALOKASI).map(k => <option key={k}>{k}</option>)}</select></td>
                 <td><button className="danger" onClick={() => setA({ peranTetap: a.peranTetap.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}</tbody></table></div>
@@ -355,6 +378,7 @@ export default function TenderPage() {
 
       {tab === 'Hasil' && <HasilPanel hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={hitung} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
+      </fieldset>
     </>
   );
 }

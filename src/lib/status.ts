@@ -21,3 +21,6 @@ export const DROP = ['drop', 'batal'];
 export const PIPELINE = STATUS.filter(s => s.grup === 'pipeline').map(s => s.v);
 export const butuhAlasan = (s: string) => ['menang', 'kalah', 'drop', 'batal'].includes(s);
 export const pillStatus = (s: string) => MENANG.includes(s) ? 'ok' : KALAH.includes(s) || DROP.includes(s) ? 'bad' : 'warn';
+
+/** Tahap draft: hanya pembuat (dan admin) yang boleh mengedit — sama dengan aturan di database. */
+export const STATUS_DRAFT = ['draft', 'dihitung', 'review', 'approved'];

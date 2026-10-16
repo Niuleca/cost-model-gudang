@@ -7,7 +7,7 @@ import { rp, tanggal, INDUSTRI } from '@/lib/format';
 import { useProfile } from '@/lib/useProfile';
 import { STATUS, labelStatus, pillStatus } from '@/lib/status';
 
-const DRAFT = ['draft', 'dihitung', 'review', 'approved'];
+import { STATUS_DRAFT as DRAFT } from '@/lib/status';
 
 interface Baris {
   id: string; kode: string | null; customer: string; kab_kota: string; provinsi: string; industri: string | null; status: string; versi: number; updated_at: string; created_at: string; pic: string | null;

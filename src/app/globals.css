@@ -156,3 +156,8 @@ td input, td select { padding: 4px 6px; font-size: 13px; }
 .sp-bar > div { min-width: 2px; }
 .sp-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 4px 12px; font-size: 12px; }
 .sp-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* Draft milik akun lain: hanya lihat */
+.ro-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: contents; }
+.ro-fieldset:disabled input, .ro-fieldset:disabled select, .ro-fieldset:disabled textarea { background: var(--surface-2) !important; cursor: not-allowed; }
+.ro-banner { border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); padding: 10px 14px; border-radius: 6px; font-size: 14px; }

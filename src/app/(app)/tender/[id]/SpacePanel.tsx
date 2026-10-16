@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { hitungSpaceExcel, lengkapiSpaceExcel, type SpaceExcel, type StagingIn, type RakDim } from '@/lib/engine/space';
+import { hitungSpaceExcel, lengkapiSpaceExcel, type SpaceExcel, type StagingIn, type RakDim, type Porsi } from '@/lib/engine/space';
 import { angka } from '@/lib/format';
 
 const f1 = (x: number) => (x ? x.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–');
@@ -38,12 +38,30 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
       <Baris l="Foot print corridor per bay" v={f1(r.koridorBay)} u="m²" />
       <Baris l="Foot print total per bay" v={f1(r.totalBay)} u="m²" />
       <Baris l="Level of rack" v={angka(r.level, 1)} u="level" />
-      <Baris l={`${k === 'sd' ? 'Selective' : 'Double Deep'} rack capacity per bay`} v={angka(r.kapBay, 1)} u="palet" />
+      <Baris l={`${k === 'sd' ? 'SPR' : 'DDR'} capacity per bay`} v={angka(r.kapBay, 1)} u="palet" />
       <Baris l="Space required per pallet position" v={angka(r.m2PerPP, 2)} u="m²" />
       <Baris l="Capacity required" v={<span className="sp-pink">{angka(r.ppReq, 1)}</span>} u={`PP · ${r.bay} bay`} />
       <Baris l="Foot print" v={<b>{f1(r.footprint)}</b>} u="m²" tebal />
     </>;
   };
+  const LantaiRows = (k: 'block' | 'floor', r: typeof h.block) => {
+    const d = x[k];
+    const setL = (patch: Partial<typeof d>) => set({ [k]: { ...d, ...patch } } as Partial<SpaceExcel>);
+    return <>
+      <Baris l="Dimensi palet (panjang × lebar)" input={<>{inp(x.palet.panjang, v => set({ palet: { ...x.palet, panjang: v ?? 0 } }), { w: 60 })} × {inp(x.palet.lebar, v => set({ palet: { ...x.palet, lebar: v ?? 0 } }), { w: 60 })}</>} u="m" />
+      {k === 'block' ? <Baris l="Tumpukan (stacking)" input={inp(d.tumpuk, v => setL({ tumpuk: Math.max(1, v ?? 1) }), { w: 64 })} u="level" />
+        : <Baris l="Tumpukan" v="1" u="level (palet di lantai, tidak ditumpuk)" />}
+      <Baris l="Allowance gang / akses" input={<>{inp(Math.round(d.gangPersen * 1000) / 10, v => setL({ gangPersen: (v ?? 0) / 100 }), { w: 64 })}%</>} u="dari luas palet" />
+      <Baris l="Space required per pallet position" v={angka(r.m2PerPP, 2)} u="m²" />
+      <Baris l="Capacity required" v={<span className="sp-pink">{angka(r.ppReq, 1)}</span>} u={`PP · ${f0(r.tapak)} tapak palet`} />
+      <Baris l="Foot print" v={<b>{f1(r.footprint)}</b>} u="m²" tebal />
+    </>;
+  };
+  const p = x.porsi!;
+  const setP = (k: keyof Porsi, v: number | null) => set({ porsi: { ...p, [k]: Math.min(100, Math.max(0, v ?? 0)) / 100 } });
+  const PorsiRow = ({ k, l, pp }: { k: keyof Porsi; l: string; pp: number }) =>
+    <Baris l={l} input={<>{inp(Math.round(p[k] * 1000) / 10, v => setP(k, v), { w: 64 })}%</>} u={`${f0(pp)} PP`} />;
+
   const StgRows = (k: 'inbound' | 'outbound', r: typeof h.inbound, uom: string) => {
     const d = x[k];
     const setS = (patch: Partial<StagingIn>) => set({ [k]: { ...d, ...patch } } as Partial<SpaceExcel>);
@@ -64,8 +82,10 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
 
   // ---- Visual komposisi luas ----
   const komp = [
-    { l: 'Selective rack', v: h.sd.footprint, c: 'var(--accent)' },
-    { l: 'Double deep', v: h.dd.footprint, c: '#5b8fc7' },
+    { l: 'SPR', v: h.sd.footprint, c: 'var(--accent)' },
+    { l: 'DDR', v: h.dd.footprint, c: '#5b8fc7' },
+    { l: 'Block stack', v: h.block.footprint, c: '#8a6bb8' },
+    { l: 'Pallet floor', v: h.floor.footprint, c: '#a0765a' },
     { l: 'Receiving & staging', v: h.inbound.footprint, c: 'var(--ok)' },
     { l: 'Outbound & staging', v: h.outbound.footprint, c: 'var(--warn)' },
     { l: 'Fasilitas', v: h.fasilitasM2, c: 'var(--floor)' },
@@ -80,15 +100,24 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
           <table className="sp-tabel"><tbody>
             <Judul t="A  Capacity Requirement" />
             <Baris l="Total posisi palet (dari Volume storage peak)" v={<b>{f0(ppTotal)}</b>} u="PP" />
-            <Baris l="Porsi Racking SD (selective)" input={<>{inp(Math.round(x.porsiSd * 1000) / 10, v => set({ porsiSd: Math.min(100, Math.max(0, v ?? 0)) / 100 }), { w: 64 })}%</>} u={`${f0(h.sd.ppReq)} PP`} />
-            <Baris l="Porsi Racking DD (double deep)" v={`${angka((1 - x.porsiSd) * 100, 1)}%`} u={`${f0(h.dd.ppReq)} PP`} />
-            {x.porsiSd > 0 && <><Judul t="B  Racking space (Selective Rack)" />{RakRows('sd', h.sd)}</>}
-            {x.porsiSd < 1 && <><Judul t="C  Racking space (Double Deep)" />{RakRows('dd', h.dd)}</>}
+            {PorsiRow({ k: 'spr', l: 'Porsi SPR (selective pallet rack)', pp: h.sd.ppReq })}
+            {PorsiRow({ k: 'ddr', l: 'Porsi DDR (double deep rack)', pp: h.dd.ppReq })}
+            {PorsiRow({ k: 'block', l: 'Porsi block stack (palet ditumpuk)', pp: h.block.ppReq })}
+            {PorsiRow({ k: 'floor', l: 'Porsi pallet floor (palet di lantai)', pp: h.floor.ppReq })}
+            <tr className="sp-foot"><td>Total porsi</td><td className="num"><span className={`pill ${h.porsiOk ? 'ok' : 'bad'}`}>{angka(h.totalPorsi * 100, 1)}%</span></td>
+              <td className="small muted">{h.porsiOk ? 'OK' : 'harus 100%'}{!h.porsiOk && <button className="ghost" style={{ marginLeft: 6, padding: '0 8px' }}
+                onClick={() => { const sisa = Math.max(0, 1 - p.spr - p.block - p.floor); set({ porsi: { ...p, ddr: sisa } }); }}>Sisa ke DDR</button>}</td></tr>
+            {p.spr > 0 && <><Judul t="B  Racking space (SPR · Selective Pallet Rack)" />{RakRows('sd', h.sd)}</>}
+            {p.ddr > 0 && <><Judul t="C  Racking space (DDR · Double Deep Rack)" />{RakRows('dd', h.dd)}</>}
+            {p.block > 0 && <><Judul t="C2  Block stack" />{LantaiRows('block', h.block)}</>}
+            {p.floor > 0 && <><Judul t="C3  Pallet floor" />{LantaiRows('floor', h.floor)}</>}
             <Judul t="D  Receiving & Staging" />{StgRows('inbound', h.inbound, uomIn)}
             <Judul t="D  Outbound & Staging" />{StgRows('outbound', h.outbound, uomOut)}
             <Judul t="E  Foot Print Requirement (TOTAL)" />
-            <Baris l="Racking space (Selective Rack)" v={f0(h.sd.footprint)} u="m²" />
-            <Baris l="Racking space (Double Deep)" v={f0(h.dd.footprint)} u="m²" />
+            <Baris l="Racking space (SPR)" v={f0(h.sd.footprint)} u="m²" />
+            <Baris l="Racking space (DDR)" v={f0(h.dd.footprint)} u="m²" />
+            {h.block.footprint > 0 && <Baris l="Block stack" v={f0(h.block.footprint)} u="m²" />}
+            {h.floor.footprint > 0 && <Baris l="Pallet floor" v={f0(h.floor.footprint)} u="m²" />}
             <Baris l="Receiving & Staging" v={f0(h.inbound.footprint)} u="m²" />
             <Baris l="Outbound & Staging" v={f0(h.outbound.footprint)} u="m²" />
             {x.fasilitas.map((fa, i) => (

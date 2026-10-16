@@ -12,7 +12,7 @@ export interface TenderRow {
   skenario_aset: 'Rental' | 'Own Asset' | 'Built-to-Suit'; durasi_kontrak_bulan: number; tanggal_go_live: string | null;
   jumlah_shift: number; jam_kerja_per_shift: number; jam_efektif_per_shift: number; hari_kerja_per_minggu: 5 | 6 | 7;
   payment_term_hari: number; asumsi: Asumsi; hasil: unknown; status: string; versi: number; updated_at: string;
-  warehouse_id: string | null; pic: string | null; alasan_hasil: string | null; tanggal_keputusan: string | null; created_at?: string;
+  warehouse_id: string | null; pic: string | null; alasan_hasil: string | null; tanggal_keputusan: string | null; created_at?: string; created_by?: string | null;
 }
 
 /** Snapshot gudang terpilih (disalin dari master gudang saat dipilih, supaya tender tetap utuh walau master berubah). */
@@ -32,6 +32,7 @@ export interface Asumsi {
   volumes: VolumeInput[];
   aktivitas: (AktivitasInput & { productivityId?: number })[];
   peranTetap: PeranTetap[];
+  alatSupervisor?: string[];
   space: SpaceInput;
   mhe: (MheInput & { priceItemId?: number })[];
   costLines: (CostLineInput & { priceItemId?: number })[];
@@ -85,7 +86,7 @@ export function keInput(t: TenderRow): TenderInput {
     customer: t.customer, provinsi: t.provinsi, kabKota: t.kab_kota, tahun,
     durasiKontrakBulan: t.durasi_kontrak_bulan, jumlahShift: t.jumlah_shift, jamEfektifPerShift: Number(t.jam_efektif_per_shift),
     hariKerjaPerMinggu: t.hari_kerja_per_minggu, cutiTahunanHari: a.cutiTahunanHari, skenarioAset: t.skenario_aset,
-    paymentTermHari: t.payment_term_hari, volumes: a.volumes, aktivitas: a.aktivitas, peranTetap: a.peranTetap,
+    paymentTermHari: t.payment_term_hari, volumes: a.volumes, aktivitas: a.aktivitas, peranTetap: a.peranTetap, alatSupervisor: a.alatSupervisor ?? [],
     spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, faktorProduktivitas: a.faktorProduktivitas,
     efisiensi: a.efisiensi, mhe: a.mhe, listrik: a.listrik,
     space: a.gudang ? { ...a.space, luasTersediaM2: Number(a.gudang.luas_m2), namaGudang: a.gudang.nama,
