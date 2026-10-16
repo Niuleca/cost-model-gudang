@@ -53,7 +53,7 @@ export const TABS: Tab[] = [
       { key: 'key', label: 'Kode', readonly: true }, { key: 'label', label: 'Komponen' },
       { key: 'nilai', label: 'Nilai', type: 'number' }, { key: 'dasar_hukum', label: 'Dasar hukum' }, { key: 'catatan', label: 'Catatan' },
     ] },
-  { id: 'harga', label: 'Harga item', pemilik: 'Procurement / IT / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'it', 'engineering'],
+  { id: 'harga', kelompok: 'kategori', label: 'Semua item harga', pemilik: 'Procurement / IT / Engineering', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'it', 'engineering'],
     approval: true, orderBy: [{ col: 'kategori' }, { col: 'item' }], cari: ['kategori', 'item', 'vendor', 'sumber'],
     catatan: 'Isi vendor, tanggal harga, dan masa berlaku. Harga yang lewat masa berlaku otomatis berstatus expired dan muncul sebagai red flag di tender.',
     kolom: [
@@ -197,6 +197,7 @@ export const PRICE_PAGES: { slug: string; label: string; judul: string; ids: str
   { slug: 'services', label: 'Services', judul: 'Services (jasa pihak ketiga)', ids: ['pi-services'] },
   { slug: 'utilities', label: 'Utilities', judul: 'Utilities & listrik', ids: ['pi-utilitas', 'listrik'], listrik: true },
   { slug: 'hr', label: 'HR (UMK Manpower per area)', judul: 'HR: UMK & komponen manpower per area', ids: ['umk', 'ump', 'jabatan', 'payroll'] },
+  { slug: 'semua', label: 'Semua Price Inquiry', judul: 'Semua price inquiry', ids: ['harga', 'umk'], gudang: true },
 ];
 
 // ---------- Productivity: satu halaman per UoM ----------
