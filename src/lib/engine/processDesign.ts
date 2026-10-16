@@ -18,12 +18,16 @@ export interface ProcessDesignInput {
   mhe: KalenderResource;
   operatingAlat: number;   // alat dipakai bergantian oleh N shift/grup
   bebanShift: number[];    // porsi workload shift 1..3
+  hariKerjaBulan?: number;     // working days (operasional gudang) per bulan — informasi tabel workload shift
+  hariKerjaKaryawan?: number;  // working days employee per bulan
+  group?: number;              // jumlah grup/regu kerja
 }
 export const PD_DEFAULT: ProcessDesignInput = {
   mp: { totalHari: 365, minggu: 52, cuti: 12, libur: 18, sakit: 0, sabtuPerTahun: 52, jamSabtu: 5, jamWeekday: 7 },
   mhe: { totalHari: 365, minggu: 0, cuti: 0, libur: 0, sakit: 14, sabtuPerTahun: 0, jamSabtu: 0, jamWeekday: 7 },
   operatingAlat: 2,
   bebanShift: [1, 0, 0],
+  hariKerjaBulan: 25, hariKerjaKaryawan: 25, group: 1,
 };
 
 export function hitungKalenderResource(k: KalenderResource) {

@@ -9,10 +9,11 @@ const f0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 /** Process Design & Resource Calculation (format Excel): kalender kerja MP/MHE, shift, rincian per task, ringkasan MP & MHE. */
-export default function ProcessDesignPanel({ aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, hariKerja, onPd, onFaktor }: {
+export default function ProcessDesignPanel({ bagian, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift }: {
+  bagian: 'rincian' | 'desain';
   aktivitas: AktivitasInput[]; volumes: VolumeInput[]; pd?: ProcessDesignInput; faktorProduktivitas: number; efisiensi: number;
-  jumlahShift: number; hariKerja: number;
-  onPd: (pd: ProcessDesignInput) => void; onFaktor: (patch: { faktorProduktivitas?: number; efisiensi?: number }) => void;
+  jumlahShift: number;
+  onPd: (pd: ProcessDesignInput) => void; onFaktor: (patch: { faktorProduktivitas?: number; efisiensi?: number }) => void; onShift: (n: number) => void;
 }) {
   const pd = { ...PD_DEFAULT, ...(pdIn ?? {}), mp: { ...PD_DEFAULT.mp, ...(pdIn?.mp ?? {}) }, mhe: { ...PD_DEFAULT.mhe, ...(pdIn?.mhe ?? {}) } };
   const h = useMemo(() => hitungProcessDesign(aktivitas, volumes, pd, faktorProduktivitas, efisiensi, jumlahShift),
@@ -66,48 +67,19 @@ export default function ProcessDesignPanel({ aktivitas, volumes, pd: pdIn, fakto
       </table></div>
     </div>);
 
-  return (
-    <div className="card" style={{ gap: 14 }}>
-      <h2>Process Design & Resource Calculation</h2>
-      <p className="small muted">Workload = volume per bulan × %. RfR (MH) = workload ÷ (produktivitas × faktor). Man hour = RfR ÷ efisiensi.
-        FTE = man hour ÷ man hours per bulan (Man Power) atau ÷ (man hours MHE × operating) untuk equipment. Resources = ROUNDUP(FTE) per shift aktif.</p>
+  const setBeban = (i: number, v: number) => { const b = [...pd.bebanShift]; while (b.length < 3) b.push(0); b[i] = v / 100; onPd({ ...pd, bebanShift: b }); };
 
-      <div className="pd-atas">
-        <div style={{ minWidth: 0 }}>
-          <h3>Working day</h3>
-          <div className="tablewrap"><table>
-            <thead><tr><th>Working day</th><th className="num">Man Power</th><th className="num">MHE</th><th></th></tr></thead>
-            <tbody>{barisKal.map(b => (
-              <tr key={b.label} style={b.tebal ? { background: 'var(--link)', fontWeight: 700 } : undefined}>
-                <td>{b.label}</td>
-                <td className="num">{b.key ? inp(b.mp, v => setKal('mp', b.key!, v)) : (b.tebal ? Math.round(b.mp) : angka(b.mp, b.mp % 1 ? 2 : 0))}</td>
-                <td className="num">{b.key ? inp(b.mhe, v => setKal('mhe', b.key!, v)) : (b.tebal ? Math.round(b.mhe) : angka(b.mhe, b.mhe % 1 ? 2 : 0))}</td>
-                <td className="small muted">{b.satuan}</td>
-              </tr>))}</tbody>
-          </table></div>
-        </div>
-        <div style={{ display: 'grid', gap: 14, alignContent: 'start', minWidth: 0 }}>
-          <div className="tablewrap"><table>
-            <tbody>
-              <tr><td>Number of working shift</td><td className="num"><b>{jumlahShift}</b></td><td className="small muted">shift (ubah di Key assumption)</td></tr>
-              <tr><td>Working days per minggu</td><td className="num">{hariKerja}</td><td className="small muted">hari</td></tr>
-              <tr><td>Produktivitas faktor</td><td className="num">{inp(Math.round(faktorProduktivitas * 1000) / 10, v => onFaktor({ faktorProduktivitas: v / 100 }))}</td><td className="small muted">%</td></tr>
-              <tr><td>Efficiency</td><td className="num">{inp(Math.round(efisiensi * 1000) / 10, v => onFaktor({ efisiensi: v / 100 }))}</td><td className="small muted">%</td></tr>
-              <tr><td>Operating (alat dipakai bergantian)</td><td className="num">{inp(pd.operatingAlat, v => onPd({ ...pd, operatingAlat: Math.max(1, v) }))}</td><td className="small muted">shift/grup</td></tr>
-              {Array.from({ length: Math.max(1, jumlahShift) }, (_, i) => (
-                <tr key={i}><td>Workload shift {i + 1}</td>
-                  <td className="num">{inp(Math.round((pd.bebanShift[i] ?? 0) * 1000) / 10, v => { const b = [...pd.bebanShift]; while (b.length < 3) b.push(0); b[i] = v / 100; onPd({ ...pd, bebanShift: b }); })}</td>
-                  <td className="small muted">% → dipakai {pct(h.beban[i] ?? 0)}</td></tr>))}
-            </tbody>
-          </table></div>
-          <div className="pd-ringkas">
-            <Ringkas judul="Man Power Summary" rows={h.mp} remark="Head Count" tFte={h.totalFteMp} tRes={h.totalMp} />
-            <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} />
-          </div>
+  if (bagian === 'rincian') return (
+    <div className="card" style={{ gap: 10 }}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h2>Rincian per task</h2>
+        <div className="row small">
+          <span className="pill ok">Man Power {h.totalMp} org · FTE {f2(h.totalFteMp)}</span>
+          <span className="pill info">Equipment {h.totalMhe} unit · FTE {f2(h.totalFteMhe)}</span>
         </div>
       </div>
-
-      <h3>Rincian per task</h3>
+      <p className="small muted">Workload = volume per bulan × %. RfR (MH) = workload ÷ (produktivitas × faktor). Man hour = RfR ÷ efisiensi.
+        FTE = man hour ÷ man hours per bulan (Man Power) atau ÷ (man hours MHE × operating) untuk equipment.</p>
       <div className="tablewrap" style={{ maxHeight: '70vh' }}><table className="pd-tabel">
         <thead><tr>
           <th>No</th><th>Task</th><th>Workload driver</th><th>Equipment / role</th><th className="num">Volume/bln</th><th>UoM</th><th className="num">%</th>
@@ -115,7 +87,7 @@ export default function ProcessDesignPanel({ aktivitas, volumes, pd: pdIn, fakto
           <th className="num">Man hours tersedia</th><th className="num">Operating</th><th>Resources</th><th className="num">FTE</th><th className="num">Prod. per man</th>
         </tr></thead>
         <tbody>
-          {grup.length === 0 && <tr><td colSpan={17} className="muted">Belum ada aktivitas.</td></tr>}
+          {grup.length === 0 && <tr><td colSpan={17} className="muted">Belum ada aktivitas. Tambahkan di bagian Aktivitas (VSM) & manpower di bawah.</td></tr>}
           {grup.flatMap((g, gi) => g.driver.flatMap((d, di) => d.rows.map((b, ri) => (
             <tr key={`${gi}-${di}-${ri}`} className={ri === 0 && (di > 0 || gi > 0) ? 'pd-pisah' : ''}>
               <td className="num">{di === 0 && ri === 0 ? gi + 1 : ''}</td>
@@ -131,6 +103,59 @@ export default function ProcessDesignPanel({ aktivitas, volumes, pd: pdIn, fakto
             </tr>))))}
         </tbody>
       </table></div>
+    </div>);
+
+  return (
+    <div className="card" style={{ gap: 14 }}>
+      <h2>Process Design & Resource Calculation</h2>
+      <div className="pd-atas">
+        <div style={{ minWidth: 0 }}>
+          <h3>Working day</h3>
+          <div className="tablewrap"><table>
+            <thead><tr><th>Working day</th><th className="num">Man Power</th><th className="num">MHE</th><th></th></tr></thead>
+            <tbody>{barisKal.map(b => (
+              <tr key={b.label} style={b.tebal ? { background: 'var(--link)', fontWeight: 700 } : undefined}>
+                <td>{b.label}</td>
+                <td className="num">{b.key ? inp(b.mp, v => setKal('mp', b.key!, v)) : (b.tebal ? Math.round(b.mp) : angka(b.mp, b.mp % 1 ? 2 : 0))}</td>
+                <td className="num">{b.key ? inp(b.mhe, v => setKal('mhe', b.key!, v)) : (b.tebal ? Math.round(b.mhe) : angka(b.mhe, b.mhe % 1 ? 2 : 0))}</td>
+                <td className="small muted">{b.satuan}</td>
+              </tr>))}</tbody>
+          </table></div>
+        </div>
+        <div style={{ display: 'grid', gap: 14, alignContent: 'start', minWidth: 0 }}>
+          <div className="pd-ringkas">
+            <div style={{ minWidth: 0 }}>
+              <h3>Workload shift</h3>
+              <table className="pd-shift"><tbody>
+                <tr><td>Number of working shift</td><td className="num">
+                  <select aria-label="Jumlah shift" value={jumlahShift} onChange={e => onShift(Number(e.target.value))} style={{ width: 64, minWidth: 64 }}>{[1, 2, 3].map(n => <option key={n}>{n}</option>)}</select></td><td>Shift</td></tr>
+                <tr><td>Working Days</td><td className="num">{inp(pd.hariKerjaBulan ?? 25, v => onPd({ ...pd, hariKerjaBulan: v }))}</td><td></td></tr>
+                <tr><td>Working Days Employee</td><td className="num">{inp(pd.hariKerjaKaryawan ?? 25, v => onPd({ ...pd, hariKerjaKaryawan: v }))}</td><td></td></tr>
+                <tr><td>Group</td><td className="num">{inp(pd.group ?? 1, v => onPd({ ...pd, group: Math.max(1, v) }))}</td><td>Group</td></tr>
+                {[0, 1, 2].map(i => (
+                  <tr key={i} style={i >= jumlahShift ? { opacity: 0.5 } : undefined}>
+                    {i === 0 && <td rowSpan={3} style={{ verticalAlign: 'middle' }}>Workload</td>}
+                    <td className="num">{inp(Math.round((pd.bebanShift[i] ?? 0) * 1000) / 10, v => setBeban(i, v))}%</td>
+                    <td>Shift {i + 1}{i < jumlahShift ? <span className="small muted"> · dipakai {pct(h.beban[i] ?? 0)}</span> : <span className="small muted"> · tidak aktif</span>}</td>
+                  </tr>))}
+              </tbody></table>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <h3>Faktor</h3>
+              <table className="pd-shift"><tbody>
+                <tr><td>Produktivitas faktor</td><td className="num">{inp(Math.round(faktorProduktivitas * 1000) / 10, v => onFaktor({ faktorProduktivitas: v / 100 }))}%</td></tr>
+                <tr><td>Efficiency</td><td className="num">{inp(Math.round(efisiensi * 1000) / 10, v => onFaktor({ efisiensi: v / 100 }))}%</td></tr>
+                <tr><td>Operating (alat dipakai bergantian)</td><td className="num">{inp(pd.operatingAlat, v => onPd({ ...pd, operatingAlat: Math.max(1, v) }))}</td></tr>
+              </tbody></table>
+              <p className="small muted" style={{ marginTop: 6 }}>Resources man power = ROUNDUP(FTE × workload shift) per shift aktif. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
+            </div>
+          </div>
+          <div className="pd-ringkas">
+            <Ringkas judul="Man Power Summary" rows={h.mp} remark="Head Count" tFte={h.totalFteMp} tRes={h.totalMp} />
+            <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

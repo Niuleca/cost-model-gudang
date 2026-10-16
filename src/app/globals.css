@@ -132,3 +132,5 @@ td input, td select { padding: 4px 6px; font-size: 13px; }
 .pd-tabel td, .pd-tabel th { white-space: nowrap; font-size: 13px; }
 .pd-tabel tr.pd-pisah td { border-top: 2px solid var(--line); }
 @media (max-width: 900px) { .pd-atas { grid-template-columns: 1fr; } }
+.pd-shift { border: 1px solid var(--line); }
+.pd-shift td { border: 1px solid var(--line); padding: 4px 8px; font-size: 13px; }
