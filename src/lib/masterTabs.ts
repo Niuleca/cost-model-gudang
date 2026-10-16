@@ -137,7 +137,7 @@ export const TABS: Tab[] = [
       { key: 'tanggal', label: 'Tanggal', type: 'date' }, { key: 'nama', label: 'Nama' },
       { key: 'jenis', label: 'Jenis', type: 'select', options: ['Libur Nasional', 'Cuti Bersama'] }, { key: 'sumber', label: 'Sumber' },
     ] },
-  { id: 'listrik', label: 'Tarif listrik', pemilik: 'Engineering', table: 'electricity_tariffs', editorRoles: ['engineering'], approval: true,
+  { id: 'listrik', label: 'Tarif PLN', pemilik: 'Engineering', table: 'electricity_tariffs', editorRoles: ['engineering'], approval: true,
     orderBy: [{ col: 'golongan' }],
     kolom: [
       { key: 'golongan', label: 'Golongan' }, { key: 'daya_min_va', label: 'Daya min (VA)', type: 'number' },
@@ -182,10 +182,10 @@ TABS.push(
   tabItem('pi-hse', 'HSE & Fire Protection', ['HSE'], 'APD, APAR, hydrant, sprinkler, fire alarm, P3K, safety sign, training K3.' + CATATAN_HARGA),
   tabItem('pi-it', 'Perangkat IT', ['IT', 'Software'], 'Hardware & software IT gudang (PC, scanner, printer label, CCTV, jaringan). Biaya sistem format BAP ada di tab Katalog IT.' + CATATAN_HARGA, 'it'),
   tabItem('pi-services', 'Services', ['Pest Control', 'Security', 'Cleaning', 'Asuransi', 'Konstruksi'], 'Jasa pihak ketiga: pest control, security, cleaning, asuransi, pekerjaan konstruksi/fit-out.' + CATATAN_HARGA),
-  tabItem('pi-utilitas', 'Utilities', ['Utilitas'], 'Air, gas, internet, genset & utilitas lain. Tarif listrik PLN ada di tab Tarif listrik.' + CATATAN_HARGA),
+  tabItem('pi-utilitas', 'Utilities', ['Utilitas'], 'Air, gas, internet, genset & utilitas lain. Hitung kebutuhan listrik di tab Kalkulator listrik; tarif resmi di tab Tarif PLN.' + CATATAN_HARGA),
 );
 
-export const PRICE_PAGES: { slug: string; label: string; judul: string; ids: string[]; gudang?: boolean }[] = [
+export const PRICE_PAGES: { slug: string; label: string; judul: string; ids: string[]; gudang?: boolean; listrik?: boolean }[] = [
   { slug: 'warehouse', label: 'List Rental Warehouse', judul: 'Daftar gudang sewa', ids: [], gudang: true },
   { slug: 'mhe', label: 'MHE', judul: 'MHE / forklift', ids: ['mhe'] },
   { slug: 'racking', label: 'Racking', judul: 'Racking', ids: ['pi-racking'] },
@@ -195,7 +195,7 @@ export const PRICE_PAGES: { slug: string; label: string; judul: string; ids: str
   { slug: 'hse', label: 'HSE & Fire Protection', judul: 'HSE & fire protection', ids: ['pi-hse'] },
   { slug: 'it', label: 'IT & Automation', judul: 'IT & automation', ids: ['itkatalog', 'pi-it'] },
   { slug: 'services', label: 'Services', judul: 'Services (jasa pihak ketiga)', ids: ['pi-services'] },
-  { slug: 'utilities', label: 'Utilities', judul: 'Utilities', ids: ['pi-utilitas', 'listrik'] },
+  { slug: 'utilities', label: 'Utilities', judul: 'Utilities & listrik', ids: ['pi-utilitas', 'listrik'], listrik: true },
   { slug: 'hr', label: 'HR (UMK Manpower per area)', judul: 'HR: UMK & komponen manpower per area', ids: ['umk', 'ump', 'jabatan', 'payroll'] },
 ];
 
