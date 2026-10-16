@@ -1,3 +1,4 @@
+import { PD_DEFAULT, type ProcessDesignInput } from '@/lib/engine/processDesign';
 // Penghubung antara database (Supabase) dan mesin hitung.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
@@ -43,6 +44,8 @@ export interface Asumsi {
   it: ItSheet;
   gudang?: GudangTerpilih | null;
   historis?: ProjectHistoris;
+  metodeManpower?: 'excel' | 'shift';
+  processDesign?: ProcessDesignInput;
 }
 
 /** Project berjalan yang diimpor dari cost model Excel lama (tidak dihitung ulang oleh mesin hitung). */
@@ -72,7 +75,7 @@ export const ASUMSI_DEFAULT: Asumsi = {
     sequencePerShift: 2, fasilitasM2: 60, allowancePersen: 0.1, tarifSewaM2Bulan: 0, hargaRakPerPosisi: 0, umurRakBulan: 120 },
   mhe: [], costLines: [], listrik: [],
   golonganListrik: 'B-2/TR', tarifListrikKwh: 1444.70, advanceSewaBulan: 0, depositBulan: 0,
-  it: IT_SHEET_DEFAULT, gudang: null,
+  it: IT_SHEET_DEFAULT, gudang: null, metodeManpower: 'excel', processDesign: PD_DEFAULT,
 };
 
 export function keInput(t: TenderRow): TenderInput {
@@ -90,6 +93,7 @@ export function keInput(t: TenderRow): TenderInput {
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: a.advanceSewaBulan, depositBulan: a.depositBulan,
     stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter,
+    metodeManpower: a.metodeManpower ?? 'excel', processDesign: { ...PD_DEFAULT, ...(a.processDesign ?? {}) },
   };
 }
 

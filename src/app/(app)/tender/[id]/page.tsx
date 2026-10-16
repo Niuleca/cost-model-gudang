@@ -10,6 +10,7 @@ import { useProfile } from '@/lib/useProfile';
 import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
+import ProcessDesignPanel from './ProcessDesignPanel';
 import HistorisPanel from './HistorisPanel';
 import StatusControl from '@/components/StatusControl';
 import { labelStatus } from '@/lib/status';
@@ -23,6 +24,7 @@ interface Jab { role_name: string }
 const TAB_EXCEL = 'Data project (Excel)' as const;
 const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
+const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM = ['palet', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pail', 'pack', 'roll', 'order', 'line', 'lokasi'];
 const KELOMPOK: Kelompok[] = ['IT', 'Office', 'Consumable', 'HSE', 'Asuransi', 'Startup', 'Fasilitas', 'Utilitas', 'Racking', 'Lainnya'];
 const RISIKO: KategoriRisiko[] = ['Rendah', 'Sedang', 'Tinggi'];
@@ -185,26 +187,54 @@ export default function TenderPage() {
       {tab === 'Aktivitas & manpower' && (
         <div className="card">
           <h2>Aktivitas (VSM) & manpower</h2>
-          <p className="small muted">Pilih aktivitas dari database produktivitas (Operations). Jam per shift = volume peak per shift × % ÷ (produktivitas × faktor) ÷ efisiensi. Headcount = ROUNDUP(jam ÷ jam efektif) × shift × faktor pengganti cuti.</p>
+          <p className="small muted">Pilih aktivitas dari database produktivitas (Operations) atau tambah baris kosong. Semua kolom kuning bisa diubah: task, aktivitas, equipment, alat pendukung, role, produktivitas, UoM, arus, volume, %. Volume/bln kosong = volume peak arus × pengali.</p>
           <TambahAktivitas prods={prods} industri={t.industri} onTambah={p => setA({ aktivitas: [...a.aktivitas, {
             productivityId: p.id, aktivitas: p.aktivitas, tahap: p.tahap, tool: p.tool, roleName: p.role_name, uom: p.uom,
             prodPerJam: Number(p.prod_per_jam), arus: p.tahap.toLowerCase().startsWith('outbound') ? 'outbound' : p.tahap.toLowerCase().startsWith('inventory') ? 'storage' : 'inbound',
             persenVolume: 1, pengaliUom: 1 }] })} />
-          <div className="tablewrap"><table>
-            <thead><tr><th>Aktivitas</th><th>Tool</th><th>Role</th><th className="num">Prod/jam</th><th>UoM</th><th>Arus</th><th className="num">% volume</th><th className="num">Pengali UoM</th><th></th></tr></thead>
+          <div className="row">
+            <button className="ghost" onClick={() => setA({ aktivitas: [...a.aktivitas, { aktivitas: 'Aktivitas baru', tahap: a.aktivitas.at(-1)?.tahap ?? 'Inbound', tool: 'Manual', roleName: jabatan[0] ?? '',
+              uom: 'palet', prodPerJam: 20, arus: 'inbound', persenVolume: 1, pengaliUom: 1 }] })}>Tambah baris kosong</button>
+            <label className="f" htmlFor="metode" style={{ maxWidth: 360 }}>Metode hitung manpower
+              <select id="metode" value={a.metodeManpower ?? 'excel'} onChange={e => setA({ metodeManpower: e.target.value as 'excel' | 'shift' })}>
+                <option value="excel">Process design (Excel): FTE per bulan</option>
+                <option value="shift">Per shift (jam per shift × relief cuti)</option>
+              </select></label>
+          </div>
+          <datalist id="dl-tool">{TOOLS.concat(prods.map(p => p.tool), a.mhe.map(m => m.tool)).filter((v, k, xs) => v && xs.indexOf(v) === k).map(v => <option key={v} value={v} />)}</datalist>
+          <datalist id="dl-tahap">{Array.from(new Set([...prods.map(p => p.tahap), ...a.aktivitas.map(x => x.tahap)])).map(v => <option key={v} value={v} />)}</datalist>
+          <div className="tablewrap"><table className="akt-edit">
+            <thead><tr><th>Task / tahap</th><th>Aktivitas (workload driver)</th><th>Equipment</th><th>Alat pendukung</th><th>Role (man power)</th><th className="num">Prod/jam</th><th>UoM</th><th>Arus</th>
+              <th className="num" title="Kosongkan untuk memakai volume peak arus × pengali">Volume/bln</th><th className="num">% volume</th><th className="num">Pengali UoM</th><th></th></tr></thead>
             <tbody>
-              {a.aktivitas.length === 0 && <tr><td colSpan={9} className="muted">Belum ada aktivitas. Tambahkan dari daftar di atas.</td></tr>}
-              {a.aktivitas.map((x, i) => (
+              {a.aktivitas.length === 0 && <tr><td colSpan={12} className="muted">Belum ada aktivitas. Tambahkan dari daftar di atas atau baris kosong.</td></tr>}
+              {a.aktivitas.map((x, i) => {
+                const ub = (patch: Partial<typeof x>) => setA({ aktivitas: ubahArray(a.aktivitas, i, patch) });
+                const vAuto = (a.volumes.find(v => v.arus === x.arus)?.peakBulan ?? 0) * (x.pengaliUom || 1);
+                return (
                 <tr key={i}>
-                  <td>{x.aktivitas}<div className="small muted">{x.tahap}</div></td><td>{x.tool}</td><td>{x.roleName}</td>
-                  <td className="num db"><input aria-label="Produktivitas" type="number" step="any" value={x.prodPerJam} onChange={e => setA({ aktivitas: ubahArray(a.aktivitas, i, { prodPerJam: Number(e.target.value) }) })} /></td>
-                  <td>{x.uom}</td>
-                  <td><select aria-label="Arus" value={x.arus} onChange={e => setA({ aktivitas: ubahArray(a.aktivitas, i, { arus: e.target.value as Arus }) })}>{ARUS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select></td>
-                  <td className="num"><input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => setA({ aktivitas: ubahArray(a.aktivitas, i, { persenVolume: Number(e.target.value) / 100 }) })} /></td>
-                  <td className="num"><input aria-label="Pengali UoM" type="number" step="any" value={x.pengaliUom} onChange={e => setA({ aktivitas: ubahArray(a.aktivitas, i, { pengaliUom: Number(e.target.value) }) })} title="Mis. 1 palet = 40 karton → 40" /></td>
-                  <td><button className="danger" onClick={() => setA({ aktivitas: a.aktivitas.filter((_, j) => j !== i) })}>Hapus</button></td>
-                </tr>))}
+                  <td><input aria-label="Tahap" list="dl-tahap" value={x.tahap} onChange={e => ub({ tahap: e.target.value })} style={{ minWidth: 140 }} /></td>
+                  <td><input aria-label="Aktivitas" value={x.aktivitas} onChange={e => ub({ aktivitas: e.target.value })} style={{ minWidth: 180 }} /></td>
+                  <td><input aria-label="Equipment" list="dl-tool" value={x.tool} onChange={e => ub({ tool: e.target.value })} style={{ minWidth: 130 }} /></td>
+                  <td><input aria-label="Alat pendukung" list="dl-tool" placeholder="mis. Scanner RDT" value={(x.alatTambahan ?? []).join(', ')}
+                    onChange={e => ub({ alatTambahan: e.target.value.split(',').map(t => t.trimStart()) })} onBlur={e => ub({ alatTambahan: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })} style={{ minWidth: 130 }} /></td>
+                  <td><select aria-label="Role" value={x.roleName} onChange={e => ub({ roleName: e.target.value })} style={{ minWidth: 160 }}>
+                    {(jabatan.includes(x.roleName) ? jabatan : [x.roleName, ...jabatan]).map(j => <option key={j}>{j}</option>)}</select></td>
+                  <td className="num db"><input aria-label="Produktivitas" type="number" step="any" value={x.prodPerJam} onChange={e => ub({ prodPerJam: Number(e.target.value) })} style={{ width: 80, minWidth: 80 }} /></td>
+                  <td><select aria-label="UoM" value={x.uom} onChange={e => ub({ uom: e.target.value })}>{(UOM.includes(x.uom) ? UOM : [x.uom, ...UOM]).map(u => <option key={u}>{u}</option>)}</select></td>
+                  <td><select aria-label="Arus" value={x.arus} onChange={e => ub({ arus: e.target.value as Arus })}>{ARUS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select></td>
+                  <td className="num"><input aria-label="Volume per bulan" type="number" step="any" placeholder={Math.round(vAuto).toLocaleString('id-ID')} value={x.volumeManual ?? ''}
+                    onChange={e => ub({ volumeManual: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 96, minWidth: 96 }} /></td>
+                  <td className="num"><input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>
+                  <td className="num"><input aria-label="Pengali UoM" type="number" step="any" value={x.pengaliUom} onChange={e => ub({ pengaliUom: Number(e.target.value) })} title="Mis. 1 palet = 40 karton → 40" style={{ width: 70, minWidth: 70 }} /></td>
+                  <td className="row" style={{ flexWrap: 'nowrap', gap: 4 }}>
+                    <button className="ghost" title="Duplikat baris" onClick={() => setA({ aktivitas: [...a.aktivitas.slice(0, i + 1), { ...x }, ...a.aktivitas.slice(i + 1)] })}>Salin</button>
+                    <button className="danger" onClick={() => setA({ aktivitas: a.aktivitas.filter((_, j) => j !== i) })}>Hapus</button></td>
+                </tr>); })}
             </tbody></table></div>
+          {(a.metodeManpower ?? 'excel') === 'excel' && (
+            <ProcessDesignPanel aktivitas={a.aktivitas} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+              jumlahShift={t.jumlah_shift} hariKerja={t.hari_kerja_per_minggu} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} />)}
           <h3>Indirect & peran tetap</h3>
           <div className="grid3">
             <Num id="span" label="Span of control" suffix="direct per supervisor" value={a.spanOfControl} onChange={v => setA({ spanOfControl: v })} />

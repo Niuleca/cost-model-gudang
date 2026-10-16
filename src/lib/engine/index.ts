@@ -3,6 +3,7 @@
 // → MHE → payroll → biaya (fasilitas, utilitas, CAPEX, startup, finance, overhead)
 // → alokasi ke aktivitas → harga per kategori risiko → rate card → red flag.
 
+import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
 } from './types.ts';
@@ -120,7 +121,34 @@ export function hitungTender(t: TenderInput, m: MasterData) {
 
   type MpBaris = { roleName: string; jenis: 'Direct' | 'Indirect' | 'Tetap'; jamPerShift: number; mpPerShift: number; headcount: number; utilisasi: number; alokasi: Record<Bucket, number> };
   const manpower: MpBaris[] = [];
+  const metodeExcel = (t.metodeManpower ?? 'excel') === 'excel';
+  const pd = metodeExcel ? hitungProcessDesign(t.aktivitas, t.volumes, t.processDesign ?? PD_DEFAULT, t.faktorProduktivitas, t.efisiensi, t.jumlahShift) : null;
   let directPerShift = 0;
+  if (pd) {
+    // ---- 4b. Manpower direct metode Process Design: FTE per bulan → ROUNDUP per shift aktif ----
+    const shiftAktif = pd.beban.filter(w => w > 0).length || 1;
+    for (const r of pd.mp) {
+      if (!jobs.has(r.nama)) continue;
+      const alok = kosongAlokasi();
+      for (const a of Object.keys(r.jamPerArus) as Arus[]) alok[ARUS_KE_BUCKET[a]] = r.manHour > 0 ? r.jamPerArus[a] / r.manHour : 0;
+      const mpPerShift = Math.ceil(r.resources / shiftAktif - 1e-9);
+      directPerShift += mpPerShift;
+      const utilisasi = r.resources > 0 ? r.fte / r.resources : 0;
+      manpower.push({ roleName: r.nama, jenis: 'Direct', jamPerShift: bulat(r.manHour / Math.max(1, pd.kalender.mp.hariBulan) / shiftAktif, 2), mpPerShift,
+        headcount: r.resources, utilisasi: bulat(utilisasi, 3), alokasi: alok });
+      if (r.resources > 0 && utilisasi < 0.5) flags.push({ level: 'info', kode: 'UTILISASI_RENDAH', pesan: `${r.nama}: FTE ${r.fte.toFixed(2)} dibulatkan jadi ${r.resources} orang (terisi ${Math.round(utilisasi * 100)}%) — pertimbangkan multi-skill/pooling.` });
+    }
+    if (t.spanOfControl > 0 && directPerShift > 0) {
+      const spvPerShift = Math.ceil(directPerShift / t.spanOfControl);
+      manpower.push({ roleName: t.roleSupervisor, jenis: 'Indirect', jamPerShift: 0, mpPerShift: spvPerShift, headcount: spvPerShift * shiftAktif, utilisasi: 1,
+        alokasi: normalisasi(undefined, { handling_in: 0.4, handling_out: 0.4, storage: 0.2 }) });
+    }
+    for (const p of t.peranTetap) {
+      manpower.push({ roleName: p.roleName, jenis: 'Tetap', jamPerShift: 0, mpPerShift: 0, headcount: p.qty, utilisasi: 1,
+        alokasi: normalisasi(p.alokasi, { manajemen: 1 }) });
+    }
+  }
+  if (!pd) {
   for (const [roleName, r] of perRole) {
     const mpPerShift = Math.ceil(r.jamPerShift / t.jamEfektifPerShift - 1e-9);
     const headcount = Math.ceil(mpPerShift * t.jumlahShift * kal.faktorPengganti - 1e-9);
@@ -142,11 +170,13 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     manpower.push({ roleName: p.roleName, jenis: 'Tetap', jamPerShift: 0, mpPerShift: 0, headcount: p.qty, utilisasi: 1,
       alokasi: normalisasi(p.alokasi, { manajemen: 1 }) });
   }
+  }
 
-  // ---- 5. MHE ----
+  // ---- 5. MHE ---- (metode Process Design: unit = ROUNDUP(FTE alat); jam tersedia sudah memperhitungkan hari repair)
   const mhe = t.mhe.map(x => {
     const jam = perTool.get(x.tool)?.jamPerShift ?? 0;
-    const unitDasar = Math.ceil(jam / (t.jamEfektifPerShift * x.ketersediaan) - 1e-9);   // alat dipakai bergantian antar shift
+    const fteAlat = pd?.mhe.find(r => r.nama === x.tool)?.fte;
+    const unitDasar = pd ? Math.ceil((fteAlat ?? 0) - 1e-9) : Math.ceil(jam / (t.jamEfektifPerShift * x.ketersediaan) - 1e-9);   // alat dipakai bergantian antar shift
     const spare = unitDasar > 0 ? Math.ceil(unitDasar * x.sparePersen - 1e-9) : 0;
     const arusJam = perTool.get(x.tool)?.jamPerArus ?? { inbound: 0, outbound: 0, storage: 0, vas: 0 };
     const alok = kosongAlokasi();
@@ -323,6 +353,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
 
   return {
     kalender: { ...kal, hariOperasionalBulan: bulat(kal.hariOperasionalBulan, 2), faktorPengganti: bulat(kal.faktorPengganti, 4) },
+    processDesign: pd,
     volume, space, aktivitas: aktivitasHasil, manpower: payroll, mhe,
     totalHeadcount: payroll.reduce((sum, p) => sum + p.headcount, 0),
     biaya: baris, perKelompok, totalBiayaBulan: bulat(totalBiaya), investasi: bulat(investasi),

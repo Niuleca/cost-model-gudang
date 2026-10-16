@@ -126,3 +126,9 @@ td input, td select { padding: 4px 6px; font-size: 13px; }
 .gudang-kartu td { font-size: 13px; padding-top: 4px; padding-bottom: 4px; }
 .gudang-kartu td:first-child { white-space: nowrap; color: var(--muted); }
 .gudang-foto .geser { display: grid; place-items: center; min-width: 30px; }
+/* Process design (format Excel) */
+.pd-atas { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 18px; align-items: start; }
+.pd-ringkas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.pd-tabel td, .pd-tabel th { white-space: nowrap; font-size: 13px; }
+.pd-tabel tr.pd-pisah td { border-top: 2px solid var(--line); }
+@media (max-width: 900px) { .pd-atas { grid-template-columns: 1fr; } }

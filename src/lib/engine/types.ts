@@ -27,6 +27,8 @@ export interface AktivitasInput {
   arus: Arus;
   persenVolume: number;     // porsi volume arus yang melewati aktivitas
   pengaliUom: number;       // konversi uom arus -> uom aktivitas
+  alatTambahan?: string[];  // alat pendukung (mis. Scanner RDT) — dihitung FTE-nya di process design
+  volumeManual?: number | null; // override volume per bulan (sebelum %); kosong = peak arus × pengali
 }
 
 export interface PeranTetap {
@@ -112,6 +114,8 @@ export interface TenderInput {
   stokTon?: number;                 // untuk tarif storage alternatif
   stokCbm?: number;
   stokLiter?: number;
+  metodeManpower?: 'excel' | 'shift';   // excel = Process Design (FTE per bulan), shift = jam per shift
+  processDesign?: import('./processDesign').ProcessDesignInput;
 }
 
 export interface JobLevel {
