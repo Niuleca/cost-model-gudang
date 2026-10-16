@@ -123,7 +123,7 @@ export const TABS: Tab[] = [
     kolom: [
       { key: 'tahap', label: 'Tahap' }, { key: 'aktivitas', label: 'Aktivitas', width: 240 }, { key: 'tool', label: 'Tool', width: 90 },
       { key: 'role_name', label: 'Role' },
-      { key: 'uom', label: 'UoM', type: 'select', options: ['pcs', 'bag', 'karton', 'palet', 'ton', 'cbm', 'order', 'lokasi', 'line'] },
+      { key: 'uom', label: 'UoM', type: 'select', options: ['pcs', 'karton', 'ton', 'cbm', 'liter', 'bag', 'pail', 'pack', 'roll', 'palet', 'order', 'line', 'lokasi'] },
       { key: 'kelas_berat', label: 'Kelas berat', type: 'select', options: ['semua', 'light', 'medium', 'heavy'] },
       { key: 'industri', label: 'Industri' }, { key: 'prod_per_jam', label: 'Prod/jam', type: 'number', width: 80 },
       { key: 'detik_per_uom', label: 'Detik/UoM', type: 'number', readonly: true, width: 70 },
@@ -156,3 +156,65 @@ export const TABS: Tab[] = [
     kolom: [{ key: 'nama', label: 'Nama' }, { key: 'isi', label: 'Isi', type: 'textarea', width: 480 }, { key: 'aktif', label: 'Aktif', type: 'bool' }] },
 ];
 
+
+// ---------- Price Inquiry: satu halaman per kelompok harga (kategori price_items) ----------
+const kolomItem = (kats: string[]): Kolom[] => [
+  { key: 'kategori', label: 'Kategori', type: 'select', options: kats }, { key: 'item', label: 'Item', width: 240 },
+  { key: 'satuan', label: 'Satuan', width: 90 },
+  { key: 'harga_beli', label: 'Harga beli', type: 'number' }, { key: 'harga_sewa_bulan', label: 'Sewa/bln', type: 'number' },
+  { key: 'umur_ekonomis_bulan', label: 'Umur (bln)', type: 'number', width: 70 }, { key: 'daya_watt', label: 'Watt', type: 'number', width: 70 },
+  { key: 'vendor', label: 'Vendor' }, { key: 'spesifikasi', label: 'Spesifikasi' },
+  { key: 'tanggal_harga', label: 'Tgl harga', type: 'date' }, { key: 'berlaku_sampai', label: 'Berlaku s.d.', type: 'date' },
+  { key: 'owner_role', label: 'Pemilik', type: 'select', options: ['procurement', 'engineering', 'it'] }, { key: 'sumber', label: 'Sumber', width: 220 },
+];
+const tabItem = (id: string, label: string, kats: string[], catatan: string, owner: AppRole = 'procurement'): Tab => ({
+  id, label, pemilik: owner === 'it' ? 'IT' : 'Procurement / Engineering', table: 'price_items', view: 'price_items_status',
+  editorRoles: ['procurement', 'engineering', 'it'], approval: true, filter: { kategori: kats }, defaults: { owner_role: owner, kategori: kats[0] },
+  orderBy: [{ col: 'kategori' }, { col: 'item' }], cari: ['kategori', 'item', 'vendor', 'sumber', 'spesifikasi'],
+  kelompok: kats.length > 1 ? 'kategori' : undefined, catatan, kolom: kolomItem(kats),
+});
+const CATATAN_HARGA = ' Harga lewat masa berlaku otomatis expired dan jadi red flag di tender.';
+TABS.push(
+  tabItem('pi-racking', 'Racking', ['Racking'], 'Selective, double deep, drive-in, shelving, mezzanine. Isi harga per posisi palet atau per unit di kolom satuan.' + CATATAN_HARGA),
+  tabItem('pi-palet', 'Pallet', ['Palet'], 'Palet kayu, plastik, slipsheet. Sewa/bln untuk skema sewa, harga beli + umur untuk skema beli.' + CATATAN_HARGA),
+  tabItem('pi-consumable', 'Consumable', ['Konsumsi', 'Seragam', 'Lainnya'], 'Air minum, konsumsi, seragam, stretch film, label dan bahan habis pakai lain.' + CATATAN_HARGA),
+  tabItem('pi-stationery', 'Stationery', ['ATK', 'Printer', 'Office', 'Rental Office'], 'ATK, printer & tinta, perlengkapan/furnitur kantor, sewa ruang kantor.' + CATATAN_HARGA),
+  tabItem('pi-hse', 'HSE & Fire Protection', ['HSE'], 'APD, APAR, hydrant, sprinkler, fire alarm, P3K, safety sign, training K3.' + CATATAN_HARGA),
+  tabItem('pi-it', 'Perangkat IT', ['IT', 'Software'], 'Hardware & software IT gudang (PC, scanner, printer label, CCTV, jaringan). Biaya sistem format BAP ada di tab Katalog IT.' + CATATAN_HARGA, 'it'),
+  tabItem('pi-services', 'Services', ['Pest Control', 'Security', 'Cleaning', 'Asuransi', 'Konstruksi'], 'Jasa pihak ketiga: pest control, security, cleaning, asuransi, pekerjaan konstruksi/fit-out.' + CATATAN_HARGA),
+  tabItem('pi-utilitas', 'Utilities', ['Utilitas'], 'Air, gas, internet, genset & utilitas lain. Tarif listrik PLN ada di tab Tarif listrik.' + CATATAN_HARGA),
+);
+
+export const PRICE_PAGES: { slug: string; label: string; judul: string; ids: string[]; gudang?: boolean }[] = [
+  { slug: 'warehouse', label: 'List Rental Warehouse', judul: 'Daftar gudang sewa', ids: [], gudang: true },
+  { slug: 'mhe', label: 'MHE', judul: 'MHE / forklift', ids: ['mhe'] },
+  { slug: 'racking', label: 'Racking', judul: 'Racking', ids: ['pi-racking'] },
+  { slug: 'pallet', label: 'Pallet', judul: 'Pallet', ids: ['pi-palet'] },
+  { slug: 'consumable', label: 'Consumable', judul: 'Consumable', ids: ['pi-consumable'] },
+  { slug: 'stationery', label: 'Stationery', judul: 'Stationery & perlengkapan kantor', ids: ['pi-stationery'] },
+  { slug: 'hse', label: 'HSE & Fire Protection', judul: 'HSE & fire protection', ids: ['pi-hse'] },
+  { slug: 'it', label: 'IT & Automation', judul: 'IT & automation', ids: ['itkatalog', 'pi-it'] },
+  { slug: 'services', label: 'Services', judul: 'Services (jasa pihak ketiga)', ids: ['pi-services'] },
+  { slug: 'utilities', label: 'Utilities', judul: 'Utilities', ids: ['pi-utilitas', 'listrik'] },
+  { slug: 'hr', label: 'HR (UMK Manpower per area)', judul: 'HR: UMK & komponen manpower per area', ids: ['umk', 'ump', 'jabatan', 'payroll'] },
+];
+
+// ---------- Productivity: satu halaman per UoM ----------
+export const UOM_PROD = ['pcs', 'karton', 'ton', 'cbm', 'liter', 'bag', 'pail', 'pack', 'roll', 'palet', 'order', 'line', 'lokasi'];
+export const PROD_PAGES: { slug: string; label: string; uom: string[] }[] = [
+  { slug: 'pcs', label: 'Pcs', uom: ['pcs'] },
+  { slug: 'carton', label: 'Case/Carton', uom: ['karton'] },
+  { slug: 'ton', label: 'Ton', uom: ['ton'] },
+  { slug: 'cbm', label: 'CBM', uom: ['cbm'] },
+  { slug: 'liter', label: 'Liter', uom: ['liter'] },
+  { slug: 'bag', label: 'Bag', uom: ['bag'] },
+  { slug: 'pail', label: 'Pail', uom: ['pail'] },
+  { slug: 'pack', label: 'Pack', uom: ['pack'] },
+  { slug: 'roll', label: 'Roll', uom: ['roll'] },
+  { slug: 'lainnya', label: 'Pallet, order & line', uom: ['palet', 'order', 'line', 'lokasi'] },
+];
+export const tabProduktivitas = (uom: string[], label: string): Tab => {
+  const dasar = TABS.find(t => t.id === 'produktivitas')!;
+  return { ...dasar, id: `prod-${uom[0]}`, label, filter: { uom }, defaults: { ...(dasar.defaults ?? {}), uom: uom[0] },
+    kelompok: 'tahap', kolom: dasar.kolom.map(k => k.key === 'uom' ? { ...k, options: uom.length > 1 ? uom : UOM_PROD } : k) };
+};

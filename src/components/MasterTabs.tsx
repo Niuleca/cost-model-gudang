@@ -2,18 +2,18 @@
 import { useState, type ReactNode } from 'react';
 import TableEditor from '@/components/TableEditor';
 import { useProfile } from '@/lib/useProfile';
-import { TABS } from '@/lib/masterTabs';
+import { TABS, type Tab } from '@/lib/masterTabs';
 
 /** Halaman master data per departemen: sekumpulan tab TableEditor + tab khusus (opsional). */
-export default function MasterTabs({ ids, eyebrow, judul, ekstra }: {
-  ids: string[]; eyebrow: string; judul: string;
+export default function MasterTabs({ ids, eyebrow, judul, ekstra, tabsLangsung }: {
+  ids: string[]; eyebrow: string; judul: string; tabsLangsung?: Tab[];
   ekstra?: { id: string; label: string; pemilik: string; isi: ReactNode }[];
 }) {
   const { profile } = useProfile();
-  const tabs = [...(ekstra ?? []).map(e => ({ id: e.id, label: e.label, pemilik: e.pemilik })), ...TABS.filter(t => ids.includes(t.id))];
+  const tabs = [...(ekstra ?? []).map(e => ({ id: e.id, label: e.label, pemilik: e.pemilik })), ...ids.map(id => TABS.find(t => t.id === id)).filter((t): t is Tab => !!t), ...(tabsLangsung ?? [])];
   const [tab, setTab] = useState(tabs[0].id);
   const e = ekstra?.find(x => x.id === tab);
-  const t = TABS.find(x => x.id === tab);
+  const t = [...TABS, ...(tabsLangsung ?? [])].find(x => x.id === tab);
   const pemilik = e?.pemilik ?? t?.pemilik;
   return (
     <>

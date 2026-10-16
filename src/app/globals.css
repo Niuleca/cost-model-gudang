@@ -29,23 +29,34 @@ h2 { font-size: 22px; }
 h3 { font-size: 18px; }
 p { margin: 0; }
 
-.shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
-.side { background: var(--ink); color: var(--bg); padding: 20px 14px; display: flex; flex-direction: column; gap: 18px; }
-.side .brand { font-family: var(--display); font-size: 22px; line-height: 1; border-bottom: 3px solid var(--floor); padding-bottom: 12px; }
-.side nav { display: grid; gap: 12px; }
-.side .navgrup { display: grid; gap: 2px; }
-.side .navjudul { font: 500 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; opacity: .55; padding: 0 10px; }
-.side nav a { color: inherit; text-decoration: none; padding: 8px 10px; border-radius: 4px; opacity: .85; }
-.side nav a:hover, .side nav a.on { background: rgba(255,255,255,.1); opacity: 1; }
-.side .who { margin-top: auto; font-size: 12px; opacity: .8; display: grid; gap: 6px; }
-.main { padding: 24px max(16px, env(safe-area-inset-right, 0px)) 64px max(16px, env(safe-area-inset-left, 0px)); min-width: 0; display: grid; gap: 20px; align-content: start; max-width: 1280px; }
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar { position: sticky; top: 0; z-index: 50; background: var(--ink); color: var(--bg); display: flex; align-items: center; gap: 18px;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); border-bottom: 3px solid var(--floor); min-height: 54px; flex-wrap: wrap; }
+.topbar .brand { font-family: var(--display); font-size: 22px; line-height: 1; color: inherit; text-decoration: none; white-space: nowrap; }
+.topbar .brand span { color: var(--floor); }
+.topnav { display: flex; align-items: stretch; flex: 1; gap: 2px; flex-wrap: wrap; min-width: 0; }
+.topnav .sela { flex: 1; }
+.dd { position: relative; display: flex; }
+.ddbtn { background: transparent; color: inherit; border: 0; border-radius: 0; padding: 16px 12px 13px; border-bottom: 3px solid transparent; margin-bottom: -3px; opacity: .88; font-weight: 500; white-space: nowrap; }
+.ddbtn:hover, .dd.open .ddbtn { opacity: 1; background: rgba(255,255,255,.08); }
+.ddbtn.on { opacity: 1; border-bottom-color: var(--floor); }
+.ddbtn .caret { font-size: 10px; opacity: .7; margin-left: 2px; }
+.ddmenu { position: absolute; top: 100%; left: 0; min-width: 240px; max-width: min(360px, calc(100vw - 32px)); background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-top: 3px solid var(--floor); border-radius: 0 0 6px 6px; box-shadow: 0 10px 28px rgba(0,0,0,.18); padding: 6px; display: grid; gap: 1px; z-index: 60; }
+.ddmenu.kanan { left: auto; right: 0; }
+.ddmenu a, .ddmenu .ddkeluar { color: var(--ink); text-decoration: none; padding: 8px 10px; border-radius: 4px; font-size: 14px; text-align: left; background: transparent; border: 0; font-weight: 400; }
+.ddmenu a:hover, .ddmenu .ddkeluar:hover { background: var(--surface-2); }
+.ddmenu a.on { background: var(--input); font-weight: 600; }
+.ddmenu a.pisah { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 10px; border-radius: 0 0 4px 4px; }
+.ddmenu .ddkeluar { border-top: 1px solid var(--line); border-radius: 0; margin-top: 4px; color: var(--bad); cursor: pointer; }
+.main { padding: 24px max(16px, env(safe-area-inset-right, 0px)) 64px max(16px, env(safe-area-inset-left, 0px)); min-width: 0; display: grid; gap: 20px; align-content: start; max-width: 1360px; width: 100%; margin: 0 auto; }
 @media (max-width: 800px) {
-  .shell { grid-template-columns: 1fr; }
-  .side { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; }
-  .side nav { display: flex; flex-wrap: wrap; gap: 4px; }
-  .side .navgrup { display: contents; }
-  .side .navjudul { display: none; }
-  .side .who { margin-top: 0; margin-left: auto; }
+  .topbar { gap: 6px; padding-top: 8px; }
+  .topnav { flex-basis: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .topnav .sela { display: none; }
+  .ddbtn { padding: 10px 10px 9px; }
+  .dd { position: static; }
+  .ddmenu, .ddmenu.kanan { left: 16px; right: 16px; max-width: none; top: auto; position: fixed; margin-top: 44px; }
 }
 
 .head { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; justify-content: space-between; }

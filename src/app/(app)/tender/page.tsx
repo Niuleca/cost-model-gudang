@@ -7,6 +7,8 @@ import { rp, tanggal, INDUSTRI } from '@/lib/format';
 import { useProfile } from '@/lib/useProfile';
 import { STATUS, labelStatus, pillStatus } from '@/lib/status';
 
+const DRAFT = ['draft', 'dihitung', 'review', 'approved'];
+
 interface Baris {
   id: string; kode: string | null; customer: string; kab_kota: string; provinsi: string; industri: string | null; status: string; versi: number; updated_at: string; created_at: string; pic: string | null;
   hasil: { totalBiayaBulan?: number; redFlags?: { level: string }[]; simulasi?: { gpPersen: number }[] } | null;
@@ -21,6 +23,8 @@ export default function DaftarTender() {
   const [rows, setRows] = useState<Baris[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [fil, setFil] = useState({ q: '', status: '', industri: '', tahun: '' });
+  const [draftSaja, setDraftSaja] = useState(false);
+  useEffect(() => { setDraftSaja(new URLSearchParams(window.location.search).get('grup') === 'draft'); }, []);
   useEffect(() => {
     supabaseBrowser().from('tenders').select('id, kode, customer, kab_kota, provinsi, industri, status, versi, updated_at, created_at, pic, hasil, excel:asumsi->historis->ringkasan').order('updated_at', { ascending: false })
       .then(({ data, error }: { data: Baris[] | null; error: { message: string } | null }) => { if (error) setErr(error.message); else setRows(data ?? []); });
@@ -36,17 +40,21 @@ export default function DaftarTender() {
   }
 
   const tahunList = Array.from(new Set(rows.map(r => r.created_at.slice(0, 4)))).sort().reverse();
-  const tampil = rows.filter(r => (!fil.status || r.status === fil.status) && (!fil.industri || r.industri === fil.industri)
+  const tampil = rows.filter(r => (!draftSaja || DRAFT.includes(r.status)) && (!fil.status || r.status === fil.status) && (!fil.industri || r.industri === fil.industri)
     && (!fil.tahun || r.created_at.startsWith(fil.tahun))
     && (!fil.q || `${r.kode} ${r.customer} ${r.kab_kota} ${r.pic ?? ''}`.toLowerCase().includes(fil.q.toLowerCase())));
 
   return (
     <>
       <div className="head">
-        <div><div className="eyebrow">Menu 5 · 9 · Cost model & riwayat</div><h1>Tender</h1></div>
+        <div><div className="eyebrow">Tender</div><h1>{draftSaja ? 'Draft tender' : 'Semua tender'}</h1></div>
         <Link className="btn" href="/tender/baru">Tender baru</Link>
       </div>
       {err && <p className="error">{err}</p>}
+      <div className="row" role="group" aria-label="Tampilan">
+        <button className={draftSaja ? '' : 'ghost'} aria-pressed={draftSaja} onClick={() => { setDraftSaja(true); window.history.replaceState(null, '', '/tender?grup=draft'); }}>Draft (masih disusun)</button>
+        <button className={draftSaja ? 'ghost' : ''} aria-pressed={!draftSaja} onClick={() => { setDraftSaja(false); window.history.replaceState(null, '', '/tender'); }}>Semua tender</button>
+      </div>
       <div className="row">
         <input aria-label="Cari" placeholder="Cari kode, customer, kota, PIC…" value={fil.q} onChange={e => setFil({ ...fil, q: e.target.value })} style={{ maxWidth: 260, background: 'var(--surface)' }} />
         <select aria-label="Status" value={fil.status} onChange={e => setFil({ ...fil, status: e.target.value })} style={{ maxWidth: 180 }}><option value="">Semua status</option>{STATUS.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}</select>

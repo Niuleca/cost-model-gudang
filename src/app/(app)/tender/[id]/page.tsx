@@ -23,7 +23,7 @@ interface Jab { role_name: string }
 const TAB_EXCEL = 'Data project (Excel)' as const;
 const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
-const UOM = ['palet', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'order', 'line', 'lokasi'];
+const UOM = ['palet', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pail', 'pack', 'roll', 'order', 'line', 'lokasi'];
 const KELOMPOK: Kelompok[] = ['IT', 'Office', 'Consumable', 'HSE', 'Asuransi', 'Startup', 'Fasilitas', 'Utilitas', 'Racking', 'Lainnya'];
 const RISIKO: KategoriRisiko[] = ['Rendah', 'Sedang', 'Tinggi'];
 const ALOKASI: Record<string, Partial<Record<Bucket, number>>> = {
