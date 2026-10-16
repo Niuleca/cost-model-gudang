@@ -134,3 +134,7 @@ td input, td select { padding: 4px 6px; font-size: 13px; }
 @media (max-width: 900px) { .pd-atas { grid-template-columns: 1fr; } }
 .pd-shift { border: 1px solid var(--line); }
 .pd-shift td { border: 1px solid var(--line); padding: 4px 8px; font-size: 13px; }
+.pd-dua { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; align-items: stretch; }
+.pd-sum { table-layout: fixed; width: 100%; }
+.pd-sum th:nth-child(1) { width: 44%; } .pd-sum th:nth-child(2) { width: 22%; } .pd-sum th:nth-child(3), .pd-sum th:nth-child(4) { width: 17%; }
+.pd-sum td { height: 34px; }

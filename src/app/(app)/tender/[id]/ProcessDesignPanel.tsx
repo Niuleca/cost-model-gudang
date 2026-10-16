@@ -10,7 +10,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 /** Process Design & Resource Calculation (format Excel): kalender kerja MP/MHE, shift, rincian per task, ringkasan MP & MHE. */
 export default function ProcessDesignPanel({ bagian, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift }: {
-  bagian: 'rincian' | 'desain';
+  bagian: 'ringkasan' | 'rincian' | 'desain';
   aktivitas: AktivitasInput[]; volumes: VolumeInput[]; pd?: ProcessDesignInput; faktorProduktivitas: number; efisiensi: number;
   jumlahShift: number;
   onPd: (pd: ProcessDesignInput) => void; onFaktor: (patch: { faktorProduktivitas?: number; efisiensi?: number }) => void; onShift: (n: number) => void;
@@ -54,20 +54,30 @@ export default function ProcessDesignPanel({ bagian, aktivitas, volumes, pd: pdI
     return m;
   }, [h.baris]);
 
-  const Ringkas = ({ judul, rows, remark, tFte, tRes }: { judul: string; rows: typeof h.mp; remark: string; tFte: number; tRes: number }) => (
+  const Ringkas = ({ judul, rows, remark, tFte, tRes, pad = 0 }: { judul: string; rows: typeof h.mp; remark: string; tFte: number; tRes: number; pad?: number }) => (
     <div style={{ minWidth: 0 }}>
       <h3>{judul}</h3>
-      <div className="tablewrap"><table>
+      <div className="tablewrap"><table className="pd-sum">
         <thead><tr><th>Description</th><th>Remarks</th><th className="num">FTE</th><th className="num">Resources</th></tr></thead>
         <tbody>
           {rows.length === 0 && <tr><td colSpan={4} className="muted">–</td></tr>}
           {rows.map(r => <tr key={r.nama}><td>{r.nama}</td><td className="small muted">{remark}</td><td className="num">{f2(r.fte)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>)}
+          {Array.from({ length: Math.max(0, pad - Math.max(1, rows.length)) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={4}>&nbsp;</td></tr>)}
           <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>{remark}</b></td><td className="num"><b>{f2(tFte)}</b></td><td className="num"><b>{tRes}</b></td></tr>
         </tbody>
       </table></div>
     </div>);
 
   const setBeban = (i: number, v: number) => { const b = [...pd.bebanShift]; while (b.length < 3) b.push(0); b[i] = v / 100; onPd({ ...pd, bebanShift: b }); };
+
+  if (bagian === 'ringkasan') {
+    const n = Math.max(h.mp.length, h.mhe.length, 1);
+    return (
+      <div className="card pd-dua">
+        <Ringkas judul="Man Power Summary" rows={h.mp} remark="Head Count" tFte={h.totalFteMp} tRes={h.totalMp} pad={n} />
+        <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={n} />
+      </div>);
+  }
 
   if (bagian === 'rincian') return (
     <div className="card" style={{ gap: 10 }}>
@@ -149,10 +159,6 @@ export default function ProcessDesignPanel({ bagian, aktivitas, volumes, pd: pdI
               </tbody></table>
               <p className="small muted" style={{ marginTop: 6 }}>Resources man power = ROUNDUP(FTE × workload shift) per shift aktif. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
             </div>
-          </div>
-          <div className="pd-ringkas">
-            <Ringkas judul="Man Power Summary" rows={h.mp} remark="Head Count" tFte={h.totalFteMp} tRes={h.totalMp} />
-            <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} />
           </div>
         </div>
       </div>
