@@ -318,12 +318,12 @@ export default function TenderPage() {
             : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />
       </>)}
 
-      {tab === 'IT' && <ItPanel sheet={a.it} onChange={it => setA({ it })} />}
+      {tab === 'IT' && <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} />}
 
       {tab === 'Biaya lain' && (
         <div className="card">
           <h2>Biaya lain (office, ATK, seragam, konsumsi, HSE, asuransi, pest control, startup)</h2>
-          {a.it.lines.length > 0 && <p className="small notice">IT dari tab IT ikut dihitung otomatis: {rp(ringkasIt(a.it).setaraBulan)}/bln + OTC {rp(ringkasIt(a.it).sekali)}. Jangan diinput dua kali di sini.</p>}
+          {a.it.lines.length > 0 && <p className="small notice">IT dari tab IT ikut dihitung otomatis: ±{rp(ringkasIt(a.it, { kontrakBulan: t.durasi_kontrak_bulan, bungaTahun: 0.1 }).totalBulan)}/bln (termasuk depresiasi/amortisasi OTC {rp(ringkasIt(a.it).sekali)}). Jangan diinput dua kali di sini.</p>}
           <p className="small muted">Harga ditarik dari database. Mode beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak.</p>
           <div className="tablewrap"><table>
             <thead><tr><th>Item</th><th>Kelompok</th><th>Mode</th><th className="num">Qty</th><th className="num">Harga satuan</th><th className="num">Umur</th><th>Risiko</th><th>Alokasi</th><th></th></tr></thead>
