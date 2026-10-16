@@ -139,7 +139,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
         headcount: r.resources, utilisasi: bulat(utilisasi, 3), alokasi: alok });
       if (r.resources > 0 && utilisasi < 0.5) flags.push({ level: 'info', kode: 'UTILISASI_RENDAH', pesan: `${r.nama}: FTE ${r.fte.toFixed(2)} dibulatkan jadi ${r.resources} orang (terisi ${Math.round(utilisasi * 100)}%) — pertimbangkan multi-skill/pooling.` });
     }
-    if (t.spanOfControl > 0 && directPerShift > 0) {
+    if (t.spanOfControl > 0 && directPerShift > 0 && !t.peranTetap.some(p => p.roleName === t.roleSupervisor)) {
       const spvPerShift = Math.ceil(directPerShift / t.spanOfControl);
       manpower.push({ roleName: t.roleSupervisor, jenis: 'Indirect', jamPerShift: 0, mpPerShift: spvPerShift, headcount: spvPerShift * shiftAktif, utilisasi: 1,
         alokasi: normalisasi(undefined, { handling_in: 0.4, handling_out: 0.4, storage: 0.2 }) });
@@ -161,7 +161,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     if (utilisasi < 0.5) flags.push({ level: 'info', kode: 'UTILISASI_RENDAH', pesan: `${roleName} terisi ${Math.round(utilisasi * 100)}% per shift — pertimbangkan multi-skill/pooling.` });
   }
   // Supervisor berdasarkan span of control
-  if (t.spanOfControl > 0 && directPerShift > 0) {
+  if (t.spanOfControl > 0 && directPerShift > 0 && !t.peranTetap.some(p => p.roleName === t.roleSupervisor)) {
     const spvPerShift = Math.ceil(directPerShift / t.spanOfControl);
     manpower.push({ roleName: t.roleSupervisor, jenis: 'Indirect', jamPerShift: 0, mpPerShift: spvPerShift,
       headcount: Math.ceil(spvPerShift * t.jumlahShift * kal.faktorPengganti - 1e-9), utilisasi: 1,

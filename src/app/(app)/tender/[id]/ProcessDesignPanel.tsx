@@ -72,29 +72,36 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
   const setBeban = (i: number, v: number) => { const b = [...pd.bebanShift]; while (b.length < 3) b.push(0); b[i] = v / 100; onPd({ ...pd, bebanShift: b }); };
 
   if (bagian === 'ringkasan') {
+    // Man Power Summary = direct (process design) + indirect (supervisor) + peran tetap, dalam satu tabel
     const ind = h.indirect.rows;
     const totInd = ind.reduce((t, r) => t + r.qty, 0);
-    const n = Math.max(h.mp.length, h.mhe.length, ind.length, 1);
+    const totalOrang = h.totalMp + totInd;
+    const n = Math.max(h.mp.length + ind.length + (ind.length ? 2 : 0), h.mhe.length, 1);
+    const sub = (l: string, fte: string, v: number) => <tr className="pd-sub"><td colSpan={2}><b>{l}</b></td><td className="num">{fte}</td><td className="num"><b>{v}</b></td></tr>;
     return (
       <div className="card" style={{ gap: 10 }}>
-        <div className="pd-tiga">
-          <Ringkas judul="Man Power Summary" rows={h.mp} remark="Head Count" tFte={h.totalFteMp} tRes={h.totalMp} pad={n} />
-          <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={n} />
+        <div className="pd-dua">
           <div style={{ minWidth: 0 }}>
-            <h3>Indirect & peran tetap</h3>
+            <h3>Man Power Summary</h3>
             <div className="tablewrap"><table className="pd-sum">
-              <thead><tr><th>Description</th><th>Remarks</th><th className="num">Basis</th><th className="num">Resources</th></tr></thead>
+              <thead><tr><th>Description</th><th>Remarks</th><th className="num">FTE</th><th className="num">Resources</th></tr></thead>
               <tbody>
-                {ind.length === 0 && <tr><td colSpan={4} className="muted">–</td></tr>}
-                {ind.map((r, i) => <tr key={i}><td>{r.nama}{r.alat.length > 0 && <div className="small muted">alat: {r.alat.join(', ')}</div>}</td><td className="small muted">Head Count</td><td className="num small muted">{r.ket}</td><td className="num"><b>{r.qty || '–'}</b></td></tr>)}
-                {Array.from({ length: Math.max(0, n - Math.max(1, ind.length)) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={4}>&nbsp;</td></tr>)}
-                <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>Head Count</b></td><td></td><td className="num"><b>{totInd}</b></td></tr>
+                {h.mp.length + ind.length === 0 && <tr><td colSpan={4} className="muted">–</td></tr>}
+                {h.mp.map(r => <tr key={`d-${r.nama}`}><td>{r.nama}</td><td className="small muted">Direct</td><td className="num">{f2(r.fte)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>)}
+                {ind.length > 0 && sub('Subtotal direct', f2(h.totalFteMp), h.totalMp)}
+                {ind.map((r, i) => <tr key={`i-${i}`}><td>{r.nama}{r.alat.length > 0 && <div className="small muted">alat: {r.alat.join(', ')}</div>}</td>
+                  <td className="small muted">{r.ket === 'Peran tetap' ? 'Peran tetap' : `Indirect · ${r.ket}`}</td><td className="num muted">–</td><td className="num"><b>{r.qty || '–'}</b></td></tr>)}
+                {ind.length > 0 && sub('Subtotal indirect & peran tetap', '–', totInd)}
+                {Array.from({ length: Math.max(0, n - Math.max(1, h.mp.length + ind.length + (ind.length ? 2 : 0))) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={4}>&nbsp;</td></tr>)}
+                <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>Head Count</b></td><td className="num"><b>{f2(h.totalFteMp)}</b></td><td className="num"><b>{totalOrang}</b></td></tr>
               </tbody>
             </table></div>
           </div>
+          <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={n} />
         </div>
+        {h.indirect.spvManual && <p className="small muted">Supervisor ({indirect?.roleSupervisor}) mengikuti jumlah yang Anda isi di peran tetap — tidak dihitung otomatis dari span of control.</p>}
         <div className="row small" style={{ justifyContent: 'flex-end' }}>
-          <span className="pill ok">Total manpower: {h.totalMp} direct + {totInd} indirect/tetap = <b>{h.totalMp + totInd} orang</b></span>
+          <span className="pill ok">Total manpower: {h.totalMp} direct + {totInd} indirect/tetap = <b>{totalOrang} orang</b></span>
           <span className="pill info">Total equipment: <b>{h.totalMhe} unit</b></span>
         </div>
       </div>);

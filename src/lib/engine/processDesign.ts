@@ -105,7 +105,9 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   // Indirect: supervisor per shift aktif dari span of control + peran tetap; alat pendukung 1 unit per orang
   const shiftAktif = beban.filter(w => w > 0).length || 1;
   const directPerShift = mp.reduce((t, r) => t + Math.ceil(r.resources / shiftAktif - 1e-9), 0);
-  const spv = indirect && indirect.spanOfControl > 0 && directPerShift > 0 ? Math.ceil(directPerShift / indirect.spanOfControl) * shiftAktif : 0;
+  // Supervisor otomatis hanya bila role supervisor TIDAK diisi manual di peran tetap (input user yang dipakai) dan span > 0
+  const spvManual = !!indirect && indirect.peranTetap.some(r => r.roleName === indirect.roleSupervisor);
+  const spv = indirect && !spvManual && indirect.spanOfControl > 0 && directPerShift > 0 ? Math.ceil(directPerShift / indirect.spanOfControl) * shiftAktif : 0;
   const indirectRows = indirect ? [
     ...(spv ? [{ nama: indirect.roleSupervisor, ket: `Span 1:${indirect.spanOfControl}`, qty: spv, alat: (indirect.alatSupervisor ?? []).filter(Boolean) }] : []),
     ...indirect.peranTetap.map(r => ({ nama: r.roleName, ket: 'Peran tetap', qty: Number(r.qty) || 0, alat: (r.alat ?? []).filter(Boolean) })),
@@ -117,7 +119,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   }
   return {
     kalender: { mp: kalMp, mhe: kalMhe }, beban, baris, mp, mhe,
-    indirect: { spv, directPerShift, rows: indirectRows, total: indirectRows.reduce((t, r) => t + r.qty, 0) },
+    indirect: { spv, spvManual, directPerShift, rows: indirectRows, total: indirectRows.reduce((t, r) => t + r.qty, 0) },
     totalFteMp: mp.reduce((s, x) => s + x.fte, 0), totalMp: mp.reduce((s, x) => s + x.resources, 0),
     totalFteMhe: mhe.reduce((s, x) => s + x.fte, 0), totalMhe: mhe.reduce((s, x) => s + x.resources, 0),
   };

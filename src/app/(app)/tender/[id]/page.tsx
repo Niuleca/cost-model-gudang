@@ -228,7 +228,7 @@ export default function TenderPage() {
             <label className="f" htmlFor="alat-spv">Alat pendukung supervisor
               <AlatInput id="alat-spv" value={a.alatSupervisor ?? []} onChange={v => setA({ alatSupervisor: v })} /></label>
           </div>
-          <p className="small muted">Alat pendukung (mis. PC, HT, Scanner RDT) dihitung 1 unit per orang dan masuk ke MHE Summary serta Kebutuhan MHE. Pisahkan dengan koma.</p>
+          <p className="small muted">Supervisor dihitung otomatis = ROUNDUP(direct per shift ÷ span) × shift aktif — kecuali role supervisor sudah Anda isi di tabel peran tetap; maka jumlahnya mengikuti input Anda. Isi span 0 untuk mematikan perhitungan otomatis. Alat pendukung (mis. PC, HT, Scanner RDT) dihitung 1 unit per orang dan masuk ke MHE Summary serta Kebutuhan MHE. Pisahkan dengan koma.</p>
           <div className="tablewrap"><table>
             <thead><tr><th>Role</th><th className="num">Headcount</th><th>Alat pendukung</th><th>Alokasi</th><th></th></tr></thead>
             <tbody>{a.peranTetap.map((r, i) => (
