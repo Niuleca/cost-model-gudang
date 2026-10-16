@@ -54,6 +54,7 @@ export interface SpaceInput {
   luasTersediaM2?: number;        // luas gudang terpilih (master gudang Procurement)
   sewaTetapBulan?: number;        // sewa gudang utuh per bulan (bila disewa per unit, bukan per m²)
   namaGudang?: string;
+  excel?: import('./space').SpaceExcel;   // kebutuhan space format Excel (dipakai mesin hitung)
 }
 
 export interface MheInput {

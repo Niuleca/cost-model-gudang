@@ -11,6 +11,9 @@ import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
 import ProcessDesignPanel from './ProcessDesignPanel';
+import SpacePanel from './SpacePanel';
+import MhePanel from './MhePanel';
+import { hitungProcessDesign, PD_DEFAULT } from '@/lib/engine/processDesign';
 import HistorisPanel from './HistorisPanel';
 import StatusControl from '@/components/StatusControl';
 import { labelStatus } from '@/lib/status';
@@ -110,6 +113,8 @@ export default function TenderPage() {
   }
 
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
+  const pdMhe = useMemo(() => t ? hitungProcessDesign(t.asumsi.aktivitas, t.asumsi.volumes, { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
+    t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift).mhe : [], [t]);
 
   if (!t) return <p className="muted">{pesan ?? 'Memuat tender…'}</p>;
   const a = t.asumsi;
@@ -270,46 +275,24 @@ export default function TenderPage() {
           setKol('warehouse_id', g?.id ?? null);
           setA({ gudang: g, space: { ...a.space, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
         }} />
-        <div className="card">
-          <h2>Space</h2>
-          <div className="grid3">
-            <Sel id="metode" label="Metode simpan" value={a.space.metodeSimpan} options={[{ v: 'block', l: 'Block stacking' }, { v: 'spr', l: 'Selective rack' }, { v: 'dd', l: 'Double deep' }, { v: 'shelving', l: 'Shelving' }]} onChange={v => setA({ space: { ...a.space, metodeSimpan: v } })} />
-            <Num id="pp" label="Panjang palet" suffix="m" value={a.space.palletPanjangM} onChange={v => setA({ space: { ...a.space, palletPanjangM: v } })} />
-            <Num id="pl" label="Lebar palet" suffix="m" value={a.space.palletLebarM} onChange={v => setA({ space: { ...a.space, palletLebarM: v } })} />
-            <Num id="lvl" label="Level tumpuk / level rak" value={a.space.levelSimpan} onChange={v => setA({ space: { ...a.space, levelSimpan: v } })} />
-            <Pct id="aisle" label="Tambahan area gang" value={a.space.faktorAisle} onChange={v => setA({ space: { ...a.space, faktorAisle: v } })} hint="Terhadap footprint palet; rak selektif ±100%" />
-            <Num id="stg" label="Area staging per palet" suffix="m²" value={a.space.stagingM2PerPalet} onChange={v => setA({ space: { ...a.space, stagingM2PerPalet: v } })} />
-            <Num id="seq" label="Siklus staging per shift" value={a.space.sequencePerShift} onChange={v => setA({ space: { ...a.space, sequencePerShift: v } })} />
-            <Num id="fas" label="Fasilitas (office, charging, toilet)" suffix="m²" value={a.space.fasilitasM2} onChange={v => setA({ space: { ...a.space, fasilitasM2: v } })} />
-            <Pct id="allow" label="Allowance (fire lane, kolom)" value={a.space.allowancePersen} onChange={v => setA({ space: { ...a.space, allowancePersen: v } })} />
-            <Num id="sewa" label="Tarif sewa gudang" suffix="Rp/m²/bln" value={a.space.tarifSewaM2Bulan} onChange={v => setA({ space: { ...a.space, tarifSewaM2Bulan: v } })} />
-            <Num id="rak" label="Harga rak per posisi (beli)" suffix="Rp" value={a.space.hargaRakPerPosisi} onChange={v => setA({ space: { ...a.space, hargaRakPerPosisi: v } })} />
-            <Num id="cad" label="Luas layout CAD (cek)" suffix="m²" value={a.space.luasCadM2} onChange={v => setA({ space: { ...a.space, luasCadM2: v } })} />
-          </div>
-          <h2>MHE</h2>
-          <p className="small muted">Unit = ROUNDUP(jam alat per shift ÷ (jam efektif × ketersediaan)) + spare. Alat dipakai bergantian antar shift; operatornya dihitung di manpower. Tool dipakai: {toolsDipakai.join(', ') || '—'}.</p>
-          <div className="tablewrap"><table>
-            <thead><tr><th>Tool (sesuai aktivitas)</th><th>Item harga</th><th>Mode</th><th className="num">Harga</th><th className="num">Umur (bln)</th><th className="num">Ketersediaan %</th><th className="num">Spare %</th><th></th></tr></thead>
-            <tbody>{a.mhe.map((m, i) => (
-              <tr key={i}>
-                <td><input aria-label="Tool" value={m.tool} list="tools" onChange={e => setA({ mhe: ubahArray(a.mhe, i, { tool: e.target.value }) })} /></td>
-                <td><select aria-label="Item MHE" value={m.priceItemId ?? ''} onChange={e => {
-                  const it = items.find(x => x.id === Number(e.target.value));
-                  if (it) setA({ mhe: ubahArray(a.mhe, i, { priceItemId: it.id, nama: it.item, harga: Number((m.mode === 'sewa' ? it.harga_sewa_bulan : it.harga_beli) ?? 0), umurBulan: it.umur_ekonomis_bulan ?? 60 }) });
-                }}><option value="">Pilih…</option>{items.filter(x => x.kategori === 'MHE').map(x => <option key={x.id} value={x.id}>{x.mhe_tipe ? `${x.mhe_tipe} ${x.kapasitas_ton ?? ''}T${x.sumber_tenaga ? ' ' + x.sumber_tenaga : ''} · ` : ''}{x.item}{x.status_efektif !== 'approved' ? ` (${x.status_efektif})` : ''}</option>)}</select></td>
-                <td><select aria-label="Mode" value={m.mode} onChange={e => {
-                  const mode = e.target.value as 'sewa' | 'beli'; const it = items.find(x => x.id === m.priceItemId);
-                  setA({ mhe: ubahArray(a.mhe, i, { mode, harga: it ? Number((mode === 'sewa' ? it.harga_sewa_bulan : it.harga_beli) ?? 0) : m.harga }) });
-                }}><option value="sewa">Sewa</option><option value="beli">Beli</option></select></td>
-                <td className="num db"><input aria-label="Harga" type="number" value={m.harga} onChange={e => setA({ mhe: ubahArray(a.mhe, i, { harga: Number(e.target.value) }) })} /></td>
-                <td className="num"><input aria-label="Umur" type="number" value={m.umurBulan ?? ''} onChange={e => setA({ mhe: ubahArray(a.mhe, i, { umurBulan: Number(e.target.value) }) })} /></td>
-                <td className="num"><input aria-label="Ketersediaan" type="number" value={+(m.ketersediaan * 100).toFixed(1)} onChange={e => setA({ mhe: ubahArray(a.mhe, i, { ketersediaan: Number(e.target.value) / 100 }) })} /></td>
-                <td className="num"><input aria-label="Spare" type="number" value={+(m.sparePersen * 100).toFixed(1)} onChange={e => setA({ mhe: ubahArray(a.mhe, i, { sparePersen: Number(e.target.value) / 100 }) })} /></td>
-                <td><button className="danger" onClick={() => setA({ mhe: a.mhe.filter((_, j) => j !== i) })}>Hapus</button></td>
-              </tr>))}</tbody></table></div>
-          <datalist id="tools">{toolsDipakai.map(x => <option key={x} value={x} />)}</datalist>
-          <div className="row"><button className="ghost" onClick={() => setA({ mhe: [...a.mhe, { tool: toolsDipakai[0] ?? 'CBT', nama: '', mode: 'sewa', harga: 0, ketersediaan: 0.85, sparePersen: 0 }] })}>Tambah MHE</button></div>
-        </div>
+        <SpacePanel excel={a.space.excel} ppTotal={a.volumes.find(v => v.arus === 'storage')?.peakBulan ?? 0}
+          inboundBulan={a.volumes.find(v => v.arus === 'inbound')?.peakBulan ?? 0} outboundBulan={a.volumes.find(v => v.arus === 'outbound')?.peakBulan ?? 0}
+          uomIn={a.volumes.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={a.volumes.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
+          jumlahShift={t.jumlah_shift} onChange={excel => setA({ space: { ...a.space, excel } })}
+          komersial={<div className="card" style={{ gap: 8, padding: 12 }}>
+            <h3>Biaya space & racking</h3>
+            <div className="grid2">
+              <Num id="sewa" label="Tarif sewa gudang" suffix="Rp/m²/bln" value={a.space.tarifSewaM2Bulan} onChange={v => setA({ space: { ...a.space, tarifSewaM2Bulan: v } })} />
+              <Num id="rak" label="Harga rak per posisi (beli)" suffix="Rp" value={a.space.hargaRakPerPosisi} onChange={v => setA({ space: { ...a.space, hargaRakPerPosisi: v } })} />
+              <Num id="umurrak" label="Umur ekonomis rak" suffix="bulan" value={a.space.umurRakBulan} onChange={v => setA({ space: { ...a.space, umurRakBulan: v } })} />
+              <Sel id="metode" label="Penyimpanan" value={a.space.metodeSimpan} options={[{ v: 'spr', l: 'Racking (SD/DD)' }, { v: 'block', l: 'Block stacking (tanpa rak)' }]} onChange={v => setA({ space: { ...a.space, metodeSimpan: v } })} />
+            </div>
+            <p className="small muted">Luas sewa = Space Rent. Harga rak × posisi palet jadi CAPEX racking bila penyimpanan = racking.</p>
+          </div>} />
+        <MhePanel mhe={a.mhe} items={items} metodeExcel={(a.metodeManpower ?? 'excel') === 'excel'} onChange={mhe => setA({ mhe })}
+          kebutuhan={(a.metodeManpower ?? 'excel') === 'excel'
+            ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
+            : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />
       </>)}
 
       {tab === 'IT' && <ItPanel sheet={a.it} onChange={it => setA({ it })} />}

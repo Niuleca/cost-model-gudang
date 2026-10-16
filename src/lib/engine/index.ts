@@ -4,6 +4,7 @@
 // → alokasi ke aktivitas → harga per kategori risiko → rate card → red flag.
 
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
+import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
 } from './types.ts';
@@ -82,21 +83,19 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   // ---- 3. Space (UC12) ----
   const s = t.space;
   const ppDesain = volArus('storage')?.peakBulan ?? 0;
-  const luasPalet = s.palletPanjangM * s.palletLebarM;
-  const m2PerPP = (luasPalet * (1 + s.faktorAisle)) / Math.max(1, s.levelSimpan);
-  const storageM2 = ppDesain * m2PerPP;
-  const stagingIn = ((volArus('inbound')?.desainPerShift ?? 0) / Math.max(1, s.sequencePerShift)) * s.stagingM2PerPalet;
-  const stagingOut = ((volArus('outbound')?.desainPerShift ?? 0) / Math.max(1, s.sequencePerShift)) * s.stagingM2PerPalet;
-  const subtotalM2 = storageM2 + stagingIn + stagingOut + s.fasilitasM2;
-  const totalM2 = Math.ceil(subtotalM2 * (1 + s.allowancePersen));
+  // Metode Excel: selective / double deep per bay + staging per sequence + fasilitas → dibulatkan (space rent)
+  const sx = hitungSpaceExcel(lengkapiSpaceExcel(s.excel), ppDesain, volArus('inbound')?.peakBulan ?? 0, volArus('outbound')?.peakBulan ?? 0, t.jumlahShift);
+  const storageM2 = sx.sd.footprint + sx.dd.footprint;
+  const totalM2 = sx.spaceRent;
   const space = {
-    ppDesain, m2PerPP: bulat(m2PerPP, 3), storageM2: bulat(storageM2, 1),
-    stagingInM2: bulat(stagingIn, 1), stagingOutM2: bulat(stagingOut, 1),
-    fasilitasM2: s.fasilitasM2, allowanceM2: bulat(totalM2 - subtotalM2, 1), totalM2,
-    posisiRak: s.metodeSimpan === 'block' ? 0 : Math.ceil(ppDesain),
+    ppDesain, m2PerPP: bulat(ppDesain > 0 ? storageM2 / ppDesain : 0, 3), storageM2: bulat(storageM2, 1),
+    stagingInM2: bulat(sx.inbound.footprint, 1), stagingOutM2: bulat(sx.outbound.footprint, 1),
+    fasilitasM2: bulat(sx.fasilitasM2, 1), allowanceM2: bulat(totalM2 - sx.subtotal, 1), totalM2,
+    posisiRak: Math.ceil(ppDesain), levelRak: sx.level.level, excel: sx,
   };
-  if (s.luasCadM2 && Math.abs(totalM2 - s.luasCadM2) / s.luasCadM2 > 0.05)
-    flags.push({ level: 'peringatan', kode: 'CAD_GAP', pesan: `Luas hitung ${totalM2} m² berbeda >5% dari CAD ${s.luasCadM2} m².` });
+  if (!sx.level.ok) flags.push({ level: 'kritis', kode: 'RAK_TERLALU_TINGGI', pesan: `Tinggi rak ${sx.level.tinggi} mm melebihi tinggi sisi gudang ${s.excel?.rak.sideMm ?? '-'} mm.` });
+  if (sx.cadTotal > 0 && Math.abs(totalM2 - sx.cadTotal) / sx.cadTotal > 0.05)
+    flags.push({ level: 'peringatan', kode: 'CAD_GAP', pesan: `Luas hitung ${totalM2} m² berbeda >5% dari CAD ${sx.cadTotal} m².` });
 
   // ---- 4. Manpower direct (UC13) — jam per shift dipool per role ----
   const jobs = new Map<string, JobLevel>(m.jobLevels.map(j => [j.roleName, j]));
