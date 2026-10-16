@@ -10,6 +10,7 @@ import { useProfile } from '@/lib/useProfile';
 import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
+import HistorisPanel from './HistorisPanel';
 import StatusControl from '@/components/StatusControl';
 import { labelStatus } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
@@ -19,6 +20,7 @@ interface Item { id: number; kategori: string; item: string; satuan: string; har
 interface Tarif { golongan: string; tarif_kwh: number }
 interface Jab { role_name: string }
 
+const TAB_EXCEL = 'Data project (Excel)' as const;
 const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const UOM = ['palet', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'order', 'line', 'lokasi'];
@@ -41,7 +43,7 @@ export default function TenderPage() {
   const sb = supabaseBrowser();
   const { profile } = useProfile();
   const [t, setT] = useState<TenderRow | null>(null);
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Key assumption');
+  const [tab, setTab] = useState<(typeof TABS)[number] | typeof TAB_EXCEL>('Key assumption');
   const [prods, setProds] = useState<Prod[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [tarif, setTarif] = useState<Tarif[]>([]);
@@ -66,6 +68,7 @@ export default function TenderPage() {
     setT(row); setProds((p.data ?? []) as Prod[]); setItems((it.data ?? []) as Item[]); setTarif((tf.data ?? []) as Tarif[]);
     setJabatan(((jb.data ?? []) as Jab[]).map(j => j.role_name));
     if (row.hasil) setHasil(row.hasil as HasilTender);
+    if (row.asumsi.historis) setTab(TAB_EXCEL);
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { muat(); }, [muat]);
@@ -123,8 +126,10 @@ export default function TenderPage() {
       <StatusControl tender={t} onBerubah={st => setT(x => x && ({ ...x, status: st }))} />
 
       <div className="tabs" role="tablist">
-        {TABS.map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}
+        {([...(a.historis ? [TAB_EXCEL] : []), ...TABS] as ((typeof TABS)[number] | typeof TAB_EXCEL)[]).map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}
       </div>
+
+      {tab === TAB_EXCEL && a.historis && <HistorisPanel h={a.historis} nama={(t.kode ?? t.customer).replace(/[^\w]+/g, '_')} />}
 
       {tab === 'Key assumption' && (
         <div className="card">

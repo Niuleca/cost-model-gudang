@@ -42,6 +42,21 @@ export interface Asumsi {
   stokTon?: number; stokCbm?: number; stokLiter?: number;
   it: ItSheet;
   gudang?: GudangTerpilih | null;
+  historis?: ProjectHistoris;
+}
+
+/** Project berjalan yang diimpor dari cost model Excel lama (tidak dihitung ulang oleh mesin hitung). */
+export interface ProjectHistoris {
+  sumber: { file: string; sheet: string; diimpor: string };
+  ringkasan: {
+    pendapatanBulan: number; biayaBulan: number; gpPersen: number; basisMargin: string;
+    grandTotalCM: number; totalCostCM: number; gpGrandTotal: number;
+    headcount: number | null; luasM2: number | null; posisiPalet: number | null; tipeGudang?: string;
+  };
+  rateCard: { bucket: string; layanan: string; uom: string; tarif: number; volumeMinimum: number | null }[];
+  biayaKelompok: { kelompok: string; biayaBulan: number;
+    items: { deskripsi: string; qty: number | null; uom: string | null; hargaSatuan: number | null; biayaBulan: number; catatan: string | null }[] }[];
+  catatan: string;
 }
 
 export const ASUMSI_DEFAULT: Asumsi = {

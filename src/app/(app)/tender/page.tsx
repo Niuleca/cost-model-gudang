@@ -10,7 +10,10 @@ import { STATUS, labelStatus, pillStatus } from '@/lib/status';
 interface Baris {
   id: string; kode: string | null; customer: string; kab_kota: string; provinsi: string; industri: string | null; status: string; versi: number; updated_at: string; created_at: string; pic: string | null;
   hasil: { totalBiayaBulan?: number; redFlags?: { level: string }[]; simulasi?: { gpPersen: number }[] } | null;
+  excel: { biayaBulan: number; gpPersen: number } | null;
 }
+const biayaOf = (r: Baris) => r.hasil?.totalBiayaBulan ?? r.excel?.biayaBulan ?? null;
+const gpOf = (r: Baris) => r.hasil?.simulasi?.[0]?.gpPersen ?? r.excel?.gpPersen ?? null;
 
 /** Menu 5 & 9 · Daftar tender dan riwayat pekerjaan (semua versi tersimpan, filter status/industri/tahun). */
 export default function DaftarTender() {
@@ -19,7 +22,7 @@ export default function DaftarTender() {
   const [err, setErr] = useState<string | null>(null);
   const [fil, setFil] = useState({ q: '', status: '', industri: '', tahun: '' });
   useEffect(() => {
-    supabaseBrowser().from('tenders').select('id, kode, customer, kab_kota, provinsi, industri, status, versi, updated_at, created_at, pic, hasil').order('updated_at', { ascending: false })
+    supabaseBrowser().from('tenders').select('id, kode, customer, kab_kota, provinsi, industri, status, versi, updated_at, created_at, pic, hasil, excel:asumsi->historis->ringkasan').order('updated_at', { ascending: false })
       .then(({ data, error }: { data: Baris[] | null; error: { message: string } | null }) => { if (error) setErr(error.message); else setRows(data ?? []); });
   }, []);
 
@@ -50,7 +53,7 @@ export default function DaftarTender() {
         <select aria-label="Industri" value={fil.industri} onChange={e => setFil({ ...fil, industri: e.target.value })} style={{ maxWidth: 180 }}><option value="">Semua industri</option>{INDUSTRI.map(i => <option key={i}>{i}</option>)}</select>
         <select aria-label="Tahun" value={fil.tahun} onChange={e => setFil({ ...fil, tahun: e.target.value })} style={{ maxWidth: 120 }}><option value="">Semua tahun</option>{tahunList.map(t => <option key={t}>{t}</option>)}</select>
         <span className="small muted">{tampil.length} dari {rows.length} tender</span>
-        <ExportButton nama="Daftar_Tender" rows={tampil.map(r => ({ ...r, status: labelStatus(r.status), biaya: r.hasil?.totalBiayaBulan ?? null, gp: r.hasil?.simulasi?.[0]?.gpPersen ?? null }))}
+        <ExportButton nama="Daftar_Tender" rows={tampil.map(r => ({ ...r, status: labelStatus(r.status), biaya: biayaOf(r), gp: gpOf(r) }))}
           kolom={[{ key: 'kode', label: 'Kode' }, { key: 'customer', label: 'Customer' }, { key: 'industri', label: 'Industri' }, { key: 'provinsi', label: 'Provinsi' },
             { key: 'kab_kota', label: 'Kabupaten/kota' }, { key: 'pic', label: 'PIC' }, { key: 'status', label: 'Status' }, { key: 'versi', label: 'Versi', type: 'number' },
             { key: 'biaya', label: 'Biaya per bulan (Rp)', type: 'number' }, { key: 'gp', label: 'GP volume komitmen', type: 'percent' }, { key: 'created_at', label: 'Dibuat', type: 'date' }, { key: 'updated_at', label: 'Diubah', type: 'date' }]} />
@@ -62,15 +65,16 @@ export default function DaftarTender() {
             {tampil.length === 0 && <tr><td colSpan={9} className="muted">Belum ada tender. Mulai dari tombol Tender baru.</td></tr>}
             {tampil.map(r => {
               const kritis = r.hasil?.redFlags?.filter(f => f.level === 'kritis').length ?? 0;
-              const gp = r.hasil?.simulasi?.[0]?.gpPersen;
+              const gp = gpOf(r);
+              const excel = !r.hasil && !!r.excel;
               return (
                 <tr key={r.id}>
                   <td><Link href={`/tender/${r.id}`}>{r.kode ?? r.id.slice(0, 8)}</Link></td>
                   <td>{r.customer}{r.pic ? <div className="small muted">{r.pic}</div> : null}</td><td className="small">{r.industri ?? '—'}</td><td>{r.kab_kota}</td>
                   <td><span className={`pill ${pillStatus(r.status)}`}>{labelStatus(r.status)}</span> <span className="small muted">v{r.versi}</span></td>
-                  <td className="num">{rp(r.hasil?.totalBiayaBulan)}</td>
+                  <td className="num">{rp(biayaOf(r))}</td>
                   <td className="num">{gp == null ? '—' : (gp * 100).toFixed(1) + '%'}</td>
-                  <td>{r.hasil ? (kritis ? <span className="pill bad">{kritis} kritis</span> : <span className="pill ok">aman</span>) : '—'}</td>
+                  <td>{excel ? <span className="pill info">data Excel</span> : r.hasil ? (kritis ? <span className="pill bad">{kritis} kritis</span> : <span className="pill ok">aman</span>) : '—'}</td>
                   <td className="small">{tanggal(r.updated_at)}</td>
                 </tr>
               );

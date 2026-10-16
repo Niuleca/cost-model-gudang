@@ -1,0 +1,3519 @@
+[
+ {
+  "key": "MDLZ",
+  "file": "20230630 - Mondelez - Cost Model-actual- update 28082023 update 25042024.xlsm",
+  "sheet": "CM",
+  "customer": "Mondelez Indonesia",
+  "industri": "FMCG",
+  "provinsi": "Jawa Barat",
+  "kab_kota": "Kabupaten Bekasi",
+  "alamat": "CKR 2 (Cainiao Cikarang)",
+  "tipe": "Ambient + Temp Control",
+  "skema": "Dedicated",
+  "kontrak": 12,
+  "golive": "2023-06-30",
+  "term": 120,
+  "luas": 14820,
+  "pp": 26247,
+  "hc": 80,
+  "sec": [
+   {
+    "kelompok": "Manpower (all in salary)",
+    "biayaBulan": 630488220,
+    "items": [
+     {
+      "deskripsi": "Operation Manager",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 35211527,
+      "biayaBulan": 35211527,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WH Supervisor",
+      "qty": 3.0,
+      "uom": null,
+      "hargaSatuan": 10092546,
+      "biayaBulan": 30277639,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WMS User",
+      "qty": 13.0,
+      "uom": null,
+      "hargaSatuan": 7650220,
+      "biayaBulan": 99452861,
+      "catatan": "Admin WMS"
+     },
+     {
+      "deskripsi": "Inventory",
+      "qty": 3.0,
+      "uom": null,
+      "hargaSatuan": 7650220,
+      "biayaBulan": 22950660,
+      "catatan": null
+     },
+     {
+      "deskripsi": "MHE Driver",
+      "qty": 21.0,
+      "uom": null,
+      "hargaSatuan": 7519112,
+      "biayaBulan": 157901347,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Picker",
+      "qty": 22.0,
+      "uom": null,
+      "hargaSatuan": 7288112,
+      "biayaBulan": 160338459,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Checker",
+      "qty": 14.0,
+      "uom": null,
+      "hargaSatuan": 7288112,
+      "biayaBulan": 102033565,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Admin KPI",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 7440720,
+      "biayaBulan": 7440720,
+      "catatan": "Admin KPI"
+     },
+     {
+      "deskripsi": "Admin KPI",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 7440720,
+      "biayaBulan": 7440720,
+      "catatan": "Admin GA & FA"
+     },
+     {
+      "deskripsi": "Admin KPI",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 7440720,
+      "biayaBulan": 7440720,
+      "catatan": "Admin HSSE"
+     }
+    ]
+   },
+   {
+    "kelompok": "Facility",
+    "biayaBulan": 1160337012,
+    "items": [
+     {
+      "deskripsi": "Rental Space",
+      "qty": 14820,
+      "uom": "Sqm",
+      "hargaSatuan": 68000,
+      "biayaBulan": 1007760000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Advance Payment Interest",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 9237800,
+      "biayaBulan": 9237800,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Electricity",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 50000000,
+      "biayaBulan": 50000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Water",
+      "qty": 14820,
+      "uom": "sqm",
+      "hargaSatuan": 150.0,
+      "biayaBulan": 2223000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pest control",
+      "qty": 14820,
+      "uom": "Sqm",
+      "hargaSatuan": 1000,
+      "biayaBulan": 14820000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Security",
+      "qty": 6.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 7857294,
+      "biayaBulan": 47143765,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Cleaning service/Helper",
+      "qty": 4.0,
+      "uom": "person",
+      "hargaSatuan": 7288112,
+      "biayaBulan": 29152447,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Consumables",
+    "biayaBulan": 473938010,
+    "items": [
+     {
+      "deskripsi": "Rental CBT + spare Battery",
+      "qty": 2.0,
+      "uom": "unit",
+      "hargaSatuan": 16000000,
+      "biayaBulan": 32000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Rental RT + spare Battery",
+      "qty": 5.0,
+      "uom": "unit",
+      "hargaSatuan": 24000000,
+      "biayaBulan": 120000000,
+      "catatan": "2023-08-28"
+     },
+     {
+      "deskripsi": "Rental Pallet Mover + Battery",
+      "qty": 3.0,
+      "uom": "unit",
+      "hargaSatuan": 6000000,
+      "biayaBulan": 18000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Supporting alat kebersihan ARSA",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 3258185,
+      "biayaBulan": 3258185,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Supporting security (alat, uniform, uang koordinasi)",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1970000,
+      "biayaBulan": 1970000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pulpen/staples dll",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2000000,
+      "biayaBulan": 2000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Sewa copier",
+      "qty": 3.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1000000,
+      "biayaBulan": 3000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Drinking water",
+      "qty": 253.0,
+      "uom": "galon",
+      "hargaSatuan": 13500,
+      "biayaBulan": 3415500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Uniforms",
+      "qty": 80.0,
+      "uom": "set",
+      "hargaSatuan": 300000,
+      "biayaBulan": 2000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Shoes+helm",
+      "qty": 88.0,
+      "uom": "set",
+      "hargaSatuan": 420000,
+      "biayaBulan": 3080000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Community cost",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1000000,
+      "biayaBulan": 1000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Asuransi",
+      "qty": 0.12,
+      "uom": "lumpsum",
+      "hargaSatuan": 20833333,
+      "biayaBulan": 2442997,
+      "catatan": null
+     },
+     {
+      "deskripsi": "TKBM Muat",
+      "qty": 1997564,
+      "uom": "ctn",
+      "hargaSatuan": 65.0,
+      "biayaBulan": 129841661,
+      "catatan": null
+     },
+     {
+      "deskripsi": "TKBM Bongkar ctn",
+      "qty": 522044,
+      "uom": "ctn",
+      "hargaSatuan": 65.0,
+      "biayaBulan": 33932829,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Maintenance Temp control",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1750000,
+      "biayaBulan": 1750000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Power BI License",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 130833,
+      "biayaBulan": 130833,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pallet wrap - pake tali rapiah",
+      "qty": 6961,
+      "uom": "pallet",
+      "hargaSatuan": 200.0,
+      "biayaBulan": 1392116,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pallet label",
+      "qty": 19674,
+      "uom": "pallet",
+      "hargaSatuan": 80.0,
+      "biayaBulan": 1573889,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Rental pallet Wooden",
+      "qty": 24000,
+      "uom": "pallet",
+      "hargaSatuan": 4715,
+      "biayaBulan": 113150000,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Admin Expense",
+    "biayaBulan": 413902922,
+    "items": [
+     {
+      "deskripsi": "Kertas NCR 7 Ply",
+      "qty": 28.0,
+      "uom": "box",
+      "hargaSatuan": 410000,
+      "biayaBulan": 11480000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Kertas A4",
+      "qty": 312.0,
+      "uom": "rim",
+      "hargaSatuan": 55000,
+      "biayaBulan": 17160000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "OM - CYOD Laptop",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 450000,
+      "biayaBulan": 450000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "SPV - CYOD Laptop",
+      "qty": 3.0,
+      "uom": null,
+      "hargaSatuan": 450000,
+      "biayaBulan": 1350000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Racking rental",
+      "qty": 26247,
+      "uom": null,
+      "hargaSatuan": 13600,
+      "biayaBulan": 356959200,
+      "catatan": "excld copacking"
+     },
+     {
+      "deskripsi": "Lakban bening",
+      "qty": 72.0,
+      "uom": "unit",
+      "hargaSatuan": 6565,
+      "biayaBulan": 472680,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Rental additional CB",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 10500000,
+      "biayaBulan": 10500000,
+      "catatan": "2023-06-30"
+     },
+     {
+      "deskripsi": "Office Tools (Base on requirement)",
+      "qty": 4.0,
+      "uom": null,
+      "hargaSatuan": 950000,
+      "biayaBulan": 316667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Antivirus (Base on requirement)",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 39375,
+      "biayaBulan": 39375,
+      "catatan": null
+     },
+     {
+      "deskripsi": "KLOG Email System",
+      "qty": 5.0,
+      "uom": null,
+      "hargaSatuan": 115000,
+      "biayaBulan": 575000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "additional rental PM",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 7500000,
+      "biayaBulan": 7500000,
+      "catatan": "2023-07-26"
+     },
+     {
+      "deskripsi": "PC Desktop (Base of requirement)",
+      "qty": 6.0,
+      "uom": null,
+      "hargaSatuan": 350000,
+      "biayaBulan": 2100000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Internet cost",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 5000000,
+      "biayaBulan": 5000000,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Capex",
+    "biayaBulan": 14672115,
+    "items": [
+     {
+      "deskripsi": "Meja + Laci",
+      "qty": 22.0,
+      "uom": null,
+      "hargaSatuan": 1800000,
+      "biayaBulan": 825000,
+      "catatan": "incl org mdlz"
+     },
+     {
+      "deskripsi": "Kursi",
+      "qty": 22.0,
+      "uom": null,
+      "hargaSatuan": 750000,
+      "biayaBulan": 343750,
+      "catatan": "incl org mdlz"
+     },
+     {
+      "deskripsi": "Locker isi 4",
+      "qty": 8.0,
+      "uom": null,
+      "hargaSatuan": 2000000,
+      "biayaBulan": 333333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Dispenser",
+      "qty": 5.0,
+      "uom": null,
+      "hargaSatuan": 500000,
+      "biayaBulan": 52083,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Lemari arsip",
+      "qty": 5.0,
+      "uom": null,
+      "hargaSatuan": 2500000,
+      "biayaBulan": 260417,
+      "catatan": null
+     },
+     {
+      "deskripsi": "AC Office 1.5PK",
+      "qty": 10.0,
+      "uom": null,
+      "hargaSatuan": 6000000,
+      "biayaBulan": 1250000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Whiteboard 120 x 240",
+      "qty": 4.0,
+      "uom": null,
+      "hargaSatuan": 2000000,
+      "biayaBulan": 166667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Camera",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 2000000,
+      "biayaBulan": 41667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "HSE",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 30000000,
+      "biayaBulan": 625000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Signage",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 30000000,
+      "biayaBulan": 625000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Fire Extinguihser",
+      "qty": 54.0,
+      "uom": null,
+      "hargaSatuan": 850000,
+      "biayaBulan": 956250,
+      "catatan": null
+     },
+     {
+      "deskripsi": "container 20ft for damage",
+      "qty": 2.0,
+      "uom": null,
+      "hargaSatuan": 30000000,
+      "biayaBulan": 1250000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Lampu tembak",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 13650000,
+      "biayaBulan": 379167,
+      "catatan": "2023-07-10"
+     },
+     {
+      "deskripsi": "Handpallet",
+      "qty": 20.0,
+      "uom": null,
+      "hargaSatuan": 5000000,
+      "biayaBulan": 2083333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "DOR/Dashboard TV (50 in tv + Mini PC + standing bracket)",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 9000000,
+      "biayaBulan": 187500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "UPS for  Network Devices & CCTV (1,2 kVA)",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 104167,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Router",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 5500000,
+      "biayaBulan": 114583,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Switch (survey needed)",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 52083,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Tangga Panggung + loket",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 15251500,
+      "biayaBulan": 317740,
+      "catatan": "2023-06-30"
+     },
+     {
+      "deskripsi": "Safety cages",
+      "qty": 5.0,
+      "uom": "unit",
+      "hargaSatuan": 5180000,
+      "biayaBulan": 539583,
+      "catatan": "2023-06-30"
+     },
+     {
+      "deskripsi": "Network Cabling",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2000000,
+      "biayaBulan": 41667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Network Electrical Cabling",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 500000,
+      "biayaBulan": 20833,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Network Racking (20u + tray)",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 8000000,
+      "biayaBulan": 166667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Network Racking (wallmount 4u + tray)",
+      "qty": 4.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2000000,
+      "biayaBulan": 166667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "UPS for PC (625 VA)",
+      "qty": 6.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1500000,
+      "biayaBulan": 187500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "FO Cabling",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 10000000,
+      "biayaBulan": 416667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Alat ukur suhu EBI 20TH1 not set",
+      "qty": 6.0,
+      "uom": "unit",
+      "hargaSatuan": 2450000,
+      "biayaBulan": 306250,
+      "catatan": "2023-07-07"
+     },
+     {
+      "deskripsi": "Camera CCTV",
+      "qty": 26.0,
+      "uom": "unit",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 1354167,
+      "catatan": null
+     },
+     {
+      "deskripsi": "NVR + harddisk",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 12000000,
+      "biayaBulan": 250000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "TV Monitoring",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 4000000,
+      "biayaBulan": 83333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Papan nama racking",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 36300000,
+      "biayaBulan": 756250,
+      "catatan": "2023-07-03"
+     },
+     {
+      "deskripsi": "Alat ukur suhu EBI 20TH1 set",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 3550000,
+      "biayaBulan": 73958,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Alat ukur suhu EBI 20TH1 not set",
+      "qty": 3.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2450000,
+      "biayaBulan": 153125,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Tempat sampah",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 3876000,
+      "biayaBulan": 80750,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Handly talky Baofeng",
+      "qty": 5.0,
+      "uom": "unit",
+      "hargaSatuan": 600000,
+      "biayaBulan": 62500,
+      "catatan": "2023-06-30"
+     },
+     {
+      "deskripsi": "Electrical tambahan",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2134000,
+      "biayaBulan": 44458,
+      "catatan": "2023-06-30"
+     }
+    ]
+   },
+   {
+    "kelompok": "Startup Cost",
+    "biayaBulan": 88368083,
+    "items": [
+     {
+      "deskripsi": "Pre-Go live labour cost",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 268029460,
+      "biayaBulan": 5583947,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Internet installation cost",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 8500000,
+      "biayaBulan": 177083,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Temp control setup + Pengecatan",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2829058000,
+      "biayaBulan": 58938708,
+      "catatan": "2023-06-30"
+     },
+     {
+      "deskripsi": "Mob demob RT linde fr MDLZ",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 11700000,
+      "biayaBulan": 487500,
+      "catatan": "2023-08-09"
+     },
+     {
+      "deskripsi": "Rental RT linde fr MDLZ for 1 months 2 unit",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 30000000,
+      "biayaBulan": 1250000,
+      "catatan": "2023-08-09"
+     },
+     {
+      "deskripsi": "Office setup",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 94000000,
+      "biayaBulan": 1958333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Biaya perbaikan sprinkler karena tertabrak",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 5000000,
+      "biayaBulan": 104167,
+      "catatan": "2023-08-09"
+     },
+     {
+      "deskripsi": "Biaya tambah 7 titik CCTV (estimasi)",
+      "qty": 7.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 3500000,
+      "biayaBulan": 510417,
+      "catatan": "2023-08-09"
+     },
+     {
+      "deskripsi": "Sertifikasi HALAL, ISO dll",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 356000000,
+      "biayaBulan": 7416667,
+      "catatan": "2023-08-09"
+     },
+     {
+      "deskripsi": "additional 1 PM Jung 3 bulan",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 22500000,
+      "biayaBulan": 468750,
+      "catatan": "2023-08-09"
+     },
+     {
+      "deskripsi": "Barrier Coolroom",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 75000000,
+      "biayaBulan": 1562500,
+      "catatan": "2023-08-15"
+     },
+     {
+      "deskripsi": "Pemindahan lampu",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 135000000,
+      "biayaBulan": 2812500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Jasa pasang CCTV",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 101500000,
+      "biayaBulan": 2114583,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Yellow line marking",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 90000000,
+      "biayaBulan": 1875000,
+      "catatan": "2023-08-28"
+     },
+     {
+      "deskripsi": "Kerja tambah Fasola",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 59180515,
+      "biayaBulan": 1232927,
+      "catatan": "2023-07-26"
+     },
+     {
+      "deskripsi": "Akses door KLOG",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 5000000,
+      "biayaBulan": 208333,
+      "catatan": "2023-08-24"
+     },
+     {
+      "deskripsi": "Tambahan CCTV",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 80000000,
+      "biayaBulan": 1666667,
+      "catatan": "2023-08-24"
+     }
+    ]
+   },
+   {
+    "kelompok": "Finance Charge",
+    "biayaBulan": 109311729,
+    "items": [
+     {
+      "deskripsi": "Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 4691420,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Working Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 80359985,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Startup Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 24260324,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Overhead",
+    "biayaBulan": 78057488,
+    "items": []
+   }
+  ],
+  "totalCost": 2891018089,
+  "grandTotal": 2969075578,
+  "rev": 3074833785.88,
+  "biayaFile": 2891018089.48,
+  "marginFile": 0.0636,
+  "marginBasis": "Total cost sebelum overhead 2,7%",
+  "rate": [
+   [
+    "storage",
+    "Storage ambient",
+    "palet/bulan",
+    65000,
+    24000
+   ],
+   [
+    "storage",
+    "Storage temp control (20-25\u00b0C)",
+    "palet/bulan",
+    135000,
+    1100
+   ],
+   [
+    "handling_in",
+    "Handling in",
+    "karton",
+    209,
+    1997564
+   ],
+   [
+    "handling_out",
+    "Handling out",
+    "karton",
+    475,
+    1997564
+   ]
+  ],
+  "catatan": "Revenue & margin dari blok rev/cost/margin baris 196-199 sheet CM. Volume handling in & out di file sama (1.997.564 karton/bln)."
+ },
+ {
+  "key": "ABBOTT",
+  "file": "Cost Model Abbott FY2024 2026 R1.xlsm",
+  "sheet": "CM",
+  "customer": "Abbott Indonesia",
+  "industri": "Healthcare",
+  "provinsi": "Jawa Barat",
+  "kab_kota": "Kabupaten Bekasi",
+  "alamat": "KLOG Park Cibitung",
+  "tipe": "Ambient",
+  "skema": "Shared",
+  "kontrak": 24,
+  "golive": "2024-01-01",
+  "term": 120,
+  "luas": null,
+  "pp": 2000,
+  "hc": 6.06,
+  "sec": [
+   {
+    "kelompok": "Manpower (all in salary)",
+    "biayaBulan": 57235982,
+    "items": [
+     {
+      "deskripsi": "Warehouse  Manager",
+      "qty": 0.25,
+      "uom": "Orang",
+      "hargaSatuan": 30596151,
+      "biayaBulan": 7649038,
+      "catatan": "Shared"
+     },
+     {
+      "deskripsi": "WH Supervisor",
+      "qty": 1.0,
+      "uom": "Orang",
+      "hargaSatuan": 9294190,
+      "biayaBulan": 9294190,
+      "catatan": null
+     },
+     {
+      "deskripsi": "MHE Driver",
+      "qty": 1.0,
+      "uom": "Orang",
+      "hargaSatuan": 8590873,
+      "biayaBulan": 8590873,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Checker",
+      "qty": 2.05,
+      "uom": "Orang",
+      "hargaSatuan": 8348900,
+      "biayaBulan": 17083134,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WMS User",
+      "qty": 0.5,
+      "uom": "Orang",
+      "hargaSatuan": 7937441,
+      "biayaBulan": 3968720,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Picker",
+      "qty": 1.0,
+      "uom": "Orang",
+      "hargaSatuan": 8348900,
+      "biayaBulan": 8348900,
+      "catatan": null
+     },
+     {
+      "deskripsi": "MHE Driver",
+      "qty": 0.27,
+      "uom": "Orang",
+      "hargaSatuan": 8590873,
+      "biayaBulan": 2301127,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Facility",
+    "biayaBulan": 133314719,
+    "items": [
+     {
+      "deskripsi": "Rental Space 1.6m",
+      "qty": 2000,
+      "uom": "PP",
+      "hargaSatuan": 59924,
+      "biayaBulan": 119848849,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Electricity",
+      "qty": 0.04,
+      "uom": "lumpsum",
+      "hargaSatuan": 98574506,
+      "biayaBulan": 3658959,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Security",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 8823411,
+      "biayaBulan": 8823411,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pest Control",
+      "qty": 0.5,
+      "uom": "lumpsum",
+      "hargaSatuan": 1967000,
+      "biayaBulan": 983500,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Consumables",
+    "biayaBulan": 24607109,
+    "items": [
+     {
+      "deskripsi": "CBT - Asset",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 6200000,
+      "biayaBulan": 6200000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "RT - Asset",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 10800000,
+      "biayaBulan": 10800000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "PM - Single - Asset",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 2600000,
+      "biayaBulan": 2600000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "PM - Double - Asset",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 2600000,
+      "biayaBulan": 2600000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Stationery",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1137917,
+      "biayaBulan": 1137917,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Drinking water",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 246497,
+      "biayaBulan": 246497,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Uniforms",
+      "qty": 6.06,
+      "uom": "set",
+      "hargaSatuan": 300000,
+      "biayaBulan": 151600,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Shoes",
+      "qty": 6.06,
+      "uom": "set",
+      "hargaSatuan": 300000,
+      "biayaBulan": 151600,
+      "catatan": null
+     },
+     {
+      "deskripsi": "label pcs",
+      "qty": 2000,
+      "uom": "PP",
+      "hargaSatuan": 242.0,
+      "biayaBulan": 484000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Refill APAR",
+      "qty": 0.0,
+      "uom": "Unit",
+      "hargaSatuan": 12500,
+      "biayaBulan": 28,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Medical Check Up",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 235467,
+      "biayaBulan": 235467,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Admin Expense",
+    "biayaBulan": 7892060,
+    "items": [
+     {
+      "deskripsi": "Telephones",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 110000,
+      "biayaBulan": 110000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WMS Monthly Cost",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 7654188,
+      "biayaBulan": 7654188,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Tolerance Factor (Risk)",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 127872,
+      "biayaBulan": 127872,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Capex",
+    "biayaBulan": 484404,
+    "items": [
+     {
+      "deskripsi": "IT One time cost",
+      "qty": 0.5,
+      "uom": "lumpsum",
+      "hargaSatuan": 11900000,
+      "biayaBulan": 165278,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Meja + Laci",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 1650000,
+      "biayaBulan": 45833,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Kursi",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 750000,
+      "biayaBulan": 20833,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Locker isi 4",
+      "qty": 0.04,
+      "uom": null,
+      "hargaSatuan": 3250000,
+      "biayaBulan": 3351,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Dispenser",
+      "qty": 0.04,
+      "uom": null,
+      "hargaSatuan": 500000,
+      "biayaBulan": 516,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Lemari arsip",
+      "qty": 0.04,
+      "uom": null,
+      "hargaSatuan": 2500000,
+      "biayaBulan": 2578,
+      "catatan": null
+     },
+     {
+      "deskripsi": "AC Office 1.5PK",
+      "qty": 0.04,
+      "uom": null,
+      "hargaSatuan": 6000000,
+      "biayaBulan": 6186,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Whiteboard 120 x 240",
+      "qty": 0.04,
+      "uom": null,
+      "hargaSatuan": 1800000,
+      "biayaBulan": 1856,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Fingerprint",
+      "qty": 0.04,
+      "uom": null,
+      "hargaSatuan": 3000000,
+      "biayaBulan": 3093,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Camera",
+      "qty": 0.04,
+      "uom": null,
+      "hargaSatuan": 1500000,
+      "biayaBulan": 1547,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Alat Thermohygrometer",
+      "qty": 3.0,
+      "uom": "Unit",
+      "hargaSatuan": 1000000,
+      "biayaBulan": 83333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Kalibrasi",
+      "qty": 3.0,
+      "uom": "Unit",
+      "hargaSatuan": 600000,
+      "biayaBulan": 150000,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Startup Cost",
+    "biayaBulan": 416667,
+    "items": [
+     {
+      "deskripsi": "General Licenses",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 5000000,
+      "biayaBulan": 416667,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Finance Charge",
+    "biayaBulan": 3145920,
+    "items": [
+     {
+      "deskripsi": "Working Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 3145920,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Overhead",
+    "biayaBulan": 6131615,
+    "items": []
+   }
+  ],
+  "totalCost": 227096860,
+  "grandTotal": 233228476,
+  "rev": 301367900,
+  "biayaFile": 228646898.5,
+  "marginFile": 0.24130307673776802,
+  "marginBasis": "Grand total CM tanpa biaya VAS handling Rp4,6 jt (file menulis margin 31,8% on cost)",
+  "rate": [
+   [
+    "storage",
+    "Storage",
+    "palet/bulan",
+    94117,
+    2000
+   ],
+   [
+    "handling_in",
+    "Handling in",
+    "palet",
+    58962,
+    950
+   ],
+   [
+    "handling_out",
+    "Handling out",
+    "karton",
+    2040,
+    28000
+   ]
+  ],
+  "catatan": "Tarif = baris \"Rate\" (sudah termasuk PPh 2%). Tariff agreed di file: storage 89.629, handling in 56.888, handling out 1.968. Sewa space dihitung per palet (2.000 PP), luas m\u00b2 tidak tercantum."
+ },
+ {
+  "key": "ARNOTTS",
+  "file": "CM Arnotts New Tender 2026.xlsm",
+  "sheet": "CM Scenario A",
+  "customer": "Arnott's Indonesia",
+  "industri": "FMCG",
+  "provinsi": "Jawa Barat",
+  "kab_kota": "Kota Bekasi",
+  "alamat": "WSK - gudang milik Arnott's (6 chamber, \u00b17.042 m\u00b2)",
+  "tipe": "Ambient",
+  "skema": "Dedicated",
+  "kontrak": 12,
+  "golive": "2026-01-01",
+  "term": 60,
+  "luas": 7042,
+  "pp": null,
+  "hc": 39,
+  "sec": [
+   {
+    "kelompok": "Manpower (all in salary)",
+    "biayaBulan": 345441825,
+    "items": [
+     {
+      "deskripsi": "Warehouse  Manager",
+      "qty": 1.0,
+      "uom": "Orang",
+      "hargaSatuan": 25550737,
+      "biayaBulan": 25550737,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WH Supervisor",
+      "qty": 3.0,
+      "uom": "Orang",
+      "hargaSatuan": 8957891,
+      "biayaBulan": 26873673,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Inventory",
+      "qty": 3.0,
+      "uom": "Orang",
+      "hargaSatuan": 8068956,
+      "biayaBulan": 24206868,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WMS User",
+      "qty": 3.0,
+      "uom": "Orang",
+      "hargaSatuan": 8299406,
+      "biayaBulan": 24898218,
+      "catatan": "Adm Outbound"
+     },
+     {
+      "deskripsi": "WMS User",
+      "qty": 3.0,
+      "uom": "Orang",
+      "hargaSatuan": 8299406,
+      "biayaBulan": 24898218,
+      "catatan": "Adm Inbound"
+     },
+     {
+      "deskripsi": "HR Assustance",
+      "qty": 1.0,
+      "uom": "Orang",
+      "hargaSatuan": 8068956,
+      "biayaBulan": 8068956,
+      "catatan": null
+     },
+     {
+      "deskripsi": "HR Assustance",
+      "qty": 1.0,
+      "uom": "Orang",
+      "hargaSatuan": 8068956,
+      "biayaBulan": 8068956,
+      "catatan": "Safety Office"
+     },
+     {
+      "deskripsi": "Maintanance",
+      "qty": 1.0,
+      "uom": "Orang",
+      "hargaSatuan": 8068956,
+      "biayaBulan": 8068956,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Checker",
+      "qty": 3.0,
+      "uom": "Orang",
+      "hargaSatuan": 8285281,
+      "biayaBulan": 24855843,
+      "catatan": "Inbound"
+     },
+     {
+      "deskripsi": "Checker",
+      "qty": 5.0,
+      "uom": "Orang",
+      "hargaSatuan": 8285281,
+      "biayaBulan": 41426405,
+      "catatan": "Outbound"
+     },
+     {
+      "deskripsi": "Picker",
+      "qty": 3.0,
+      "uom": "Orang",
+      "hargaSatuan": 8615281,
+      "biayaBulan": 25845843,
+      "catatan": "Runner Inbund"
+     },
+     {
+      "deskripsi": "Picker",
+      "qty": 4.0,
+      "uom": "Orang",
+      "hargaSatuan": 8395281,
+      "biayaBulan": 33581124,
+      "catatan": "Outbound"
+     },
+     {
+      "deskripsi": "MHE Driver",
+      "qty": 3.0,
+      "uom": "Orang",
+      "hargaSatuan": 8637254,
+      "biayaBulan": 25911761,
+      "catatan": "Inbound"
+     },
+     {
+      "deskripsi": "MHE Driver",
+      "qty": 5.0,
+      "uom": "Orang",
+      "hargaSatuan": 8637254,
+      "biayaBulan": 43186268,
+      "catatan": "Outbound"
+     }
+    ]
+   },
+   {
+    "kelompok": "Facility",
+    "biayaBulan": 74325035,
+    "items": [
+     {
+      "deskripsi": "Security (8 orang)",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 65275372,
+      "biayaBulan": 65275372,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pest Control",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1560000,
+      "biayaBulan": 1560000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Medical Exam",
+      "qty": 48.0,
+      "uom": "Unit",
+      "hargaSatuan": 30000,
+      "biayaBulan": 1440000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Cleaning Service",
+      "qty": 1.0,
+      "uom": "person",
+      "hargaSatuan": 6049663,
+      "biayaBulan": 6049663,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Consumables",
+    "biayaBulan": 63609026,
+    "items": [
+     {
+      "deskripsi": "Rental Pallet Mover",
+      "qty": 2.0,
+      "uom": "unit",
+      "hargaSatuan": 5000000,
+      "biayaBulan": 10000000,
+      "catatan": "Cek Linda"
+     },
+     {
+      "deskripsi": "RT Rental",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 16000000,
+      "biayaBulan": 16000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "RT Own KLOG",
+      "qty": 2.0,
+      "uom": "unit",
+      "hargaSatuan": 5347731,
+      "biayaBulan": 10695461,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Stationaries",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 4317500,
+      "biayaBulan": 4317500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Load wheel",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 266667,
+      "biayaBulan": 266667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "New Hand Pallet",
+      "qty": 5.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 4250000,
+      "biayaBulan": 442708,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Uniforms",
+      "qty": 39.0,
+      "uom": "set",
+      "hargaSatuan": 85000,
+      "biayaBulan": 138125,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Shoes (Non OS)",
+      "qty": 16.0,
+      "uom": "set",
+      "hargaSatuan": 125000,
+      "biayaBulan": 83333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Sewa Mobil Manager",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 2250000,
+      "biayaBulan": 2250000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Sewa Baterei RT DD+1 roller",
+      "qty": 5.0,
+      "uom": "Unit",
+      "hargaSatuan": 2100000,
+      "biayaBulan": 10500000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Shoes Labor O/S",
+      "qty": 23.0,
+      "uom": "set",
+      "hargaSatuan": 29500,
+      "biayaBulan": 678500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Hand Pallet 9 Unit",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 105027,
+      "biayaBulan": 105027,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Biaya Fixed Maintenance Unit KLOG",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2950000,
+      "biayaBulan": 5900000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Labor Kontrak Service MHE KLOG",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 525000,
+      "biayaBulan": 1050000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Alat kebersihan/Consumable sabun2",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 923371,
+      "biayaBulan": 923371,
+      "catatan": null
+     },
+     {
+      "deskripsi": "APAR Refill",
+      "qty": 31.0,
+      "uom": "Unit",
+      "hargaSatuan": 8333,
+      "biayaBulan": 258333,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Admin Expense",
+    "biayaBulan": 16330650,
+    "items": [
+     {
+      "deskripsi": "WMS Monthly Cost (Inc Internet)",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 16330650,
+      "biayaBulan": 16330650,
+      "catatan": "Harga bulanan di exc"
+     }
+    ]
+   },
+   {
+    "kelompok": "Capex",
+    "biayaBulan": 2784531,
+    "items": [
+     {
+      "deskripsi": "IT One time cost",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 35000000,
+      "biayaBulan": 729167,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Kursi",
+      "qty": 5.0,
+      "uom": null,
+      "hargaSatuan": 1500000,
+      "biayaBulan": 156250,
+      "catatan": null
+     },
+     {
+      "deskripsi": "LCD/TV 40 inch",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 7000000,
+      "biayaBulan": 145833,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Singage",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 2980000,
+      "biayaBulan": 62083,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Fire Extinguihser",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 15840000,
+      "biayaBulan": 330000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Repair MHE/Lain2",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 3900000,
+      "biayaBulan": 81250,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Old Asset In CM (Office Furniture)",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1279948,
+      "biayaBulan": 1279948,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Startup Cost",
+    "biayaBulan": 0,
+    "items": []
+   },
+   {
+    "kelompok": "Finance Charge",
+    "biayaBulan": 6906108,
+    "items": [
+     {
+      "deskripsi": "Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 480386,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Working Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 6425723,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Overhead",
+    "biayaBulan": 13753724,
+    "items": []
+   }
+  ],
+  "totalCost": 509397176,
+  "grandTotal": 523150899,
+  "rev": 603400000,
+  "biayaFile": 523150899.4,
+  "marginFile": 0.1329948634405038,
+  "marginBasis": "Grand total termasuk overhead 3% (file menulis margin 15% on cost)",
+  "rate": [
+   [
+    "manajemen",
+    "Fixed charge per bulan (throughput 68.000 karton/hari)",
+    "bulan",
+    603400000,
+    1
+   ],
+   [
+    "handling_out",
+    "Kelebihan throughput (outbound)",
+    "karton",
+    233,
+    0
+   ],
+   [
+    "handling_in",
+    "Kelebihan throughput (inbound)",
+    "karton",
+    233,
+    0
+   ]
+  ],
+  "skenario_aset": "Own Asset",
+  "catatan": "Skema fixed charge (gudang & listrik dari Arnott's). Tarif 2026 dari sheet Commercial2026 opsi 1; tarif per karton hanya untuk volume di atas kapasitas. Lokasi Kota Bekasi diambil dari UMK yang dipakai di sheet Analisa nego."
+ },
+ {
+  "key": "VINDA",
+  "file": "New Cost Model Vinda CBT - V4 - 2 shift.xlsm",
+  "sheet": "CM",
+  "customer": "PT Vinda Indonesia International",
+  "industri": "FMCG",
+  "provinsi": "Jawa Barat",
+  "kab_kota": "Kabupaten Bekasi",
+  "alamat": "Cibitung (shared warehouse)",
+  "tipe": "Ambient",
+  "skema": "Shared",
+  "kontrak": 12,
+  "golive": "2025-12-01",
+  "term": 45,
+  "luas": 503.84,
+  "pp": 1000,
+  "shift": 2,
+  "hc": 4.2,
+  "sec": [
+   {
+    "kelompok": "Manpower (all in salary)",
+    "biayaBulan": 37647815,
+    "items": [
+     {
+      "deskripsi": "WH Supervisor",
+      "qty": 1.0,
+      "uom": "Monthly",
+      "hargaSatuan": 11412284,
+      "biayaBulan": 11935347,
+      "catatan": null
+     },
+     {
+      "deskripsi": "MHE Driver",
+      "qty": 1.2,
+      "uom": "Monthly",
+      "hargaSatuan": 7814258,
+      "biayaBulan": 9806894,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Checker",
+      "qty": 1.0,
+      "uom": "Monthly",
+      "hargaSatuan": 7499258,
+      "biayaBulan": 7842974,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Admin",
+      "qty": 1.0,
+      "uom": "Monthly",
+      "hargaSatuan": 7709258,
+      "biayaBulan": 8062599,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Facility",
+    "biayaBulan": 44215906,
+    "items": [
+     {
+      "deskripsi": "Rental Space",
+      "qty": 503.84,
+      "uom": "SQM",
+      "hargaSatuan": 75518,
+      "biayaBulan": 38049346,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Electricity",
+      "qty": 770.0,
+      "uom": "Pallet",
+      "hargaSatuan": 1350,
+      "biayaBulan": 1039419,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Water",
+      "qty": 770.0,
+      "uom": "Pallet",
+      "hargaSatuan": 1636,
+      "biayaBulan": 1259903,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pest control",
+      "qty": 503.84,
+      "uom": "SQM",
+      "hargaSatuan": 1200,
+      "biayaBulan": 604614,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Security",
+      "qty": 0.02,
+      "uom": "Person",
+      "hargaSatuan": 140656648,
+      "biayaBulan": 2215170,
+      "catatan": "Proporsional"
+     },
+     {
+      "deskripsi": "Cleaning service/Helper",
+      "qty": 0.02,
+      "uom": "Lumpsum",
+      "hargaSatuan": 66510189,
+      "biayaBulan": 1047454,
+      "catatan": "Proporsional"
+     }
+    ]
+   },
+   {
+    "kelompok": "Consumables",
+    "biayaBulan": 10248480,
+    "items": [
+     {
+      "deskripsi": "Rental RT",
+      "qty": 0.2,
+      "uom": "Unit",
+      "hargaSatuan": 18500000,
+      "biayaBulan": 3700000,
+      "catatan": "Maintenance"
+     },
+     {
+      "deskripsi": "Stationaries",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 200000,
+      "biayaBulan": 200000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Drinking water",
+      "qty": 12.0,
+      "uom": "Galon",
+      "hargaSatuan": 15000,
+      "biayaBulan": 180000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Asuransi",
+      "qty": 0.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 66666667,
+      "biayaBulan": 166251,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pallet wrap / Tali Plastics",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 1000000,
+      "biayaBulan": 1000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Allowance for Miss Handling",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 1372000,
+      "biayaBulan": 1372000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Rental pallet Wooden",
+      "qty": 770.0,
+      "uom": "Pallet",
+      "hargaSatuan": 4715,
+      "biayaBulan": 3630229,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Admin Expense",
+    "biayaBulan": 3030424,
+    "items": [
+     {
+      "deskripsi": "Kertas Continous From",
+      "qty": 0.25,
+      "uom": "Box",
+      "hargaSatuan": 500000,
+      "biayaBulan": 125000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Kertas A4",
+      "qty": 1.0,
+      "uom": "Rim",
+      "hargaSatuan": 55000,
+      "biayaBulan": 55000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "SPV - CYOD Laptop",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 450000,
+      "biayaBulan": 450000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WMS cost",
+      "qty": 187.5,
+      "uom": "Unit",
+      "hargaSatuan": 3400,
+      "biayaBulan": 637500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Dashboard power BI",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 132000,
+      "biayaBulan": 132000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Office Tools (Base on requirement)",
+      "qty": 2.0,
+      "uom": "Unit",
+      "hargaSatuan": 950000,
+      "biayaBulan": 158333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Antivirus (Base on requirement)",
+      "qty": 2.0,
+      "uom": "Unit",
+      "hargaSatuan": 39375,
+      "biayaBulan": 78750,
+      "catatan": null
+     },
+     {
+      "deskripsi": "KLOG Email System",
+      "qty": 2.0,
+      "uom": "Unit",
+      "hargaSatuan": 115000,
+      "biayaBulan": 230000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "RF Handheld (Base on requirement)",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 550000,
+      "biayaBulan": 550000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "PC Desktop (Base of requirement)",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 350000,
+      "biayaBulan": 350000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Internet cost",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 16753100,
+      "biayaBulan": 263841,
+      "catatan": "Proporsional"
+     }
+    ]
+   },
+   {
+    "kelompok": "Capex",
+    "biayaBulan": 1292552,
+    "items": [
+     {
+      "deskripsi": "Meja + Laci",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 2000000,
+      "biayaBulan": 2625,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Kursi",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 1000000,
+      "biayaBulan": 1312,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Locker isi 4",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 2000000,
+      "biayaBulan": 2625,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Dispenser",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 500000,
+      "biayaBulan": 656,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Lemari arsip",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 3281,
+      "catatan": null
+     },
+     {
+      "deskripsi": "AC Office 1.5PK",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 6000000,
+      "biayaBulan": 7874,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Whiteboard 120 x 240",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 2000000,
+      "biayaBulan": 2625,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Fingerprint",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 4500000,
+      "biayaBulan": 5906,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Signage",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 2000000,
+      "biayaBulan": 166667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Fire Extinguihser",
+      "qty": 3.0,
+      "uom": "Unit",
+      "hargaSatuan": 850000,
+      "biayaBulan": 212500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Handpallet",
+      "qty": 1.0,
+      "uom": "Unit",
+      "hargaSatuan": 4000000,
+      "biayaBulan": 333333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Printer Dot Matrix (LQ)",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 15000000,
+      "biayaBulan": 19686,
+      "catatan": null
+     },
+     {
+      "deskripsi": "DOR/Dashboard TV (50 in tv + Mini PC + standing bracket)",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 9000000,
+      "biayaBulan": 11812,
+      "catatan": null
+     },
+     {
+      "deskripsi": "All in one Printer",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 5000000,
+      "biayaBulan": 6562,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Printer Barcode (Base on Requirement)",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 8000000,
+      "biayaBulan": 10499,
+      "catatan": null
+     },
+     {
+      "deskripsi": "UPS for  Network Devices & CCTV (1,2 kVA)",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 500000,
+      "biayaBulan": 656,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Router",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 5500000,
+      "biayaBulan": 7218,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Akses Point (survey needed)",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 3281,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Camera CCTV",
+      "qty": 1.01,
+      "uom": "Unit",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 209935,
+      "catatan": null
+     },
+     {
+      "deskripsi": "NVR + harddisk",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 12000000,
+      "biayaBulan": 15749,
+      "catatan": null
+     },
+     {
+      "deskripsi": "TV Monitoring",
+      "qty": 0.02,
+      "uom": "Unit",
+      "hargaSatuan": 4000000,
+      "biayaBulan": 5250,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Uniforms",
+      "qty": 4.2,
+      "uom": "Set",
+      "hargaSatuan": 300000,
+      "biayaBulan": 105000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Shoes + Helm",
+      "qty": 4.2,
+      "uom": "Set",
+      "hargaSatuan": 450000,
+      "biayaBulan": 157500,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Startup Cost",
+    "biayaBulan": 1243706,
+    "items": [
+     {
+      "deskripsi": "Pre-Go live labour cost",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 9924478,
+      "biayaBulan": 827040,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Project implementation",
+      "qty": 1.0,
+      "uom": "Lumpsum",
+      "hargaSatuan": 5000000,
+      "biayaBulan": 416667,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Finance Charge",
+    "biayaBulan": 1175436,
+    "items": [
+     {
+      "deskripsi": "Capital Interest",
+      "qty": 0.09,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 63012,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Working Capital Interest",
+      "qty": 0.09,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 1051793,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Startup Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 60631,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Overhead",
+    "biayaBulan": 2965630,
+    "items": []
+   }
+  ],
+  "totalCost": 98854319,
+  "grandTotal": 101819949,
+  "rev": 157000000,
+  "biayaFile": 81204450.8,
+  "marginFile": 0.48277419872611466,
+  "marginBasis": "Blok \"Actual Condition (Sharing manpower)\": biaya manpower dibagi dengan customer lain",
+  "rate": [
+   [
+    "storage",
+    "Rack storage ambient",
+    "CBM/bulan",
+    65000,
+    1500
+   ],
+   [
+    "handling_in",
+    "Handling in",
+    "CBM",
+    35000,
+    750
+   ],
+   [
+    "handling_out",
+    "Handling out",
+    "CBM",
+    35000,
+    750
+   ],
+   [
+    "vas",
+    "Sewa palet kayu",
+    "palet/bulan",
+    7000,
+    1000
+   ],
+   [
+    "vas",
+    "Loading / unloading",
+    "unit",
+    256000,
+    0
+   ]
+  ],
+  "catatan": "Ada 3 skenario P&L di file; yang dipakai blok terakhir \"Actual Condition (Sharing manpower)\" (GP 48%). Proposal 1 (per karton) GP 39%, per CBM tanpa sharing GP 9%. Jumlah shift = 2 dari nama file (Key Assumption menulis 1 shift)."
+ },
+ {
+  "key": "RB-MDN",
+  "file": "RB Medan - Commercial 2025.10.23.xlsm",
+  "sheet": "C. Costing Sheet (CM) -Medan",
+  "customer": "Reckitt Benckiser Indonesia (Medan)",
+  "industri": "FMCG",
+  "provinsi": "Sumatera Utara",
+  "kab_kota": "Kota Medan",
+  "alamat": "KLOG Park Medan",
+  "tipe": "Ambient",
+  "skema": "Shared",
+  "kontrak": 12,
+  "golive": "2025-11-01",
+  "term": 105,
+  "luas": null,
+  "pp": 1200,
+  "hc": 5.6,
+  "sec": [
+   {
+    "kelompok": "Manpower (all in salary)",
+    "biayaBulan": 36748885,
+    "items": [
+     {
+      "deskripsi": "Operation Manager",
+      "qty": 0.1,
+      "uom": "man",
+      "hargaSatuan": 15873979,
+      "biayaBulan": 1587398,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WH Supervisor",
+      "qty": 1.0,
+      "uom": "man",
+      "hargaSatuan": 8088362,
+      "biayaBulan": 8088362,
+      "catatan": "Merangkap Inv"
+     },
+     {
+      "deskripsi": "WMS User",
+      "qty": 1.0,
+      "uom": "man",
+      "hargaSatuan": 6025307,
+      "biayaBulan": 6025307,
+      "catatan": null
+     },
+     {
+      "deskripsi": "MHE Driver",
+      "qty": 1.0,
+      "uom": "man",
+      "hargaSatuan": 6265226,
+      "biayaBulan": 6265226,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Picker",
+      "qty": 1.0,
+      "uom": "man",
+      "hargaSatuan": 5806301,
+      "biayaBulan": 5806301,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Checker",
+      "qty": 1.0,
+      "uom": "man",
+      "hargaSatuan": 5806301,
+      "biayaBulan": 5806301,
+      "catatan": null
+     },
+     {
+      "deskripsi": "HSSE Supervisor",
+      "qty": 0.1,
+      "uom": "man",
+      "hargaSatuan": 7130991,
+      "biayaBulan": 713099,
+      "catatan": null
+     },
+     {
+      "deskripsi": "QA Supervisor",
+      "qty": 0.1,
+      "uom": "man",
+      "hargaSatuan": 7130991,
+      "biayaBulan": 713099,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Maintenance",
+      "qty": 0.1,
+      "uom": "man",
+      "hargaSatuan": 5815807,
+      "biayaBulan": 581581,
+      "catatan": null
+     },
+     {
+      "deskripsi": "FA & GA Admin",
+      "qty": 0.1,
+      "uom": "man",
+      "hargaSatuan": 5815807,
+      "biayaBulan": 581581,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Cleaning service/Helper",
+      "qty": 0.1,
+      "uom": "man",
+      "hargaSatuan": 5806301,
+      "biayaBulan": 580630,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Facility",
+    "biayaBulan": 36633751,
+    "items": [
+     {
+      "deskripsi": "Rental Space",
+      "qty": 1200,
+      "uom": "pp",
+      "hargaSatuan": 20000,
+      "biayaBulan": 24000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Racking",
+      "qty": 1200,
+      "uom": "PP",
+      "hargaSatuan": 2000,
+      "biayaBulan": 2400000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Electricity",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 3000000,
+      "biayaBulan": 3000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pest Control",
+      "qty": 600.0,
+      "uom": "Sqm",
+      "hargaSatuan": 1200,
+      "biayaBulan": 720000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Security",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 6033751,
+      "biayaBulan": 6033751,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Facility Maintenance Cost",
+      "qty": 1200,
+      "uom": "sqm",
+      "hargaSatuan": 400.0,
+      "biayaBulan": 480000,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Consumable",
+    "biayaBulan": 25404298,
+    "items": [
+     {
+      "deskripsi": "Reach Truck Asset",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 12000000,
+      "biayaBulan": 12000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Stationaries",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1000000,
+      "biayaBulan": 1000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Drinking water",
+      "qty": 20.84,
+      "uom": "galon",
+      "hargaSatuan": 15000,
+      "biayaBulan": 312632,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Uniforms",
+      "qty": 8.0,
+      "uom": "set",
+      "hargaSatuan": 250000,
+      "biayaBulan": 166667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Shoes",
+      "qty": 8.0,
+      "uom": "set",
+      "hargaSatuan": 250000,
+      "biayaBulan": 166667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Medical Checkup",
+      "qty": 9.0,
+      "uom": "unit",
+      "hargaSatuan": 400000,
+      "biayaBulan": 300000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Consumable",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 3000000,
+      "biayaBulan": 250000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Sewa printer foto copy",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 1000000,
+      "biayaBulan": 1000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Plastic Wrap",
+      "qty": 1019,
+      "uom": null,
+      "hargaSatuan": 5850,
+      "biayaBulan": 5958333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "TKBM",
+      "qty": 50000,
+      "uom": "cases",
+      "hargaSatuan": 85.0,
+      "biayaBulan": 4250000,
+      "catatan": "as per info dari Pak Yudo 85 IDR / Carton"
+     }
+    ]
+   },
+   {
+    "kelompok": "Admin Expense",
+    "biayaBulan": 12008750,
+    "items": [
+     {
+      "deskripsi": "WMS License Cost (Monthly",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 12008750,
+      "biayaBulan": 12008750,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Capex",
+    "biayaBulan": 23055093,
+    "items": [
+     {
+      "deskripsi": "IT One time cost",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 21600000,
+      "biayaBulan": 21600000,
+      "catatan": "8 Mandays"
+     },
+     {
+      "deskripsi": "Meja + Laci",
+      "qty": 2.0,
+      "uom": null,
+      "hargaSatuan": 5000000,
+      "biayaBulan": 92593,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Kursi",
+      "qty": 2.0,
+      "uom": null,
+      "hargaSatuan": 2000000,
+      "biayaBulan": 37037,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Locker isi 4",
+      "qty": 3.0,
+      "uom": null,
+      "hargaSatuan": 1700000,
+      "biayaBulan": 47222,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Dispenser",
+      "qty": 0.5,
+      "uom": null,
+      "hargaSatuan": 2500000,
+      "biayaBulan": 11574,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Lemari arsip",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 2000000,
+      "biayaBulan": 18519,
+      "catatan": null
+     },
+     {
+      "deskripsi": "AC Office 1.5PK",
+      "qty": 0.5,
+      "uom": null,
+      "hargaSatuan": 6000000,
+      "biayaBulan": 27778,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Whiteboard 120 x 240",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 1800000,
+      "biayaBulan": 16667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Temperature Room",
+      "qty": 0.3,
+      "uom": null,
+      "hargaSatuan": 100000000,
+      "biayaBulan": 277778,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Camera",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 1500000,
+      "biayaBulan": 13889,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Equipment",
+      "qty": 0.3,
+      "uom": null,
+      "hargaSatuan": 30000000,
+      "biayaBulan": 83333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Cage for Damage Area",
+      "qty": 0.3,
+      "uom": null,
+      "hargaSatuan": 100000000,
+      "biayaBulan": 277778,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Handpallet",
+      "qty": 5.0,
+      "uom": null,
+      "hargaSatuan": 4500000,
+      "biayaBulan": 208333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Printer All in One",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 5000000,
+      "biayaBulan": 46296,
+      "catatan": null
+     },
+     {
+      "deskripsi": "CCTV",
+      "qty": 0.2,
+      "uom": null,
+      "hargaSatuan": 160000000,
+      "biayaBulan": 296296,
+      "catatan": "kata Pak Andri sebetulnya tidak usah"
+     }
+    ]
+   },
+   {
+    "kelompok": "Startup Cost",
+    "biayaBulan": 2965247,
+    "items": [
+     {
+      "deskripsi": "Pre-Go live labor cost",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 36748885,
+      "biayaBulan": 1020802,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Implementation",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 20000000,
+      "biayaBulan": 555556,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Cage Aerosol",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 50000000,
+      "biayaBulan": 1388889,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Finance Charge",
+    "biayaBulan": 2627366,
+    "items": [
+     {
+      "deskripsi": "Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 411979,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Working Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 2215387,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Overhead",
+    "biayaBulan": 3764972,
+    "items": []
+   }
+  ],
+  "totalCost": 139443389,
+  "grandTotal": 143208361,
+  "rev": 158467967.93,
+  "biayaFile": 121025160.89,
+  "marginFile": 0.2362799720921492,
+  "marginBasis": "Sheet A. Financial Summary, biaya bulanan tanpa IT one-time Rp22,2 jt",
+  "rate": [
+   [
+    "storage",
+    "Storage (racking + palet)",
+    "palet/bulan",
+    58000,
+    1200
+   ],
+   [
+    "handling_in",
+    "Handling inbound",
+    "karton",
+    1840,
+    28000
+   ],
+   [
+    "handling_out",
+    "Handling outbound",
+    "karton",
+    1840,
+    28000
+   ],
+   [
+    "vas",
+    "Sewa palet (opsional)",
+    "palet/bulan",
+    8500,
+    0
+   ],
+   [
+    "vas",
+    "Stretch wrap palet",
+    "palet",
+    4500,
+    0
+   ],
+   [
+    "vas",
+    "System interface (sekali bayar)",
+    "sekali",
+    28800000,
+    1
+   ]
+  ],
+  "catatan": "Revenue di Financial Summary memakai tarif storage hasil hitung (46.190/PP), lebih rendah dari tarif proposal 58.000/PP. Dengan tarif proposal revenue = Rp172,6 jt/bln. Grand total CM Rp143,2 jt sudah termasuk IT one-time Rp22,2 jt."
+ },
+ {
+  "key": "RB-CLS",
+  "file": "CM RB v2b update 27122023 final.xlsm",
+  "sheet": "CM - Efficiency",
+  "customer": "Reckitt Benckiser Indonesia (Cileungsi)",
+  "industri": "FMCG",
+  "provinsi": "Jawa Barat",
+  "kab_kota": "Kabupaten Bogor",
+  "alamat": "MMP Cileungsi",
+  "tipe": "Ambient + Flammable + Temp Control",
+  "skema": "Dedicated",
+  "kontrak": 12,
+  "golive": "2024-01-01",
+  "term": 90,
+  "luas": 11365,
+  "pp": 13517,
+  "hc": 54,
+  "sec": [
+   {
+    "kelompok": "Manpower (all in salary)",
+    "biayaBulan": 388116225,
+    "items": [
+     {
+      "deskripsi": "Operation Manager",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 24888380,
+      "biayaBulan": 24888380,
+      "catatan": null
+     },
+     {
+      "deskripsi": "WH Supervisor",
+      "qty": 4.0,
+      "uom": null,
+      "hargaSatuan": 9605289,
+      "biayaBulan": 38421156,
+      "catatan": "+1 spv inventory"
+     },
+     {
+      "deskripsi": "WMS User",
+      "qty": 12.0,
+      "uom": null,
+      "hargaSatuan": 6780613,
+      "biayaBulan": 81367352,
+      "catatan": null
+     },
+     {
+      "deskripsi": "MHE Driver",
+      "qty": 17.0,
+      "uom": null,
+      "hargaSatuan": 6587514,
+      "biayaBulan": 111987739,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Picker",
+      "qty": 6.0,
+      "uom": null,
+      "hargaSatuan": 6356514,
+      "biayaBulan": 38139084,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Checker",
+      "qty": 7.0,
+      "uom": null,
+      "hargaSatuan": 6356514,
+      "biayaBulan": 44495598,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Inventory",
+      "qty": 2.0,
+      "uom": null,
+      "hargaSatuan": 6780613,
+      "biayaBulan": 13561225,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Cleaning service/Helper",
+      "qty": 3.0,
+      "uom": null,
+      "hargaSatuan": 7231488,
+      "biayaBulan": 21694464,
+      "catatan": "cleaning"
+     },
+     {
+      "deskripsi": "WMS User",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 6780613,
+      "biayaBulan": 6780613,
+      "catatan": "HSSE"
+     },
+     {
+      "deskripsi": "WMS User",
+      "qty": 1.0,
+      "uom": null,
+      "hargaSatuan": 6780613,
+      "biayaBulan": 6780613,
+      "catatan": "GA/FA"
+     }
+    ]
+   },
+   {
+    "kelompok": "Facility",
+    "biayaBulan": 1095159570,
+    "items": [
+     {
+      "deskripsi": "Rental Space",
+      "qty": 13517,
+      "uom": "pp",
+      "hargaSatuan": 67263,
+      "biayaBulan": 909200000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Advance Payment Interest",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 8296447,
+      "biayaBulan": 8296447,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Racking rental",
+      "qty": 13517,
+      "uom": "pp",
+      "hargaSatuan": 7100,
+      "biayaBulan": 95970700,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Community allowance",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1000000,
+      "biayaBulan": 1000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Water",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 500000,
+      "biayaBulan": 500000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pest Control",
+      "qty": 11365,
+      "uom": "sqm",
+      "hargaSatuan": 1139,
+      "biayaBulan": 12950000,
+      "catatan": "update 10oct"
+     },
+     {
+      "deskripsi": "Security",
+      "qty": 10.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 6724242,
+      "biayaBulan": 67242423,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Consumables",
+    "biayaBulan": 226691727,
+    "items": [
+     {
+      "deskripsi": "Rental CBTE (incld 2 spare batt)",
+      "qty": 2.0,
+      "uom": "unit",
+      "hargaSatuan": 12500000,
+      "biayaBulan": 25000000,
+      "catatan": "harga ffi - pushpull"
+     },
+     {
+      "deskripsi": "Rental RT 11m (incld 2 spare batt)",
+      "qty": 2.0,
+      "uom": "unit",
+      "hargaSatuan": 23000000,
+      "biayaBulan": 46000000,
+      "catatan": "harga ffi"
+     },
+     {
+      "deskripsi": "Rental PM Panjang (incld 2 spare batt)",
+      "qty": 2.0,
+      "uom": "unit",
+      "hargaSatuan": 8000000,
+      "biayaBulan": 16000000,
+      "catatan": "harga ffi"
+     },
+     {
+      "deskripsi": "MHE reserved cost",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 10000000,
+      "biayaBulan": 10000000,
+      "catatan": "harga ffi"
+     },
+     {
+      "deskripsi": "Stationaries",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 3000000,
+      "biayaBulan": 3000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Sewa copier",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1000000,
+      "biayaBulan": 1000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Drinking water",
+      "qty": 148.0,
+      "uom": "galon",
+      "hargaSatuan": 15000,
+      "biayaBulan": 2220000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Uniforms",
+      "qty": 54.0,
+      "uom": "set",
+      "hargaSatuan": 255000,
+      "biayaBulan": 1147500,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Safety Shoes",
+      "qty": 54.0,
+      "uom": "set",
+      "hargaSatuan": 250000,
+      "biayaBulan": 1125000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Rental RT 12m (incld 2 spare batt)",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 24000000,
+      "biayaBulan": 24000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pallet label (inbound)",
+      "qty": 10929,
+      "uom": "pallet",
+      "hargaSatuan": 100.0,
+      "biayaBulan": 1092930,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Pallet wrapping",
+      "qty": 919.17,
+      "uom": "pallet",
+      "hargaSatuan": 4545,
+      "biayaBulan": 4178030,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Repalletize & Loose unloading RMPM",
+      "qty": 3900,
+      "uom": "plt",
+      "hargaSatuan": 9000,
+      "biayaBulan": 35100000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "TKBM",
+      "qty": 351443,
+      "uom": "ctn",
+      "hargaSatuan": 160.0,
+      "biayaBulan": 56230896,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Asuransi",
+      "qty": 0.08,
+      "uom": "lumpsum",
+      "hargaSatuan": 7168459,
+      "biayaBulan": 597372,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Admin Expense",
+    "biayaBulan": 34290000,
+    "items": [
+     {
+      "deskripsi": "WMS Dashboard",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 560000,
+      "biayaBulan": 560000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Laptop rental",
+      "qty": 5.0,
+      "uom": "unit",
+      "hargaSatuan": 450000,
+      "biayaBulan": 2250000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "License WMS (for laptop, RF, PC)",
+      "qty": 2000,
+      "uom": "SO",
+      "hargaSatuan": 3400,
+      "biayaBulan": 6800000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Rental PC",
+      "qty": 7.0,
+      "uom": "unit",
+      "hargaSatuan": 350000,
+      "biayaBulan": 2450000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Interface Closed Stored Services",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 2500000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Internet",
+      "qty": 2.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 5000000,
+      "biayaBulan": 10000000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Antivirus",
+      "qty": 12.0,
+      "uom": "unit",
+      "hargaSatuan": 50000,
+      "biayaBulan": 600000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "AS2 Yearly Annual Fee for interface",
+      "qty": 1.0,
+      "uom": "lumpsum",
+      "hargaSatuan": 1750000,
+      "biayaBulan": 1750000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "KLOG Email",
+      "qty": 12.0,
+      "uom": "unit",
+      "hargaSatuan": 115000,
+      "biayaBulan": 1380000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "RF Handheld (zebra)",
+      "qty": 10.0,
+      "uom": "unit",
+      "hargaSatuan": 600000,
+      "biayaBulan": 6000000,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Capex",
+    "biayaBulan": 16565278,
+    "items": [
+     {
+      "deskripsi": "Meja + Laci",
+      "qty": 12.0,
+      "uom": "unit",
+      "hargaSatuan": 1650000,
+      "biayaBulan": 550000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Kursi",
+      "qty": 12.0,
+      "uom": "unit",
+      "hargaSatuan": 750000,
+      "biayaBulan": 250000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Locker isi 4",
+      "qty": 6.0,
+      "uom": "unit",
+      "hargaSatuan": 3250000,
+      "biayaBulan": 541667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Dispenser",
+      "qty": 3.0,
+      "uom": "unit",
+      "hargaSatuan": 500000,
+      "biayaBulan": 41667,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Lemari arsip",
+      "qty": 3.0,
+      "uom": "unit",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 208333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "AC Office 1.5PK",
+      "qty": 5.0,
+      "uom": "unit",
+      "hargaSatuan": 6000000,
+      "biayaBulan": 833333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Whiteboard 120 x 240",
+      "qty": 2.0,
+      "uom": "unit",
+      "hargaSatuan": 2500000,
+      "biayaBulan": 138889,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Bongkar aerosol dan pasang kembali",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 50000000,
+      "biayaBulan": 1388889,
+      "catatan": "update 02 Jan 2024"
+     },
+     {
+      "deskripsi": "Digital Termometer - EBH 20TH 1 set",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 3550000,
+      "biayaBulan": 98611,
+      "catatan": "update 9 oct"
+     },
+     {
+      "deskripsi": "Digital Termometer - EBH 20TH 1 not set",
+      "qty": 6.0,
+      "uom": "unit",
+      "hargaSatuan": 2450000,
+      "biayaBulan": 408333,
+      "catatan": "update 27 Des"
+     },
+     {
+      "deskripsi": "Pekerjaan office reckitt",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 100000000,
+      "biayaBulan": 2777778,
+      "catatan": "update 27 Des"
+     },
+     {
+      "deskripsi": "Handpallet",
+      "qty": 10.0,
+      "uom": "unit",
+      "hargaSatuan": 6000000,
+      "biayaBulan": 1250000,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Fire extinguisher",
+      "qty": 51.0,
+      "uom": "unit",
+      "hargaSatuan": 800000,
+      "biayaBulan": 1133333,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Other",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 50000000,
+      "biayaBulan": 1388889,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Plastic curtain",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 100000000,
+      "biayaBulan": 2777778,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Partisi antar tenant",
+      "qty": 1.0,
+      "uom": "unit",
+      "hargaSatuan": 100000000,
+      "biayaBulan": 2777778,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Startup Cost (ditagihkan sebagai one-time cost)",
+    "biayaBulan": 0,
+    "items": []
+   },
+   {
+    "kelompok": "Finance Charge",
+    "biayaBulan": 42512185,
+    "items": [
+     {
+      "deskripsi": "Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 3266391,
+      "catatan": null
+     },
+     {
+      "deskripsi": "Working Capital Interest",
+      "qty": null,
+      "uom": null,
+      "hargaSatuan": null,
+      "biayaBulan": 39245794,
+      "catatan": null
+     }
+    ]
+   },
+   {
+    "kelompok": "Overhead",
+    "biayaBulan": 54100050,
+    "items": []
+   }
+  ],
+  "totalCost": 1803334985,
+  "grandTotal": 1857435035,
+  "rev": 2119768724.27,
+  "biayaFile": 1857435034.9,
+  "marginFile": 0.12375580711067513,
+  "marginBasis": "Sheet Cost Structure (versi efisiensi), grand total termasuk overhead 3%",
+  "rate": [
+   [
+    "storage",
+    "Storage Non-DG",
+    "palet/bulan",
+    84000,
+    13376
+   ],
+   [
+    "storage",
+    "Storage flammable",
+    "palet/bulan",
+    84000,
+    200
+   ],
+   [
+    "storage",
+    "Storage temp control",
+    "palet/bulan",
+    84000,
+    924
+   ],
+   [
+    "handling_in",
+    "Inbound single stack",
+    "palet",
+    18000,
+    10870
+   ],
+   [
+    "handling_in",
+    "Inbound loose (per palet)",
+    "palet",
+    15450,
+    3900
+   ],
+   [
+    "handling_in",
+    "Inbound loose (per karton)",
+    "karton",
+    360,
+    13863
+   ],
+   [
+    "handling_out",
+    "Outbound full pallet",
+    "palet",
+    18000,
+    6500
+   ],
+   [
+    "handling_out",
+    "Outbound case pick",
+    "karton",
+    350,
+    337580
+   ],
+   [
+    "vas",
+    "Embellishment transfer",
+    "palet",
+    15500,
+    754
+   ],
+   [
+    "vas",
+    "Return (case level)",
+    "karton",
+    760,
+    2701
+   ],
+   [
+    "manajemen",
+    "Personel indirect (fixed)",
+    "bulan",
+    171799339,
+    1
+   ],
+   [
+    "manajemen",
+    "WMS (fixed)",
+    "bulan",
+    24290000,
+    1
+   ],
+   [
+    "manajemen",
+    "Fixed cost lain",
+    "bulan",
+    120827314,
+    1
+   ],
+   [
+    "manajemen",
+    "Startup (amortisasi)",
+    "bulan",
+    41576271,
+    1
+   ]
+  ],
+  "catatan": "Dipakai sheet \"CM - Efficiency\" (penghematan manpower shift 3 inbound import mulai 1 Apr 2025). Versi original: biaya Rp1.865,1 jt, margin 12,0%. Tanggal go-live mengikuti versi file Des 2023 (perkiraan)."
+ }
+]
