@@ -215,3 +215,5 @@ button.br-item:hover:not(:disabled), .br-pilih:hover:not(:disabled) { background
 .br-nama { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .hapus-box { display: grid; gap: 8px; max-width: 460px; padding: 12px; border: 1px solid #e3c4c0; background: #fdf6f5; border-radius: 8px; }
+
+.hasil-aksi { justify-content: flex-end; }

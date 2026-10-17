@@ -359,7 +359,7 @@ export default function TenderPage() {
 
       {tab === 'Hasil' && <HasilPanel hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
-        pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} />}
+        pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
     </>
@@ -382,8 +382,8 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak }: {
-  hasil: HasilTender | null; catatan: string[]; onSimpan: () => void; onHitung: () => void;
+function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang }: {
+  hasil: HasilTender | null; catatan: string[]; onSimpan: () => void; onHitung: () => void; gudang: { nama: string; luas_m2: number } | null | undefined;
   marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
   kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number; pajak: Pajak; onPajak: (p: Pajak) => void;
 }) {
@@ -392,18 +392,23 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
   const kritis = h.redFlags.filter(f => f.level === 'kritis').length;
   return (
     <>
-      <div className="kpis">
-        <div className="kpi"><span className="small muted">Biaya per bulan</span><b>{rp(h.totalBiayaBulan)}</b></div>
-        <div className="kpi"><span className="small muted">Headcount</span><b>{h.totalHeadcount} orang</b></div>
-        <div className="kpi"><span className="small muted">Luas gudang</span><b>{angka(h.space.totalM2)} m²</b></div>
-        <div className="kpi"><span className="small muted">Investasi</span><b>{rp(h.investasi)}</b></div>
-        <div className="kpi"><span className="small muted">GP volume komitmen</span><b>{persen(h.simulasi[0]?.gpPersen)}</b></div>
-      </div>
+      {(() => {
+        const s0 = h.simulasi[0];
+        const sell = s0?.pendapatanBulan ?? 0, cost = h.totalBiayaBulan, profit = s0?.gp ?? sell - cost;
+        const kpi: [string, string, string?][] = [
+          ['Cost per bulan', rp(cost)], ['Selling per bulan', rp(sell), 'bersih setelah PPh'],
+          ['Cost per tahun', rp(cost * 12)], ['Selling per tahun', rp(sell * 12)],
+          ['Profit per bulan', rp(profit), `per tahun ${rp(profit * 12)}`], ['Margin (GP%)', persen(s0?.gpPersen), 'volume komitmen'],
+          ['Jumlah manpower', `${h.totalHeadcount} orang`], ['Luas gudang', `${angka(h.space.totalM2)} m²`, gudang ? `dari ${angka(Number(gudang.luas_m2))} m² tersedia` : undefined],
+          ['Jumlah gudang', gudang ? '1 gudang' : '–', gudang ? gudang.nama : 'belum dipilih'],
+        ];
+        return <div className="kpis">{kpi.map(([l, v, k]) => <div key={l} className="kpi"><span className="small muted">{l}</span><b>{v}</b>{k && <span className="small muted">{k}</span>}</div>)}</div>;
+      })()}
+      <div className="row hasil-aksi"><button className="ghost" onClick={onHitung}>Hitung ulang</button><button onClick={onSimpan}>Simpan hasil sebagai versi baru</button></div>
 
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2>Red flag {kritis > 0 ? <span className="pill bad">{kritis} kritis</span> : <span className="pill ok">tidak ada yang kritis</span>}</h2>
-          <div className="row"><button className="ghost" onClick={onHitung}>Hitung ulang</button><button onClick={onSimpan}>Simpan hasil sebagai versi baru</button></div>
         </div>
         {h.redFlags.length === 0 && <p className="muted">Tidak ada red flag.</p>}
         {h.redFlags.map((f, i) => <div key={i} className={`flag ${f.level}`}><b className="small">{f.level.toUpperCase()} · {f.kode}</b><div>{f.pesan}</div></div>)}
@@ -464,6 +469,7 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
             <tr><td colSpan={4}><b>Total</b></td><td className="num out">{rp(h.totalBiayaBulan)}</td></tr></tbody>
         </table></div>
       </div>
+      <div className="row hasil-aksi"><button className="ghost" onClick={onHitung}>Hitung ulang</button><button onClick={onSimpan}>Simpan hasil sebagai versi baru</button></div>
     </>
   );
 }
