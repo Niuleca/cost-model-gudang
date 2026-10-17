@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { TenderRow, GudangTerpilih } from '@/lib/tender';
@@ -49,7 +50,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     setList((q.data ?? []) as Quo[]); setTc((t.data ?? []) as Tc[]);
   }, [tender.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { muat(); }, [muat]);
-  useEffect(() => { if (profile?.full_name) setTtd(x => ({ ...x, nama: x.nama || profile.full_name })); }, [profile]);
+  // Penanda tangan default dari Profil (menu akun → Profil & password); masih bisa diubah per quotation
+  useEffect(() => { if (profile) setTtd({ nama: profile.full_name || '', jabatan: profile.jabatan || 'Solution Design', perusahaan: profile.perusahaan || 'PT LX Pantos Indonesia' }); }, [profile]);
 
   const isiTc = (isi: string) => isi.replaceAll('{payment_term}', String(tender.payment_term_hari)).replaceAll('{durasi}', String(tender.durasi_kontrak_bulan));
 
@@ -189,7 +191,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
         </div>
       )}
 
-      <h3>Penanda tangan PDF</h3>
+      <div className="row" style={{ justifyContent: 'space-between' }}><h3>Penanda tangan PDF</h3>
+        <span className="small muted">Default dari <Link href="/akun">Profil</Link> · ubah di sini hanya untuk unduhan ini</span></div>
       <div className="grid3">
         <label className="f" htmlFor="ttdn">Nama<input id="ttdn" value={ttd.nama} onChange={e => setTtd({ ...ttd, nama: e.target.value })} /></label>
         <label className="f" htmlFor="ttdj">Jabatan<input id="ttdj" value={ttd.jabatan} onChange={e => setTtd({ ...ttd, jabatan: e.target.value })} /></label>

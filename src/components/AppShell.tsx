@@ -31,7 +31,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
 const AKUN: Item[] = [
   { href: '/admin', label: 'Pengguna & role', roles: ['admin'] },
   { href: '/master', label: 'Master data (kalender, keuangan, margin, T&C)', roles: 'semua' },
-  { href: '/akun', label: 'Ganti password', roles: 'semua' },
+  { href: '/akun', label: 'Profil & password', roles: 'semua' },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
