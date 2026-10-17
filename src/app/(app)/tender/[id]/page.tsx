@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -87,6 +87,7 @@ export default function TenderPage() {
     const row = tr.data as TenderRow;
     row.asumsi = { ...ASUMSI_DEFAULT, ...(row.asumsi ?? {}) };
     row.asumsi.it = { ...IT_SHEET_DEFAULT, ...(row.asumsi.it ?? {}) };
+    riwayat.current = { lalu: [], depan: [], terakhir: 0 };
     setT(row); setProds((p.data ?? []) as Prod[]); setItems((it.data ?? []) as Item[]); setTarif((tf.data ?? []) as Tarif[]);
     setJabatan(((jb.data ?? []) as Jab[]).map(j => j.role_name));
     if (row.hasil) setHasil(row.hasil as HasilTender);
@@ -99,8 +100,30 @@ export default function TenderPage() {
 
   useEffect(() => { muat(); }, [muat]);
 
-  const setKol = <K extends keyof TenderRow>(k: K, v: TenderRow[K]) => { setT(x => x && ({ ...x, [k]: v })); setKotor(true); };
-  const setA = (patch: Partial<Asumsi>) => { setT(x => x && ({ ...x, asumsi: { ...x.asumsi, ...patch } })); setKotor(true); };
+  // ---- Undo / redo: setiap perubahan input dicatat; ketikan beruntun (< 800 ms) digabung jadi satu langkah ----
+  const tRef = useRef<TenderRow | null>(null); tRef.current = t;
+  const riwayat = useRef<{ lalu: TenderRow[]; depan: TenderRow[]; terakhir: number }>({ lalu: [], depan: [], terakhir: 0 });
+  const [, setVerRiwayat] = useState(0);
+  const catat = () => {
+    const r = riwayat.current, now = Date.now();
+    if (tRef.current && now - r.terakhir > 800) { r.lalu.push(tRef.current); if (r.lalu.length > 100) r.lalu.shift(); r.depan = []; setVerRiwayat(v => v + 1); }
+    r.terakhir = now;
+  };
+  const undo = () => { const r = riwayat.current; const prev = r.lalu.pop(); if (!prev || !tRef.current) return; r.depan.push(tRef.current); r.terakhir = 0; setT(prev); setKotor(true); setVerRiwayat(v => v + 1); };
+  const redo = () => { const r = riwayat.current; const nxt = r.depan.pop(); if (!nxt || !tRef.current) return; r.lalu.push(tRef.current); r.terakhir = 0; setT(nxt); setKotor(true); setVerRiwayat(v => v + 1); };
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+    };
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setKol = <K extends keyof TenderRow>(k: K, v: TenderRow[K]) => { catat(); setT(x => x && ({ ...x, [k]: v })); setKotor(true); };
+  const setA = (patch: Partial<Asumsi>) => { catat(); setT(x => x && ({ ...x, asumsi: { ...x.asumsi, ...patch } })); setKotor(true); };
 
   async function simpan(extra: Partial<TenderRow> = {}) {
     if (!t) return false;
@@ -169,6 +192,10 @@ export default function TenderPage() {
         </div>
         <div className="row">
           {pesan && <span className="small" role="status">{pesan}</span>}
+          {bisaEdit && <>
+            <button className="ghost" onClick={undo} disabled={!riwayat.current.lalu.length} title="Undo (Ctrl+Z)" aria-label="Undo">↶ Undo</button>
+            <button className="ghost" onClick={redo} disabled={!riwayat.current.depan.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷ Redo</button>
+          </>}
           {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor}>Simpan input</button>}
           <button onClick={() => hitung()}>Hitung</button>
         </div>
