@@ -103,6 +103,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   faktorProduktivitas: number, efisiensi: number, jumlahShift: number, indirect?: IndirectInput) {
   const kalMp = hitungKalenderResource(pd.mp), kalMhe = hitungKalenderResource(pd.mhe);
   const beban = bebanAktif(pd.bebanShift, jumlahShift);
+  const operatingAuto = Math.max(1, beban.filter(w => w > 0).length || Math.min(3, Math.max(1, jumlahShift)));
   const baris: BarisPD[] = [];
   aktivitas.forEach((a, i) => {
     const v = volumes.find(x => x.arus === a.arus);
@@ -119,7 +120,8 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
     for (const r of res) {
       const alat = r.jenis === 'Equipment';
       const jamTersedia = alat ? kalMhe.jamBulan : kalMp.jamBulan;
-      const operating = alat ? Math.max(1, pd.operatingAlat) : 1;
+      // Operating = jumlah shift aktif (alat dipakai bergantian antar shift) — otomatis, tidak bisa melebihi shift.
+      const operating = alat ? operatingAuto : 1;
       baris.push({ no: i + 1, tahap: a.tahap, aktivitas: a.aktivitas, arus: a.arus, resource: r.nama, jenis: r.jenis,
         volume, uom: a.uom, persen: a.persenVolume, workload, prodDasar: a.prodPerJam, prod, rfr, efisiensi, manHour,
         jamTersedia, operating, fte: jamTersedia > 0 ? manHour / (jamTersedia * operating) : 0 });
@@ -180,7 +182,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
     e.unitIndirect += r.qty; e.resources += r.qty;
   }
   return {
-    kalender: { mp: kalMp, mhe: kalMhe }, beban, baris, mp, mhe,
+    kalender: { mp: kalMp, mhe: kalMhe }, beban, operating: operatingAuto, baris, mp, mhe,
     indirect: { spv, spvManual, directPerShift, rows: indirectRows, total: indirectRows.reduce((t, r) => t + r.qty, 0) },
     totalFteMp: mp.reduce((s, x) => s + x.fte, 0), totalMp: mp.reduce((s, x) => s + x.resources, 0),
     totalFteMhe: mhe.reduce((s, x) => s + x.fte, 0), totalMhe: mhe.reduce((s, x) => s + x.resources, 0),

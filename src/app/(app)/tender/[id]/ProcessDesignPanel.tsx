@@ -184,7 +184,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
               <table className="pd-shift"><tbody>
                 <tr><td>Produktivitas faktor</td><td className="num">{inp(Math.round(faktorProduktivitas * 1000) / 10, v => onFaktor({ faktorProduktivitas: v / 100 }))}%</td></tr>
                 <tr><td>Efficiency</td><td className="num">{inp(Math.round(efisiensi * 1000) / 10, v => onFaktor({ efisiensi: v / 100 }))}%</td></tr>
-                <tr><td>Operating (alat dipakai bergantian)</td><td className="num">{inp(pd.operatingAlat, v => onPd({ ...pd, operatingAlat: Math.max(1, v) }))}</td></tr>
+                <tr><td>Operating (alat dipakai bergantian)<div className="small muted">otomatis = jumlah shift aktif</div></td><td className="num"><b>{h.operating}</b></td></tr>
               </tbody></table>
               <p className="small muted" style={{ marginTop: 6 }}>Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling sesuai matriks rangkap di bawah. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
             </div>
