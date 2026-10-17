@@ -218,8 +218,8 @@ export default function TenderPage() {
             <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln</th><th className="num">Faktor peak</th><th></th></tr></thead>
             <tbody>{a.volumes.map((v, i) => (
               <tr key={i}>
-                <td><select aria-label="Arus" value={v.arus} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>
-                <td><select aria-label="UoM" value={v.uom} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { uom: e.target.value }) })}>{UOM.map(u => <option key={u}>{u}</option>)}</select></td>
+                <td><select aria-label="Arus" value={v.arus} style={{ minWidth: 130 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>
+                <td><select aria-label="UoM" value={v.uom} style={{ minWidth: 100 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { uom: e.target.value }) })}>{UOM.map(u => <option key={u}>{u}</option>)}</select></td>
                 {(['rataRataBulan', 'peakBulan', 'komitmenBulan'] as const).map(k => (
                   <td key={k} className="num"><input aria-label={k} type="number" step="any" value={v[k]} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { [k]: Number(e.target.value) }) })} /></td>
                 ))}
@@ -269,7 +269,7 @@ export default function TenderPage() {
         </div>
         <div className="card">
           <h2>Aktivitas (VSM) & manpower</h2>
-          <p className="small muted">Pilih aktivitas dari database produktivitas (Operations) atau tambah baris kosong. Semua kolom kuning bisa diubah: task, aktivitas, equipment, alat pendukung, role, produktivitas, UoM, arus, volume, %. Volume/bln kosong = volume peak arus × pengali.</p>
+          <p className="small muted">Pilih aktivitas dari database produktivitas (Operations) atau tambah baris kosong. Semua kolom kuning bisa diubah: task, aktivitas, equipment, alat pendukung, role, produktivitas, UoM, arus, volume, %. Volume/bln kosong = volume peak arus × pengali. <b>Arus</b> = alur barang yang menjadi dasar volume aktivitas: Inbound (barang masuk), Outbound (barang keluar), Storage (stok/penyimpanan), VAS (value added service).</p>
           <TambahAktivitas prods={prods} industri={t.industri} onTambah={p => setA({ aktivitas: [...a.aktivitas, { ...dariProd(p), persenVolume: 1, pengaliUom: 1 }] })} />
           <div className="row">
             <button className="ghost" onClick={() => setA({ aktivitas: [...a.aktivitas, { aktivitas: 'Aktivitas baru', tahap: a.aktivitas.at(-1)?.tahap ?? 'Inbound', tool: 'Manual', roleName: jabatan[0] ?? '',
@@ -283,7 +283,7 @@ export default function TenderPage() {
           <datalist id="dl-tool">{TOOLS.concat(prods.map(p => p.tool), a.mhe.map(m => m.tool)).filter((v, k, xs) => v && xs.indexOf(v) === k).map(v => <option key={v} value={v} />)}</datalist>
           <datalist id="dl-tahap">{Array.from(new Set([...prods.map(p => p.tahap), ...a.aktivitas.map(x => x.tahap)])).map(v => <option key={v} value={v} />)}</datalist>
           <div className="tablewrap"><table className="akt-edit">
-            <thead><tr><th>Task / tahap</th><th>Aktivitas (workload driver)</th><th>Equipment</th><th>Alat pendukung</th><th>Role (man power)</th><th className="num">Prod/jam</th><th>UoM</th><th>Arus</th>
+            <thead><tr><th>Task / tahap</th><th>Aktivitas (workload driver)</th><th>Equipment</th><th>Alat pendukung</th><th>Role (man power)</th><th className="num">Prod/jam</th><th>UoM</th><th title="Alur barang yang menjadi dasar volume aktivitas">Arus (alur barang)</th>
               <th className="num" title="Kosongkan untuk memakai volume peak arus × pengali">Volume/bln</th><th className="num">% volume</th><th className="num">Pengali UoM</th><th></th></tr></thead>
             <tbody>
               {a.aktivitas.length === 0 && <tr><td colSpan={12} className="muted">Belum ada aktivitas. Tambahkan dari daftar di atas atau baris kosong.</td></tr>}
@@ -305,8 +305,8 @@ export default function TenderPage() {
                   <td><select aria-label="Role" value={x.roleName} onChange={e => ub({ roleName: e.target.value })} style={{ minWidth: 160 }}>
                     {(jabatan.includes(x.roleName) ? jabatan : [x.roleName, ...jabatan]).map(j => <option key={j}>{j}</option>)}</select></td>
                   <td className="num db"><input aria-label="Produktivitas" type="number" step="any" value={x.prodPerJam} onChange={e => ub({ prodPerJam: Number(e.target.value) })} style={{ width: 80, minWidth: 80 }} /></td>
-                  <td><select aria-label="UoM" value={x.uom} onChange={e => ub({ uom: e.target.value })}>{(UOM.includes(x.uom) ? UOM : [x.uom, ...UOM]).map(u => <option key={u}>{u}</option>)}</select></td>
-                  <td><select aria-label="Arus" value={x.arus} onChange={e => ub({ arus: e.target.value as Arus })}>{ARUS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select></td>
+                  <td><select aria-label="UoM" value={x.uom} style={{ minWidth: 100 }} onChange={e => ub({ uom: e.target.value })}>{(UOM.includes(x.uom) ? UOM : [x.uom, ...UOM]).map(u => <option key={u}>{u}</option>)}</select></td>
+                  <td><select aria-label="Arus" value={x.arus} style={{ minWidth: 130 }} title="Alur barang: inbound (masuk), outbound (keluar), storage (penyimpanan), VAS" onChange={e => ub({ arus: e.target.value as Arus })}>{ARUS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select></td>
                   <td className="num"><input aria-label="Volume per bulan" type="number" step="any" placeholder={Math.round(vAuto).toLocaleString('id-ID')} value={x.volumeManual ?? ''}
                     onChange={e => ub({ volumeManual: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 96, minWidth: 96 }} /></td>
                   <td className="num"><input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>
