@@ -333,7 +333,9 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     const hargaDefault = (['Rendah', 'Sedang', 'Tinggi'] as KategoriRisiko[]).reduce((sum, k) => sum + biayaBucket[b][k] * (1 + m.margin[k]), 0);
     const mm = t.marginManual?.[b];
     const manual = mm != null && Number.isFinite(mm);
-    const hargaSebelumPph = manual ? biaya * (1 + Number(mm)) : hargaDefault;
+    // Input user = GP% atas pendapatan (bukan markup): harga = biaya ÷ (1 − GP)
+    const gpIn = manual ? Math.min(0.95, Number(mm)) : 0;
+    const hargaSebelumPph = manual ? biaya / (1 - gpIn) : hargaDefault;
     const harga = hargaSebelumPph / (1 - g);
     const v = volArus(bucketKeArus[b]);
     const komitmen = v?.komitmenBulan ?? 0;
@@ -345,6 +347,8 @@ export function hitungTender(t: TenderInput, m: MasterData) {
       bucket: b, uom: v?.uom ?? '-', biayaBulan: bulat(biaya), hargaBulan: bulat(harga),
       marginEfektif: biaya > 0 ? bulat(hargaSebelumPph / biaya - 1, 4) : 0,
       marginDefault: biaya > 0 ? bulat(hargaDefault / biaya - 1, 4) : 0, marginManual: manual, hargaSebelumPph: bulat(hargaSebelumPph),
+      gpPersen: hargaSebelumPph > 0 ? bulat(1 - biaya / hargaSebelumPph, 4) : 0,                       // GP% atas pendapatan (sebelum PPh)
+      gpDefault: hargaDefault > 0 ? bulat(1 - biaya / hargaDefault, 4) : 0,
       volumeKomitmen: komitmen, biayaPerUnit: komitmen > 0 ? bulat(biaya / komitmen, 2) : 0,
       tarifPerUnit: tarifExcl,                       // tarif belum PPN (dasar pendapatan)
       tarifInclPpn: tarifIncl, ppnPerUnit: tarifIncl - tarifExcl,
@@ -355,7 +359,8 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   // Total margin gabungan (tertimbang biaya) dari semua layanan
   const totBiayaRc = rateCard.reduce((s2, rc) => s2 + rc.biayaBulan, 0), totHargaRc = rateCard.reduce((s2, rc) => s2 + rc.hargaSebelumPph, 0);
   const marginTotal = { biayaBulan: bulat(totBiayaRc), hargaSebelumPph: bulat(totHargaRc), hargaBulan: bulat(rateCard.reduce((s2, rc) => s2 + rc.hargaBulan, 0)),
-    margin: totBiayaRc > 0 ? bulat(totHargaRc / totBiayaRc - 1, 4) : 0 };
+    margin: totBiayaRc > 0 ? bulat(totHargaRc / totBiayaRc - 1, 4) : 0,                 // markup gabungan
+    gpPersen: totHargaRc > 0 ? bulat(1 - totBiayaRc / totHargaRc, 4) : 0 };              // GP% gabungan atas pendapatan
 
   // Tarif storage alternatif (per m², ton, CBM, liter) dari harga storage yang sama
   const st = rateCard.find(rc => rc.bucket === 'storage');
@@ -376,7 +381,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const simulasi = (['komitmenBulan', 'rataRataBulan', 'peakBulan'] as const).map(sk => {
     const rev = pendapatan(sk) * (1 - pphRate);          // pendapatan bersih setelah PPh 23 dipotong customer (PPN bukan pendapatan)
     return { skenario: sk === 'komitmenBulan' ? 'Volume komitmen' : sk === 'rataRataBulan' ? 'Volume rata-rata' : 'Volume peak',
-      pendapatanBulan: bulat(rev), biayaBulan: bulat(totalBiaya), gp: bulat(rev - totalBiaya), gpPersen: rev > 0 ? bulat((rev - totalBiaya) / rev, 4) : 0 };
+      pendapatanBulan: bulat(rev), invoiceInclPpn: bulat(pendapatan(sk) * (1 + ppn)), ppnBulan: bulat(pendapatan(sk) * ppn), biayaBulan: bulat(totalBiaya), gp: bulat(rev - totalBiaya), gpPersen: rev > 0 ? bulat((rev - totalBiaya) / rev, 4) : 0 };
   });
   const gpKomitmen = simulasi[0].gpPersen;
   if (gpKomitmen < m.finance.gpMinimum)
