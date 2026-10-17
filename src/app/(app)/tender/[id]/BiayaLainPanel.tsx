@@ -78,10 +78,10 @@ function KartuSeksi({ s, rows, items, kontrak, bunga, onUbah, onUbahBanyak, onHa
 }
 
 export interface StartupAuto { aktif: boolean; persenOpex: number; persenManpower: number }
-export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, headcount, hariKerjaBulan }: {
+export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, onHitung, headcount, hariKerjaBulan }: {
   lines: Baris[]; items: Item[]; kontrakBulan: number; onChange: (l: Baris[]) => void;
   startup: StartupAuto; onStartup: (s: StartupAuto) => void;
-  hasilBaris?: { deskripsi: string; biayaBulan: number; dasar: string }[]; headcount: number; hariKerjaBulan: number;
+  hasilBaris?: { deskripsi: string; biayaBulan: number; dasar: string }[]; onHitung: () => Promise<void> | void; headcount: number; hariKerjaBulan: number;
 }) {
   const sb = supabaseBrowser();
   const [bunga, setBunga] = useState(0.1);
@@ -108,6 +108,12 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
   const manualDobel = lines.map((b, i) => ({ b, i })).filter(r => startup.aktif && /implement|start ?up/i.test(r.b.deskripsi));
   const persenInp = (v: number, on: (n: number) => void) => <input type="number" min={0} step="any" value={Math.round(v * 1000) / 10} disabled={!startup.aktif}
     onChange={e => on(Number(e.target.value) / 100)} style={{ width: 70, minWidth: 70, textAlign: 'right' }} />;
+  const [sibuk, setSibuk] = useState(false);
+  const jalankan = async () => { setSibuk(true); try { await onHitung(); } finally { setSibuk(false); } };
+  // persen berubah sejak Hitung terakhir → angka lama tidak berlaku
+  const persenHasil = (nama: string) => Number(barisAuto(nama)?.dasar.match(/^(\d+(?:\.\d+)?)%/)?.[1] ?? NaN) / 100;
+  const basi = startup.aktif && ((barisAuto('Startup cost') && Math.abs(persenHasil('Startup cost') - startup.persenOpex) > 1e-6)
+    || (barisAuto('Implementation cost') && Math.abs(persenHasil('Implementation cost') - startup.persenManpower) > 1e-6));
   const extraStartup = (
     <div className="bl-auto">
       <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={startup.aktif} onChange={e => onStartup({ ...startup, aktif: e.target.checked })} style={{ width: 'auto' }} /> <b>Hitung otomatis</b> (biaya sekali, diamortisasi {kontrakBulan} bln + bunga modal)</label>
@@ -117,9 +123,13 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
           {([['Startup cost', 'persenOpex', 'OPEX per bulan (semua biaya operasi, di luar startup)'], ['Implementation cost', 'persenManpower', 'total biaya manpower per bulan']] as const).map(([nama, k, dasar]) => {
             const h = barisAuto(nama);
             return <tr key={k}><td><b>{nama}</b></td><td className="num">{persenInp(startup[k], v => onStartup({ ...startup, [k]: v }))}%</td>
-              <td className="small">{h ? h.dasar : dasar}</td><td className="num">{!startup.aktif ? '–' : h ? <b>{rp(h.biayaBulan)}</b> : <span className="small muted">tekan Hitung</span>}</td></tr>;
+              <td className="small">{h ? h.dasar : dasar}</td><td className="num">{!startup.aktif ? '–' : h ? <b>{rp(h.biayaBulan)}</b> : <button className="ghost" style={{ padding: '2px 10px' }} disabled={sibuk} onClick={jalankan}>{sibuk ? 'Menghitung…' : 'Hitung sekarang'}</button>}</td></tr>;
           })}
         </tbody></table></div>
+      {startup.aktif && (barisAuto('Startup cost') || barisAuto('Implementation cost')) && <div className="row small">
+        {basi && <span className="pill warn">persen berubah — angka belum diperbarui</span>}
+        <button className="ghost" style={{ padding: '2px 10px' }} disabled={sibuk} onClick={jalankan}>{sibuk ? 'Menghitung…' : 'Hitung ulang'}</button>
+        <span className="muted">Angka dari Hitung terakhir; ikut berubah bila biaya lain/manpower berubah.</span></div>}
       {manualDobel.length > 0 && <div className="notice small">Baris manual berikut kemungkinan <b>dobel</b> dengan startup/implementation otomatis:{' '}
         {manualDobel.map(r => <span key={r.i} style={{ marginRight: 8 }}>“{r.b.deskripsi}” <button className="danger" style={{ padding: '0 8px' }} onClick={() => onChange(lines.filter((_, j) => j !== r.i))}>Hapus</button></span>)}</div>}
     </div>);

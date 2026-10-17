@@ -110,13 +110,13 @@ export default function TenderPage() {
     return true;
   }
 
-  async function hitung() {
+  async function hitung(pindahTab = true) {
     if (!t) return;
     setPesan('Menghitung…');
     const { master, catatan } = await muatMaster(sb, t);
     const h = hitungTender(keInput(t), master);
     for (const c of catatan) h.redFlags.push({ level: 'peringatan', kode: 'MASTER_DATA', pesan: c });
-    setHasil(h); setCatatanMaster(catatan); setTab('Hasil'); setPesan(null);
+    setHasil(h); setCatatanMaster(catatan); if (pindahTab) setTab('Hasil'); setPesan(pindahTab ? null : 'Dihitung ulang.'); if (!pindahTab) setTimeout(() => setPesan(null), 2000);
   }
 
   async function simpanHasil() {
@@ -159,7 +159,7 @@ export default function TenderPage() {
         <div className="row">
           {pesan && <span className="small" role="status">{pesan}</span>}
           {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor}>Simpan input</button>}
-          <button onClick={hitung}>Hitung</button>
+          <button onClick={() => hitung()}>Hitung</button>
         </div>
       </div>
       {profile && !bisaEdit && <div className="ro-banner" role="note"><b>Hanya lihat</b> · Draft ini dibuat oleh {pembuat ?? 'akun lain'}. Anda bisa melihat isi dan menjalankan Hitung untuk simulasi, tetapi tidak bisa menyimpan perubahan, mengubah status, atau membuat quotation.</div>}
@@ -334,7 +334,7 @@ export default function TenderPage() {
           <p className="small muted">Dipisah per klasifikasi sesuai Price Inquiry; pilihan item di tiap bagian hanya dari kategorinya. Bulanan/sewa = qty × harga per bulan. Beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak + bunga modal.</p>
           <BiayaLainPanel lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan} onChange={costLines => setA({ costLines })}
             startup={a.startupAuto ?? STARTUP_DEFAULT} onStartup={startupAuto => setA({ startupAuto })}
-            hasilBaris={hasil?.biaya} headcount={headcountTotal} hariKerjaBulan={a.processDesign?.hariKerjaBulan ?? 25} />
+            hasilBaris={hasil?.biaya} onHitung={() => hitung(false)} headcount={headcountTotal} hariKerjaBulan={a.processDesign?.hariKerjaBulan ?? 25} />
 
           <h2>Listrik</h2>
           <ListrikTender simulasi={a.listrikSimulasi} listrik={a.listrik} golongan={a.golonganListrik} tarifKwh={a.tarifListrikKwh} tarif={tarif} items={items}
@@ -343,7 +343,7 @@ export default function TenderPage() {
         </div>
       )}
 
-      {tab === 'Hasil' && <HasilPanel hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={hitung} />}
+      {tab === 'Hasil' && <HasilPanel hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
     </>
