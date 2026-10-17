@@ -12,13 +12,14 @@ export interface QuotationPdfData {
   tagihanSekali?: { deskripsi: string; nilai: number }[];
   gudang?: InfoGudangPdf | null; catatanRevisi?: string | null; durasiBulan?: number; termasukPpn?: boolean; ppnPersen?: number;
   termCondition: string; penandatangan: string; jabatan: string; perusahaan: string;
-  logo?: GambarPdf | null; ttd?: GambarPdf | null;
+  logo?: GambarPdf | null; ttd?: GambarPdf | null; watermark?: string;
 }
 export interface GambarPdf { dataUrl: string; format: string; w: number; h: number }
 /** Ukuran gambar (mm) dalam kotak maksimum, aspek dijaga. */
 const muat = (g: GambarPdf, maxW: number, maxH: number) => { const r = Math.min(maxW / g.w, maxH / g.h); return { w: g.w * r, h: g.h * r }; };
 
-export async function unduhQuotationPdf(d: QuotationPdfData) {
+/** Susun dokumen PDF (dipakai untuk unduh dan pratinjau). */
+export async function buatQuotationPdf(d: QuotationPdfData) {
   const { jsPDF } = await import('jspdf');
   const autoTable = (await import('jspdf-autotable')).default;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -129,5 +130,20 @@ export async function unduhQuotationPdf(d: QuotationPdfData) {
     doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120);
     doc.text(`${d.nomor} · Halaman ${i} dari ${halaman}`, 210 - kiri, 290, { align: 'right' });
   }
-  doc.save(`${d.nomor.replace(/[^\w-]+/g, '_')}.pdf`);
+  if (d.watermark) for (let i = 1; i <= halaman; i++) {
+    doc.setPage(i); doc.setFont('helvetica', 'bold'); doc.setFontSize(80); doc.setTextColor(150);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const D = doc as any; if (D.GState) D.setGState(new D.GState({ opacity: 0.12 }));
+    doc.text(d.watermark, 105, 175, { align: 'center', angle: 35 });
+    if (D.GState) D.setGState(new D.GState({ opacity: 1 }));
+  }
+  return doc;
+}
+export const namaFilePdf = (nomor: string) => `${nomor.replace(/[^\w-]+/g, '_')}.pdf`;
+export async function unduhQuotationPdf(d: QuotationPdfData) {
+  (await buatQuotationPdf(d)).save(namaFilePdf(d.nomor));
+}
+/** PDF sebagai Blob untuk pratinjau di halaman. */
+export async function blobQuotationPdf(d: QuotationPdfData) {
+  return (await buatQuotationPdf(d)).output('blob') as Blob;
 }

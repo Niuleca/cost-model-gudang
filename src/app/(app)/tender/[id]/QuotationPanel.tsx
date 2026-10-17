@@ -7,7 +7,8 @@ import type { HasilTender } from '@/lib/engine/index.ts';
 import type { Profile } from '@/lib/useProfile';
 import { rp, tanggal, angka, BUCKET_LABEL } from '@/lib/format';
 import { ringkasIt, IT_SHEET_DEFAULT } from '@/lib/it';
-import { unduhQuotationPdf, type InfoGudangPdf } from '@/lib/quotationPdf';
+import { unduhQuotationPdf, blobQuotationPdf, type InfoGudangPdf, type QuotationPdfData } from '@/lib/quotationPdf';
+import PdfPreview from './PdfPreview';
 import BrandingPanel, { gambarUntukPdf, type PilihanBranding } from './BrandingPanel';
 
 interface RateRow { layanan: string; satuan: string; tarif: number; catatan?: string }
@@ -39,6 +40,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const [branding, setBranding] = useState<PilihanBranding>({ logoPath: null, ttdPath: null });
   const [hapusId, setHapusId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [pratinjau, setPratinjau] = useState<{ blob: Blob; data: QuotationPdfData } | null>(null);
+  const [sibukPv, setSibukPv] = useState(false);
   const [tambahIdx, setTambahIdx] = useState('');
   const hasil = tender.hasil as HasilTender | null;
   const bolehApprove = !!profile && ['commercial', 'finance', 'admin'].includes(profile.role);
@@ -133,14 +136,22 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     if (error || !data?.length) { setErr(error?.message ?? 'Tidak bisa menghapus (hanya pembuat tender / admin).'); setHapusId(null); return; }
     setHapusId(null); setErr(null); muat();
   }
-  async function unduh(q: Quo) {
+  /** Data PDF dari quotation tersimpan atau draft yang sedang diedit; draft diberi watermark. */
+  async function dataPdf(q: Draft & { status?: string }): Promise<QuotationPdfData> {
     const [logo, ttdImg] = await Promise.all([gambarUntukPdf(branding.logoPath), gambarUntukPdf(branding.ttdPath)]);
-    await unduhQuotationPdf({ logo, ttd: ttdImg,
+    return { logo, ttd: ttdImg, watermark: !q.status || q.status === 'draft' ? 'DRAFT' : q.status === 'batal' ? 'BATAL' : undefined,
       nomor: q.nomor, tanggal: q.tanggal, berlakuSampai: q.berlaku_sampai, kepada: q.kepada ?? tender.customer, customer: tender.customer,
       lokasi: `${tender.kab_kota}, ${tender.provinsi}`, perihal: q.revisi > 0 ? `Revisi ${q.revisi} Penawaran Harga Jasa Pergudangan` : 'Penawaran Harga Jasa Pergudangan',
       rateCard: q.rate_card, tagihanSekali: q.tagihan_sekali ?? [], gudang: q.info_gudang, catatanRevisi: q.catatan_revisi,
-      durasiBulan: tender.durasi_kontrak_bulan, termasukPpn: (tender.asumsi.pajak?.ppn ?? 'exclude') === 'include', ppnPersen: tender.asumsi.pajak?.ppnPersen ?? 0.11, termCondition: q.term_condition, penandatangan: ttd.nama, jabatan: ttd.jabatan, perusahaan: ttd.perusahaan,
-    });
+      durasiBulan: tender.durasi_kontrak_bulan, termasukPpn: (tender.asumsi.pajak?.ppn ?? 'exclude') === 'include', ppnPersen: tender.asumsi.pajak?.ppnPersen ?? 0.11,
+      termCondition: q.term_condition, penandatangan: ttd.nama, jabatan: ttd.jabatan, perusahaan: ttd.perusahaan };
+  }
+  async function unduh(q: Quo) { await unduhQuotationPdf(await dataPdf(q)); }
+  async function lihat(q: Draft & { status?: string }) {
+    setSibukPv(true);
+    try { const data = await dataPdf(q); setPratinjau({ blob: await blobQuotationPdf(data), data }); }
+    catch (e) { setErr(`Gagal membuat pratinjau: ${e instanceof Error ? e.message : e}`); }
+    finally { setSibukPv(false); }
   }
 
   const ubahRate = (i: number, patch: Partial<RateRow>) => draft && setDraft({ ...draft, rate_card: draft.rate_card.map((x, j) => j === i ? { ...x, ...patch } : x) });
@@ -202,7 +213,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
                 {tc.map(x => <option key={x.id} value={x.id}>{x.nama}</option>)}</select></label>
           )}
           <label className="f" htmlFor="qtc">Syarat dan ketentuan<textarea id="qtc" rows={10} value={draft.term_condition} onChange={e => setDraft({ ...draft, term_condition: e.target.value })} /></label>
-          <div className="row"><button onClick={simpanDraft}>{editId ? 'Simpan perubahan' : `Simpan draft ${draft.revisi > 0 ? `revisi ${draft.revisi}` : 'quotation'}`}</button><button className="ghost" onClick={tutupDraft}>Batal</button></div>
+          <div className="row"><button onClick={simpanDraft}>{editId ? 'Simpan perubahan' : `Simpan draft ${draft.revisi > 0 ? `revisi ${draft.revisi}` : 'quotation'}`}</button><button className="ghost" disabled={sibukPv} onClick={() => lihat(draft)}>{sibukPv ? 'Menyiapkan…' : 'Pratinjau'}</button><button className="ghost" onClick={tutupDraft}>Batal</button></div>
         </div>
       )}
 
@@ -227,6 +238,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
               <td className="row">
                 {q.status === 'draft' && bolehApprove && <button onClick={() => setStatus(q, 'approved')}>Approve</button>}
                 {q.status === 'draft' && !bolehApprove && <span className="small muted">Menunggu approve Commercial/Finance</span>}
+                <button className="ghost" disabled={sibukPv} onClick={() => lihat(q)}>Pratinjau</button>
                 {q.status !== 'draft' && <button onClick={() => unduh(q)}>Unduh PDF</button>}
                 {q.status === 'approved' && <button className="ghost" onClick={() => setStatus(q, 'terkirim')}>Tandai terkirim</button>}
                 {(q.status === 'approved' || q.status === 'terkirim') && !draft && <button className="ghost" onClick={() => revisi(q)}>Buat revisi</button>}
@@ -239,6 +251,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
             </tr>))}
         </tbody>
       </table></div>
+      {pratinjau && <PdfPreview blob={pratinjau.blob} judul={pratinjau.data.nomor} onTutup={() => setPratinjau(null)} onUnduh={() => unduhQuotationPdf(pratinjau.data)} />}
     </div>
   );
 }
