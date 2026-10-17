@@ -42,6 +42,7 @@ export interface Asumsi {
   listrikSimulasi?: TenderInput['listrikSimulasi'];
   startupAuto?: TenderInput['startupAuto'];
   marginManual?: TenderInput['marginManual'];
+  pajak?: TenderInput['pajak'];
   kurs?: { kode: string; rupiahPer: number; tanggal?: string } | null;
   advanceSewaBulan: number;
   depositBulan: number;
@@ -67,6 +68,7 @@ export interface ProjectHistoris {
   catatan: string;
 }
 
+export const PAJAK_DEFAULT = { pph: 'include' as const, ppn: 'exclude' as const, ppnPersen: 0.11 };
 export const STARTUP_DEFAULT = { aktif: true, persenOpex: 0.5, persenManpower: 0.5 };
 export const ASUMSI_DEFAULT: Asumsi = {
   cutiTahunanHari: 12, faktorProduktivitas: 0.95, efisiensi: 0.9, spanOfControl: 15, roleSupervisor: 'Operational SPV',
@@ -101,7 +103,7 @@ export function keInput(t: TenderRow): TenderInput {
       sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
-    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, startupAuto: a.startupAuto ?? STARTUP_DEFAULT,
+    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT,
     stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter,
     metodeManpower: a.metodeManpower ?? 'excel', processDesign: { ...PD_DEFAULT, ...(a.processDesign ?? {}) },
   };

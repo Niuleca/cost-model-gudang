@@ -10,7 +10,7 @@ export interface QuotationPdfData {
   nomor: string; tanggal: string; berlakuSampai: string; kepada: string; customer: string; lokasi: string;
   perihal: string; rateCard: { layanan: string; satuan: string; tarif: number; catatan?: string }[];
   tagihanSekali?: { deskripsi: string; nilai: number }[];
-  gudang?: InfoGudangPdf | null; catatanRevisi?: string | null; durasiBulan?: number;
+  gudang?: InfoGudangPdf | null; catatanRevisi?: string | null; durasiBulan?: number; termasukPpn?: boolean; ppnPersen?: number;
   termCondition: string; penandatangan: string; jabatan: string; perusahaan: string;
 }
 
@@ -77,7 +77,7 @@ export async function unduhQuotationPdf(d: QuotationPdfData) {
 
   autoTable(doc, {
     startY: y, margin: { left: kiri, right: kiri },
-    head: [['No', 'Layanan', 'Satuan', 'Tarif (belum PPN)', 'Keterangan']],
+    head: [['No', 'Layanan', 'Satuan', d.termasukPpn ? `Tarif (termasuk PPN ${Math.round((d.ppnPersen ?? 0.11) * 1000) / 10}%)` : 'Tarif (belum PPN)', 'Keterangan']],
     body: d.rateCard.map((r, i) => [String(i + 1), r.layanan, r.satuan, rp(r.tarif), r.catatan ?? '']),
     styles: { font: 'helvetica', fontSize: 9, cellPadding: 2.2 },
     headStyles: { fillColor: [31, 78, 121], textColor: 255 },

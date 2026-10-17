@@ -51,7 +51,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
 
   /** Rate card + tagihan sekali dari hasil hitung tersimpan. */
   function dariHasil(h: HasilTender) {
-    const rate: RateRow[] = h.rateCard.map(r => ({ layanan: BUCKET_LABEL[r.bucket], satuan: (SATUAN[r.bucket] ?? (u => u))(r.uom), tarif: r.tarifPerUnit,
+    const inclPpn = (tender.asumsi.pajak?.ppn ?? 'exclude') === 'include';
+    const rate: RateRow[] = h.rateCard.map(r => ({ layanan: BUCKET_LABEL[r.bucket], satuan: (SATUAN[r.bucket] ?? (u => u))(r.uom), tarif: inclPpn ? (r.tarifInclPpn ?? r.tarifPerUnit) : r.tarifPerUnit,
       catatan: `Minimum ${r.volumeKomitmen.toLocaleString('id-ID')} ${r.uom}/bulan` }));
     for (const alt of h.storageAlternatif.slice(1))
       rate.push({ layanan: 'Storage (alternatif)', satuan: `per ${alt.uom} per bulan`, tarif: alt.tarif, catatan: 'Pilih salah satu basis storage' });
@@ -111,7 +112,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
       nomor: q.nomor, tanggal: q.tanggal, berlakuSampai: q.berlaku_sampai, kepada: q.kepada ?? tender.customer, customer: tender.customer,
       lokasi: `${tender.kab_kota}, ${tender.provinsi}`, perihal: q.revisi > 0 ? `Revisi ${q.revisi} Penawaran Harga Jasa Pergudangan` : 'Penawaran Harga Jasa Pergudangan',
       rateCard: q.rate_card, tagihanSekali: q.tagihan_sekali ?? [], gudang: q.info_gudang, catatanRevisi: q.catatan_revisi,
-      durasiBulan: tender.durasi_kontrak_bulan, termCondition: q.term_condition, penandatangan: ttd.nama, jabatan: ttd.jabatan, perusahaan: ttd.perusahaan,
+      durasiBulan: tender.durasi_kontrak_bulan, termasukPpn: (tender.asumsi.pajak?.ppn ?? 'exclude') === 'include', ppnPersen: tender.asumsi.pajak?.ppnPersen ?? 0.11, termCondition: q.term_condition, penandatangan: ttd.nama, jabatan: ttd.jabatan, perusahaan: ttd.perusahaan,
     });
   }
 

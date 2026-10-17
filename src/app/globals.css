@@ -196,3 +196,5 @@ td.out { background: var(--g100); }
 
 .bar-kat { height: 10px; background: var(--g100); border-radius: 99px; overflow: hidden; }
 .bar-kat i { display: block; height: 100%; background: var(--g700); border-radius: 99px; }
+
+.pajak-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; padding: 12px; background: var(--g50); border: 1px solid var(--line); border-radius: 8px; }

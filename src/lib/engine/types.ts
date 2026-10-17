@@ -118,6 +118,8 @@ export interface TenderInput {
   tarifListrikKwh: number;
   /** Biaya listrik per bulan dari simulasi Utilities (Price Inquiry). Bila diisi, menggantikan perhitungan per peralatan. */
   listrikSimulasi?: { id: string; nama: string; totalBulan: number; kwhBulan: number } | null;
+  /** Perlakuan pajak di tarif: PPh 23 di-gross-up (include) atau tidak (exclude); PPN termasuk di tarif (include) atau ditambahkan terpisah (exclude). */
+  pajak?: { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number };
   /** Margin (markup atas biaya) per layanan, diinput user. Kosong = margin default per kategori risiko (master Finance). */
   marginManual?: Partial<Record<Bucket, number | null>>;
   /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */

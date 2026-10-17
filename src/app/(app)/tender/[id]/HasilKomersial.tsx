@@ -13,10 +13,14 @@ const MATA_UANG: { kode: string; nama: string }[] = [
 const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: kode, maximumFractionDigits: ['JPY', 'KRW', 'VND'].includes(kode) ? 0 : 2 }).format(v);
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan }: {
+export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak }: {
   h: HasilTender; marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
   kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number;
+  pajak: Pajak; onPajak: (p: Pajak) => void;
 }) {
+  const pphPersen = h.pajak?.pphPersen ?? 0.02;
+  const tq = (r: HasilTender['rateCard'][number]) => pajak.ppn === 'include' ? (r.tarifInclPpn ?? r.tarifPerUnit) : r.tarifPerUnit;
   const [ambil, setAmbil] = useState<string | null>(null);
   const mt = h.marginTotal;
   const setM = (b: Bucket, v: string) => onMargin({ ...marginManual, [b]: v === '' ? null : Number(v) / 100 });
@@ -42,9 +46,25 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
   return (<>
     <div className="card">
       <h2>Rate card & margin</h2>
-      <p className="small muted">Margin = markup atas biaya per layanan, diisi sendiri. Kosongkan untuk memakai margin default per kategori risiko (master Finance). Tarif sudah termasuk gross-up PPh.</p>
+      <div className="pajak-bar">
+        <label className="f" htmlFor="pj-pph">PPh 23 ({(pphPersen * 100).toFixed(1)}%)
+          <select id="pj-pph" value={pajak.pph} onChange={e => onPajak({ ...pajak, pph: e.target.value as Pajak['pph'] })}>
+            <option value="include">Include — tarif di-gross-up (PPh ditanggung customer)</option>
+            <option value="exclude">Exclude — tarif tanpa gross-up (PPh mengurangi pendapatan)</option>
+          </select></label>
+        <label className="f" htmlFor="pj-ppn">PPN / VAT
+          <select id="pj-ppn" value={pajak.ppn} onChange={e => onPajak({ ...pajak, ppn: e.target.value as Pajak['ppn'] })}>
+            <option value="exclude">Exclude — tarif belum termasuk PPN</option>
+            <option value="include">Include — tarif sudah termasuk PPN</option>
+          </select></label>
+        <label className="f" htmlFor="pj-ppnp">Tarif PPN efektif
+          <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input id="pj-ppnp" type="number" step="0.1" value={Math.round(pajak.ppnPersen * 1000) / 10}
+            onChange={e => onPajak({ ...pajak, ppnPersen: Number(e.target.value) / 100 })} style={{ width: 80 }} />%</span></label>
+      </div>
+      <p className="small muted">Margin = markup atas biaya per layanan, diisi sendiri (kosong = default per kategori risiko). PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
+        {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>
       <div className="tablewrap"><table>
-        <thead><tr><th>Layanan</th><th>Satuan</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">Margin (input)</th><th className="num">Harga/bln</th><th className="num">Tarif/unit</th></tr></thead>
+        <thead><tr><th>Layanan</th><th>Satuan</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">Margin (input)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
         <tbody>
           {h.rateCard.map(r => {
             const b = r.bucket as Bucket, v = marginManual[b];
@@ -53,10 +73,13 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
               <td className="num"><input aria-label={`Margin ${BUCKET_LABEL[r.bucket]}`} type="number" step="0.1" value={v == null ? '' : Math.round(v * 1000) / 10}
                 placeholder={(Math.round((r.marginDefault ?? r.marginEfektif) * 1000) / 10).toString()} onChange={e => setM(b, e.target.value)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /> %
                 {v == null && <div className="small muted">default</div>}</td>
-              <td className="num">{rp(r.hargaBulan)}</td><td className="num out">{rp(r.tarifPerUnit)}</td></tr>;
+              <td className="num">{rp(r.hargaBulan)}</td>
+              <td className={`num${pajak.ppn === 'exclude' ? ' out' : ''}`}>{rp(r.tarifPerUnit)}</td>
+              <td className="num">{rp(r.ppnPerUnit ?? 0)}</td>
+              <td className={`num${pajak.ppn === 'include' ? ' out' : ''}`}>{rp(r.tarifInclPpn ?? r.tarifPerUnit)}</td></tr>;
           })}
           {mt && <tr className="pd-sub"><td colSpan={3}><b>Total (gabungan semua layanan)</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td><td></td>
-            <td className="num"><b>{persen(mt.margin)}</b></td><td className="num"><b>{rp(mt.hargaBulan)}</b></td><td></td></tr>}
+            <td className="num"><b>{persen(mt.margin)}</b></td><td className="num"><b>{rp(mt.hargaBulan)}</b></td><td colSpan={3} className="small muted">kolom tebal = tarif yang dipakai di quotation ({pajak.ppn === 'include' ? 'incl.' : 'excl.'} PPN)</td></tr>}
         </tbody>
       </table></div>
       {mt && <p className="small">Total margin {persen(mt.margin)} = (Σ harga sebelum PPh {rp(mt.hargaSebelumPph)} ÷ Σ biaya {rp(mt.biayaBulan)}) − 1, tertimbang biaya tiap layanan.
@@ -72,7 +95,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
           <td className="num">{rp(s.gp)}</td><td className="num"><b>{persen(s.gpPersen)}</b></td>
           <td className="num">{rp(s.pendapatanBulan * 12)}</td><td className="num">{rp(s.biayaBulan * 12)}</td><td className="num">{rp(s.gp * 12)}</td><td className="num">{rp(s.gp * kontrakBulan)}</td></tr>)}</tbody>
       </table></div>
-      <p className="small muted">Pendapatan = bersih setelah PPh. Per tahun = per bulan × 12.</p>
+      <p className="small muted">Pendapatan = tarif sebelum PPN × volume, dikurangi PPh 23 {(pphPersen * 100).toFixed(1)}% (PPh {pajak.pph === 'include' ? 'sudah di-gross-up di tarif' : 'tidak di-gross-up → GP turun'}). Per tahun = per bulan × 12.</p>
     </div>
 
     <div className="card">
@@ -93,8 +116,8 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       {!kurs && <p className="small muted">Pilih mata uang untuk menampilkan rate card dan simulasi dalam IDR dan mata uang tersebut.</p>}
       {kurs && kurs.rupiahPer > 0 && <div className="grid2">
         <div className="tablewrap"><table>
-          <thead><tr><th>Tarif</th><th className="num">IDR</th><th className="num">{kurs.kode}</th></tr></thead>
-          <tbody>{h.rateCard.map(r => <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]} / {r.uom}</td><td className="num">{rp(r.tarifPerUnit)}</td><td className="num"><b>{fmtAsing(x(r.tarifPerUnit), kurs.kode)}</b></td></tr>)}
+          <thead><tr><th>Tarif ({pajak.ppn === 'include' ? 'incl.' : 'excl.'} PPN)</th><th className="num">IDR</th><th className="num">{kurs.kode}</th></tr></thead>
+          <tbody>{h.rateCard.map(r => <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]} / {r.uom}</td><td className="num">{rp(tq(r))}</td><td className="num"><b>{fmtAsing(x(tq(r)), kurs.kode)}</b></td></tr>)}
             {h.storageAlternatif.filter(s => s.uom !== 'palet posisi').map(s => <tr key={s.uom}><td>Storage / {s.uom}</td><td className="num">{rp(s.tarif)}</td><td className="num">{fmtAsing(x(s.tarif), kurs.kode)}</td></tr>)}</tbody>
         </table></div>
         <div className="tablewrap"><table>

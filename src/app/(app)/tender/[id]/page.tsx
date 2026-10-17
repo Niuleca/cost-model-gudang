@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { ASUMSI_DEFAULT, STARTUP_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
+import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
@@ -19,7 +19,7 @@ import BiayaSpacePanel from './BiayaSpacePanel';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from '@/lib/engine/space';
 import { hitungProcessDesign, PD_DEFAULT } from '@/lib/engine/processDesign';
 import HistorisPanel from './HistorisPanel';
-import HasilKomersial, { type Kurs } from './HasilKomersial';
+import HasilKomersial, { type Kurs, type Pajak } from './HasilKomersial';
 import StatusControl from '@/components/StatusControl';
 import { labelStatus, STATUS_DRAFT } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
@@ -131,7 +131,7 @@ export default function TenderPage() {
   }
 
   // Margin diubah di tab Hasil → hitung ulang otomatis (tanpa pindah tab)
-  const kunciMargin = JSON.stringify(t?.asumsi.marginManual ?? {});
+  const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null]);
   useEffect(() => {
     if (!hasil || tab !== 'Hasil') return;
     const id = setTimeout(() => { hitung(false); }, 400);
@@ -353,7 +353,8 @@ export default function TenderPage() {
       )}
 
       {tab === 'Hasil' && <HasilPanel hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
-        marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan} />}
+        marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
+        pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
     </>
@@ -376,10 +377,10 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan }: {
+function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak }: {
   hasil: HasilTender | null; catatan: string[]; onSimpan: () => void; onHitung: () => void;
   marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
-  kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number;
+  kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number; pajak: Pajak; onPajak: (p: Pajak) => void;
 }) {
   if (!hasil) return <div className="card"><p>Belum dihitung.</p><div className="row"><button onClick={onHitung}>Hitung sekarang</button></div></div>;
   const h = hasil;
@@ -404,7 +405,7 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
         {catatan.length > 0 && <p className="small muted">Catatan master data ikut dimasukkan sebagai red flag MASTER_DATA.</p>}
       </div>
 
-      <HasilKomersial h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} />
+      <HasilKomersial h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} />
 
       <div className="grid2">
         <div className="card">

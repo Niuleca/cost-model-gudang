@@ -313,17 +313,20 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   // Biaya manajemen (tetap) disebar ke bucket operasional sesuai porsi biaya
   const opsBuckets: Bucket[] = ['storage', 'handling_in', 'handling_out', 'vas'];
   const totOps = opsBuckets.reduce((s2, b) => s2 + Object.values(biayaBucket[b]).reduce((a, c) => a + c, 0), 0) || 1;
+  // porsi dihitung SEKALI sebelum penyebaran (dulu dihitung ulang tiap kategori risiko → biaya terhitung dobel)
+  const porsiOps = Object.fromEntries(opsBuckets.map(b => [b, Object.values(biayaBucket[b]).reduce((a, c) => a + c, 0) / totOps])) as Record<Bucket, number>;
   for (const risk of ['Rendah', 'Sedang', 'Tinggi'] as KategoriRisiko[]) {
     const man = biayaBucket.manajemen[risk];
-    for (const b of opsBuckets) {
-      const porsi = Object.values(biayaBucket[b]).reduce((a, c) => a + c, 0) / totOps;
-      biayaBucket[b][risk] += man * porsi;
-    }
+    for (const b of opsBuckets) biayaBucket[b][risk] += man * porsiOps[b];
     biayaBucket.manajemen[risk] = 0;
   }
 
   // ---- 11. Harga & rate card ----
-  const g = m.finance.pphGrossUp;
+  // Pajak: PPh 23 dipotong customer dari pembayaran. Include = tarif di-gross-up supaya pendapatan bersih tetap; exclude = tidak di-gross-up.
+  const pajak = t.pajak ?? { pph: 'include', ppn: 'exclude', ppnPersen: 0.11 };
+  const pphRate = m.finance.pphGrossUp;
+  const g = pajak.pph === 'include' ? pphRate : 0;
+  const ppn = Math.max(0, pajak.ppnPersen ?? 0.11);
   const bucketKeArus: Record<string, Arus> = { storage: 'storage', handling_in: 'inbound', handling_out: 'outbound', vas: 'vas' };
   const rateCard = opsBuckets.map(b => {
     const biaya = Object.values(biayaBucket[b]).reduce((a, c) => a + c, 0);
@@ -336,12 +339,16 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     const komitmen = v?.komitmenBulan ?? 0;
     if (biaya > 0 && komitmen <= 0) flags.push({ level: 'kritis', kode: 'KOMITMEN_NOL', pesan: `Biaya ${b} ada tetapi volume komitmen ${bucketKeArus[b]} = 0, tarif tidak bisa dihitung.` });
     const tarif = komitmen > 0 ? harga / komitmen : 0;
+    const tarifExcl = roundupHarga(tarif);
+    const tarifIncl = roundupHarga(tarifExcl * (1 + ppn));
     return {
       bucket: b, uom: v?.uom ?? '-', biayaBulan: bulat(biaya), hargaBulan: bulat(harga),
       marginEfektif: biaya > 0 ? bulat(hargaSebelumPph / biaya - 1, 4) : 0,
       marginDefault: biaya > 0 ? bulat(hargaDefault / biaya - 1, 4) : 0, marginManual: manual, hargaSebelumPph: bulat(hargaSebelumPph),
       volumeKomitmen: komitmen, biayaPerUnit: komitmen > 0 ? bulat(biaya / komitmen, 2) : 0,
-      tarifPerUnit: roundupHarga(tarif),
+      tarifPerUnit: tarifExcl,                       // tarif belum PPN (dasar pendapatan)
+      tarifInclPpn: tarifIncl, ppnPerUnit: tarifIncl - tarifExcl,
+      tarifQuote: pajak.ppn === 'include' ? tarifIncl : tarifExcl,   // tarif yang ditampilkan di penawaran
     };
   }).filter(rc => rc.biayaBulan > 0);
 
@@ -367,7 +374,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     return sum + rc.tarifPerUnit * (v ? v[skenario] : 0);
   }, 0);
   const simulasi = (['komitmenBulan', 'rataRataBulan', 'peakBulan'] as const).map(sk => {
-    const rev = pendapatan(sk) * (1 - g);                // pendapatan bersih setelah PPh dipotong
+    const rev = pendapatan(sk) * (1 - pphRate);          // pendapatan bersih setelah PPh 23 dipotong customer (PPN bukan pendapatan)
     return { skenario: sk === 'komitmenBulan' ? 'Volume komitmen' : sk === 'rataRataBulan' ? 'Volume rata-rata' : 'Volume peak',
       pendapatanBulan: bulat(rev), biayaBulan: bulat(totalBiaya), gp: bulat(rev - totalBiaya), gpPersen: rev > 0 ? bulat((rev - totalBiaya) / rev, 4) : 0 };
   });
@@ -388,7 +395,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     volume, space, aktivitas: aktivitasHasil, manpower: payroll, mhe,
     totalHeadcount: payroll.reduce((sum, p) => sum + p.headcount, 0),
     biaya: baris, perKelompok, totalBiayaBulan: bulat(totalBiaya), investasi: bulat(investasi),
-    biayaPerBucket: biayaBucket, rateCard, marginTotal, storageAlternatif, simulasi,
+    biayaPerBucket: biayaBucket, rateCard, marginTotal, pajak: { ...pajak, pphPersen: pphRate }, storageAlternatif, simulasi,
     redFlags: flags,
   };
 }
