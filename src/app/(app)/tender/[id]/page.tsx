@@ -12,6 +12,7 @@ import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
 import BiayaLainPanel from './BiayaLainPanel';
+import HapusTender from './HapusTender';
 import ListrikTender from './ListrikTender';
 import ProcessDesignPanel from './ProcessDesignPanel';
 import SpacePanel from './SpacePanel';
@@ -173,7 +174,10 @@ export default function TenderPage() {
         </div>
       </div>
       {profile && !bisaEdit && <div className="ro-banner" role="note"><b>Hanya lihat</b> · Draft ini dibuat oleh {pembuat ?? 'akun lain'}. Anda bisa melihat isi dan menjalankan Hitung untuk simulasi, tetapi tidak bisa menyimpan perubahan, mengubah status, atau membuat quotation.</div>}
-      {bisaEdit && <StatusControl tender={t} onBerubah={st => setT(x => x && ({ ...x, status: st }))} />}
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
+        {bisaEdit ? <StatusControl tender={t} onBerubah={st => setT(x => x && ({ ...x, status: st }))} /> : <span />}
+        {profile && (profile.role === 'admin' || (t.created_by === profile.id && STATUS_DRAFT.includes(t.status))) && <HapusTender id={t.id} kode={t.kode ?? t.customer} customer={t.customer} />}
+      </div>
 
       <div className="tabs" role="tablist">
         {([...(a.historis ? [TAB_EXCEL] : []), ...TABS] as ((typeof TABS)[number] | typeof TAB_EXCEL)[]).map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}
