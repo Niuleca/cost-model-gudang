@@ -230,3 +230,5 @@ td select { min-width: 96px; }
 
 /* Bar aksi bawah halaman tender (Simpan / Hitung) */
 .aksi-bawah { position: sticky; bottom: 0; z-index: 5; margin-top: 16px; padding: 10px 12px; background: var(--g50, #f8f9fa); border: 1px solid var(--g200, #e5e7eb); border-radius: 12px; box-shadow: 0 -4px 12px rgba(0,0,0,.05); }
+.pd-matriks th, .pd-matriks td { white-space: nowrap; }
+.pd-matriks input[type=checkbox] { width: 18px; height: 18px; min-width: 18px; }

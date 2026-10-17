@@ -1,7 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import type { AktivitasInput, VolumeInput } from '@/lib/engine/types';
-import { hitungProcessDesign, PD_DEFAULT, type IndirectInput, type KalenderResource, type ProcessDesignInput } from '@/lib/engine/processDesign';
+import { hitungProcessDesign, bolehRangkap, isTkbm, PD_DEFAULT, type IndirectInput, type KalenderResource, type ProcessDesignInput } from '@/lib/engine/processDesign';
 import { angka } from '@/lib/format';
 
 const f2 = (x: number) => (x ? x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
@@ -186,11 +186,43 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
                 <tr><td>Efficiency</td><td className="num">{inp(Math.round(efisiensi * 1000) / 10, v => onFaktor({ efisiensi: v / 100 }))}%</td></tr>
                 <tr><td>Operating (alat dipakai bergantian)</td><td className="num">{inp(pd.operatingAlat, v => onPd({ ...pd, operatingAlat: Math.max(1, v) }))}</td></tr>
               </tbody></table>
-              <p className="small muted" style={{ marginTop: 6 }}>Resources man power = ROUNDUP(FTE × workload shift) per shift aktif. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
+              <p className="small muted" style={{ marginTop: 6 }}>Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling sesuai matriks rangkap di bawah. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
             </div>
           </div>
         </div>
       </div>
+      <MatriksRangkap roles={h.mp.map(r => r.nama)} matriks={pd.rangkap} onChange={rangkap => onPd({ ...pd, rangkap })} />
     </div>
   );
+}
+
+/** Matriks multi-skill: baris = orang yang merangkap, kolom = pekerjaan yang boleh dirangkap. */
+function MatriksRangkap({ roles, matriks, onChange }: { roles: string[]; matriks?: Record<string, string[]>; onChange: (m: Record<string, string[]> | undefined) => void }) {
+  if (roles.length < 2) return null;
+  const boleh = (a: string, b: string) => bolehRangkap(a, b, matriks);
+  const toggle = (a: string, b: string) => {
+    const baris = roles.filter(x => x !== a && boleh(a, x));
+    const baru = baris.includes(b) ? baris.filter(x => x !== b) : [...baris, b];
+    onChange({ ...(matriks ?? {}), [a]: baru });
+  };
+  const diubah = !!matriks && Object.keys(matriks).length > 0;
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h3>Matriks multi-skill (siapa boleh merangkap siapa)</h3>
+        {diubah && <button className="ghost" onClick={() => onChange(undefined)}>Kembalikan ke default</button>}
+      </div>
+      <p className="small muted">Centang = role di baris boleh merangkap pekerjaan role di kolom. Default: Checker ↔ Picker ↔ Operator RT/CB; Admin hanya Picker & Checker (tidak operator);
+        Operator RT/CB hanya sesama operator; TKBM & Helper (daily worker) tidak merangkap dan tidak dirangkap.</p>
+      <div className="tablewrap"><table className="pd-matriks">
+        <thead><tr><th>Merangkap ↓ / dirangkap →</th>{roles.map(c => <th key={c} className="small" style={{ textAlign: 'center' }}>{c}</th>)}</tr></thead>
+        <tbody>{roles.map(a => (
+          <tr key={a}><td><b>{a}</b>{isTkbm(a) && <div className="small muted">non-karyawan</div>}</td>
+            {roles.map(b => <td key={b} style={{ textAlign: 'center' }}>
+              {a === b ? <span className="muted">—</span>
+                : <input type="checkbox" aria-label={`${a} merangkap ${b}`} checked={boleh(a, b)} disabled={isTkbm(a) || isTkbm(b)} onChange={() => toggle(a, b)} />}
+            </td>)}
+          </tr>))}</tbody>
+      </table></div>
+    </div>);
 }

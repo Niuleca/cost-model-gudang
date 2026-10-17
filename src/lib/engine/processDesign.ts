@@ -18,6 +18,8 @@ export interface ProcessDesignInput {
   mhe: KalenderResource;
   operatingAlat: number;   // alat dipakai bergantian oleh N shift/grup
   bebanShift: number[];    // porsi workload shift 1..3
+  /** Matriks multi-skill per tender: role perangkap → daftar role yang boleh ia rangkap. Kosong = pakai aturan default. */
+  rangkap?: Record<string, string[]>;
   hariKerjaBulan?: number;     // working days (operasional gudang) per bulan — informasi tabel workload shift
   hariKerjaKaryawan?: number;  // working days employee per bulan
   group?: number;              // jumlah grup/regu kerja
@@ -66,6 +68,37 @@ export const isTkbm = (nama: string) => /\btkbm\b|kuli|bongkar\s*muat|buruh|help
 /** Operator MHE ber-SIO (Reach Truck, Forklift CB/CBT) — hanya bisa dibackup sesama operator. */
 export const isOperatorMhe = (nama: string) => /reach\s*truck|forklift|\bRT\b|\bCBT?\b/i.test(nama) && !/admin/i.test(nama);
 
+/** Kategori role untuk aturan rangkap default. */
+export type KategoriRole = 'nonkaryawan' | 'operator' | 'admin' | 'checker' | 'picker' | 'lain';
+export function kategoriRole(nama: string): KategoriRole {
+  if (isTkbm(nama)) return 'nonkaryawan';
+  if (/admin/i.test(nama)) return 'admin';
+  if (isOperatorMhe(nama)) return 'operator';
+  if (/checker/i.test(nama)) return 'checker';
+  if (/picker/i.test(nama)) return 'picker';
+  return 'lain';
+}
+/** Aturan default: siapa (baris) boleh merangkap kategori apa. */
+export const RANGKAP_DEFAULT: Record<KategoriRole, KategoriRole[]> = {
+  checker: ['checker', 'picker', 'operator', 'lain'],
+  picker: ['picker', 'checker', 'operator', 'lain'],
+  admin: ['admin', 'picker', 'checker'],
+  operator: ['operator'],
+  lain: ['lain', 'picker', 'checker'],
+  nonkaryawan: [],
+};
+export function rangkapDefault(perangkap: string, dirangkap: string) {
+  const a = kategoriRole(perangkap), b = kategoriRole(dirangkap);
+  if (a === 'nonkaryawan' || b === 'nonkaryawan') return false;
+  return RANGKAP_DEFAULT[a].includes(b);
+}
+export function bolehRangkap(perangkap: string, dirangkap: string, matriks?: Record<string, string[]>) {
+  if (perangkap === dirangkap) return true;
+  if (isTkbm(perangkap) || isTkbm(dirangkap)) return false;
+  const m = matriks?.[perangkap];
+  return m ? m.includes(dirangkap) : rangkapDefault(perangkap, dirangkap);
+}
+
 export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: VolumeInput[], pd: ProcessDesignInput,
   faktorProduktivitas: number, efisiensi: number, jumlahShift: number, indirect?: IndirectInput) {
   const kalMp = hitungKalenderResource(pd.mp), kalMhe = hitungKalenderResource(pd.mhe);
@@ -106,26 +139,28 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   };
   const mp = ringkas('Man Power'), mhe = ringkas('Equipment');
 
-  // Man power: multi-skill pooling per shift aktif.
-  // Tiap role dapat orang tetap = bagian bulat FTE; sisa pecahan semua role dijumlah → ROUNDUP = orang multi-skill,
-  // diberikan ke role dengan sisa terbesar; role dengan sisa kecil dirangkap oleh mereka.
-  // TKBM (tenaga kerja bongkar muat / kuli, bukan karyawan) TIDAK ikut pooling: tidak merangkap & tidak dirangkap → ROUNDUP sendiri.
-  // Operator MHE (Reach Truck / Forklift CB) butuh SIO → hanya saling backup sesama operator; admin & role lain tidak boleh merangkapnya.
-  const grupPool = (nama: string) => isTkbm(nama) ? null : isOperatorMhe(nama) ? 'operator' : 'umum';
+  // Man power: multi-skill pooling per shift aktif, mengikuti matriks rangkap.
+  // Tiap role dapat orang tetap = bagian bulat FTE. Sisa pecahan diurutkan dari terbesar; tiap sisa ditumpangkan ke
+  // orang multi-skill yang masih punya kapasitas DAN boleh merangkap role itu (best fit); bila tidak ada → orang baru.
+  // TKBM & Helper (non-karyawan) tidak ikut: tidak merangkap & tidak dirangkap → ROUNDUP sendiri.
   for (const w of beban) {
     if (w <= 0) continue;
-    mp.forEach(r => { if (isTkbm(r.nama)) { r.resources += Math.ceil(r.fte * w - 1e-9); r.tkbm = true; } });
-    for (const g of ['operator', 'umum']) {
-      const v = mp.map(r => grupPool(r.nama) === g ? r.fte * w : 0);
-      const dasar = v.map(x => Math.floor(x + 1e-9));
-      const sisa = v.map((x, i) => Math.max(0, x - dasar[i]));
-      const pool = Math.ceil(sisa.reduce((a, b) => a + b, 0) - 1e-9);
-      const urut = sisa.map((x, i) => ({ x, i })).filter(o => o.x > 1e-6).sort((a, b) => b.x - a.x);
-      const dapat = new Set(urut.slice(0, pool).map(o => o.i));
-      const dirangkap = urut.slice(pool).map(o => mp[o.i].nama);
-      mp.forEach((r, i) => { r.resources += dasar[i] + (dapat.has(i) ? 1 : 0); });
-      for (const o of urut.slice(pool)) mp[o.i].dirangkap = true;
-      for (const i of dapat) for (const n of dirangkap) if (!mp[i].merangkap.includes(n)) mp[i].merangkap.push(n);
+    const orang: { host: number; sisaKap: number }[] = [];
+    const urut = mp.map((r, i) => ({ i, v: r.fte * w })).filter(o => o.v > 1e-9);
+    for (const o of urut) {
+      const r = mp[o.i];
+      if (isTkbm(r.nama)) { r.resources += Math.ceil(o.v - 1e-9); r.tkbm = true; continue; }
+      r.resources += Math.floor(o.v + 1e-9);
+    }
+    const pecahan = urut.filter(o => !isTkbm(mp[o.i].nama)).map(o => ({ i: o.i, x: o.v - Math.floor(o.v + 1e-9) }))
+      .filter(o => o.x > 1e-6).sort((p, q) => q.x - p.x);
+    for (const f of pecahan) {
+      const cocok = orang.filter(p => p.sisaKap >= f.x - 1e-9 && bolehRangkap(mp[p.host].nama, mp[f.i].nama, pd.rangkap))
+        .sort((p, q) => p.sisaKap - q.sisaKap)[0];
+      if (cocok) {
+        cocok.sisaKap -= f.x; mp[f.i].dirangkap = true;
+        if (!mp[cocok.host].merangkap.includes(mp[f.i].nama)) mp[cocok.host].merangkap.push(mp[f.i].nama);
+      } else { orang.push({ host: f.i, sisaKap: 1 - f.x }); mp[f.i].resources += 1; }
     }
   }
 
