@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
@@ -62,7 +63,7 @@ export default function TenderPage() {
   const sb = supabaseBrowser();
   const { profile } = useProfile();
   const [t, setT] = useState<TenderRow | null>(null);
-  const [tab, setTab] = useState<(typeof TABS)[number] | typeof TAB_EXCEL>('Key assumption');
+  const [tab, setTab] = useTabUrl<(typeof TABS)[number] | typeof TAB_EXCEL>([TAB_EXCEL, ...TABS], 'Key assumption');
   const [prods, setProds] = useState<Prod[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [tarif, setTarif] = useState<Tarif[]>([]);
@@ -88,7 +89,7 @@ export default function TenderPage() {
     setT(row); setProds((p.data ?? []) as Prod[]); setItems((it.data ?? []) as Item[]); setTarif((tf.data ?? []) as Tarif[]);
     setJabatan(((jb.data ?? []) as Jab[]).map(j => j.role_name));
     if (row.hasil) setHasil(row.hasil as HasilTender);
-    if (row.asumsi.historis) setTab(TAB_EXCEL);
+    if (row.asumsi.historis && !new URLSearchParams(window.location.search).get('tab')) setTab(TAB_EXCEL);
     if (row.created_by) {
       const { data: pc } = await sb.from('profiles').select('full_name, email').eq('id', row.created_by).maybeSingle();
       setPembuat(pc ? (pc.full_name || pc.email) : null);

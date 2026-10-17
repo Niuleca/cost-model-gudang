@@ -1,5 +1,6 @@
 'use client';
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import { useTabUrl } from '@/lib/useTabUrl';
 import TableEditor from '@/components/TableEditor';
 import { useProfile } from '@/lib/useProfile';
 import { TABS, type Tab } from '@/lib/masterTabs';
@@ -11,7 +12,7 @@ export default function MasterTabs({ ids, eyebrow, judul, ekstra, tabsLangsung }
 }) {
   const { profile } = useProfile();
   const tabs = [...(ekstra ?? []).map(e => ({ id: e.id, label: e.label, pemilik: e.pemilik })), ...ids.map(id => TABS.find(t => t.id === id)).filter((t): t is Tab => !!t), ...(tabsLangsung ?? [])];
-  const [tab, setTab] = useState(tabs[0].id);
+  const [tab, setTab] = useTabUrl(tabs.map(t => t.id), tabs[0].id);
   const e = ekstra?.find(x => x.id === tab);
   const t = [...TABS, ...(tabsLangsung ?? [])].find(x => x.id === tab);
   const pemilik = e?.pemilik ?? t?.pemilik;
