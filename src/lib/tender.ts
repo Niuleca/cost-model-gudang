@@ -105,7 +105,8 @@ export function keInput(t: TenderRow): TenderInput {
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
     listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT,
     stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter,
-    metodeManpower: a.metodeManpower ?? 'excel', processDesign: { ...PD_DEFAULT, ...(a.processDesign ?? {}) },
+    metodeManpower: 'excel', processDesign:   // hanya metode FTE (process design) yang dipakai
+    { ...PD_DEFAULT, ...(a.processDesign ?? {}) },
   };
 }
 

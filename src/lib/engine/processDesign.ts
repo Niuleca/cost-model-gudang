@@ -93,14 +93,29 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
       x.fte += b.fte; x.manHour += b.manHour; x.jamPerArus[b.arus] += b.manHour; m.set(b.resource, x);
     }
     return Array.from(m.values()).map(x => ({
-      ...x, unitIndirect: 0,
-      // Man power: dibulatkan per shift aktif (orang tidak bisa dibagi antar shift); alat: dipakai bergantian antar shift.
-      resources: x.fte <= 0 ? 0 : jenis === 'Man Power'
-        ? beban.reduce((s, w) => s + (w > 0 ? Math.ceil(x.fte * w - 1e-9) : 0), 0)
-        : Math.ceil(x.fte - 1e-9),
+      ...x, unitIndirect: 0, merangkap: [] as string[], dirangkap: false,
+      // alat: dipakai bergantian antar shift → ROUNDUP(FTE). Man power dihitung dengan pooling di bawah.
+      resources: x.fte <= 0 ? 0 : jenis === 'Man Power' ? 0 : Math.ceil(x.fte - 1e-9),
     }));
   };
   const mp = ringkas('Man Power'), mhe = ringkas('Equipment');
+
+  // Man power: multi-skill pooling per shift aktif.
+  // Tiap role dapat orang tetap = bagian bulat FTE; sisa pecahan semua role dijumlah → ROUNDUP = orang multi-skill,
+  // diberikan ke role dengan sisa terbesar; role dengan sisa kecil dirangkap oleh mereka.
+  for (const w of beban) {
+    if (w <= 0) continue;
+    const v = mp.map(r => r.fte * w);
+    const dasar = v.map(x => Math.floor(x + 1e-9));
+    const sisa = v.map((x, i) => Math.max(0, x - dasar[i]));
+    const pool = Math.ceil(sisa.reduce((a, b) => a + b, 0) - 1e-9);
+    const urut = sisa.map((x, i) => ({ x, i })).filter(o => o.x > 1e-6).sort((a, b) => b.x - a.x);
+    const dapat = new Set(urut.slice(0, pool).map(o => o.i));
+    const dirangkap = urut.slice(pool).map(o => mp[o.i].nama);
+    mp.forEach((r, i) => { r.resources += dasar[i] + (dapat.has(i) ? 1 : 0); });
+    for (const o of urut.slice(pool)) mp[o.i].dirangkap = true;
+    for (const i of dapat) for (const n of dirangkap) if (!mp[i].merangkap.includes(n)) mp[i].merangkap.push(n);
+  }
 
   // Indirect: supervisor per shift aktif dari span of control + peran tetap; alat pendukung 1 unit per orang
   const shiftAktif = beban.filter(w => w > 0).length || 1;
@@ -114,7 +129,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   ] : [];
   for (const r of indirectRows) for (const nama of r.alat) {
     let e = mhe.find(x => x.nama === nama);
-    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0 }; mhe.push(e); }
+    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0, merangkap: [], dirangkap: false }; mhe.push(e); }
     e.unitIndirect += r.qty; e.resources += r.qty;
   }
   return {

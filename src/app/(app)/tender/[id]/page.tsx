@@ -265,7 +265,7 @@ export default function TenderPage() {
       )}
 
       {tab === 'Aktivitas & manpower' && (<>
-        {(a.metodeManpower ?? 'excel') === 'excel' && <>
+        {<>
           <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={a.aktivitas} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
           <ProcessDesignPanel bagian="rincian" aktivitas={a.aktivitas} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
@@ -301,11 +301,7 @@ export default function TenderPage() {
           <div className="row">
             <button className="ghost" onClick={() => setA({ aktivitas: [...a.aktivitas, { aktivitas: 'Aktivitas baru', tahap: a.aktivitas.at(-1)?.tahap ?? 'Inbound', tool: 'Manual', roleName: jabatan[0] ?? '',
               uom: 'palet', prodPerJam: 20, arus: 'inbound', persenVolume: 1, pengaliUom: 1 }] })}>Tambah baris kosong</button>
-            <label className="f" htmlFor="metode" style={{ maxWidth: 360 }}>Metode hitung manpower
-              <select id="metode" value={a.metodeManpower ?? 'excel'} onChange={e => setA({ metodeManpower: e.target.value as 'excel' | 'shift' })}>
-                <option value="excel">Process design (Excel): FTE per bulan</option>
-                <option value="shift">Per shift (jam per shift × relief cuti)</option>
-              </select></label>
+            <span className="small muted">Manpower dihitung dengan FTE per bulan (Process Design) + multi-skill pooling.</span>
           </div>
           <datalist id="dl-tool">{TOOLS.concat(prods.map(p => p.tool), a.mhe.map(m => m.tool)).filter((v, k, xs) => v && xs.indexOf(v) === k).map(v => <option key={v} value={v} />)}</datalist>
           <datalist id="dl-tahap">{Array.from(new Set([...prods.map(p => p.tahap), ...a.aktivitas.map(x => x.tahap)])).map(v => <option key={v} value={v} />)}</datalist>
@@ -360,8 +356,8 @@ export default function TenderPage() {
             posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
             skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
             onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />} />
-        <MhePanel mhe={a.mhe} items={items} metodeExcel={(a.metodeManpower ?? 'excel') === 'excel'} onChange={mhe => setA({ mhe })}
-          kebutuhan={(a.metodeManpower ?? 'excel') === 'excel'
+        <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })}
+          kebutuhan={true
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
             : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />
       </>)}
