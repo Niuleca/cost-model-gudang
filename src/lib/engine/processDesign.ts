@@ -63,6 +63,9 @@ export interface IndirectInput {
 /** Role TKBM / kuli bongkar muat — tenaga borongan, bukan karyawan, jadi tidak bisa multi-skill. */
 export const isTkbm = (nama: string) => /\btkbm\b|kuli|bongkar\s*muat|buruh/i.test(nama);
 
+/** Operator MHE ber-SIO (Reach Truck, Forklift CB/CBT) — hanya bisa dibackup sesama operator. */
+export const isOperatorMhe = (nama: string) => /reach\s*truck|forklift|\bRT\b|\bCBT?\b/i.test(nama) && !/admin/i.test(nama);
+
 export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: VolumeInput[], pd: ProcessDesignInput,
   faktorProduktivitas: number, efisiensi: number, jumlahShift: number, indirect?: IndirectInput) {
   const kalMp = hitungKalenderResource(pd.mp), kalMhe = hitungKalenderResource(pd.mhe);
@@ -107,19 +110,23 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   // Tiap role dapat orang tetap = bagian bulat FTE; sisa pecahan semua role dijumlah → ROUNDUP = orang multi-skill,
   // diberikan ke role dengan sisa terbesar; role dengan sisa kecil dirangkap oleh mereka.
   // TKBM (tenaga kerja bongkar muat / kuli, bukan karyawan) TIDAK ikut pooling: tidak merangkap & tidak dirangkap → ROUNDUP sendiri.
+  // Operator MHE (Reach Truck / Forklift CB) butuh SIO → hanya saling backup sesama operator; admin & role lain tidak boleh merangkapnya.
+  const grupPool = (nama: string) => isTkbm(nama) ? null : isOperatorMhe(nama) ? 'operator' : 'umum';
   for (const w of beban) {
     if (w <= 0) continue;
     mp.forEach(r => { if (isTkbm(r.nama)) { r.resources += Math.ceil(r.fte * w - 1e-9); r.tkbm = true; } });
-    const v = mp.map(r => isTkbm(r.nama) ? 0 : r.fte * w);
-    const dasar = v.map(x => Math.floor(x + 1e-9));
-    const sisa = v.map((x, i) => Math.max(0, x - dasar[i]));
-    const pool = Math.ceil(sisa.reduce((a, b) => a + b, 0) - 1e-9);
-    const urut = sisa.map((x, i) => ({ x, i })).filter(o => o.x > 1e-6).sort((a, b) => b.x - a.x);
-    const dapat = new Set(urut.slice(0, pool).map(o => o.i));
-    const dirangkap = urut.slice(pool).map(o => mp[o.i].nama);
-    mp.forEach((r, i) => { r.resources += dasar[i] + (dapat.has(i) ? 1 : 0); });
-    for (const o of urut.slice(pool)) mp[o.i].dirangkap = true;
-    for (const i of dapat) for (const n of dirangkap) if (!mp[i].merangkap.includes(n)) mp[i].merangkap.push(n);
+    for (const g of ['operator', 'umum']) {
+      const v = mp.map(r => grupPool(r.nama) === g ? r.fte * w : 0);
+      const dasar = v.map(x => Math.floor(x + 1e-9));
+      const sisa = v.map((x, i) => Math.max(0, x - dasar[i]));
+      const pool = Math.ceil(sisa.reduce((a, b) => a + b, 0) - 1e-9);
+      const urut = sisa.map((x, i) => ({ x, i })).filter(o => o.x > 1e-6).sort((a, b) => b.x - a.x);
+      const dapat = new Set(urut.slice(0, pool).map(o => o.i));
+      const dirangkap = urut.slice(pool).map(o => mp[o.i].nama);
+      mp.forEach((r, i) => { r.resources += dasar[i] + (dapat.has(i) ? 1 : 0); });
+      for (const o of urut.slice(pool)) mp[o.i].dirangkap = true;
+      for (const i of dapat) for (const n of dirangkap) if (!mp[i].merangkap.includes(n)) mp[i].merangkap.push(n);
+    }
   }
 
   // Indirect: supervisor per shift aktif dari span of control + peran tetap; alat pendukung 1 unit per orang

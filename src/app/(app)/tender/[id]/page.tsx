@@ -304,7 +304,7 @@ export default function TenderPage() {
           <div className="row">
             <button className="ghost" onClick={() => setA({ aktivitas: [...a.aktivitas, { aktivitas: 'Aktivitas baru', tahap: a.aktivitas.at(-1)?.tahap ?? 'Inbound', tool: 'Manual', roleName: jabatan[0] ?? '',
               uom: 'palet', prodPerJam: 20, arus: 'inbound', persenVolume: 1, pengaliUom: 1 }] })}>Tambah baris kosong</button>
-            <span className="small muted">Manpower dihitung dengan FTE per bulan (Process Design) + multi-skill pooling.</span>
+            <span className="small muted">Manpower dihitung dengan FTE per bulan (Process Design) + multi-skill pooling. Operator RT/Forklift CB hanya saling backup sesama operator; TKBM tidak dirangkap.</span>
           </div>
           <datalist id="dl-tool">{TOOLS.concat(prods.map(p => p.tool), a.mhe.map(m => m.tool)).filter((v, k, xs) => v && xs.indexOf(v) === k).map(v => <option key={v} value={v} />)}</datalist>
           <datalist id="dl-tahap">{Array.from(new Set([...prods.map(p => p.tahap), ...a.aktivitas.map(x => x.tahap)])).map(v => <option key={v} value={v} />)}</datalist>
