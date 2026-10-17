@@ -7,6 +7,7 @@ import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, keInput, muatMaster, ty
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
+import { faktorUom, pengaliEfektif } from '@/lib/engine/types';
 import { useProfile } from '@/lib/useProfile';
 import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
@@ -35,7 +36,8 @@ const TAB_EXCEL = 'Data project (Excel)' as const;
 const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
-const UOM = ['palet', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pail', 'pack', 'roll', 'order', 'line', 'lokasi'];
+const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
+const UOM = ['palet', 'case', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pail', 'pack', 'roll', 'order', 'line', 'lokasi'];
 const KELOMPOK: Kelompok[] = ['IT', 'Office', 'Consumable', 'HSE', 'Asuransi', 'Startup', 'Fasilitas', 'Utilitas', 'Racking', 'Lainnya'];
 const RISIKO: KategoriRisiko[] = ['Rendah', 'Sedang', 'Tinggi'];
 const ALOKASI: Record<string, Partial<Record<Bucket, number>>> = {
@@ -245,7 +247,7 @@ export default function TenderPage() {
           <h2>Volume</h2>
           <p className="small muted">Sizing memakai <b>peak</b>. Tarif dihitung dari <b>volume komitmen</b> (MGV). Storage diisi jumlah stok (posisi), arus lain per bulan.</p>
           <div className="tablewrap"><table>
-            <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln</th><th className="num">Faktor peak</th><th></th></tr></thead>
+            <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln</th><th className="num">Faktor peak</th><th title="1 UoM = berapa case/karton">Isi per UoM</th><th title="1 case = berapa pcs">Isi per case</th><th></th></tr></thead>
             <tbody>{a.volumes.map((v, i) => (
               <tr key={i}>
                 <td><select aria-label="Arus" value={v.arus} style={{ minWidth: 130 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>
@@ -254,9 +256,32 @@ export default function TenderPage() {
                   <td key={k} className="num"><input aria-label={k} type="number" step="any" value={v[k]} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { [k]: Number(e.target.value) }) })} /></td>
                 ))}
                 <td className="num">{v.rataRataBulan > 0 ? (v.peakBulan / v.rataRataBulan).toFixed(2) + '×' : '—'}</td>
+                {(() => {
+                  const k = v.konversi ?? { uom1: 'case', per1: 0, uom2: 'pcs', per2: 0 };
+                  const uk = (p: Partial<typeof k>) => setA({ volumes: ubahArray(a.volumes, i, { konversi: { ...k, ...p } }) });
+                  return <>
+                    <td><div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><span className="small muted">1 {v.uom} =</span>
+                      <input aria-label={`Isi per ${v.uom}`} type="number" step="any" min={0} value={k.per1 || ''} placeholder="0" onChange={e => uk({ per1: Number(e.target.value) })} style={{ width: 70, minWidth: 70 }} />
+                      <select aria-label="UoM isi" value={k.uom1} onChange={e => uk({ uom1: e.target.value })} style={{ minWidth: 96 }}>{(UOM_ISI.includes(k.uom1) ? UOM_ISI : [k.uom1, ...UOM_ISI]).map(u => <option key={u}>{u}</option>)}</select></div></td>
+                    <td><div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><span className="small muted">1 {k.uom1} =</span>
+                      <input aria-label={`Isi per ${k.uom1}`} type="number" step="any" min={0} value={k.per2 || ''} placeholder="0" onChange={e => uk({ per2: Number(e.target.value) })} style={{ width: 70, minWidth: 70 }} />
+                      <select aria-label="UoM isi kecil" value={k.uom2} onChange={e => uk({ uom2: e.target.value })} style={{ minWidth: 96 }}>{(UOM_ISI.includes(k.uom2) ? UOM_ISI : [k.uom2, ...UOM_ISI]).map(u => <option key={u}>{u}</option>)}</select></div></td>
+                  </>;
+                })()}
                 <td><button className="danger" onClick={() => setA({ volumes: a.volumes.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}
             </tbody></table></div>
+          {a.volumes.some(v => (v.konversi?.per1 ?? 0) > 0) && <>
+            <h3>Volume dipecah per UoM (peak/bln)</h3>
+            <div className="tablewrap"><table>
+              <thead><tr><th>Arus</th><th className="num">Rata-rata</th><th className="num">Peak</th><th className="num">Komitmen</th></tr></thead>
+              <tbody>{a.volumes.map((v, i) => {
+                const k = v.konversi; const p1 = k?.per1 || 0, p2 = k?.per2 || 0;
+                const sel = (x: number) => <>{angka(x)} {v.uom}{p1 > 0 && <div className="small">{angka(x * p1)} {k!.uom1}</div>}{p1 > 0 && p2 > 0 && <div className="small muted">{angka(x * p1 * p2)} {k!.uom2}</div>}</>;
+                return <tr key={i}><td>{ARUS.find(o => o.v === v.arus)?.l ?? v.arus}</td><td className="num">{sel(v.rataRataBulan)}</td><td className="num">{sel(v.peakBulan)}</td><td className="num">{sel(v.komitmenBulan)}</td></tr>;
+              })}</tbody></table></div>
+            <p className="small muted">Aktivitas dengan UoM case/pcs (mis. Case Picking per karton) otomatis memakai konversi ini bila pengali UoM-nya 1.</p>
+          </>}
           <div className="row"><button className="ghost" onClick={() => setA({ volumes: [...a.volumes, { arus: 'vas', uom: 'karton', rataRataBulan: 0, peakBulan: 0, komitmenBulan: 0 }] })}>Tambah baris volume</button></div>
           <h3>Stok untuk tarif storage alternatif</h3>
           <div className="grid3">
@@ -315,7 +340,9 @@ export default function TenderPage() {
               {a.aktivitas.length === 0 && <tr><td colSpan={12} className="muted">Belum ada aktivitas. Tambahkan dari daftar di atas atau baris kosong.</td></tr>}
               {a.aktivitas.map((x, i) => {
                 const ub = (patch: Partial<typeof x>) => setA({ aktivitas: ubahArray(a.aktivitas, i, patch) });
-                const vAuto = (a.volumes.find(v => v.arus === x.arus)?.peakBulan ?? 0) * (x.pengaliUom || 1);
+                const vArus = a.volumes.find(v => v.arus === x.arus);
+                const pEf = pengaliEfektif(x, vArus);
+                const vAuto = (vArus?.peakBulan ?? 0) * pEf;
                 return (
                 <tr key={i}>
                   <td><input aria-label="Tahap" list="dl-tahap" value={x.tahap} onChange={e => ub({ tahap: e.target.value })} style={{ minWidth: 140 }} /></td>
@@ -336,7 +363,9 @@ export default function TenderPage() {
                   <td className="num"><input aria-label="Volume per bulan" type="number" step="any" placeholder={Math.round(vAuto).toLocaleString('id-ID')} value={x.volumeManual ?? ''}
                     onChange={e => ub({ volumeManual: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 96, minWidth: 96 }} /></td>
                   <td className="num"><input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>
-                  <td className="num"><input aria-label="Pengali UoM" type="number" step="any" value={x.pengaliUom} onChange={e => ub({ pengaliUom: Number(e.target.value) })} title="Mis. 1 palet = 40 karton → 40" style={{ width: 70, minWidth: 70 }} /></td>
+                  <td className="num"><input aria-label="Pengali UoM" type="number" step="any" value={x.pengaliUom} onChange={e => ub({ pengaliUom: Number(e.target.value) })} title="Mis. 1 palet = 40 karton → 40. Biarkan 1 agar memakai konversi di tab Volume." style={{ width: 70, minWidth: 70 }} />
+                    {(x.pengaliUom || 1) === 1 && pEf !== 1 && <div className="small muted" title="dari konversi di tab Volume">auto ×{angka(pEf)}</div>}
+                    {vArus && faktorUom(vArus, x.uom) == null && (x.pengaliUom || 1) === 1 && <div className="small" style={{ color: 'var(--warn, #b45309)' }} title={`UoM ${x.uom} belum ada di konversi arus (${vArus.uom})`}>isi konversi</div>}</td>
                   <td className="row" style={{ flexWrap: 'nowrap', gap: 4 }}>
                     <button className="ghost" title="Duplikat baris" onClick={() => setA({ aktivitas: [...a.aktivitas.slice(0, i + 1), { ...x }, ...a.aktivitas.slice(i + 1)] })}>Salin</button>
                     <button className="danger" onClick={() => setA({ aktivitas: a.aktivitas.filter((_, j) => j !== i) })}>Hapus</button></td>

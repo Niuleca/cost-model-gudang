@@ -15,6 +15,28 @@ export interface VolumeInput {
   rataRataBulan: number;
   peakBulan: number;        // dipakai untuk sizing
   komitmenBulan: number;    // dipakai untuk billing (MGV)
+  /** Isi per UoM: 1 [uom] = per1 [uom1]; 1 [uom1] = per2 [uom2]. Mis. 1 palet = 40 case, 1 case = 24 pcs. */
+  konversi?: { uom1: string; per1: number; uom2: string; per2: number };
+}
+
+/** Faktor konversi dari UoM volume arus ke UoM lain (1 bila sama, null bila tidak dikenal). */
+export function faktorUom(v: VolumeInput | undefined, uom: string): number | null {
+  if (!v) return null;
+  // case = karton = dus = carton = ctn dianggap sama
+  const n = (x: string) => { const y = x.trim().toLowerCase(); return ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes(y) ? 'case' : ['pcs', 'pc', 'piece', 'unit', 'ea'].includes(y) ? 'pcs' : y; };
+  if (n(v.uom) === n(uom)) return 1;
+  const k = v.konversi;
+  if (!k) return null;
+  if (k.uom1 && n(k.uom1) === n(uom) && k.per1 > 0) return k.per1;
+  if (k.uom2 && n(k.uom2) === n(uom) && k.per1 > 0 && k.per2 > 0) return k.per1 * k.per2;
+  return null;
+}
+
+/** Pengali efektif aktivitas: pengali manual bila ≠ 1; bila 1 dan UoM aktivitas beda dari UoM arus → pakai konversi Volume. */
+export function pengaliEfektif(a: { uom: string; pengaliUom: number }, v: VolumeInput | undefined): number {
+  const p = a.pengaliUom || 1;
+  if (p !== 1) return p;
+  return faktorUom(v, a.uom) ?? 1;
 }
 
 export interface AktivitasInput {

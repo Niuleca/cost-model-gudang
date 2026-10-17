@@ -1,7 +1,7 @@
 // Process Design & Resource Calculation (mengikuti Excel Esa):
 // Volume/bln × % = workload → ÷ (produktivitas × faktor) = RfR (MH) → ÷ efisiensi = man hour
 // → ÷ jam tersedia per bulan (kalender Man Power / MHE) = FTE per resource → ROUNDUP = resources.
-import type { AktivitasInput, Arus, VolumeInput } from './types';
+import { pengaliEfektif, type AktivitasInput, type Arus, type VolumeInput } from './types';
 
 export interface KalenderResource {
   totalHari: number;       // 365
@@ -107,7 +107,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   const baris: BarisPD[] = [];
   aktivitas.forEach((a, i) => {
     const v = volumes.find(x => x.arus === a.arus);
-    const volume = a.volumeManual != null && Number.isFinite(a.volumeManual) ? Number(a.volumeManual) : (v?.peakBulan ?? 0) * (a.pengaliUom || 1);
+    const volume = a.volumeManual != null && Number.isFinite(a.volumeManual) ? Number(a.volumeManual) : (v?.peakBulan ?? 0) * pengaliEfektif(a, v);
     const workload = volume * a.persenVolume;
     const prod = a.prodPerJam * faktorProduktivitas;
     const rfr = prod > 0 ? workload / prod : 0;

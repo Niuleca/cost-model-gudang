@@ -5,6 +5,7 @@
 
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
+import { pengaliEfektif } from './types';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
 } from './types.ts';
@@ -107,7 +108,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     const v = volArus(a.arus);
     const volPerShift = (v?.arus === 'storage'
       ? (v.peakBulan / kal.hariOperasionalBulan) / t.jumlahShift   // aktivitas storage (cycle count) dihitung per hari
-      : (v?.desainPerShift ?? 0)) * a.persenVolume * a.pengaliUom;
+      : (v?.desainPerShift ?? 0)) * a.persenVolume * pengaliEfektif(a, t.volumes.find(x => x.arus === a.arus));
     const jam = volPerShift / (a.prodPerJam * t.faktorProduktivitas) / t.efisiensi;
     if (!jobs.has(a.roleName)) flags.push({ level: 'kritis', kode: 'ROLE_TIDAK_ADA', pesan: `Role "${a.roleName}" belum ada di master jabatan.` });
     const r = perRole.get(a.roleName) ?? { jamPerShift: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 } };
