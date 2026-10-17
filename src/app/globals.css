@@ -227,3 +227,6 @@ button.br-item:hover:not(:disabled), .br-pilih:hover:not(:disabled) { background
 
 /* dropdown di dalam tabel tidak boleh menyusut sampai teksnya hilang */
 td select { min-width: 96px; }
+
+/* Bar aksi bawah halaman tender (Simpan / Hitung) */
+.aksi-bawah { position: sticky; bottom: 0; z-index: 5; margin-top: 16px; padding: 10px 12px; background: var(--g50, #f8f9fa); border: 1px solid var(--g200, #e5e7eb); border-radius: 12px; box-shadow: 0 -4px 12px rgba(0,0,0,.05); }

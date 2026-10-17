@@ -182,6 +182,17 @@ export default function TenderPage() {
   if (!t) return <p className="muted">{pesan ?? 'Memuat tender…'}</p>;
   const a = t.asumsi;
 
+  const aksi = (atas: boolean) => (
+    <div className="row" style={atas ? undefined : { justifyContent: 'flex-end' }}>
+      {pesan && <span className="small" role="status">{pesan}</span>}
+      {bisaEdit && <>
+        <button className="ghost" onClick={undo} disabled={!riwayat.current.lalu.length} title="Undo (Ctrl+Z)" aria-label="Undo">↶ Undo</button>
+        <button className="ghost" onClick={redo} disabled={!riwayat.current.depan.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷ Redo</button>
+      </>}
+      {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor}>{kotor ? 'Simpan input' : 'Tersimpan'}</button>}
+      <button onClick={() => hitung()}>Hitung</button>
+    </div>);
+
   return (
     <>
       <div className="head">
@@ -190,15 +201,7 @@ export default function TenderPage() {
           <h1>{t.customer}</h1>
           <p className="muted">{t.kab_kota}, {t.provinsi} · {t.skenario_aset} · {t.jumlah_shift} shift · kontrak {t.durasi_kontrak_bulan} bln</p>
         </div>
-        <div className="row">
-          {pesan && <span className="small" role="status">{pesan}</span>}
-          {bisaEdit && <>
-            <button className="ghost" onClick={undo} disabled={!riwayat.current.lalu.length} title="Undo (Ctrl+Z)" aria-label="Undo">↶ Undo</button>
-            <button className="ghost" onClick={redo} disabled={!riwayat.current.depan.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷ Redo</button>
-          </>}
-          {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor}>Simpan input</button>}
-          <button onClick={() => hitung()}>Hitung</button>
-        </div>
+        {aksi(true)}
       </div>
       {profile && !bisaEdit && <div className="ro-banner" role="note"><b>Hanya lihat</b> · Draft ini dibuat oleh {pembuat ?? 'akun lain'}. Anda bisa melihat isi dan menjalankan Hitung untuk simulasi, tetapi tidak bisa menyimpan perubahan, mengubah status, atau membuat quotation.</div>}
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
@@ -385,6 +388,7 @@ export default function TenderPage() {
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
+      {tab !== 'Hasil' && tab !== 'Quotation' && <div className="aksi-bawah">{aksi(false)}</div>}
     </>
   );
 }
