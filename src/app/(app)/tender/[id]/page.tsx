@@ -8,6 +8,7 @@ import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, 
 import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { faktorUom, pengaliEfektif } from '@/lib/engine/types';
+import ProfilVolumePanel from './ProfilVolumePanel';
 import { useProfile } from '@/lib/useProfile';
 import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
@@ -291,6 +292,16 @@ export default function TenderPage() {
           </div>
         </div>
       )}
+
+      {tab === 'Volume' && <ProfilVolumePanel profil={a.profilVolume} volumes={a.volumes} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
+        onChange={profilVolume => setA({ profilVolume })}
+        onTerapkan={(arus, total) => setA({ volumes: a.volumes.map(v => {
+          if (v.arus !== arus) return v;
+          const faktor = v.rataRataBulan > 0 && v.peakBulan > 0 ? v.peakBulan / v.rataRataBulan : 1;
+          const tot = Math.round(total);
+          const fk = v.rataRataBulan > 0 && v.komitmenBulan > 0 ? v.komitmenBulan / v.rataRataBulan : 1;
+          return { ...v, uom: 'palet', rataRataBulan: tot, peakBulan: Math.round(tot * faktor), komitmenBulan: Math.round(tot * fk) };
+        }) })} />}
 
       {tab === 'Aktivitas & manpower' && (<>
         {<>

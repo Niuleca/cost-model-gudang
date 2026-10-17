@@ -52,6 +52,7 @@ export interface Asumsi {
   historis?: ProjectHistoris;
   metodeManpower?: 'excel' | 'shift';
   processDesign?: ProcessDesignInput;
+  profilVolume?: import('@/lib/profilVolume').ProfilVolume;
 }
 
 /** Project berjalan yang diimpor dari cost model Excel lama (tidak dihitung ulang oleh mesin hitung). */
