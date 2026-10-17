@@ -38,6 +38,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const [err, setErr] = useState<string | null>(null);
   const [branding, setBranding] = useState<PilihanBranding>({ logoPath: null, ttdPath: null });
   const [hapusId, setHapusId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [tambahIdx, setTambahIdx] = useState('');
   const hasil = tender.hasil as HasilTender | null;
   const bolehApprove = !!profile && ['commercial', 'finance', 'admin'].includes(profile.role);
@@ -96,16 +97,29 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
       tagihan_sekali: sekali, info_gudang: infoGudang(tender.asumsi.gudang, hasil) ?? q.info_gudang });
   }
 
+  /** Edit quotation draft/batal: dibuka di editor, disimpan ke baris yang sama (batal → kembali draft). */
+  function edit(q: Quo) {
+    const { id: _i, status: _s, approved_at: _a, created_at: _c, ...isi } = q;
+    setDraft({ ...isi, rate_card: q.rate_card ?? [], tagihan_sekali: q.tagihan_sekali ?? [] }); setEditId(q.id); setErr(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function tutupDraft() { setDraft(null); setEditId(null); }
+
   async function simpanDraft() {
     if (!draft) return;
     if (draft.revisi > 0 && !draft.catatan_revisi?.trim()) { setErr('Isi catatan revisi (apa yang berubah dan kenapa).'); return; }
+    if (editId) {
+      const { data, error } = await sb.from('quotations').update({ ...draft, status: 'draft' }).eq('id', editId).select('id');
+      if (error || !data?.length) { setErr(error?.message ?? 'Tidak tersimpan (hanya pembuat tender / admin).'); return; }
+      tutupDraft(); muat(); return;
+    }
     const { error } = await sb.from('quotations').insert({ ...draft, tender_id: tender.id });
     if (error) { setErr(error.message); return; }
     if (draft.parent_id) {   // versi lama yang masih aktif ditandai direvisi
       const lama = list.filter(x => (x.id === draft.parent_id || x.parent_id === draft.parent_id) && ['approved', 'terkirim', 'draft'].includes(x.status));
       for (const x of lama) await sb.from('quotations').update({ status: 'direvisi' }).eq('id', x.id);
     }
-    setDraft(null); muat();
+    tutupDraft(); muat();
   }
   async function setStatus(q: Quo, status: string) {
     const { error } = await sb.from('quotations').update({ status }).eq('id', q.id);
@@ -142,6 +156,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
 
       {draft && (
         <div className="card" style={{ background: 'var(--surface-2)' }}>
+          {editId && <p className="notice small"><b>Mengedit {draft.nomor}</b> — disimpan ke quotation yang sama{list.find(x => x.id === editId)?.status === 'batal' ? '; status kembali menjadi draft (perlu approve lagi)' : ''}.</p>}
           {draft.revisi > 0 && <p className="notice small">Revisi {draft.revisi}: tarif diambil dari hasil hitung terakhir (v{tender.versi}). Kalau negosiasi mengubah asumsi, ubah input lalu hitung ulang dulu.</p>}
           <div className="grid3">
             <label className="f" htmlFor="qno">Nomor<input id="qno" value={draft.nomor} onChange={e => setDraft({ ...draft, nomor: e.target.value })} /></label>
@@ -187,7 +202,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
                 {tc.map(x => <option key={x.id} value={x.id}>{x.nama}</option>)}</select></label>
           )}
           <label className="f" htmlFor="qtc">Syarat dan ketentuan<textarea id="qtc" rows={10} value={draft.term_condition} onChange={e => setDraft({ ...draft, term_condition: e.target.value })} /></label>
-          <div className="row"><button onClick={simpanDraft}>Simpan draft {draft.revisi > 0 ? `revisi ${draft.revisi}` : 'quotation'}</button><button className="ghost" onClick={() => setDraft(null)}>Batal</button></div>
+          <div className="row"><button onClick={simpanDraft}>{editId ? 'Simpan perubahan' : `Simpan draft ${draft.revisi > 0 ? `revisi ${draft.revisi}` : 'quotation'}`}</button><button className="ghost" onClick={tutupDraft}>Batal</button></div>
         </div>
       )}
 
@@ -216,6 +231,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
                 {q.status === 'approved' && <button className="ghost" onClick={() => setStatus(q, 'terkirim')}>Tandai terkirim</button>}
                 {(q.status === 'approved' || q.status === 'terkirim') && !draft && <button className="ghost" onClick={() => revisi(q)}>Buat revisi</button>}
                 {!['batal', 'direvisi'].includes(q.status) && <button className="danger" onClick={() => setStatus(q, 'batal')}>Batalkan</button>}
+                {['draft', 'batal'].includes(q.status) && !draft && <button className="ghost" onClick={() => edit(q)}>Edit</button>}
                 {['draft', 'batal'].includes(q.status) && (hapusId === q.id
                   ? <><button className="danger" onClick={() => hapusQuotation(q)}>Yakin hapus permanen</button><button className="ghost" onClick={() => setHapusId(null)}>Batal</button></>
                   : <button className="danger" onClick={() => setHapusId(q.id)}>Hapus</button>)}
