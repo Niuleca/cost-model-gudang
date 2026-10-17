@@ -49,18 +49,21 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       <div className="pajak-bar">
         <label className="f" htmlFor="pj-pph">PPh 23 ({(pphPersen * 100).toFixed(1)}%)
           <select id="pj-pph" value={pajak.pph} onChange={e => onPajak({ ...pajak, pph: e.target.value as Pajak['pph'] })}>
-            <option value="include">Include — tarif di-gross-up (PPh ditanggung customer)</option>
-            <option value="exclude">Exclude — tarif tanpa gross-up (PPh mengurangi pendapatan)</option>
+            <option value="include">Include PPh — tarif dinaikkan (gross-up), pendapatan bersih tetap</option>
+            <option value="exclude">Exclude PPh — tarif tidak dinaikkan, potongan PPh mengurangi pendapatan</option>
           </select></label>
         <label className="f" htmlFor="pj-ppn">PPN / VAT
           <select id="pj-ppn" value={pajak.ppn} onChange={e => onPajak({ ...pajak, ppn: e.target.value as Pajak['ppn'] })}>
-            <option value="exclude">Exclude — tarif belum termasuk PPN</option>
-            <option value="include">Include — tarif sudah termasuk PPN</option>
+            <option value="exclude">Exclude PPN — tarif belum termasuk PPN (PPN ditambah di invoice)</option>
+            <option value="include">Include PPN — tarif yang ditulis sudah termasuk PPN</option>
           </select></label>
         <label className="f" htmlFor="pj-ppnp">Tarif PPN efektif
           <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input id="pj-ppnp" type="number" step="0.1" value={Math.round(pajak.ppnPersen * 1000) / 10}
             onChange={e => onPajak({ ...pajak, ppnPersen: Number(e.target.value) / 100 })} style={{ width: 80 }} />%</span></label>
       </div>
+      {(() => { const p = pphPersen, n = 100000, gu = pajak.pph === 'include' ? n / (1 - p) : n; const pot = gu * p, ppnV = gu * pajak.ppnPersen;
+        return <p className="small pajak-contoh"><b>Contoh harga Rp100.000:</b> tarif {pajak.pph === 'include' ? `di-gross-up jadi ${rp(gu)}` : `tetap ${rp(gu)}`} → customer memotong PPh 23 {rp(pot)} → <b>diterima {rp(gu - pot)}</b>{pajak.pph === 'include' ? ' (utuh)' : ` (kurang ${rp(pot)})`}.
+          {' '}PPN {rp(ppnV)} {pajak.ppn === 'include' ? 'sudah di dalam tarif yang ditulis' : 'ditambahkan di invoice'} lalu disetor ke negara — tidak memengaruhi GP.</p>; })()}
       <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
         {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>
       <div className="tablewrap"><table>

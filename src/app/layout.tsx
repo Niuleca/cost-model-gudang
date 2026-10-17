@@ -1,4 +1,5 @@
 import './globals.css';
+import NumberInputFix from '@/components/NumberInputFix';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Mono:wght@400;500&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body><NumberInputFix />{children}</body>
     </html>
   );
 }
