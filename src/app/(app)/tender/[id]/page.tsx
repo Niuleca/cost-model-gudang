@@ -294,14 +294,7 @@ export default function TenderPage() {
       )}
 
       {tab === 'Volume' && <ProfilVolumePanel profil={a.profilVolume} volumes={a.volumes} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
-        onChange={profilVolume => setA({ profilVolume })}
-        onTerapkan={(arus, total) => setA({ volumes: a.volumes.map(v => {
-          if (v.arus !== arus) return v;
-          const faktor = v.rataRataBulan > 0 && v.peakBulan > 0 ? v.peakBulan / v.rataRataBulan : 1;
-          const tot = Math.round(total);
-          const fk = v.rataRataBulan > 0 && v.komitmenBulan > 0 ? v.komitmenBulan / v.rataRataBulan : 1;
-          return { ...v, uom: 'palet', rataRataBulan: tot, peakBulan: Math.round(tot * faktor), komitmenBulan: Math.round(tot * fk) };
-        }) })} />}
+        onChange={profilVolume => setA({ profilVolume })} />}
 
       {tab === 'Aktivitas & manpower' && (<>
         {<>
