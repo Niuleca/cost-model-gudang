@@ -178,10 +178,14 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     const jam = perTool.get(x.tool)?.jamPerShift ?? 0;
     const unitDasar = pd ? (pd.mhe.find(r => r.nama === x.tool)?.resources ?? 0) : Math.ceil(jam / (t.jamEfektifPerShift * x.ketersediaan) - 1e-9);   // alat dipakai bergantian antar shift
     const spare = unitDasar > 0 ? Math.ceil(unitDasar * x.sparePersen - 1e-9) : 0;
-    const arusJam = perTool.get(x.tool)?.jamPerArus ?? { inbound: 0, outbound: 0, storage: 0, vas: 0 };
+    // Porsi arus: jam per shift (metode lama) → jam process design → merata bila alat hanya dipakai indirect
+    const jamLama = perTool.get(x.tool)?.jamPerArus;
+    const arusJam = jamLama && Object.values(jamLama).some(v => v > 0) ? jamLama
+      : pd?.mhe.find(r => r.nama === x.tool)?.jamPerArus ?? { inbound: 0, outbound: 0, storage: 0, vas: 0 };
+    const totArus = Object.values(arusJam).reduce((a2, c) => a2 + c, 0);
     const alok = kosongAlokasi();
-    for (const a of Object.keys(arusJam) as Arus[]) alok[ARUS_KE_BUCKET[a]] = jam > 0 ? arusJam[a] / jam : 0;
-    return { ...x, jamPerShift: bulat(jam, 2), unit: unitDasar + spare, unitDasar, spare, alokasi: alok };
+    for (const a of Object.keys(arusJam) as Arus[]) alok[ARUS_KE_BUCKET[a]] = totArus > 0 ? arusJam[a] / totArus : 0;
+    return { ...x, jamPerShift: bulat(jam, 2), unit: unitDasar + spare, unitDasar, spare, alokasi: totArus > 0 ? alok : normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 }) };
   });
   for (const tool of perTool.keys())
     if (!t.mhe.some(x => x.tool === tool) && !['RF', 'PC', 'HPT', 'Hand Pallet', 'Hand Wrapper'].includes(tool))
@@ -211,6 +215,8 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const baris: BiayaBaris[] = [];
   const tambah = (deskripsi: string, kelompok: Kelompok, biayaBulan: number, alokasi: Record<Bucket, number>, dasar: string, risiko?: KategoriRisiko) => {
     if (biayaBulan <= 0) return;
+    // pengaman: baris tanpa alokasi tidak boleh hilang dari tarif → sebar merata
+    if (!(Object.values(alokasi).reduce((a2, c) => a2 + c, 0) > 1e-9)) alokasi = normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
     baris.push({ deskripsi, kelompok, kategoriRisiko: risiko ?? RISIKO_DEFAULT[kelompok], biayaBulan: bulat(biayaBulan), alokasi, dasar });
   };
   // biaya beli: depresiasi selama min(umur, kontrak) + bunga atas rata-rata nilai buku

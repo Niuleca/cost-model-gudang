@@ -59,7 +59,9 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
             <td className="num"><b>{persen(mt.margin)}</b></td><td className="num"><b>{rp(mt.hargaBulan)}</b></td><td></td></tr>}
         </tbody>
       </table></div>
-      {mt && <p className="small">Total margin {persen(mt.margin)} = (Σ harga sebelum PPh {rp(mt.hargaSebelumPph)} ÷ Σ biaya {rp(mt.biayaBulan)}) − 1, tertimbang biaya tiap layanan.</p>}
+      {mt && <p className="small">Total margin {persen(mt.margin)} = (Σ harga sebelum PPh {rp(mt.hargaSebelumPph)} ÷ Σ biaya {rp(mt.biayaBulan)}) − 1, tertimbang biaya tiap layanan.
+        {' '}Markup {persen(mt.margin)} atas biaya setara <b>GP ≈ {persen(mt.margin / (1 + mt.margin))}</b> atas pendapatan (margin ÷ (1 + margin)); tarif dibulatkan ke atas sehingga GP sedikit lebih tinggi.</p>}
+      {mt && h.simulasi[0] && h.simulasi[0].biayaBulan - mt.biayaBulan > 1000 && <p className="small notice">Ada biaya {rp(h.simulasi[0].biayaBulan - mt.biayaBulan)}/bln yang tidak masuk tarif mana pun (mis. biaya VAS tanpa volume) — GP% jadi lebih rendah dari margin.</p>}
       {h.storageAlternatif.length > 0 && <p className="small">Storage alternatif: {h.storageAlternatif.map(s => `${rp(s.tarif)}/${s.uom}`).join(' · ')}</p>}
 
       <h3>Simulasi</h3>
