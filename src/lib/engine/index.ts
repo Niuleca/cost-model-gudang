@@ -322,10 +322,11 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   }
 
   // ---- 11. Harga & rate card ----
-  // Pajak: PPh 23 dipotong customer dari pembayaran. Include = tarif di-gross-up supaya pendapatan bersih tetap; exclude = tidak di-gross-up.
-  const pajak = t.pajak ?? { pph: 'include', ppn: 'exclude', ppnPersen: 0.11 };
+  // Pajak (istilah komersial): PPh EXCLUDE = harga belum termasuk PPh → ditanggung customer → tarif di-gross-up;
+  // PPh INCLUDE = harga sudah termasuk PPh → ditanggung kita → tarif tidak dinaikkan, potongan PPh mengurangi pendapatan.
+  const pajak = t.pajak ?? { pph: 'exclude', ppn: 'exclude', ppnPersen: 0.11 };
   const pphRate = m.finance.pphGrossUp;
-  const g = pajak.pph === 'include' ? pphRate : 0;
+  const g = pajak.pph === 'exclude' ? pphRate : 0;
   const ppn = Math.max(0, pajak.ppnPersen ?? 0.11);
   const bucketKeArus: Record<string, Arus> = { storage: 'storage', handling_in: 'inbound', handling_out: 'outbound', vas: 'vas' };
   const rateCard = opsBuckets.map(b => {

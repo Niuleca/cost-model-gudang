@@ -68,7 +68,7 @@ export interface ProjectHistoris {
   catatan: string;
 }
 
-export const PAJAK_DEFAULT = { pph: 'include' as const, ppn: 'exclude' as const, ppnPersen: 0.11 };
+export const PAJAK_DEFAULT = { pph: 'exclude' as const, ppn: 'exclude' as const, ppnPersen: 0.11 };
 export const STARTUP_DEFAULT = { aktif: true, persenOpex: 0.5, persenManpower: 0.5 };
 export const ASUMSI_DEFAULT: Asumsi = {
   cutiTahunanHari: 12, faktorProduktivitas: 0.95, efisiensi: 0.9, spanOfControl: 15, roleSupervisor: 'Operational SPV',
