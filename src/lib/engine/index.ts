@@ -244,9 +244,14 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     if (pos > 0 && h.harga > 0) investasi += capex(`Racking ${label} (${pos} posisi)`, 'Racking', pos * h.harga, h.umurBulan, alokStorage);
 
   // Listrik
-  const kwhBulan = t.listrik.reduce((sum, l) => sum + l.watt * l.qty * l.jamPerHari, 0) * kal.hariOperasionalBulan / 1000;
-  tambah('Listrik', 'Utilitas', kwhBulan * t.tarifListrikKwh, normalisasi(undefined, { storage: 0.6, handling_in: 0.2, handling_out: 0.2 }),
-    `${bulat(kwhBulan).toLocaleString('id-ID')} kWh × Rp${t.tarifListrikKwh}`);
+  const alokListrik = normalisasi(undefined, { storage: 0.6, handling_in: 0.2, handling_out: 0.2 });
+  if (t.listrikSimulasi && t.listrikSimulasi.totalBulan > 0)
+    tambah(`Listrik — ${t.listrikSimulasi.nama}`, 'Utilitas', t.listrikSimulasi.totalBulan, alokListrik,
+      `simulasi Utilities: ${bulat(t.listrikSimulasi.kwhBulan).toLocaleString('id-ID')} kWh/bln (energi + kVArh + beban)`);
+  else {
+    const kwhBulan = t.listrik.reduce((sum, l) => sum + l.watt * l.qty * l.jamPerHari, 0) * kal.hariOperasionalBulan / 1000;
+    tambah('Listrik', 'Utilitas', kwhBulan * t.tarifListrikKwh, alokListrik, `${bulat(kwhBulan).toLocaleString('id-ID')} kWh × Rp${t.tarifListrikKwh}`);
+  }
 
   // MHE
   for (const x of mhe) {
@@ -268,14 +273,22 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     }
   }
 
-  // ---- 8. Biaya modal (usulan UC #3) ----
-  if (sewaBulan > 0 && t.advanceSewaBulan > 0) {
-    let totalBunga = 0;
-    for (let k = 0; k < t.advanceSewaBulan; k++) totalBunga += sewaBulan * (t.advanceSewaBulan - k) * r;
-    tambah('Bunga advance payment sewa', 'Finance', totalBunga / n, alokStorage, `${t.advanceSewaBulan} bln dibayar di muka, saldo menurun × ${(m.finance.bungaModalTahun * 100).toFixed(1)}%`);
+  // ---- 7b. Startup & implementation otomatis: biaya sekali = % OPEX bulanan / % biaya manpower bulanan, diamortisasi selama kontrak ----
+  const sa = t.startupAuto;
+  if (sa?.aktif) {
+    const opexDasar = baris.filter(b => b.kelompok !== 'Startup').reduce((sum, b) => sum + b.biayaBulan, 0);
+    const manpowerDasar = payroll.reduce((sum, p) => sum + p.biayaBulan, 0);
+    const alokOps = normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
+    for (const [nama, persen, dasar, ket] of [
+      ['Startup cost', sa.persenOpex, opexDasar, 'OPEX/bln'], ['Implementation cost', sa.persenManpower, manpowerDasar, 'biaya manpower/bln'],
+    ] as const) {
+      const nilai = persen * dasar;
+      if (nilai <= 0) continue;
+      tambah(`${nama} (otomatis) — amortisasi`, 'Startup', nilai / n, alokOps, `${(persen * 100).toFixed(0)}% × ${ket} Rp${bulat(dasar).toLocaleString('id-ID')} = Rp${bulat(nilai).toLocaleString('id-ID')} ÷ ${n} bln`);
+      tambah(`${nama} (otomatis) — bunga`, 'Finance', (nilai / 2) * r, alokOps, 'rata-rata saldo × bunga');
+      investasi += nilai;
+    }
   }
-  if (sewaBulan > 0 && t.depositBulan > 0)
-    tambah('Bunga deposit sewa', 'Finance', sewaBulan * t.depositBulan * r, alokStorage, `${t.depositBulan} bln deposit × bunga`);
   const subtotalOperasi = baris.reduce((sum, b) => sum + b.biayaBulan, 0);
   const selisihHari = t.paymentTermHari - m.finance.apHari;
   if (selisihHari > 0)

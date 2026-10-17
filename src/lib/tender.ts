@@ -39,6 +39,8 @@ export interface Asumsi {
   listrik: ListrikInput[];
   golonganListrik: string;
   tarifListrikKwh: number;
+  listrikSimulasi?: TenderInput['listrikSimulasi'];
+  startupAuto?: TenderInput['startupAuto'];
   advanceSewaBulan: number;
   depositBulan: number;
   stokTon?: number; stokCbm?: number; stokLiter?: number;
@@ -63,6 +65,7 @@ export interface ProjectHistoris {
   catatan: string;
 }
 
+export const STARTUP_DEFAULT = { aktif: true, persenOpex: 0.5, persenManpower: 0.5 };
 export const ASUMSI_DEFAULT: Asumsi = {
   cutiTahunanHari: 12, faktorProduktivitas: 0.95, efisiensi: 0.9, spanOfControl: 15, roleSupervisor: 'Operational SPV',
   volumes: [
@@ -95,7 +98,8 @@ export function keInput(t: TenderRow): TenderInput {
         : Math.round(Number(a.gudang.harga_sewa_m2_bulan ?? (a.gudang.harga_per_bulan ?? 0) / Math.max(1, Number(a.gudang.luas_m2)))),
       sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
-    tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: a.advanceSewaBulan, depositBulan: a.depositBulan,
+    tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
+    listrikSimulasi: a.listrikSimulasi ?? null, startupAuto: a.startupAuto ?? STARTUP_DEFAULT,
     stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter,
     metodeManpower: a.metodeManpower ?? 'excel', processDesign: { ...PD_DEFAULT, ...(a.processDesign ?? {}) },
   };

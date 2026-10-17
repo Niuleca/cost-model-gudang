@@ -116,6 +116,10 @@ export interface TenderInput {
   costLines: CostLineInput[];
   listrik: ListrikInput[];
   tarifListrikKwh: number;
+  /** Biaya listrik per bulan dari simulasi Utilities (Price Inquiry). Bila diisi, menggantikan perhitungan per peralatan. */
+  listrikSimulasi?: { id: string; nama: string; totalBulan: number; kwhBulan: number } | null;
+  /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */
+  startupAuto?: { aktif: boolean; persenOpex: number; persenManpower: number };
   advanceSewaBulan: number;
   depositBulan: number;
   stokTon?: number;                 // untuk tarif storage alternatif

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { ASUMSI_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
+import { ASUMSI_DEFAULT, STARTUP_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
@@ -11,6 +11,7 @@ import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
 import BiayaLainPanel from './BiayaLainPanel';
+import ListrikTender from './ListrikTender';
 import ProcessDesignPanel from './ProcessDesignPanel';
 import SpacePanel from './SpacePanel';
 import MhePanel from './MhePanel';
@@ -137,9 +138,12 @@ export default function TenderPage() {
     const v = (ar: Arus) => t.asumsi.volumes.find(x => x.arus === ar)?.peakBulan ?? 0;
     return hitungSpaceExcel(lengkapiSpaceExcel(t.asumsi.space.excel), v('storage'), v('inbound'), v('outbound'), t.jumlah_shift);
   }, [t]);
-  const pdMhe = useMemo(() => t ? hitungProcessDesign(t.asumsi.aktivitas, t.asumsi.volumes, { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
+  const pdFull = useMemo(() => t ? hitungProcessDesign(t.asumsi.aktivitas, t.asumsi.volumes, { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
     t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift,
-    { spanOfControl: t.asumsi.spanOfControl, roleSupervisor: t.asumsi.roleSupervisor, alatSupervisor: t.asumsi.alatSupervisor, peranTetap: t.asumsi.peranTetap }).mhe : [], [t]);
+    { spanOfControl: t.asumsi.spanOfControl, roleSupervisor: t.asumsi.roleSupervisor, alatSupervisor: t.asumsi.alatSupervisor, peranTetap: t.asumsi.peranTetap }) : null, [t]);
+  const pdMhe = pdFull?.mhe ?? [];
+  // headcount total untuk konsumsi (galon): hasil Hitung bila ada, kalau tidak dari process design (direct + indirect/tetap)
+  const headcountTotal = (hasil?.manpower?.reduce((s, m) => s + m.headcount, 0)) || ((pdFull?.totalMp ?? 0) + (pdFull?.indirect.total ?? 0));
 
   if (!t) return <p className="muted">{pesan ?? 'Memuat tender…'}</p>;
   const a = t.asumsi;
@@ -328,31 +332,14 @@ export default function TenderPage() {
           <h2>Biaya lain</h2>
           {a.it.lines.length > 0 && <p className="small notice">IT dari tab IT ikut dihitung otomatis: ±{rp(ringkasIt(a.it, { kontrakBulan: t.durasi_kontrak_bulan, bungaTahun: 0.1 }).totalBulan)}/bln (termasuk depresiasi/amortisasi OTC {rp(ringkasIt(a.it).sekali)}). Jangan diinput dua kali di sini.</p>}
           <p className="small muted">Dipisah per klasifikasi sesuai Price Inquiry; pilihan item di tiap bagian hanya dari kategorinya. Bulanan/sewa = qty × harga per bulan. Beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak + bunga modal.</p>
-          <BiayaLainPanel lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan} onChange={costLines => setA({ costLines })} />
+          <BiayaLainPanel lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan} onChange={costLines => setA({ costLines })}
+            startup={a.startupAuto ?? STARTUP_DEFAULT} onStartup={startupAuto => setA({ startupAuto })}
+            hasilBaris={hasil?.biaya} headcount={headcountTotal} hariKerjaBulan={a.processDesign?.hariKerjaBulan ?? 25} />
 
-          <h2>Listrik (Engineering)</h2>
-          <div className="grid3">
-            <label className="f" htmlFor="gol">Golongan tarif
-              <select id="gol" value={a.golonganListrik} onChange={e => { const g = tarif.find(x => x.golongan === e.target.value); setA({ golonganListrik: e.target.value, tarifListrikKwh: Number(g?.tarif_kwh ?? a.tarifListrikKwh) }); }}>
-                {tarif.map(x => <option key={x.golongan} value={x.golongan}>{x.golongan} — {rp(x.tarif_kwh, 2)}/kWh</option>)}
-              </select></label>
-          </div>
-          <div className="tablewrap"><table>
-            <thead><tr><th>Peralatan / titik lampu</th><th className="num">Watt</th><th className="num">Qty</th><th className="num">Jam/hari</th><th className="num">kWh/hari</th><th></th></tr></thead>
-            <tbody>{a.listrik.map((l, i) => (
-              <tr key={i}>
-                <td><input aria-label="Item" value={l.item} onChange={e => setA({ listrik: ubahArray(a.listrik, i, { item: e.target.value }) })} /></td>
-                {(['watt', 'qty', 'jamPerHari'] as const).map(k => <td key={k} className="num"><input aria-label={k} type="number" step="any" value={l[k]} onChange={e => setA({ listrik: ubahArray(a.listrik, i, { [k]: Number(e.target.value) }) })} /></td>)}
-                <td className="num">{angka(l.watt * l.qty * l.jamPerHari / 1000, 1)}</td>
-                <td><button className="danger" onClick={() => setA({ listrik: a.listrik.filter((_, j) => j !== i) })}>Hapus</button></td>
-              </tr>))}</tbody></table></div>
-          <div className="row"><button className="ghost" onClick={() => setA({ listrik: [...a.listrik, { item: 'Lampu LED high bay', watt: 100, qty: 1, jamPerHari: 10 }] })}>Tambah titik listrik</button></div>
-
-          <h2>Biaya modal sewa</h2>
-          <div className="grid3">
-            <Num id="adv" label="Sewa dibayar di muka" suffix="bulan" value={a.advanceSewaBulan} onChange={v => setA({ advanceSewaBulan: v })} />
-            <Num id="dep" label="Deposit sewa" suffix="bulan" value={a.depositBulan} onChange={v => setA({ depositBulan: v })} />
-          </div>
+          <h2>Listrik</h2>
+          <ListrikTender simulasi={a.listrikSimulasi} listrik={a.listrik} golongan={a.golonganListrik} tarifKwh={a.tarifListrikKwh} tarif={tarif} items={items}
+            onSimulasi={listrikSimulasi => setA({ listrikSimulasi })} onListrik={listrik => setA({ listrik })}
+            onTarif={(golonganListrik, tarifListrikKwh) => setA({ golonganListrik, tarifListrikKwh })} />
         </div>
       )}
 

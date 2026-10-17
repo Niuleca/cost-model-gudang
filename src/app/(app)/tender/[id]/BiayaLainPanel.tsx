@@ -19,9 +19,9 @@ const namaAlokasi = (a?: Partial<Record<Bucket, number>>) =>
 const MODE: { v: ModeBiaya; l: string }[] = [{ v: 'bulanan', l: 'Bulanan' }, { v: 'sewa', l: 'Sewa/bln' }, { v: 'beli', l: 'Beli (depresiasi)' }, { v: 'sekali', l: 'Sekali (amortisasi)' }];
 
 /** Satu klasifikasi biaya: tabel sendiri, item hanya dari kategori klasifikasi itu, subtotal per bulan. Di level modul supaya input tidak kehilangan fokus. */
-function KartuSeksi({ s, rows, items, kontrak, bunga, onUbah, onUbahBanyak, onHapus, onTambah }: {
+function KartuSeksi({ s, rows, items, kontrak, bunga, onUbah, onUbahBanyak, onHapus, onTambah, extra }: {
   s: Seksi; rows: { b: Baris; i: number }[]; items: Item[]; kontrak: number; bunga: number;
-  onUbah: (i: number, patch: Partial<Baris>) => void; onUbahBanyak: (u: { i: number; patch: Partial<Baris> }[]) => void; onHapus: (i: number) => void; onTambah: () => void;
+  onUbah: (i: number, patch: Partial<Baris>) => void; onUbahBanyak: (u: { i: number; patch: Partial<Baris> }[]) => void; onHapus: (i: number) => void; onTambah: () => void; extra?: React.ReactNode;
 }) {
   const pilihan = s.id === 'lainnya' ? items.filter(x => !SEKSI_BIAYA.some(z => z.kategori.includes(x.kategori)) && !['MHE', 'Racking', 'Gudang', 'IT'].includes(x.kategori))
     : items.filter(x => s.kategori.includes(x.kategori));
@@ -34,6 +34,7 @@ function KartuSeksi({ s, rows, items, kontrak, bunga, onUbah, onUbahBanyak, onHa
           {s.mode === 'beli' && rows.some(r => r.b.mode === 'bulanan') && <button className="ghost" onClick={() => onUbahBanyak(rows.filter(r => r.b.mode === 'bulanan').map(r => ({ i: r.i, patch: { mode: 'beli' as ModeBiaya, umurBulan: r.b.umurBulan || 60 } })))}>Semua jadi Beli (depresiasi)</button>}
           <span className="pill info">{rows.length} item · {rp(total)}/bln</span></span>
       </div>
+      {extra}
       {rows.length > 0 && <div className="tablewrap"><table>
         <thead><tr><th>Item</th><th>Mode</th><th className="num">Qty</th><th className="num">Harga satuan</th><th className="num">Umur (bln)</th><th className="num">Nilai</th><th className="num">Biaya/bln</th><th>Risiko</th><th>Alokasi</th><th></th></tr></thead>
         <tbody>{rows.map(({ b, i }) => {
@@ -76,8 +77,11 @@ function KartuSeksi({ s, rows, items, kontrak, bunga, onUbah, onUbahBanyak, onHa
     </div>);
 }
 
-export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange }: {
+export interface StartupAuto { aktif: boolean; persenOpex: number; persenManpower: number }
+export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, headcount, hariKerjaBulan }: {
   lines: Baris[]; items: Item[]; kontrakBulan: number; onChange: (l: Baris[]) => void;
+  startup: StartupAuto; onStartup: (s: StartupAuto) => void;
+  hasilBaris?: { deskripsi: string; biayaBulan: number; dasar: string }[]; headcount: number; hariKerjaBulan: number;
 }) {
   const sb = supabaseBrowser();
   const [bunga, setBunga] = useState(0.1);
@@ -99,6 +103,39 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange }:
   });
   const totalBulan = ringkas.reduce((t, r) => t + r.total, 0);
 
+  // ---- Startup & implementation otomatis (dihitung mesin saat Hitung) ----
+  const barisAuto = (nama: string) => hasilBaris?.find(b => b.deskripsi.startsWith(`${nama} (otomatis) — amortisasi`));
+  const manualDobel = lines.map((b, i) => ({ b, i })).filter(r => startup.aktif && /implement|start ?up/i.test(r.b.deskripsi));
+  const persenInp = (v: number, on: (n: number) => void) => <input type="number" min={0} step="any" value={Math.round(v * 1000) / 10} disabled={!startup.aktif}
+    onChange={e => on(Number(e.target.value) / 100)} style={{ width: 70, minWidth: 70, textAlign: 'right' }} />;
+  const extraStartup = (
+    <div className="bl-auto">
+      <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={startup.aktif} onChange={e => onStartup({ ...startup, aktif: e.target.checked })} style={{ width: 'auto' }} /> <b>Hitung otomatis</b> (biaya sekali, diamortisasi {kontrakBulan} bln + bunga modal)</label>
+      <div className="tablewrap"><table>
+        <thead><tr><th>Item otomatis</th><th className="num">Persen</th><th>Dasar</th><th className="num">Biaya/bln (hasil Hitung)</th></tr></thead>
+        <tbody>
+          {([['Startup cost', 'persenOpex', 'OPEX per bulan (semua biaya operasi, di luar startup)'], ['Implementation cost', 'persenManpower', 'total biaya manpower per bulan']] as const).map(([nama, k, dasar]) => {
+            const h = barisAuto(nama);
+            return <tr key={k}><td><b>{nama}</b></td><td className="num">{persenInp(startup[k], v => onStartup({ ...startup, [k]: v }))}%</td>
+              <td className="small">{h ? h.dasar : dasar}</td><td className="num">{!startup.aktif ? '–' : h ? <b>{rp(h.biayaBulan)}</b> : <span className="small muted">tekan Hitung</span>}</td></tr>;
+          })}
+        </tbody></table></div>
+      {manualDobel.length > 0 && <div className="notice small">Baris manual berikut kemungkinan <b>dobel</b> dengan startup/implementation otomatis:{' '}
+        {manualDobel.map(r => <span key={r.i} style={{ marginRight: 8 }}>“{r.b.deskripsi}” <button className="danger" style={{ padding: '0 8px' }} onClick={() => onChange(lines.filter((_, j) => j !== r.i))}>Hapus</button></span>)}</div>}
+    </div>);
+
+  // ---- Galon minum bulanan dari headcount ----
+  const itGalon = items.find(x => /air minum galon/i.test(x.item));
+  const qtyGalon = Math.ceil(headcount * 1.5 * hariKerjaBulan / 19 - 1e-9);
+  const iGalon = lines.findIndex(b => itGalon && b.priceItemId === itGalon.id);
+  const extraConsumable = itGalon ? (
+    <div className="row small">
+      {iGalon < 0
+        ? <button className="ghost" disabled={headcount <= 0} onClick={() => onChange([...lines, { priceItemId: itGalon.id, deskripsi: itGalon.item, kelompok: 'Consumable', seksi: 'consumable', mode: 'bulanan', qty: qtyGalon, hargaSatuan: Number(itGalon.harga_beli ?? 0) }])}>+ Galon minum bulanan ({qtyGalon} galon)</button>
+        : lines[iGalon].qty !== qtyGalon && <button className="ghost" onClick={() => ubah(iGalon, { qty: qtyGalon })}>Sesuaikan galon ke {qtyGalon}</button>}
+      <span className="muted">Galon/bln = {headcount} orang × 1,5 L × {hariKerjaBulan} hari ÷ 19 L = {qtyGalon} galon</span>
+    </div>) : null;
+
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <div className="tablewrap"><table>
@@ -111,6 +148,7 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange }:
       </table></div>
       {perSeksi.map(({ s, rows }) => (
         <KartuSeksi key={s.id} s={s} rows={rows} items={items} kontrak={kontrakBulan} bunga={bunga}
+          extra={s.id === 'startup' ? extraStartup : s.id === 'consumable' ? extraConsumable : undefined}
           onUbah={ubah} onUbahBanyak={ubahBanyak} onHapus={i => onChange(lines.filter((_, j) => j !== i))}
           onTambah={() => onChange([...lines, { deskripsi: '', kelompok: s.kelompok, mode: s.mode, qty: 1, hargaSatuan: 0, seksi: s.id, ...(s.mode === 'beli' ? { umurBulan: 60 } : {}) }])} />
       ))}
