@@ -60,8 +60,8 @@ export interface IndirectInput {
   peranTetap: { roleName: string; qty: number; alat?: string[] }[];
 }
 
-/** Role TKBM / kuli bongkar muat — tenaga borongan, bukan karyawan, jadi tidak bisa multi-skill. */
-export const isTkbm = (nama: string) => /\btkbm\b|kuli|bongkar\s*muat|buruh/i.test(nama);
+/** Role non-karyawan: TKBM / kuli bongkar muat (borongan) dan Helper (daily worker) — tidak bisa multi-skill. */
+export const isTkbm = (nama: string) => /\btkbm\b|kuli|bongkar\s*muat|buruh|helper|daily\s*worker|harian/i.test(nama);
 
 /** Operator MHE ber-SIO (Reach Truck, Forklift CB/CBT) — hanya bisa dibackup sesama operator. */
 export const isOperatorMhe = (nama: string) => /reach\s*truck|forklift|\bRT\b|\bCBT?\b/i.test(nama) && !/admin/i.test(nama);
