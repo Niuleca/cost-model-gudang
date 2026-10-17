@@ -60,6 +60,9 @@ export interface IndirectInput {
   peranTetap: { roleName: string; qty: number; alat?: string[] }[];
 }
 
+/** Role TKBM / kuli bongkar muat — tenaga borongan, bukan karyawan, jadi tidak bisa multi-skill. */
+export const isTkbm = (nama: string) => /\btkbm\b|kuli|bongkar\s*muat|buruh/i.test(nama);
+
 export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: VolumeInput[], pd: ProcessDesignInput,
   faktorProduktivitas: number, efisiensi: number, jumlahShift: number, indirect?: IndirectInput) {
   const kalMp = hitungKalenderResource(pd.mp), kalMhe = hitungKalenderResource(pd.mhe);
@@ -93,7 +96,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
       x.fte += b.fte; x.manHour += b.manHour; x.jamPerArus[b.arus] += b.manHour; m.set(b.resource, x);
     }
     return Array.from(m.values()).map(x => ({
-      ...x, unitIndirect: 0, merangkap: [] as string[], dirangkap: false,
+      ...x, unitIndirect: 0, merangkap: [] as string[], dirangkap: false, tkbm: false,
       // alat: dipakai bergantian antar shift → ROUNDUP(FTE). Man power dihitung dengan pooling di bawah.
       resources: x.fte <= 0 ? 0 : jenis === 'Man Power' ? 0 : Math.ceil(x.fte - 1e-9),
     }));
@@ -103,9 +106,11 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   // Man power: multi-skill pooling per shift aktif.
   // Tiap role dapat orang tetap = bagian bulat FTE; sisa pecahan semua role dijumlah → ROUNDUP = orang multi-skill,
   // diberikan ke role dengan sisa terbesar; role dengan sisa kecil dirangkap oleh mereka.
+  // TKBM (tenaga kerja bongkar muat / kuli, bukan karyawan) TIDAK ikut pooling: tidak merangkap & tidak dirangkap → ROUNDUP sendiri.
   for (const w of beban) {
     if (w <= 0) continue;
-    const v = mp.map(r => r.fte * w);
+    mp.forEach(r => { if (isTkbm(r.nama)) { r.resources += Math.ceil(r.fte * w - 1e-9); r.tkbm = true; } });
+    const v = mp.map(r => isTkbm(r.nama) ? 0 : r.fte * w);
     const dasar = v.map(x => Math.floor(x + 1e-9));
     const sisa = v.map((x, i) => Math.max(0, x - dasar[i]));
     const pool = Math.ceil(sisa.reduce((a, b) => a + b, 0) - 1e-9);
@@ -129,7 +134,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   ] : [];
   for (const r of indirectRows) for (const nama of r.alat) {
     let e = mhe.find(x => x.nama === nama);
-    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0, merangkap: [], dirangkap: false }; mhe.push(e); }
+    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0, merangkap: [], dirangkap: false, tkbm: false }; mhe.push(e); }
     e.unitIndirect += r.qty; e.resources += r.qty;
   }
   return {
