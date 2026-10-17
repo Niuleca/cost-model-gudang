@@ -7,6 +7,7 @@ import type { Profile } from '@/lib/useProfile';
 import { rp, tanggal, angka, BUCKET_LABEL } from '@/lib/format';
 import { ringkasIt, IT_SHEET_DEFAULT } from '@/lib/it';
 import { unduhQuotationPdf, type InfoGudangPdf } from '@/lib/quotationPdf';
+import BrandingPanel, { gambarUntukPdf, type PilihanBranding } from './BrandingPanel';
 
 interface RateRow { layanan: string; satuan: string; tarif: number; catatan?: string }
 interface Sekali { deskripsi: string; nilai: number }
@@ -34,6 +35,9 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [ttd, setTtd] = useState({ nama: profile?.full_name ?? '', jabatan: 'Solution Design', perusahaan: 'PT LX Pantos Indonesia' });
   const [err, setErr] = useState<string | null>(null);
+  const [branding, setBranding] = useState<PilihanBranding>({ logoPath: null, ttdPath: null });
+  const [hapusId, setHapusId] = useState<string | null>(null);
+  const [tambahIdx, setTambahIdx] = useState('');
   const hasil = tender.hasil as HasilTender | null;
   const bolehApprove = !!profile && ['commercial', 'finance', 'admin'].includes(profile.role);
 
@@ -107,8 +111,15 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     if (status === 'terkirim') await sb.from('tenders').update({ status: q.revisi > 0 ? 'negosiasi' : 'quotation_terkirim' }).eq('id', tender.id);
     muat();
   }
+  async function hapusQuotation(q: Quo) {
+    if (list.some(x => x.parent_id === q.id)) { setErr('Quotation ini punya revisi — hapus revisinya dulu, atau cukup biarkan berstatus batal.'); setHapusId(null); return; }
+    const { data, error } = await sb.from('quotations').delete().eq('id', q.id).select('id');
+    if (error || !data?.length) { setErr(error?.message ?? 'Tidak bisa menghapus (hanya pembuat tender / admin).'); setHapusId(null); return; }
+    setHapusId(null); setErr(null); muat();
+  }
   async function unduh(q: Quo) {
-    await unduhQuotationPdf({
+    const [logo, ttdImg] = await Promise.all([gambarUntukPdf(branding.logoPath), gambarUntukPdf(branding.ttdPath)]);
+    await unduhQuotationPdf({ logo, ttd: ttdImg,
       nomor: q.nomor, tanggal: q.tanggal, berlakuSampai: q.berlaku_sampai, kepada: q.kepada ?? tender.customer, customer: tender.customer,
       lokasi: `${tender.kab_kota}, ${tender.provinsi}`, perihal: q.revisi > 0 ? `Revisi ${q.revisi} Penawaran Harga Jasa Pergudangan` : 'Penawaran Harga Jasa Pergudangan',
       rateCard: q.rate_card, tagihanSekali: q.tagihan_sekali ?? [], gudang: q.info_gudang, catatanRevisi: q.catatan_revisi,
@@ -146,7 +157,21 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
                 <td><input aria-label="Keterangan" value={r.catatan ?? ''} onChange={e => ubahRate(i, { catatan: e.target.value })} /></td>
                 <td><button className="danger" onClick={() => setDraft({ ...draft, rate_card: draft.rate_card.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}</tbody></table></div>
-          <p className="small muted">Tarif dikunci dari hasil hitung supaya angka quotation = angka cost model. Baris alternatif storage boleh dihapus.</p>
+          {hasil && (() => {
+            const semua = dariHasil(hasil).rate;
+            const kunci = (r: RateRow) => `${r.layanan}|${r.satuan}`;
+            const ada = new Set(draft.rate_card.map(kunci));
+            const hilang = semua.map((r, i) => ({ r, i })).filter(x => !ada.has(kunci(x.r)));
+            return hilang.length > 0 && <div className="row">
+              <select aria-label="Baris tarif yang bisa ditambahkan" value={tambahIdx} onChange={e => setTambahIdx(e.target.value)} style={{ maxWidth: 420 }}>
+                <option value="">+ Pilih baris tarif untuk ditambahkan kembali ({hilang.length})</option>
+                {hilang.map(x => <option key={x.i} value={x.i}>{x.r.layanan} · {x.r.satuan} · {rp(x.r.tarif)}</option>)}
+              </select>
+              <button className="ghost" disabled={tambahIdx === ''} onClick={() => { const r = semua[Number(tambahIdx)]; if (r) setDraft({ ...draft, rate_card: [...draft.rate_card, r] }); setTambahIdx(''); }}>Tambah</button>
+              <button className="ghost" onClick={() => setDraft({ ...draft, rate_card: [...draft.rate_card, ...hilang.map(x => x.r)] })}>Kembalikan semua</button>
+            </div>;
+          })()}
+          <p className="small muted">Tarif dikunci dari hasil hitung supaya angka quotation = angka cost model. Baris yang dihapus bisa ditambahkan kembali dari pilihan di atas.</p>
           {draft.tagihan_sekali.length > 0 && <>
             <h3>Biaya sekali (ditagih terpisah)</h3>
             <table><tbody>{draft.tagihan_sekali.map((x, i) => <tr key={i}><td>{x.deskripsi}</td><td className="num out">{rp(x.nilai)}</td></tr>)}</tbody></table>
@@ -170,6 +195,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
         <label className="f" htmlFor="ttdj">Jabatan<input id="ttdj" value={ttd.jabatan} onChange={e => setTtd({ ...ttd, jabatan: e.target.value })} /></label>
         <label className="f" htmlFor="ttdp">Perusahaan<input id="ttdp" value={ttd.perusahaan} onChange={e => setTtd({ ...ttd, perusahaan: e.target.value })} /></label>
       </div>
+      <BrandingPanel profile={profile} onPilih={setBranding} />
 
       <div className="tablewrap"><table>
         <thead><tr><th>Nomor</th><th className="num">Rev</th><th>Tanggal</th><th>Berlaku s.d.</th><th>Status</th><th>Catatan revisi</th><th></th></tr></thead>
@@ -187,6 +213,9 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
                 {q.status === 'approved' && <button className="ghost" onClick={() => setStatus(q, 'terkirim')}>Tandai terkirim</button>}
                 {(q.status === 'approved' || q.status === 'terkirim') && !draft && <button className="ghost" onClick={() => revisi(q)}>Buat revisi</button>}
                 {!['batal', 'direvisi'].includes(q.status) && <button className="danger" onClick={() => setStatus(q, 'batal')}>Batalkan</button>}
+                {['draft', 'batal'].includes(q.status) && (hapusId === q.id
+                  ? <><button className="danger" onClick={() => hapusQuotation(q)}>Yakin hapus permanen</button><button className="ghost" onClick={() => setHapusId(null)}>Batal</button></>
+                  : <button className="danger" onClick={() => setHapusId(q.id)}>Hapus</button>)}
               </td>
             </tr>))}
         </tbody>

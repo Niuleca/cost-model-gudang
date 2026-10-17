@@ -12,7 +12,11 @@ export interface QuotationPdfData {
   tagihanSekali?: { deskripsi: string; nilai: number }[];
   gudang?: InfoGudangPdf | null; catatanRevisi?: string | null; durasiBulan?: number; termasukPpn?: boolean; ppnPersen?: number;
   termCondition: string; penandatangan: string; jabatan: string; perusahaan: string;
+  logo?: GambarPdf | null; ttd?: GambarPdf | null;
 }
+export interface GambarPdf { dataUrl: string; format: string; w: number; h: number }
+/** Ukuran gambar (mm) dalam kotak maksimum, aspek dijaga. */
+const muat = (g: GambarPdf, maxW: number, maxH: number) => { const r = Math.min(maxW / g.w, maxH / g.h); return { w: g.w * r, h: g.h * r }; };
 
 export async function unduhQuotationPdf(d: QuotationPdfData) {
   const { jsPDF } = await import('jspdf');
@@ -27,9 +31,14 @@ export async function unduhQuotationPdf(d: QuotationPdfData) {
   // Kop
   doc.setFillColor(31, 78, 121); doc.rect(0, 0, 210, 6, 'F');
   doc.setFillColor(232, 181, 0); doc.rect(0, 6, 210, 1.5, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text(d.perusahaan, kiri, 20);
+  let xNama = kiri;
+  if (d.logo) {
+    const u = muat(d.logo, 45, 16);
+    try { doc.addImage(d.logo.dataUrl, d.logo.format, kiri, 11 + (16 - u.h) / 2, u.w, u.h); xNama = kiri + u.w + 5; } catch { /* format gambar tidak didukung */ }
+  }
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text(d.perusahaan, xNama, 20);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90);
-  doc.text('Warehousing & Distribution', kiri, 25);
+  doc.text('Warehousing & Distribution', xNama, 25);
   doc.setTextColor(20);
 
   doc.setFontSize(10);
@@ -109,6 +118,10 @@ export async function unduhQuotationPdf(d: QuotationPdfData) {
   if (y > 240) { doc.addPage(); y = 20; }
   y += 8; doc.setFontSize(10);
   doc.text('Hormat kami,', kiri, y);
+  if (d.ttd) {
+    const u = muat(d.ttd, 50, 19);
+    try { doc.addImage(d.ttd.dataUrl, d.ttd.format, kiri, y + 2.5 + (19 - u.h) / 2, u.w, u.h); } catch { /* abaikan */ }
+  }
   doc.text(d.penandatangan, kiri, y + 25); doc.setFontSize(9); doc.setTextColor(90); doc.text(d.jabatan, kiri, y + 30);
 
   const halaman = doc.getNumberOfPages();
