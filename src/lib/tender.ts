@@ -41,6 +41,8 @@ export interface Asumsi {
   tarifListrikKwh: number;
   listrikSimulasi?: TenderInput['listrikSimulasi'];
   startupAuto?: TenderInput['startupAuto'];
+  marginManual?: TenderInput['marginManual'];
+  kurs?: { kode: string; rupiahPer: number; tanggal?: string } | null;
   advanceSewaBulan: number;
   depositBulan: number;
   stokTon?: number; stokCbm?: number; stokLiter?: number;
@@ -99,7 +101,7 @@ export function keInput(t: TenderRow): TenderInput {
       sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
-    listrikSimulasi: a.listrikSimulasi ?? null, startupAuto: a.startupAuto ?? STARTUP_DEFAULT,
+    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, startupAuto: a.startupAuto ?? STARTUP_DEFAULT,
     stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter,
     metodeManpower: a.metodeManpower ?? 'excel', processDesign: { ...PD_DEFAULT, ...(a.processDesign ?? {}) },
   };

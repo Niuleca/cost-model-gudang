@@ -321,7 +321,10 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const bucketKeArus: Record<string, Arus> = { storage: 'storage', handling_in: 'inbound', handling_out: 'outbound', vas: 'vas' };
   const rateCard = opsBuckets.map(b => {
     const biaya = Object.values(biayaBucket[b]).reduce((a, c) => a + c, 0);
-    const hargaSebelumPph = (['Rendah', 'Sedang', 'Tinggi'] as KategoriRisiko[]).reduce((sum, k) => sum + biayaBucket[b][k] * (1 + m.margin[k]), 0);
+    const hargaDefault = (['Rendah', 'Sedang', 'Tinggi'] as KategoriRisiko[]).reduce((sum, k) => sum + biayaBucket[b][k] * (1 + m.margin[k]), 0);
+    const mm = t.marginManual?.[b];
+    const manual = mm != null && Number.isFinite(mm);
+    const hargaSebelumPph = manual ? biaya * (1 + Number(mm)) : hargaDefault;
     const harga = hargaSebelumPph / (1 - g);
     const v = volArus(bucketKeArus[b]);
     const komitmen = v?.komitmenBulan ?? 0;
@@ -330,10 +333,16 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     return {
       bucket: b, uom: v?.uom ?? '-', biayaBulan: bulat(biaya), hargaBulan: bulat(harga),
       marginEfektif: biaya > 0 ? bulat(hargaSebelumPph / biaya - 1, 4) : 0,
+      marginDefault: biaya > 0 ? bulat(hargaDefault / biaya - 1, 4) : 0, marginManual: manual, hargaSebelumPph: bulat(hargaSebelumPph),
       volumeKomitmen: komitmen, biayaPerUnit: komitmen > 0 ? bulat(biaya / komitmen, 2) : 0,
       tarifPerUnit: roundupHarga(tarif),
     };
   }).filter(rc => rc.biayaBulan > 0);
+
+  // Total margin gabungan (tertimbang biaya) dari semua layanan
+  const totBiayaRc = rateCard.reduce((s2, rc) => s2 + rc.biayaBulan, 0), totHargaRc = rateCard.reduce((s2, rc) => s2 + rc.hargaSebelumPph, 0);
+  const marginTotal = { biayaBulan: bulat(totBiayaRc), hargaSebelumPph: bulat(totHargaRc), hargaBulan: bulat(rateCard.reduce((s2, rc) => s2 + rc.hargaBulan, 0)),
+    margin: totBiayaRc > 0 ? bulat(totHargaRc / totBiayaRc - 1, 4) : 0 };
 
   // Tarif storage alternatif (per m², ton, CBM, liter) dari harga storage yang sama
   const st = rateCard.find(rc => rc.bucket === 'storage');
@@ -373,7 +382,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     volume, space, aktivitas: aktivitasHasil, manpower: payroll, mhe,
     totalHeadcount: payroll.reduce((sum, p) => sum + p.headcount, 0),
     biaya: baris, perKelompok, totalBiayaBulan: bulat(totalBiaya), investasi: bulat(investasi),
-    biayaPerBucket: biayaBucket, rateCard, storageAlternatif, simulasi,
+    biayaPerBucket: biayaBucket, rateCard, marginTotal, storageAlternatif, simulasi,
     redFlags: flags,
   };
 }

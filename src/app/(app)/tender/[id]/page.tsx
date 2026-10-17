@@ -19,6 +19,7 @@ import BiayaSpacePanel from './BiayaSpacePanel';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from '@/lib/engine/space';
 import { hitungProcessDesign, PD_DEFAULT } from '@/lib/engine/processDesign';
 import HistorisPanel from './HistorisPanel';
+import HasilKomersial, { type Kurs } from './HasilKomersial';
 import StatusControl from '@/components/StatusControl';
 import { labelStatus, STATUS_DRAFT } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
@@ -128,6 +129,14 @@ export default function TenderPage() {
     setT(x => x && ({ ...x, hasil, versi, status: x.status === 'draft' ? 'dihitung' : x.status }));
     setPesan(`Hasil disimpan sebagai versi ${versi}.`);
   }
+
+  // Margin diubah di tab Hasil → hitung ulang otomatis (tanpa pindah tab)
+  const kunciMargin = JSON.stringify(t?.asumsi.marginManual ?? {});
+  useEffect(() => {
+    if (!hasil || tab !== 'Hasil') return;
+    const id = setTimeout(() => { hitung(false); }, 400);
+    return () => clearTimeout(id);
+  }, [kunciMargin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Draft tender hanya bisa diedit pembuatnya (atau admin/master); akun lain hanya melihat. Aturan sama dipasang di database.
   const bisaEdit = !!t && !!profile && (profile.role === 'admin' || t.created_by === profile.id || !STATUS_DRAFT.includes(t.status));
@@ -343,7 +352,8 @@ export default function TenderPage() {
         </div>
       )}
 
-      {tab === 'Hasil' && <HasilPanel hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()} />}
+      {tab === 'Hasil' && <HasilPanel hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
+        marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
     </>
@@ -366,7 +376,11 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ hasil, catatan, onSimpan, onHitung }: { hasil: HasilTender | null; catatan: string[]; onSimpan: () => void; onHitung: () => void }) {
+function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan }: {
+  hasil: HasilTender | null; catatan: string[]; onSimpan: () => void; onHitung: () => void;
+  marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
+  kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number;
+}) {
   if (!hasil) return <div className="card"><p>Belum dihitung.</p><div className="row"><button onClick={onHitung}>Hitung sekarang</button></div></div>;
   const h = hasil;
   const kritis = h.redFlags.filter(f => f.level === 'kritis').length;
@@ -390,21 +404,7 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung }: { hasil: HasilTender
         {catatan.length > 0 && <p className="small muted">Catatan master data ikut dimasukkan sebagai red flag MASTER_DATA.</p>}
       </div>
 
-      <div className="card">
-        <h2>Rate card</h2>
-        <div className="tablewrap"><table>
-          <thead><tr><th>Layanan</th><th>Satuan</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">Margin efektif</th><th className="num">Tarif/unit</th></tr></thead>
-          <tbody>{h.rateCard.map(r => (
-            <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td>{r.bucket === 'storage' ? `${r.uom}/bulan` : r.uom}</td><td className="num">{angka(r.volumeKomitmen)}</td>
-              <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaPerUnit)}</td><td className="num">{persen(r.marginEfektif)}</td><td className="num out">{rp(r.tarifPerUnit)}</td></tr>))}</tbody>
-        </table></div>
-        {h.storageAlternatif.length > 0 && <p className="small">Storage alternatif: {h.storageAlternatif.map(s => `${rp(s.tarif)}/${s.uom}`).join(' · ')}</p>}
-        <h3>Simulasi</h3>
-        <div className="tablewrap"><table>
-          <thead><tr><th>Skenario</th><th className="num">Pendapatan bersih/bln</th><th className="num">Biaya/bln</th><th className="num">GP</th><th className="num">GP%</th></tr></thead>
-          <tbody>{h.simulasi.map(s => <tr key={s.skenario}><td>{s.skenario}</td><td className="num">{rp(s.pendapatanBulan)}</td><td className="num">{rp(s.biayaBulan)}</td><td className="num">{rp(s.gp)}</td><td className="num">{persen(s.gpPersen)}</td></tr>)}</tbody>
-        </table></div>
-      </div>
+      <HasilKomersial h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} />
 
       <div className="grid2">
         <div className="card">
