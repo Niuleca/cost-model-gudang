@@ -61,7 +61,7 @@ p { margin: 0; }
 
 .head { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; justify-content: space-between; }
 .eyebrow { font: 600 11px var(--body); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; display: grid; gap: 14px; min-width: 0; align-content: start; }
 .card .card { box-shadow: none; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
@@ -262,3 +262,14 @@ tr[style*="var(--link)"] { background: var(--res-strong) !important; }
 .xl-prev table { font-size: 12px; }
 .xl-prev td, .xl-prev th { white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; padding: 4px 8px; height: auto; }
 .xl-prev td:first-child, .xl-prev th:first-child { position: sticky; left: 0; background: var(--surface-2); z-index: 1; }
+
+/* KPI hasil: kartu sama tinggi, angka tidak meluber, sub-teks rapi */
+.kpis-hasil { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.kpis-hasil .kpi { align-content: start; min-height: 104px; gap: 4px; min-width: 0; }
+.kpis-hasil .kpi b { font-size: clamp(18px, 2.1vw, 24px); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpis-hasil .kpi .small { line-height: 1.35; }
+@media (min-width: 900px) { .kpis-hasil { grid-template-columns: repeat(3, 1fr); } }
+/* Rincian biaya: header kategori & baris kategori bisa diklik */
+tr.kat-head td { background: var(--surface-2); border-top: 2px solid var(--line); }
+tr.kat-link { cursor: pointer; }
+tr.kat-link:hover td { background: var(--res); }

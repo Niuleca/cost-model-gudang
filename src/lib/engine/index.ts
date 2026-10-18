@@ -220,9 +220,16 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const n = t.durasiKontrakBulan;
   const baris: BiayaBaris[] = [];
   const tambah = (deskripsi: string, kelompok: Kelompok, biayaBulan: number, alokasi: Record<Bucket, number>, dasar: string, risiko?: KategoriRisiko) => {
-    if (biayaBulan <= 0) return;
+    const rev = t.revisiBiaya?.[deskripsi];
+    const direvisi = rev != null && Number.isFinite(rev) && rev >= 0;
+    if (biayaBulan <= 0 && !direvisi) return;
     // pengaman: baris tanpa alokasi tidak boleh hilang dari tarif → sebar merata
     if (!(Object.values(alokasi).reduce((a2, c) => a2 + c, 0) > 1e-9)) alokasi = normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
+    if (direvisi) {
+      baris.push({ deskripsi, kelompok, kategoriRisiko: risiko ?? RISIKO_DEFAULT[kelompok], biayaBulan: bulat(rev), alokasi,
+        dasar: `direvisi manual (sistem: Rp${bulat(biayaBulan).toLocaleString('id-ID')} · ${dasar})`, biayaSistem: bulat(biayaBulan) });
+      return;
+    }
     baris.push({ deskripsi, kelompok, kategoriRisiko: risiko ?? RISIKO_DEFAULT[kelompok], biayaBulan: bulat(biayaBulan), alokasi, dasar });
   };
   // biaya beli: depresiasi selama min(umur, kontrak) + bunga atas rata-rata nilai buku

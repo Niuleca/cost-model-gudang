@@ -154,6 +154,8 @@ export interface TenderInput {
   levelGaji?: Partial<Record<import('./biayaMp').LevelJabatan, number>>;
   /** UoM tarif per layanan di rate card (palet, case, pcs, CBM, ton, m²). Kosong = UoM volume arus. */
   uomRateCard?: Partial<Record<Bucket, string>>;
+  /** Revisi manual biaya/bln per baris rincian (kunci = deskripsi baris). */
+  revisiBiaya?: Record<string, number>;
   /** Konversi palet → CBM/ton untuk opsi UoM rate card (dari parameter profil order). */
   konversiPalet?: { cbmPerPalet: number; tonPerPalet: number };
   levelRole?: Record<string, import('./biayaMp').LevelJabatan>;
@@ -210,4 +212,6 @@ export interface BiayaBaris {
   biayaBulan: number;
   alokasi: Record<Bucket, number>;
   dasar: string;                    // penjelasan rumus singkat (ketertelusuran)
+  /** Diisi bila biaya/bln baris ini direvisi manual: nilai hitungan sistem sebelum direvisi. */
+  biayaSistem?: number;
 }

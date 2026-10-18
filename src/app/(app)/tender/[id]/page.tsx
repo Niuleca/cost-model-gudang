@@ -92,7 +92,9 @@ export default function TenderPage() {
   const [hasil, setHasil] = useState<HasilTender | null>(null);
   const [catatanMaster, setCatatanMaster] = useState<string[]>([]);
   const [pesan, setPesan] = useState<string | null>(null);
-  const [kotor, setKotor] = useState(false);
+  const [kotor, setKotorS] = useState(false);
+  const kotorAkhir = useRef(false);
+  const setKotor = (v: boolean) => { kotorAkhir.current = v; setKotorS(v); };
   const [pembuat, setPembuat] = useState<string | null>(null);
 
   const muat = useCallback(async () => {
@@ -119,6 +121,17 @@ export default function TenderPage() {
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { muat(); }, [muat]);
+  // Revisi biaya dari tab kategori (tab browser lain) → muat ulang tender ini
+  const kotorRef = kotorAkhir;
+  useEffect(() => {
+    const f = (e: StorageEvent) => {
+      if (e.key !== 'leca.tenderDiubah' || !e.newValue?.startsWith(`${id}|`)) return;
+      if (kotorRef.current) { setPesan('Biaya direvisi di tab lain — simpan / batalkan perubahan di sini lalu muat ulang halaman.'); return; }
+      muat().then(() => setPesan('Revisi biaya dari tab kategori sudah dimuat.'));
+    };
+    window.addEventListener('storage', f);
+    return () => window.removeEventListener('storage', f);
+  }, [id, muat]);
   // Data master (UMK, jabatan, payroll) untuk biaya default per orang di Man Power Summary
   const [masterMp, setMasterMp] = useState<Awaited<ReturnType<typeof muatMaster>>['master'] | null>(null);
   const kunciMaster = t ? `${t.id}|${t.kab_kota}|${t.provinsi}` : '';
@@ -546,6 +559,7 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
   marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
   kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number; pajak: Pajak; onPajak: (p: Pajak) => void;
 }) {
+  const { id: tenderId } = useParams<{ id: string }>();
   // Red flag bisa disembunyikan / ditampilkan — pilihan diingat di perangkat ini
   const [sembunyiFlag, setSembunyiFlagS] = useState<boolean>(() => { try { return localStorage.getItem('leca.sembunyiRedFlag') === '1'; } catch { return false; } });
   const setSembunyiFlag = (v: boolean) => { setSembunyiFlagS(v); try { localStorage.setItem('leca.sembunyiRedFlag', v ? '1' : '0'); } catch { /* abaikan */ } };
@@ -558,13 +572,14 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
         const s0 = h.simulasi[0];
         const sell = s0?.pendapatanBulan ?? 0, cost = h.totalBiayaBulan, profit = s0?.gp ?? sell - cost;
         const kpi: [string, string, string?][] = [
-          ['Cost per bulan', rp(cost)], ['Selling per bulan', rp(sell), 'bersih setelah PPh'],
-          ['Cost per tahun', rp(cost * 12)], ['Selling per tahun', rp(sell * 12)],
-          ['Profit per bulan', rp(profit), `per tahun ${rp(profit * 12)}`], ['Margin (GP%)', persen(s0?.gpPersen), 'volume komitmen'],
-          ['Jumlah manpower', `${h.totalHeadcount} orang`], ['Luas gudang', `${angka(h.space.totalM2)} m²`, gudang ? `dari ${angka(Number(gudang.luas_m2))} m² tersedia` : undefined],
-          ['Jumlah gudang', gudang ? '1 gudang' : '–', gudang ? gudang.nama : 'belum dipilih'],
+          ['Cost per bulan', rp(cost), `per tahun ${rp(cost * 12)}`],
+          ['Selling per bulan', rp(sell), `per tahun ${rp(sell * 12)} · bersih setelah PPh`],
+          ['Profit per bulan', rp(profit), `per tahun ${rp(profit * 12)}`],
+          ['Margin (GP%)', persen(s0?.gpPersen), 'atas volume komitmen'],
+          ['Jumlah manpower', `${h.totalHeadcount} orang`, 'headcount setelah rangkap'],
+          ['Luas gudang', `${angka(h.space.totalM2)} m²`, gudang ? `${gudang.nama} · dari ${angka(Number(gudang.luas_m2))} m²` : 'gudang belum dipilih'],
         ];
-        return <div className="kpis">{kpi.map(([l, v, k]) => <div key={l} className="kpi"><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}</div>)}</div>;
+        return <div className="kpis kpis-hasil">{kpi.map(([l, v, k]) => <div key={l} className="kpi"><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}</div>)}</div>;
       })()}
       <div className="row hasil-aksi"><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
 
@@ -613,27 +628,40 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
       </div>
 
       <div className="card">
-        <h2><T>Manpower</T></h2>
+        <h2><T>Kebutuhan manpower & MHE</T></h2>
+        <p className="small muted">Bagian ini hanya menunjukkan <b>jumlah</b> (berapa orang / unit dan seberapa sibuk). Biayanya ada di <b>Rincian biaya per bulan</b> di bawah, kategori Manpower & MHE — supaya angka rupiah tidak tampil dua kali.</p>
         <div className="tablewrap"><table>
-          <thead><tr><th>Role</th><th>Jenis</th><th className="num">Jam/shift</th><th className="num">MP/shift</th><th className="num">Headcount</th><th className="num">Utilisasi</th><th className="num">Upah</th><th className="num">Biaya/org</th><th className="num">Biaya/bln</th></tr></thead>
+          <thead><tr><th>Role</th><th>Jenis</th><th className="num">Jam kerja/shift</th><th className="num">MP/shift</th><th className="num">Headcount</th><th className="num">Utilisasi</th><th>Skema</th></tr></thead>
           <tbody>{h.manpower.map(m => {
-            const r = m as typeof m & { upah?: number; total?: number };
-            return <tr key={m.roleName + m.jenis}><td>{m.roleName}</td><td>{m.jenis}</td><td className="num">{angka(m.jamPerShift, 2)}</td><td className="num">{m.mpPerShift || '—'}</td>
-              <td className="num"><b>{m.headcount}</b></td><td className="num">{m.jenis === 'Direct' ? persen(m.utilisasi, 0) : '—'}</td>
-              <td className="num">{rp(r.upah)}</td><td className="num">{rp(r.total)}</td><td className="num">{rp(m.biayaBulan)}</td></tr>;
-          })}</tbody>
+            const r = m as typeof m & { skema?: string; porsi?: number };
+            return <tr key={m.roleName + m.jenis} className={m.headcount ? undefined : 'muted'}><td>{m.roleName}</td><td>{m.jenis}</td><td className="num">{m.jenis === 'Direct' ? angka(m.jamPerShift, 2) : '—'}</td><td className="num">{m.mpPerShift || '—'}</td>
+              <td className="num"><b>{m.headcount}</b>{!m.headcount && m.jenis === 'Direct' ? <span className="small"> (dirangkap)</span> : ''}</td><td className="num">{m.jenis === 'Direct' && m.headcount ? persen(m.utilisasi, 0) : '—'}</td>
+              <td className="small">{r.skema === 'sharing' ? `sharing ${(r.porsi ?? 1).toLocaleString('id-ID')}` : 'dedicated'}</td></tr>;
+          })}
+            <tr className="pd-sub"><td colSpan={4}><b>Total</b></td><td className="num"><b>{h.totalHeadcount}</b></td><td colSpan={2} /></tr></tbody>
         </table></div>
         <h3><T>MHE</T></h3>
-        <table><thead><tr><th>MHE</th><th>Mode</th><th className="num">Jam/shift</th><th className="num">Unit</th></tr></thead>
-          <tbody>{h.mhe.map(m => <tr key={m.tool + m.nama}><td>{m.nama} ({m.tool})</td><td>{m.mode}</td><td className="num">{angka(m.jamPerShift, 2)}</td><td className="num"><b>{m.unit}</b>{m.spare ? ` (spare ${m.spare})` : ''}</td></tr>)}</tbody></table>
+        {(() => { const ada = h.mhe.filter(m => m.unit > 0 || (m.spare ?? 0) > 0); const nol = h.mhe.length - ada.length;
+          return <><table><thead><tr><th>MHE</th><th>Mode</th><th className="num">Jam pakai/shift</th><th className="num">Unit</th></tr></thead>
+            <tbody>{ada.map(m => <tr key={m.tool + m.nama}><td>{m.nama} ({m.tool})</td><td>{m.mode}</td><td className="num">{m.jamPerShift > 0 ? angka(m.jamPerShift, 2) : '—'}</td><td className="num"><b>{m.unit}</b>{m.spare ? ` (spare ${m.spare})` : ''}</td></tr>)}</tbody></table>
+            {nol > 0 && <p className="small muted">{nol} alat tidak dipakai (0 unit) disembunyikan: {h.mhe.filter(m => !(m.unit > 0 || (m.spare ?? 0) > 0)).map(m => `${m.nama} (${m.tool})`).join(', ')}.</p>}</>; })()}
       </div>
 
       <div className="card">
         <h2><T>Rincian biaya per bulan</T></h2>
+        <p className="small muted">Dikelompokkan per kategori. Klik <b>Rincian & revisi ↗</b> untuk membuka kategori di tab baru dan merevisi harganya.</p>
         <div className="tablewrap"><table>
-          <thead><tr><th>Baris</th><th>Kelompok</th><th>Risiko</th><th>Dasar hitung</th><th className="num">Biaya/bln</th></tr></thead>
-          <tbody>{h.biaya.map((b, i) => <tr key={i}><td>{b.deskripsi}</td><td>{b.kelompok}</td><td>{b.kategoriRisiko}</td><td className="small muted">{b.dasar}</td><td className="num">{rp(b.biayaBulan)}</td></tr>)}
-            <tr><td colSpan={4}><b>Total</b></td><td className="num out">{rp(h.totalBiayaBulan)}</td></tr></tbody>
+          <thead><tr><th>Baris</th><th>Risiko</th><th>Dasar hitung</th><th className="num">Biaya/bln</th></tr></thead>
+          <tbody>{(() => {
+            const urut = Object.entries(h.perKelompok).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+            return urut.map(k => { const rows = h.biaya.filter(b => b.kelompok === k); if (!rows.length) return null; const sub = rows.reduce((s2, b) => s2 + b.biayaBulan, 0);
+              return [
+                <tr key={`h-${k}`} className="kat-head"><td colSpan={3}><b>{k}</b> <span className="small muted">· {rows.length} baris · {persen(sub / (h.totalBiayaBulan || 1))}</span>
+                  {' '}<a className="small" href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener">Rincian & revisi ↗</a></td><td className="num"><b>{rp(sub)}</b></td></tr>,
+                ...rows.map((b, i) => <tr key={`${k}-${i}`}><td style={{ paddingLeft: 22 }}>{b.deskripsi}{b.biayaSistem != null && <span className="pill warn small" style={{ marginLeft: 6 }}>direvisi</span>}</td><td>{b.kategoriRisiko}</td><td className="small muted">{b.dasar}</td><td className="num">{rp(b.biayaBulan)}</td></tr>),
+              ]; });
+          })()}
+            <tr className="pd-sub"><td colSpan={3}><b>Total</b></td><td className="num out">{rp(h.totalBiayaBulan)}</td></tr></tbody>
         </table></div>
       </div>
       <div className="row hasil-aksi"><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
