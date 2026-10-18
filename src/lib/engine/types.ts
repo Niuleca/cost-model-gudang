@@ -146,6 +146,10 @@ export interface TenderInput {
   marginManual?: Partial<Record<Bucket, number | null>>;
   /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */
   startupAuto?: { aktif: boolean; persenOpex: number; persenManpower: number };
+  /** Biaya per orang per bulan diisi manual (override hitungan UMK/payroll), per role. */
+  biayaOrangManual?: Record<string, number>;
+  /** Kenaikan biaya manpower per tahun kontrak (0.05 = 5%/thn). Biaya/bln = total kontrak ÷ bulan kontrak. */
+  eskalasiManpower?: { persenTahun: number };
   advanceSewaBulan: number;
   depositBulan: number;
   stokTon?: number;                 // untuk tarif storage alternatif

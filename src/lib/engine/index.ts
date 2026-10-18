@@ -194,21 +194,21 @@ export function hitungTender(t: TenderInput, m: MasterData) {
 
   // ---- 6. Payroll (UC1–UC3) ----
   const P = m.payroll;
-  const biayaPerOrang = (j: JobLevel | undefined) => {
-    const upah = m.upahMinimum * (j?.faktorUmk ?? 1);
-    const bpjsTk = upah * (P.bpjsJht + P.bpjsJkk + P.bpjsJkm) + Math.min(upah, P.batasUpahJp) * P.bpjsJp;
-    const bpjsKes = Math.min(upah, P.batasUpahKes) * P.bpjsKes;
-    const thr = upah * P.thr;
-    const pesangon = upah * P.pesangon;
-    const dasar = upah + bpjsTk + bpjsKes + thr + pesangon + (j?.tunjanganBulan ?? 0);
-    const contingency = j?.isOutsourcing ? dasar * P.contingencyOs : 0;
-    const fee = j?.isOutsourcing ? (dasar + contingency) * P.feeOs : 0;
-    return { upah, bpjsTk, bpjsKes, thr, pesangon, tunjangan: j?.tunjanganBulan ?? 0, contingency, fee, total: dasar + contingency + fee };
-  };
+  const biayaPerOrang = (j: JobLevel | undefined) => biayaPerOrangDari(m, j);
+  // Eskalasi: biaya tahun ke-y = dasar × (1+r)^(y-1); biaya/bln yang dipakai = total kontrak ÷ bulan kontrak
+  const esk = hitungEskalasi(t.eskalasiManpower?.persenTahun ?? 0, t.durasiKontrakBulan);
   const payroll = manpower.map(mp => {
     const b = biayaPerOrang(jobs.get(mp.roleName));
-    return { ...mp, ...Object.fromEntries(Object.entries(b).map(([k, v]) => [k, bulat(v)])), biayaBulan: bulat(b.total * mp.headcount) };
+    const manual = t.biayaOrangManual?.[mp.roleName];
+    const perOrang = manual != null && manual > 0 ? manual : b.total;
+    const dasarBulan = perOrang * mp.headcount;
+    return { ...mp, ...Object.fromEntries(Object.entries(b).map(([k, v]) => [k, bulat(v)])), total: bulat(perOrang), biayaManual: manual != null && manual > 0,
+      biayaBulanDasar: bulat(dasarBulan), biayaBulan: bulat(dasarBulan * esk.faktor) };
   });
+  const dasarMp = payroll.reduce((s2, p) => s2 + p.biayaBulanDasar, 0);
+  const eskalasiManpower = { ...esk, dasarBulan: bulat(dasarMp),
+    tahun: esk.tahun.map(y => ({ ...y, biayaBulan: bulat(dasarMp * y.indeks), total: bulat(dasarMp * y.indeks * y.bulan) })),
+    totalKontrak: bulat(dasarMp * esk.faktor * t.durasiKontrakBulan), rataBulan: bulat(dasarMp * esk.faktor) };
 
   // ---- 7. Baris biaya ----
   const r = m.finance.bungaModalTahun / 12;
@@ -232,7 +232,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   let investasi = 0;
 
   for (const p of payroll) tambah(`Manpower — ${p.roleName} (${p.headcount} org)`, 'Manpower', p.biayaBulan, p.alokasi,
-    `${p.headcount} org × Rp${Math.round(p.biayaBulan / Math.max(1, p.headcount)).toLocaleString('id-ID')}`);
+    `${p.headcount} org × Rp${Math.round(p.total).toLocaleString('id-ID')}${p.biayaManual ? ' (manual)' : ''}${esk.faktor > 1.0000001 ? ` × eskalasi ${esk.faktor.toFixed(4)} (rata-rata kontrak)` : ''}`);
 
   // Fasilitas
   const alokStorage = normalisasi({ storage: 1 }, { storage: 1 });
@@ -284,7 +284,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const sa = t.startupAuto;
   if (sa?.aktif) {
     const opexDasar = baris.filter(b => b.kelompok !== 'Startup').reduce((sum, b) => sum + b.biayaBulan, 0);
-    const manpowerDasar = payroll.reduce((sum, p) => sum + p.biayaBulan, 0);
+    const manpowerDasar = payroll.reduce((sum, p) => sum + p.biayaBulanDasar, 0);
     const alokOps = normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
     for (const [nama, persen, dasar, ket] of [
       ['Startup cost', sa.persenOpex, opexDasar, 'OPEX/bln'], ['Implementation cost', sa.persenManpower, manpowerDasar, 'biaya manpower/bln'],
@@ -399,7 +399,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   return {
     kalender: { ...kal, hariOperasionalBulan: bulat(kal.hariOperasionalBulan, 2), faktorPengganti: bulat(kal.faktorPengganti, 4) },
     processDesign: pd,
-    volume, space, aktivitas: aktivitasHasil, manpower: payroll, mhe,
+    volume, space, aktivitas: aktivitasHasil, manpower: payroll, eskalasiManpower, mhe,
     totalHeadcount: payroll.reduce((sum, p) => sum + p.headcount, 0),
     biaya: baris, perKelompok, totalBiayaBulan: bulat(totalBiaya), investasi: bulat(investasi),
     biayaPerBucket: biayaBucket, rateCard, marginTotal, pajak: { ...pajak, pphPersen: pphRate }, storageAlternatif, simulasi,
@@ -408,3 +408,27 @@ export function hitungTender(t: TenderInput, m: MasterData) {
 }
 
 export type HasilTender = ReturnType<typeof hitungTender>;
+
+/** Biaya 1 orang per bulan dari UMK × faktor jabatan + BPJS + THR + pesangon + tunjangan (+ contingency & fee bila outsourcing). */
+export function biayaPerOrangDari(m: MasterData, j: JobLevel | undefined) {
+  const P = m.payroll;
+  const upah = m.upahMinimum * (j?.faktorUmk ?? 1);
+  const bpjsTk = upah * (P.bpjsJht + P.bpjsJkk + P.bpjsJkm) + Math.min(upah, P.batasUpahJp) * P.bpjsJp;
+  const bpjsKes = Math.min(upah, P.batasUpahKes) * P.bpjsKes;
+  const thr = upah * P.thr;
+  const pesangon = upah * P.pesangon;
+  const dasar = upah + bpjsTk + bpjsKes + thr + pesangon + (j?.tunjanganBulan ?? 0);
+  const contingency = j?.isOutsourcing ? dasar * P.contingencyOs : 0;
+  const fee = j?.isOutsourcing ? (dasar + contingency) * P.feeOs : 0;
+  return { upah, bpjsTk, bpjsKes, thr, pesangon, tunjangan: j?.tunjanganBulan ?? 0, contingency, fee, total: dasar + contingency + fee };
+}
+
+/** Skema kenaikan per tahun kontrak: indeks tahun ke-y = (1+r)^(y-1); faktor = Σ bulan_y × indeks_y ÷ total bulan. */
+export function hitungEskalasi(persenTahun: number, kontrakBulan: number) {
+  const r = Math.max(0, Number(persenTahun) || 0);
+  const n = Math.max(1, Math.round(kontrakBulan || 1));
+  const tahun: { tahun: number; bulan: number; indeks: number }[] = [];
+  for (let y = 1, sisa = n; sisa > 0; y++) { const b = Math.min(12, sisa); tahun.push({ tahun: y, bulan: b, indeks: Math.pow(1 + r, y - 1) }); sisa -= b; }
+  const faktor = tahun.reduce((s, y) => s + y.bulan * y.indeks, 0) / n;
+  return { persenTahun: r, kontrakBulan: n, tahun, faktor };
+}

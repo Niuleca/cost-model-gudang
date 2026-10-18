@@ -232,3 +232,9 @@ td select { min-width: 96px; }
 .aksi-bawah { position: sticky; bottom: 0; z-index: 5; margin-top: 16px; padding: 10px 12px; background: var(--g50, #f8f9fa); border: 1px solid var(--g200, #e5e7eb); border-radius: 12px; box-shadow: 0 -4px 12px rgba(0,0,0,.05); }
 .pd-matriks th, .pd-matriks td { white-space: nowrap; }
 .pd-matriks input[type=checkbox] { width: 18px; height: 18px; min-width: 18px; }
+.linkbtn { background: none; border: 0; padding: 0; min-height: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+.pd-dua.tumpuk { grid-template-columns: 1fr !important; }
+.pd-sum.pd-sum-biaya { min-width: 980px; }
+.pd-sum.pd-sum-biaya th:nth-child(1) { width: 20%; } .pd-sum.pd-sum-biaya th:nth-child(2) { width: 30%; }
+.pd-sum.pd-sum-biaya th:nth-child(3) { width: 12%; } .pd-sum.pd-sum-biaya th:nth-child(4) { width: 9%; }
+.pd-sum.pd-sum-biaya th:nth-child(5) { width: 16%; } .pd-sum.pd-sum-biaya th:nth-child(6) { width: 13%; }

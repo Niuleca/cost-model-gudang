@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
-import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
+import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
+import { hitungTender, biayaPerOrangDari, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { faktorUom, pengaliEfektif } from '@/lib/engine/types';
@@ -104,6 +104,10 @@ export default function TenderPage() {
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { muat(); }, [muat]);
+  // Data master (UMK, jabatan, payroll) untuk biaya default per orang di Man Power Summary
+  const [masterMp, setMasterMp] = useState<Awaited<ReturnType<typeof muatMaster>>['master'] | null>(null);
+  const kunciMaster = t ? `${t.id}|${t.kab_kota}|${t.provinsi}` : '';
+  useEffect(() => { if (!t) return; muatMaster(sb, t).then(r => setMasterMp(r.master)).catch(() => {}); }, [kunciMaster]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Undo / redo: setiap perubahan input dicatat; ketikan beruntun (< 800 ms) digabung jadi satu langkah ----
   const tRef = useRef<TenderRow | null>(null); tRef.current = t;
@@ -313,7 +317,13 @@ export default function TenderPage() {
       {tab === 'Aktivitas & manpower' && (<>
         {<>
           <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
-              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
+              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)}
+              biaya={{
+                perOrangDefault: role => masterMp ? Math.round(biayaPerOrangDari(masterMp, masterMp.jobLevels.find(j => j.roleName === role)).total) : null,
+                manual: a.biayaOrangManual ?? {}, onManual: biayaOrangManual => setA({ biayaOrangManual }),
+                persenTahun: (a.eskalasiManpower ?? ESKALASI_DEFAULT).persenTahun, onPersen: persenTahun => setA({ eskalasiManpower: { persenTahun } }),
+                kontrakBulan: t.durasi_kontrak_bulan,
+              }} />
           <ProcessDesignPanel bagian="rincian" aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
           <ProcessDesignPanel bagian="desain" aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}

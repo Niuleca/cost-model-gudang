@@ -2,7 +2,8 @@
 import { useMemo } from 'react';
 import type { AktivitasInput, VolumeInput } from '@/lib/engine/types';
 import { hitungProcessDesign, bolehRangkap, isTkbm, PD_DEFAULT, type IndirectInput, type KalenderResource, type ProcessDesignInput } from '@/lib/engine/processDesign';
-import { angka } from '@/lib/format';
+import { angka, rp } from '@/lib/format';
+import { hitungEskalasi } from '@/lib/engine/index.ts';
 
 const f2 = (x: number) => (x ? x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
 const f0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
@@ -12,7 +13,14 @@ const jamMenit = (jam: number) => { const m = Math.round(jam * 60); const j = Ma
 const TIP_FTE = 'FTE = Full Time Equivalent (setara pekerja penuh waktu). 1,00 FTE = 1 orang bekerja penuh selama jam kerja tersedia per bulan. FTE = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan.';
 
 /** Process Design & Resource Calculation (format Excel): kalender kerja MP/MHE, shift, rincian per task, ringkasan MP & MHE. */
-export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift }: {
+export interface BiayaMpProps {
+  perOrangDefault: (role: string) => number | null;
+  manual: Record<string, number>; onManual: (m: Record<string, number>) => void;
+  persenTahun: number; onPersen: (p: number) => void; kontrakBulan: number;
+}
+
+export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift, biaya }: {
+  biaya?: BiayaMpProps;
   bagian: 'ringkasan' | 'rincian' | 'desain';
   indirect?: IndirectInput;
   aktivitas: AktivitasInput[]; volumes: VolumeInput[]; pd?: ProcessDesignInput; faktorProduktivitas: number; efisiensi: number;
@@ -86,35 +94,69 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
     const ind = h.indirect.rows;
     const totInd = ind.reduce((t, r) => t + r.qty, 0);
     const totalOrang = h.totalMp + totInd;
+    const perOrang = (role: string) => { const m = biaya?.manual[role]; return m != null && m > 0 ? m : (biaya?.perOrangDefault(role) ?? 0); };
+    const totDirect = biaya ? h.mp.reduce((t2, r) => t2 + perOrang(r.nama) * r.resources, 0) : 0;
+    const totIndirect = biaya ? ind.reduce((t2, r) => t2 + perOrang(r.nama) * r.qty, 0) : 0;
+    const selBiaya = (role: string, qty: number) => {
+      if (!biaya) return null;
+      const def = biaya.perOrangDefault(role);
+      const m = biaya.manual[role];
+      const ubah = (v: number | null) => { const x = { ...biaya.manual }; if (v == null || !(v > 0)) delete x[role]; else x[role] = v; biaya.onManual(x); };
+      return <>
+        <td className="num"><input type="number" min={0} step={1000} aria-label={`Biaya per orang ${role}`} value={m && m > 0 ? m : ''} placeholder={def != null ? String(def) : 'memuat…'}
+          onChange={e => ubah(e.target.value === '' ? null : Number(e.target.value))} style={{ width: 120, minWidth: 120, textAlign: 'right' }} />
+          <div className="small muted">{m && m > 0 ? <>manual · <button type="button" className="linkbtn" onClick={() => ubah(null)}>pakai default {def != null ? rp(def) : ''}</button></> : 'default UMK × jabatan'}</div></td>
+        <td className="num">{qty ? rp(perOrang(role) * qty) : '–'}</td></>;
+    };
+    const esk = biaya ? hitungEskalasi(biaya.persenTahun, biaya.kontrakBulan) : null;
+    const dasarBln = totDirect + totIndirect;
     const n = Math.max(h.mp.length + ind.length + (ind.length ? 2 : 0), h.mhe.length, 1);
-    const sub = (l: string, fte: string, v: number) => <tr className="pd-sub"><td colSpan={2}><b>{l}</b></td><td className="num">{fte}</td><td className="num"><b>{v}</b></td></tr>;
+    const sub = (l: string, fte: string, v: number, tot?: number) => <tr className="pd-sub"><td colSpan={2}><b>{l}</b></td><td className="num">{fte}</td><td className="num"><b>{v}</b></td>{biaya && <><td /><td className="num"><b>{tot ? rp(tot) : '–'}</b></td></>}</tr>;
     return (
       <div className="card" style={{ gap: 10 }}>
-        <div className="pd-dua">
+        <div className={`pd-dua${biaya ? " tumpuk" : ""}`}>
           <div style={{ minWidth: 0 }}>
             <h3>Man Power Summary</h3>
-            <div className="tablewrap"><table className="pd-sum">
-              <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th><th className="num">Resources</th></tr></thead>
+            <div className="tablewrap"><table className={`pd-sum${biaya ? " pd-sum-biaya" : ""}`}>
+              <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th><th className="num">Resources</th>
+                {biaya && <><th className="num">Biaya/orang/bln<div className="small muted" style={{ fontWeight: 400 }}>bisa diubah</div></th><th className="num">Total/bln</th></>}</tr></thead>
               <tbody>
-                {h.mp.length + ind.length === 0 && <tr><td colSpan={4} className="muted">–</td></tr>}
+                {h.mp.length + ind.length === 0 && <tr><td colSpan={biaya ? 6 : 4} className="muted">–</td></tr>}
                 {h.mp.map(r => {
                   const status = r.tkbm ? (/helper|daily|harian/i.test(r.nama) ? 'Daily worker' : 'TKBM')
                     : r.resources === 0 ? `Dirangkap ${r.dirangkapOleh.join(', ')}` : r.merangkap.length ? 'Direct · multi-skill' : r.dirangkap ? `Direct · sisa dirangkap ${r.dirangkapOleh.join(', ')}` : 'Direct';
                   return <tr key={`d-${r.nama}`}><td>{r.nama}{r.merangkap.length > 0 && <div className="small muted">merangkap: {r.merangkap.join(', ')}</div>}</td>
                     <td className="small"><b>{status}</b>{r.catatan.map((c, k) => <div key={k} className="muted">{c}</div>)}</td>
-                    <td className="num">{f2(r.fte)}{waktu(r.manHour)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>;
+                    <td className="num">{f2(r.fte)}{waktu(r.manHour)}</td><td className="num"><b>{r.resources || '–'}</b></td>{selBiaya(r.nama, r.resources)}</tr>;
                 })}
-                {ind.length > 0 && sub('Subtotal direct', f2(h.totalFteMp), h.totalMp)}
+                {ind.length > 0 && sub('Subtotal direct', f2(h.totalFteMp), h.totalMp, totDirect)}
                 {ind.map((r, i) => <tr key={`i-${i}`}><td>{r.nama}{r.alat.length > 0 && <div className="small muted">alat: {r.alat.join(', ')}</div>}</td>
-                  <td className="small muted">{r.ket === 'Peran tetap' ? 'Peran tetap' : `Indirect · ${r.ket}`}</td><td className="num muted">–</td><td className="num"><b>{r.qty || '–'}</b></td></tr>)}
-                {ind.length > 0 && sub('Subtotal indirect & peran tetap', '–', totInd)}
-                {Array.from({ length: Math.max(0, n - Math.max(1, h.mp.length + ind.length + (ind.length ? 2 : 0))) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={4}>&nbsp;</td></tr>)}
-                <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>Head Count</b></td><td className="num"><b>{f2(h.totalFteMp)}</b></td><td className="num"><b>{totalOrang}</b></td></tr>
+                  <td className="small muted">{r.ket === 'Peran tetap' ? 'Peran tetap' : `Indirect · ${r.ket}`}</td><td className="num muted">–</td><td className="num"><b>{r.qty || '–'}</b></td>{selBiaya(r.nama, r.qty)}</tr>)}
+                {ind.length > 0 && sub('Subtotal indirect & peran tetap', '–', totInd, totIndirect)}
+                {Array.from({ length: Math.max(0, n - Math.max(1, h.mp.length + ind.length + (ind.length ? 2 : 0))) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={biaya ? 6 : 4}>&nbsp;</td></tr>)}
+                <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>Head Count</b></td><td className="num"><b>{f2(h.totalFteMp)}</b></td><td className="num"><b>{totalOrang}</b></td>{biaya && <><td /><td className="num"><b>{rp(totDirect + totIndirect)}</b></td></>}</tr>
               </tbody>
             </table></div>
           </div>
           <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={n} />
         </div>
+        {biaya && esk && <div style={{ minWidth: 0 }}>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
+            <h3>Skema biaya manpower selama kontrak</h3>
+            <label className="f" htmlFor="esk-mp">Kenaikan per tahun
+              <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input id="esk-mp" type="number" step="any" min={0} value={Math.round(esk.persenTahun * 1000) / 10}
+                onChange={e => biaya.onPersen(Number(e.target.value) / 100)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /><span>%</span></div></label>
+          </div>
+          <div className="tablewrap"><table>
+            <thead><tr><th>Tahun</th><th className="num">Bulan</th><th className="num">Indeks</th><th className="num">Biaya/bln</th><th className="num">Total tahun</th></tr></thead>
+            <tbody>{esk.tahun.map(y => <tr key={y.tahun}><td>Tahun {y.tahun}</td><td className="num">{y.bulan}</td><td className="num">{(y.indeks * 100).toFixed(1)}%</td>
+              <td className="num">{rp(dasarBln * y.indeks)}</td><td className="num">{rp(dasarBln * y.indeks * y.bulan)}</td></tr>)}
+              <tr className="pd-sub"><td><b>Total kontrak</b></td><td className="num"><b>{esk.kontrakBulan}</b></td><td /><td /><td className="num"><b>{rp(dasarBln * esk.faktor * esk.kontrakBulan)}</b></td></tr>
+              <tr style={{ background: 'var(--link)' }}><td colSpan={3}><b>Biaya manpower/bln dipakai di cost model</b><div className="small muted">total kontrak ÷ {esk.kontrakBulan} bulan (faktor {esk.faktor.toFixed(4)}×)</div></td>
+                <td className="num"><b>{rp(dasarBln * esk.faktor)}</b></td><td /></tr>
+            </tbody></table></div>
+          <p className="small muted">Indeks tahun ke-n = (1 + {(esk.persenTahun * 100).toLocaleString('id-ID')}%)^(n−1). Biaya/orang default = UMK lokasi × faktor jabatan + BPJS + THR + pesangon + tunjangan (+ contingency & fee bila outsourcing), dari master Price Inquiry; isi manual untuk menimpa. Angka ini masuk ke Hasil setelah tekan Hitung.</p>
+        </div>}
         <p className="small muted"><b>FTE (Full Time Equivalent)</b> = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan ({Math.round(km.jamBulan)} jam MP · {Math.round(kh.jamBulan)} jam MHE).
           Contoh: 0,79 FTE = {jamMenit(0.79 * km.jamBulan / (km.hariBulan || 1))} kerja per hari dari {jamMenit(km.jamBulan / (km.hariBulan || 1))} jam tersedia. Angka kecil di bawah FTE = waktu kerja per hari & per bulan untuk menyelesaikan volume/order.</p>
         <div className="small muted" style={{ borderTop: '1px solid var(--g200, #e5e7eb)', paddingTop: 8 }}>
