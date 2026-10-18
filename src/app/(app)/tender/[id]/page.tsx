@@ -12,6 +12,7 @@ import { faktorUom, pengaliEfektif } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
+import { namaFileExport } from '@/lib/exportTender';
 import InterestPanel from './InterestPanel';
 import { rincianBiayaRole, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { aktivitasDenganOrderAdmin, isAktivitasAdmin, orderAdmin, stokDariPalet } from '@/lib/profilVolume';
@@ -230,6 +231,7 @@ export default function TenderPage() {
   // headcount total untuk konsumsi (galon): hasil Hitung bila ada, kalau tidak dari process design (direct + indirect/tetap)
   const headcountTotal = (hasil?.manpower?.reduce((s, m) => s + m.headcount, 0)) || ((pdFull?.totalMp ?? 0) + (pdFull?.indirect.total ?? 0));
 
+  const [nomorQ, setNomorQ] = useState<string | null>(null);
   if (!t) return <p className="muted">{pesan ?? 'Memuat tender…'}</p>;
   const a = t.asumsi;
   const hariOps = a.processDesign?.hariKerjaBulan ?? 25;
@@ -245,8 +247,13 @@ export default function TenderPage() {
     if (!t) throw new Error('Tender belum dimuat');
     const { master, catatan } = await muatMaster(sb, t);
     const h = hitungTender(keInput(t), master);
+    // Nomor quotation untuk nama file: yang approved/terkirim terbaru, kalau tidak ada → quotation terbaru
+    const { data: qs } = await sb.from('quotations').select('nomor, status, created_at').eq('tender_id', t.id).order('created_at', { ascending: false });
+    const ql = (qs ?? []) as { nomor: string; status: string }[];
+    const nomorQuotation = (ql.find(q => q.status === 'approved' || q.status === 'terkirim') ?? ql.find(q => q.status !== 'batal') ?? ql[0])?.nomor ?? null;
+    setNomorQ(nomorQuotation);
     return { t, hasil: h, master, catatanMaster: catatan, pd: pdFull, rincianMp, paramMp,
-      profil: a.profilVolume, orderAdmin: orderAdmin(a.profilVolume, a.volumes, hariOps) };
+      profil: a.profilVolume, orderAdmin: orderAdmin(a.profilVolume, a.volumes, hariOps), nomorQuotation };
   }
 
   const aksi = (atas: boolean) => (
@@ -548,7 +555,7 @@ export default function TenderPage() {
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
       {tab === 'Export' && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
-      {tab === 'Export' && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={`Leca_${(t.kode ?? t.customer).replace(/[^\w-]+/g, '_')}_lengkap.xlsx`} />}
+      {tab === 'Export' && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={namaFileExport(nomorQ, t.kode ?? t.customer)} />}
       {tab !== 'Hasil' && tab !== 'Quotation' && tab !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
     </>
   );

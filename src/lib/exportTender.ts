@@ -27,15 +27,19 @@ function ratakan(o: unknown, pre = '', out: Baris = {}): Baris {
 
 export interface DataExport {
   t: TenderRow; hasil: HasilTender; master: MasterData; catatanMaster: string[];
-  pd: unknown; rincianMp: RincianBiayaRole[]; paramMp: ParamBiayaMp; profil?: unknown; orderAdmin?: unknown;
+  pd: unknown; rincianMp: RincianBiayaRole[]; paramMp: ParamBiayaMp; profil?: unknown; orderAdmin?: unknown; nomorQuotation?: string | null;
 }
+
+/** Nama file: Leca_Costmodel_(nomor quotation) — "/" diganti "-" karena tidak boleh di nama file. Tanpa quotation → kode tender. */
+export const namaFileExport = (nomor: string | null | undefined, cadangan: string) =>
+  `Leca_Costmodel_(${(nomor || cadangan).replace(/[\\/:*?"<>|]+/g, '-').trim()}).xlsx`;
 
 export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
   const buf = await buatWorkbookTender(p, sheets);
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `Leca_${(p.t.kode ?? p.t.customer).replace(/[^\w-]+/g, '_')}_lengkap_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.download = namaFileExport(p.nomorQuotation, p.t.kode ?? p.t.customer);
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
