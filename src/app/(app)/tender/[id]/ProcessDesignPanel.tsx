@@ -117,6 +117,14 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
         </div>
         <p className="small muted"><b>FTE (Full Time Equivalent)</b> = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan ({Math.round(km.jamBulan)} jam MP · {Math.round(kh.jamBulan)} jam MHE).
           Contoh: 0,79 FTE = {jamMenit(0.79 * km.jamBulan / (km.hariBulan || 1))} kerja per hari dari {jamMenit(km.jamBulan / (km.hariBulan || 1))} jam tersedia. Angka kecil di bawah FTE = waktu kerja per hari & per bulan untuk menyelesaikan volume/order.</p>
+        <div className="small muted" style={{ borderTop: '1px solid var(--g200, #e5e7eb)', paddingTop: 8 }}>
+          <b>Catatan jam kerja (aturan ketenagakerjaan)</b> — UU 13/2003 Pasal 77 jo. UU 6/2023 (Cipta Kerja) & PP 35/2021:
+          <ul style={{ margin: '4px 0 4px 18px', padding: 0 }}>
+            <li>Jam kerja normal 40 jam/minggu: 7 jam × 6 hari atau 8 jam × 5 hari ≈ <b>173 jam/bulan</b> (40 × 52 ÷ 12). Lembur maksimal 4 jam/hari & 18 jam/minggu.</li>
+            <li>173 jam = jam yang <b>dibayar</b> (termasuk cuti, libur nasional, sakit) → dipakai untuk gaji & upah lembur (upah sejam = 1/173 × upah sebulan).</li>
+            <li>{Math.round(km.jamBulan)} jam di tabel Working day = jam <b>hadir efektif</b> setelah dikurangi Minggu, cuti, libur nasional & sakit → dipakai untuk FTE dan jumlah orang, agar kebutuhan orang tidak kurang saat karyawan cuti/libur.</li>
+          </ul>
+        </div>
         {h.indirect.spvManual && <p className="small muted">Supervisor ({indirect?.roleSupervisor}) mengikuti jumlah yang Anda isi di peran tetap — tidak dihitung otomatis dari span of control.</p>}
         <div className="row small" style={{ justifyContent: 'flex-end' }}>
           <span className="pill ok">Total manpower: {h.totalMp} direct + {totInd} indirect/tetap = <b>{totalOrang} orang</b></span>
