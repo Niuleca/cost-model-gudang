@@ -6,16 +6,20 @@ import { ROLE_LABEL } from '@/lib/format';
 
 export default function AkunPage() {
   const { profile } = useProfile();
-  const [f, setF] = useState({ full_name: '', jabatan: '', perusahaan: '' });
+  const [f, setF] = useState({ full_name: '', username: '', telepon: '', jabatan: '', perusahaan: '' });
   const [pesanProfil, setPesanProfil] = useState<string | null>(null);
   const [pw, setPw] = useState('');
   const [pesan, setPesan] = useState<string | null>(null);
-  useEffect(() => { if (profile) setF({ full_name: profile.full_name ?? '', jabatan: profile.jabatan ?? '', perusahaan: profile.perusahaan ?? '' }); }, [profile]);
+  useEffect(() => { if (profile) setF({ full_name: profile.full_name ?? '', username: profile.username ?? (profile.email?.split('@')[0] ?? '').toLowerCase(), telepon: profile.telepon ?? '', jabatan: profile.jabatan ?? '', perusahaan: profile.perusahaan ?? '' }); }, [profile]);
 
   async function simpanProfil(e: React.FormEvent) {
     e.preventDefault(); if (!profile) return;
-    const { error } = await supabaseBrowser().from('profiles').update({ full_name: f.full_name.trim(), jabatan: f.jabatan.trim() || null, perusahaan: f.perusahaan.trim() || null }).eq('id', profile.id);
-    setPesanProfil(error ? error.message : 'Profil tersimpan. Dipakai otomatis sebagai penanda tangan quotation.');
+    const username = f.username.trim().toLowerCase();
+    if (!/^[a-z0-9._-]{3,30}$/.test(username)) { setPesanProfil('User ID 3–30 karakter: huruf kecil, angka, titik, garis bawah, atau strip (tanpa spasi).'); return; }
+    const telepon = f.telepon.trim();
+    if (telepon && !/^\+?[0-9 ()-]{8,20}$/.test(telepon)) { setPesanProfil('Nomor telepon tidak valid (contoh: 0812-3456-7890 atau +62 812 3456 7890).'); return; }
+    const { error } = await supabaseBrowser().from('profiles').update({ full_name: f.full_name.trim(), username, telepon: telepon || null, jabatan: f.jabatan.trim() || null, perusahaan: f.perusahaan.trim() || null }).eq('id', profile.id);
+    setPesanProfil(error ? (/profiles_username_unik|duplicate/.test(error.message) ? `User ID "${username}" sudah dipakai akun lain.` : error.message) : 'Profil tersimpan. Dipakai otomatis sebagai penanda tangan quotation.');
   }
   async function simpan(e: React.FormEvent) {
     e.preventDefault();
@@ -28,9 +32,18 @@ export default function AkunPage() {
         {profile && <p className="muted">{profile.email} · {ROLE_LABEL[profile.role]}</p>}</div></div>
       <form className="card" onSubmit={simpanProfil} style={{ maxWidth: 560 }}>
         <h2>Profil</h2>
-        <label className="f" htmlFor="nm">Nama lengkap<input id="nm" required value={f.full_name} onChange={e => setF({ ...f, full_name: e.target.value })} /></label>
+        <label className="f" htmlFor="nm">Nama lengkap<input id="nm" required value={f.full_name} onChange={e => setF({ ...f, full_name: e.target.value })} autoComplete="name" /></label>
+        <div className="grid2">
+          <label className="f" htmlFor="uid">User ID<input id="uid" required value={f.username} onChange={e => setF({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') })} placeholder="mis. eghaesa" autoComplete="username" /></label>
+          <label className="f" htmlFor="tel">Nomor telepon<input id="tel" type="tel" value={f.telepon} onChange={e => setF({ ...f, telepon: e.target.value })} placeholder="mis. 0812-3456-7890" autoComplete="tel" /></label>
+        </div>
+        <div className="grid2">
+          <label className="f" htmlFor="em">Email<input id="em" value={profile?.email ?? ''} readOnly disabled /></label>
+          <label className="f" htmlFor="rl">Role<input id="rl" value={profile ? ROLE_LABEL[profile.role] : ''} readOnly disabled /></label>
+        </div>
+        <label className="f" htmlFor="pr">Perusahaan<input id="pr" value={f.perusahaan} onChange={e => setF({ ...f, perusahaan: e.target.value })} placeholder="mis. PT LX Pantos Indonesia" autoComplete="organization" /></label>
         <label className="f" htmlFor="jb">Jabatan<input id="jb" value={f.jabatan} onChange={e => setF({ ...f, jabatan: e.target.value })} placeholder="mis. W&D Business Development" /></label>
-        <label className="f" htmlFor="pr">Perusahaan<input id="pr" value={f.perusahaan} onChange={e => setF({ ...f, perusahaan: e.target.value })} placeholder="mis. PT LX Pantos Indonesia" /></label>
+        <p className="small muted">Email = alamat login (tidak bisa diubah di sini). Role diatur oleh admin di menu Pengguna &amp; role.</p>
         <p className="small muted">Nama, jabatan, dan perusahaan ini otomatis dipakai di kop & penanda tangan PDF quotation (masih bisa diubah per quotation).</p>
         {pesanProfil && <p className="small" role="status">{pesanProfil}</p>}
         <div className="row"><button type="submit" disabled={!profile}>Simpan profil</button></div>

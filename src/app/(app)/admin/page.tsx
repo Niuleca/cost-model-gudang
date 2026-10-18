@@ -9,7 +9,7 @@ export default function AdminPage() {
   const { profile } = useProfile();
   const [rows, setRows] = useState<Profile[]>([]);
   const [pesan, setPesan] = useState<string | null>(null);
-  const muat = () => sb.from('profiles').select('id, full_name, email, role').order('email').then(({ data }: { data: Profile[] | null }) => setRows(data ?? []));
+  const muat = () => sb.from('profiles').select('id, full_name, email, role, username, telepon, perusahaan').order('email').then(({ data }: { data: Profile[] | null }) => setRows(data ?? []));
   useEffect(() => { muat(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function ubahRole(id: string, role: AppRole) {
@@ -24,9 +24,9 @@ export default function AdminPage() {
       <p className="small muted">User baru mendaftar sendiri dari halaman login, lalu admin memberi role sesuai departemen.</p>
       {pesan && <p className="small" role="status">{pesan}</p>}
       <div className="tablewrap"><table>
-        <thead><tr><th>Nama</th><th>Email</th><th>Role</th></tr></thead>
+        <thead><tr><th>Nama</th><th>User ID</th><th>Email</th><th>Telepon</th><th>Perusahaan</th><th>Role</th></tr></thead>
         <tbody>{rows.map(r => (
-          <tr key={r.id}><td>{r.full_name || '—'}</td><td>{r.email}</td>
+          <tr key={r.id}><td>{r.full_name || '—'}</td><td>{r.username || '—'}</td><td>{r.email}</td><td>{r.telepon || '—'}</td><td>{r.perusahaan || '—'}</td>
             <td><select aria-label={`Role ${r.email}`} value={r.role} onChange={e => ubahRole(r.id, e.target.value as AppRole)} disabled={r.id === profile?.id}>
               {(Object.keys(ROLE_LABEL) as AppRole[]).map(k => <option key={k} value={k}>{ROLE_LABEL[k]}</option>)}
             </select></td></tr>))}</tbody>
