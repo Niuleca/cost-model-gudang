@@ -29,7 +29,7 @@ export default function MasterTabs({ ids, eyebrow, judul, ekstra, tabsLangsung }
       )}
       {e ? e.isi : t && (
         <TableEditor key={t.id} table={t.table} view={t.view} idKey={t.idKey} kolom={t.kolom} editorRoles={t.editorRoles}
-          approval={t.approval} orderBy={t.orderBy} cari={t.cari} catatan={t.catatan} defaults={t.defaults} filter={t.filter} profile={profile} namaExport={t.label.replace(/[^\w]+/g, '_')} kelompok={t.kelompok} />
+          approval={t.approval} orderBy={t.orderBy} cari={t.cari} catatan={t.catatan} defaults={t.defaults} filter={t.filter} profile={profile} namaExport={t.label.replace(/[^\w]+/g, '_')} kelompok={t.kelompok} lampiran={t.table === 'price_items' || t.table === 'it_catalog'} />
       )}
     </>
   );

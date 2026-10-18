@@ -5,6 +5,9 @@ import type { Profile } from '@/lib/useProfile';
 import type { AppRole } from '@/lib/format';
 import { exportExcel, importExcel, type KolomExcel } from '@/lib/excel';
 import GroupChips from '@/components/GroupChips';
+import PdfPreview from '@/app/(app)/tender/[id]/PdfPreview';
+
+export const BUCKET_QUOTATION_VENDOR = 'supplier-quotations';
 
 export interface Kolom {
   key: string;
@@ -30,6 +33,8 @@ interface Props {
   filter?: Record<string, string | string[]>;   // eq / in pada sumber baca
   namaExport?: string;         // nama file & sheet Excel
   kelompok?: string;           // kolom pembagi: tombol per nilai + judul grup di tabel
+  /** Lampiran quotation vendor per baris (kolom quotation_path / quotation_nama di tabel). */
+  lampiran?: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -52,6 +57,44 @@ export default function TableEditor(p: Props) {
   const [impor, setImpor] = useState<{ baru: Row[]; ubah: { id: string; row: Row }[]; diabaikan: string[]; file: string } | null>(null);
   const [sibuk, setSibuk] = useState<string | null>(null);
   const [grup, setGrup] = useState('');
+  const [lihat, setLihat] = useState<{ nama: string; url: string; blob?: Blob; pdf: boolean } | null>(null);
+  const [unggahId, setUnggahId] = useState<string | null>(null);
+  async function unggahLampiran(r: Row, f: File | undefined) {
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) { setErr('Ukuran file maksimal 10 MB.'); return; }
+    if (!/^(application\/pdf|image\/(png|jpeg|webp))$/.test(f.type)) { setErr('Format harus PDF, PNG, JPG, atau WEBP.'); return; }
+    const id = String(r[idKey]); setUnggahId(id); setErr(null);
+    const path = `${p.table}/${id}/${Date.now()}-${f.name.replace(/[^\w.-]+/g, '_')}`;
+    const up = await sb.storage.from(BUCKET_QUOTATION_VENDOR).upload(path, f, { contentType: f.type });
+    if (up.error) { setErr(`Gagal unggah: ${up.error.message}`); setUnggahId(null); return; }
+    const lama = r.quotation_path as string | null;
+    const { error } = await sb.from(p.table).update({ quotation_path: path, quotation_nama: f.name }).eq(idKey, id);
+    if (error) { await sb.storage.from(BUCKET_QUOTATION_VENDOR).remove([path]); setErr(/quotation_path/.test(error.message) ? 'Kolom lampiran belum ada di database — jalankan migrasi 0020 di Supabase SQL Editor.' : error.message); setUnggahId(null); return; }
+    if (lama) await sb.storage.from(BUCKET_QUOTATION_VENDOR).remove([lama]);
+    setUnggahId(null); muat();
+  }
+  async function hapusLampiran(r: Row) {
+    const id = String(r[idKey]); const lama = r.quotation_path as string | null;
+    const { error } = await sb.from(p.table).update({ quotation_path: null, quotation_nama: null }).eq(idKey, id);
+    if (error) { setErr(error.message); return; }
+    if (lama) await sb.storage.from(BUCKET_QUOTATION_VENDOR).remove([lama]);
+    muat();
+  }
+  async function bukaLampiran(r: Row) {
+    const path = r.quotation_path as string;
+    const { data, error } = await sb.storage.from(BUCKET_QUOTATION_VENDOR).download(path);
+    if (error || !data) { setErr(error?.message ?? 'File tidak ditemukan.'); return; }
+    setLihat({ nama: String(r.quotation_nama ?? path.split('/').pop()), url: URL.createObjectURL(data), blob: data, pdf: data.type === 'application/pdf' || /\.pdf$/i.test(path) });
+  }
+  const selLampiran = (r: Row) => {
+    const id = String(r[idKey]); const ada = !!r.quotation_path;
+    return <div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}>
+      {ada && <button className="ghost" onClick={() => bukaLampiran(r)} title={String(r.quotation_nama ?? '')}>Pratinjau</button>}
+      {bolehEdit && <label className="btn ghost" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} aria-disabled={unggahId === id}>{unggahId === id ? 'Mengunggah…' : ada ? 'Ganti' : 'Upload'}
+        <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={e => { unggahLampiran(r, e.target.files?.[0]); e.target.value = ''; }} /></label>}
+      {ada && bolehEdit && <button className="ghost" onClick={() => hapusLampiran(r)} aria-label="Hapus lampiran">✕</button>}
+    </div>;
+  };
   const nilaiGrup = (r: Row) => (p.kelompok ? String(ambil(r, p.kelompok) ?? '') : '') || 'Tanpa kategori';
 
   const bolehEdit = !!p.profile && (!!p.profile.is_master || p.profile.role === 'admin' || p.profile.role === 'manager' || p.editorRoles.includes(p.profile.role));
@@ -232,6 +275,7 @@ export default function TableEditor(p: Props) {
         <table>
           <thead><tr>
             {p.kolom.map(k => <th key={k.key} className={k.type === 'number' || k.type === 'percent' ? 'num' : ''}>{k.label}</th>)}
+            {p.lampiran && <th>Quotation vendor</th>}
             {p.approval && <th>Status</th>}
             {bolehEdit && <th></th>}
           </tr></thead>
@@ -239,6 +283,7 @@ export default function TableEditor(p: Props) {
             {baru && (
               <tr>
                 {p.kolom.map(k => <td key={k.key}>{k.readonly ? '' : sel(baru, k, null)}</td>)}
+                {p.lampiran && <td className="small muted">simpan dulu</td>}
                 {p.approval && <td><span className="pill info">draft</span></td>}
                 <td className="row"><button onClick={tambah}>Simpan</button><button className="ghost" onClick={() => setBaru(null)}>Batal</button></td>
               </tr>
@@ -252,11 +297,12 @@ export default function TableEditor(p: Props) {
               const judul = !!p.kelompok && (i === 0 || nilaiGrup(tampil[i - 1]) !== g);
               return (
                 <Fragment key={id}>
-                {judul && <tr className="grup"><td colSpan={p.kolom.length + (p.approval ? 1 : 0) + (bolehEdit ? 1 : 0)}
+                {judul && <tr className="grup"><td colSpan={p.kolom.length + (p.approval ? 1 : 0) + (bolehEdit ? 1 : 0) + (p.lampiran ? 1 : 0)}
                   style={{ background: 'var(--surface-2)', fontWeight: 600, position: 'sticky', left: 0 }}>
                   {g} <span className="small muted">· {tampil.filter(x => nilaiGrup(x) === g).length} item</span></td></tr>}
                 <tr>
                   {p.kolom.map(k => <td key={k.key} className={k.type === 'number' || k.type === 'percent' ? 'num' : ''}>{sel(r, k, id)}</td>)}
+                  {p.lampiran && <td>{selLampiran(r)}</td>}
                   {p.approval && (
                     <td>
                       <span className={`pill ${status === 'approved' ? 'ok' : status === 'expired' || status === 'rejected' ? 'bad' : 'warn'}`}>{status}</span>
@@ -277,6 +323,14 @@ export default function TableEditor(p: Props) {
           </tbody>
         </table>
       </div>
+      {lihat && (lihat.pdf && lihat.blob
+        ? <PdfPreview blob={lihat.blob} judul={lihat.nama} onTutup={() => { URL.revokeObjectURL(lihat.url); setLihat(null); }}
+            onUnduh={() => { const a = document.createElement('a'); a.href = lihat.url; a.download = lihat.nama; a.click(); }} />
+        : <div className="pv-latar" role="dialog" aria-modal="true" aria-label={`Pratinjau ${lihat.nama}`} onClick={e => { if (e.target === e.currentTarget) { URL.revokeObjectURL(lihat.url); setLihat(null); } }}>
+            <div className="pv-kotak"><div className="pv-bar"><b className="satu-baris">{lihat.nama}</b><span style={{ flex: 1 }} />
+              <a className="btn ghost" href={lihat.url} download={lihat.nama}>Unduh</a><button onClick={() => { URL.revokeObjectURL(lihat.url); setLihat(null); }}>Tutup</button></div>
+              <div className="pv-isi"><img src={lihat.url} alt={lihat.nama} style={{ maxWidth: '100%' }} /></div></div>
+          </div>)}
     </div>
   );
 }

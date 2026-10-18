@@ -7,7 +7,7 @@ export interface Warehouse {
   gmaps_url: string | null; latitude: number | null; longitude: number | null; luas_m2: number;
   harga_sewa_m2_bulan: number | null; harga_per_bulan: number | null; tinggi_bersih_m: number | null;
   daya_lantai_ton_m2: number | null; jumlah_dock: number | null; daya_listrik_kva: number | null; tipe: string;
-  fasilitas: string | null; foto: string[]; kontak: string | null; sumber: string | null; tanggal_harga: string | null;
+  fasilitas: string | null; foto: string[]; kontak: string | null; pic_nama?: string | null; pic_telepon?: string | null; sumber: string | null; tanggal_harga: string | null;
   berlaku_sampai: string | null; status: string; updated_at: string;
 }
 

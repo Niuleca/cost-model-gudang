@@ -17,7 +17,7 @@ const KOLOM_X: KolomExcel[] = [
   { key: 'harga_per_bulan', label: 'Harga sewa per bulan (utuh)', type: 'number' }, { key: 'tinggi_bersih_m', label: 'Tinggi bersih (m)', type: 'number' },
   { key: 'daya_lantai_ton_m2', label: 'Daya lantai (ton/m²)', type: 'number' }, { key: 'jumlah_dock', label: 'Jumlah dock', type: 'number' },
   { key: 'daya_listrik_kva', label: 'Daya listrik (kVA)', type: 'number' }, { key: 'fasilitas', label: 'Fasilitas / keterangan', width: 360 },
-  { key: 'kontak', label: 'Kontak' }, { key: 'sumber', label: 'Sumber harga', width: 240 }, { key: 'tanggal_harga', label: 'Tanggal harga', type: 'date' },
+  { key: 'pic_nama', label: 'Nama PIC' }, { key: 'pic_telepon', label: 'No. telepon PIC' }, { key: 'kontak', label: 'Kontak lain' }, { key: 'sumber', label: 'Sumber harga', width: 240 }, { key: 'tanggal_harga', label: 'Tanggal harga', type: 'date' },
   { key: 'berlaku_sampai', label: 'Berlaku sampai', type: 'date' }, { key: 'foto', label: 'Foto (path, pisahkan koma)', type: 'list', width: 260 },
 ];
 const TIPE = ['Ambient', 'Cold storage', 'Chiller', 'Air-conditioned', 'Bonded', 'Open yard', 'B3 / kimia'];
@@ -169,7 +169,9 @@ export default function GudangManager() {
             <label className="f" htmlFor="g-dock">Jumlah dock<input id="g-dock" type="number" value={form.jumlah_dock ?? ''} onChange={e => set('jumlah_dock', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-kva">Daya listrik (kVA)<input id="g-kva" type="number" value={form.daya_listrik_kva ?? ''} onChange={e => set('daya_listrik_kva', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-fas">Fasilitas<input id="g-fas" value={form.fasilitas ?? ''} onChange={e => set('fasilitas', e.target.value)} placeholder="office, toilet, mushola, parkir truk…" /></label>
-            <label className="f" htmlFor="g-kontak">Kontak<input id="g-kontak" value={form.kontak ?? ''} onChange={e => set('kontak', e.target.value)} /></label>
+            <label className="f" htmlFor="g-pic">Nama PIC<input id="g-pic" value={form.pic_nama ?? ''} onChange={e => set('pic_nama', e.target.value || null)} placeholder="mis. Bp. Andi (marketing landlord)" /></label>
+            <label className="f" htmlFor="g-tel">No. telepon PIC<input id="g-tel" type="tel" value={form.pic_telepon ?? ''} onChange={e => set('pic_telepon', e.target.value || null)} placeholder="mis. 0812-3456-7890" /></label>
+            <label className="f" htmlFor="g-kontak">Kontak lain<input id="g-kontak" value={form.kontak ?? ''} onChange={e => set('kontak', e.target.value)} /></label>
             <label className="f" htmlFor="g-sumber">Sumber harga<input id="g-sumber" value={form.sumber ?? ''} onChange={e => set('sumber', e.target.value)} placeholder="penawaran landlord no…, survei…" /></label>
             <label className="f" htmlFor="g-tgl">Tanggal harga<input id="g-tgl" type="date" value={form.tanggal_harga ?? ''} onChange={e => set('tanggal_harga', e.target.value || null)} /></label>
             <label className="f" htmlFor="g-berlaku">Berlaku sampai<input id="g-berlaku" type="date" value={form.berlaku_sampai ?? ''} onChange={e => set('berlaku_sampai', e.target.value || null)} /></label>
@@ -209,6 +211,8 @@ export default function GudangManager() {
               <tr><td>Sewa utuh per bulan</td><td className="num">{adaHarga(w) ? rp(sewaBulanPenuh(w)) : '—'}</td></tr>
               <tr><td>Tinggi bersih · dock</td><td className="num">{w.tinggi_bersih_m != null ? `${w.tinggi_bersih_m} m` : '—'} · {w.jumlah_dock ?? '—'}</td></tr>
               <tr><td>Harga per</td><td className="num">{tanggal(w.tanggal_harga)}{w.berlaku_sampai ? ` · s.d. ${tanggal(w.berlaku_sampai)}` : ''}</td></tr>
+              <tr><td>PIC</td><td className="num">{w.pic_nama ?? ''}</td></tr>
+              <tr><td>No. telepon</td><td className="num">{w.pic_telepon ? <a href={`tel:${w.pic_telepon.replace(/[^\d+]/g, '')}`}>{w.pic_telepon}</a> : ''}</td></tr>
             </tbody></table>
             <span className="small muted satu-baris" title={w.sumber ?? ''}>{w.sumber ? `Sumber: ${w.sumber}` : '\u00a0'}</span>
             <div className="row" style={{ marginTop: 'auto' }}>
