@@ -25,7 +25,8 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/approval-quotation', label: 'Approval quotation', roles: ['admin', 'manager'] },
     { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua' },
   ] },
-  { id: 'price', label: 'Price Inquiry', item: PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })) },
+  { id: 'price', label: 'Price Inquiry', item: [...PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })),
+    { href: '/price/perbandingan', label: 'Comparation Price (vendor)', roles: 'semua' as const, pisah: true }] },
   { id: 'prod', label: 'Productivity', item: [
     ...PROD_PAGES.map(p => ({ href: `/produktivitas/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: false })),
     { href: '/produktivitas', label: 'Semua UoM', roles: 'semua' },
