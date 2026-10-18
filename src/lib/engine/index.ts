@@ -317,11 +317,9 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     }
   }
   // ---- 7c. Interest cost: sumber pinjaman (semua baris biaya kecuali finance/overhead) + baris manual ----
-  const sumberPinjaman = baris.filter(b => b.kelompok !== 'Finance' && b.kelompok !== 'Overhead').map(b => {
-    const capexNilai = nilaiModal.get(b.deskripsi);
-    return { deskripsi: b.deskripsi, kelompok: b.kelompok, biayaBulan: b.biayaBulan, jenis: capexNilai != null ? 'capex' as const : 'opex' as const,
-      pokokDefault: bulat(capexNilai ?? b.biayaBulan * 12) };
-  });
+  // Hanya capex (beli → depresiasi, biaya sekali → amortisasi); opex dibiayai lewat baris manual bila perlu
+  const sumberPinjaman = baris.filter(b => nilaiModal.has(b.deskripsi)).map(b => ({
+    deskripsi: b.deskripsi, kelompok: b.kelompok, biayaBulan: b.biayaBulan, jenis: 'capex' as const, pokokDefault: bulat(nilaiModal.get(b.deskripsi)!) }));
   const bungaTahun = Math.max(0, ic?.bungaTahun ?? 0.09);
   const interestItems = (ic?.items ?? []).filter(x => x.aktif).map(x => {
     const src = x.sumber ? sumberPinjaman.find(sp => sp.deskripsi === x.sumber) : undefined;

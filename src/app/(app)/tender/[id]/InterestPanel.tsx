@@ -48,17 +48,18 @@ export default function InterestPanel({ nilai, onChange, hasilLive, kontrakBulan
 
     <div style={{ display: 'grid', gap: 14 }}>
       <div className="card">
-        <h3>1 · Pilih dari rincian biaya</h3>
+        <h3>1 · Pilih capex</h3>
         {!hasilLive && <p className="muted small">Memuat data master… (daftar muncul setelah data master selesai dimuat)</p>}
-        <p className="small muted">Default pokok: <b>capex</b> (beli/depresiasi/amortisasi) = nilai investasinya; <b>opex</b> (mis. sewa gudang, manpower) = biaya/bln × 12 (dibayar setahun di muka). Bisa diubah di tabel di bawah.
+        {hasilLive && !sumber.length && <p className="muted small">Belum ada capex di tender ini (semua MHE/racking/IT berstatus sewa). Gunakan baris manual.</p>}
+        <p className="small muted">Hanya <b>capex</b> (barang dibeli → depresiasi, biaya sekali → amortisasi). Pokok default = nilai investasinya, bisa diubah di tabel di bawah. Untuk pinjaman lain (mis. sewa gudang dibayar di muka) pakai <b>+ Baris manual</b>.
           Capex yang dipilih otomatis <b>tidak lagi</b> dikenai “bunga modal” default supaya bunga tidak dihitung dua kali.</p>
         <div className="tablewrap" style={{ maxHeight: 460 }}><table>
-          <thead><tr><th style={{ width: 36 }} /><th>Baris biaya</th><th>Jenis</th><th className="num">Biaya/bln</th><th className="num">Pokok default</th></tr></thead>
+          <thead><tr><th style={{ width: 36 }} /><th>Capex</th><th className="num">Biaya/bln</th><th className="num">Nilai capex (pokok default)</th></tr></thead>
           <tbody>{kelompok.map(k => [
-            <tr key={`h-${k}`} className="kat-head"><td colSpan={5}><b>{k}</b></td></tr>,
+            <tr key={`h-${k}`} className="kat-head"><td colSpan={4}><b>{k}</b></td></tr>,
             ...sumber.filter(s => s.kelompok === k).map(s => <tr key={s.deskripsi}>
               <td><input type="checkbox" aria-label={`Biayai ${s.deskripsi} dengan pinjaman`} checked={dipilih.has(s.deskripsi)} onChange={e => toggleSumber(s.deskripsi, e.target.checked)} /></td>
-              <td>{s.deskripsi}</td><td className="small">{s.jenis === 'capex' ? 'Capex' : 'Opex'}</td>
+              <td>{s.deskripsi}</td>
               <td className="num">{rp(s.biayaBulan)}</td><td className="num">{rp(s.pokokDefault)}</td></tr>),
           ])}</tbody>
         </table></div>
