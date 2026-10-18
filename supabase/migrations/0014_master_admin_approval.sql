@@ -1,4 +1,3 @@
--- STATUS: belum diterapkan otomatis (izin dibatalkan) — jalankan di Supabase SQL Editor.
 -- Master admin + persetujuan akun baru. eghaesa = pemilik (master permanen); master bisa menunjuk/mencabut master lain.
 -- Akun baru berstatus 'pending' dan tidak bisa membaca/menulis data apa pun sampai disetujui master admin.
 alter table public.profiles
