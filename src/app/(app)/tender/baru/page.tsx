@@ -69,7 +69,8 @@ export default function TenderBaru() {
             <select id="aset" value={f.skenario_aset} onChange={e => set('skenario_aset', e.target.value)}>{['Rental', 'Own Asset', 'Built-to-Suit'].map(x => <option key={x}>{x}</option>)}</select></label>
         </div>
         {err && <p className="error small">{err}</p>}
-        <div className="row"><button type="submit" disabled={sibuk}>{sibuk ? 'Membuat…' : 'Buat tender & lanjut isi asumsi'}</button></div>
+        <div className="row"><button type="submit" disabled={sibuk}>{sibuk ? 'Membuat…' : 'Buat tender & lanjut isi asumsi'}</button>
+          <a className="btn ghost" href="/panduan-leca.pdf" target="_blank" rel="noopener">? Baca saya sebelum mulai</a></div>
       </form>
     </>
   );
