@@ -68,6 +68,7 @@ export default function TenderPage() {
   const sb = supabaseBrowser();
   const { profile } = useProfile();
   const [t, setT] = useState<TenderRow | null>(null);
+  const [basisRingkas, setBasisRingkas] = useState<'peakBulan' | 'rataRataBulan' | 'komitmenBulan'>('peakBulan');
   const [tab, setTab] = useTabUrl<(typeof TABS)[number] | typeof TAB_EXCEL>([TAB_EXCEL, ...TABS], 'Key assumption');
   const [prods, setProds] = useState<Prod[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -275,17 +276,27 @@ export default function TenderPage() {
                 <td><button className="danger" onClick={() => setA({ volumes: a.volumes.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}
             </tbody></table></div>
-          {a.volumes.some(v => (v.konversi?.per1 ?? 0) > 0) && <>
-            <h3>Volume dipecah per UoM (peak/bln)</h3>
-            <div className="tablewrap"><table>
-              <thead><tr><th>Arus</th><th className="num">Rata-rata</th><th className="num">Peak</th><th className="num">Komitmen</th></tr></thead>
-              <tbody>{a.volumes.map((v, i) => {
-                const k = v.konversi; const p1 = k?.per1 || 0, p2 = k?.per2 || 0;
-                const sel = (x: number) => <>{angka(x)} {v.uom}{p1 > 0 && <div className="small">{angka(x * p1)} {k!.uom1}</div>}{p1 > 0 && p2 > 0 && <div className="small muted">{angka(x * p1 * p2)} {k!.uom2}</div>}</>;
-                return <tr key={i}><td>{ARUS.find(o => o.v === v.arus)?.l ?? v.arus}</td><td className="num">{sel(v.rataRataBulan)}</td><td className="num">{sel(v.peakBulan)}</td><td className="num">{sel(v.komitmenBulan)}</td></tr>;
-              })}</tbody></table></div>
-            <p className="small muted">Aktivitas dengan UoM case/pcs (mis. Case Picking per karton) otomatis memakai konversi ini bila pengali UoM-nya 1.</p>
-          </>}
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
+            <h3>Ringkasan order</h3>
+            <label className="f" htmlFor="basis-ringkas">Basis
+              <select id="basis-ringkas" value={basisRingkas} onChange={e => setBasisRingkas(e.target.value as typeof basisRingkas)} style={{ minWidth: 150 }}>
+                <option value="peakBulan">Peak (sizing)</option><option value="rataRataBulan">Rata-rata</option><option value="komitmenBulan">Komitmen (MGV)</option>
+              </select></label>
+          </div>
+          <div className="tablewrap"><table>
+            <thead><tr><th>Arus</th><th className="num">Per hari</th><th className="num">Per bulan</th><th className="num">Per tahun</th></tr></thead>
+            <tbody>{a.volumes.map((v, i) => {
+              const k = v.konversi; const p1 = k?.per1 || 0, p2 = k?.per2 || 0;
+              const sel = (x: number) => <>{angka(x, x < 100 && x % 1 ? 1 : 0)} {v.uom}{p1 > 0 && <div className="small">{angka(x * p1)} {k!.uom1}</div>}{p1 > 0 && p2 > 0 && <div className="small muted">{angka(x * p1 * p2)} {k!.uom2}</div>}</>;
+              const bln = Number(v[basisRingkas]) || 0;
+              const stok = v.arus === 'storage';
+              return <tr key={i}><td>{ARUS.find(o => o.v === v.arus)?.l ?? v.arus}{stok && <div className="small muted">stok tersimpan (posisi), bukan arus</div>}</td>
+                <td className="num">{stok ? <span className="muted">–</span> : sel(hariOps > 0 ? bln / hariOps : 0)}</td>
+                <td className="num">{sel(bln)}</td>
+                <td className="num">{stok ? <span className="muted">–</span> : sel(bln * 12)}</td></tr>;
+            })}</tbody></table></div>
+          <p className="small muted">Per hari = per bulan ÷ {hariOps} hari operasional (Working Days di Process Design); per tahun = per bulan × 12.
+            {a.volumes.some(v => (v.konversi?.per1 ?? 0) > 0) && ' Aktivitas dengan UoM case/pcs (mis. Case Picking per karton) otomatis memakai konversi ini bila pengali UoM-nya 1.'}</p>
           <div className="row"><button className="ghost" onClick={() => setA({ volumes: [...a.volumes, { arus: 'vas', uom: 'karton', rataRataBulan: 0, peakBulan: 0, komitmenBulan: 0 }] })}>Tambah baris volume</button></div>
           <h3>Stok untuk tarif storage alternatif</h3>
           <div className="grid3">
