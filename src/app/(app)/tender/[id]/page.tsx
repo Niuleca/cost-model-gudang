@@ -17,7 +17,7 @@ import InterestPanel from './InterestPanel';
 import { rincianBiayaRole, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { aktivitasDenganOrderAdmin, isAktivitasAdmin, orderAdmin, stokDariPalet } from '@/lib/profilVolume';
 import { useProfile } from '@/lib/useProfile';
-import { bolehExport } from '@/lib/akses';
+import { bolehExport, sinkronStatusTender } from '@/lib/akses';
 import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
@@ -110,6 +110,9 @@ export default function TenderPage() {
     ]);
     if (tr.error) { setPesan(tr.error.message); return; }
     const row = tr.data as TenderRow;
+    // status tender dicocokkan dengan quotation (mis. quotation terkirim dibatalkan → kembali Dihitung)
+    const stSinkron = await sinkronStatusTender(sb, row.id).catch(() => null);
+    if (stSinkron) row.status = stSinkron;
     row.asumsi = { ...ASUMSI_DEFAULT, ...(row.asumsi ?? {}) };
     row.asumsi.it = { ...IT_SHEET_DEFAULT, ...(row.asumsi.it ?? {}) };
     riwayat.current = { lalu: [], depan: [], terakhir: 0 };

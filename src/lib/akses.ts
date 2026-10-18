@@ -20,3 +20,18 @@ export const STATUS_QUOTATION: Record<string, { l: string; kelas: string }> = {
 };
 /** Unduh, print & kirim hanya setelah approved. */
 export const bolehRilis = (status: string) => status === 'approved' || status === 'terkirim';
+
+/** Status tender mengikuti quotation: ada yang terkirim → Quotation terkirim / Negosiasi (revisi);
+ *  tidak ada lagi yang terkirim (dibatalkan, dihapus, approve dibatalkan) → kembali ke Dihitung. Status lain (menang, kalah, go-live, dll.) tidak disentuh. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function sinkronStatusTender(sb: any, tenderId: string) {
+  const [{ data: qs }, { data: tt }] = await Promise.all([
+    sb.from('quotations').select('status, revisi').eq('tender_id', tenderId),
+    sb.from('tenders').select('status').eq('id', tenderId).maybeSingle(),
+  ]);
+  const kirim = ((qs ?? []) as { status: string; revisi: number }[]).filter(x => x.status === 'terkirim');
+  const skr = (tt as { status?: string } | null)?.status;
+  const target = kirim.length ? (kirim.some(x => x.revisi > 0) ? 'negosiasi' : 'quotation_terkirim') : (skr === 'quotation_terkirim' || skr === 'negosiasi' ? 'dihitung' : null);
+  if (target && target !== skr) await sb.from('tenders').update({ status: target }).eq('id', tenderId);
+  return target ?? skr;
+}

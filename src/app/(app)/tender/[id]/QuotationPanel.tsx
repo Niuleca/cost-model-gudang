@@ -9,7 +9,7 @@ import { rp, tanggal, angka, BUCKET_LABEL } from '@/lib/format';
 import { ringkasIt, IT_SHEET_DEFAULT } from '@/lib/it';
 import { unduhQuotationPdf, blobQuotationPdf, type InfoGudangPdf, type QuotationPdfData } from '@/lib/quotationPdf';
 import PdfPreview, { cetakPdf } from './PdfPreview';
-import { isApprover, STATUS_QUOTATION, bolehRilis } from '@/lib/akses';
+import { isApprover, STATUS_QUOTATION, bolehRilis, sinkronStatusTender } from '@/lib/akses';
 import { gambarUntukPdf, useBrandingSaya, BrandingRingkas } from '@/components/BrandingProfil';
 
 interface RateRow { layanan: string; satuan: string; tarif: number; catatan?: string }
@@ -68,7 +68,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
       setNamaAkun(Object.fromEntries(((ps ?? []) as { id: string; full_name: string; email: string }[]).map(p => [p.id, p.full_name || p.email])));
     }
   }, [tender.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { muat(); }, [muat]);
+  useEffect(() => { muat(); sinkronTender(); }, [muat]); // eslint-disable-line react-hooks/exhaustive-deps
   // Penanda tangan default dari Profil (menu akun → Profil & password); masih bisa diubah per quotation
   useEffect(() => { if (profile) setTtd({ nama: profile.full_name || '', jabatan: profile.jabatan || 'Solution Design', perusahaan: profile.perusahaan || 'PT LX Pantos Indonesia' }); }, [profile]);
 
@@ -167,14 +167,15 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     const { error } = await sb.from('quotations').update({ status, ...extra }).eq('id', q.id);
     if (error) { setErr(error.message); return; }
     setPutus(null); setErr(null);
-    if (status === 'terkirim') await sb.from('tenders').update({ status: q.revisi > 0 ? 'negosiasi' : 'quotation_terkirim' }).eq('id', tender.id);
+    await sinkronTender();
     muat();
   }
+  const sinkronTender = () => sinkronStatusTender(sb, tender.id);
   async function hapusQuotation(q: Quo) {
     if (list.some(x => x.parent_id === q.id)) { setErr('Quotation ini punya revisi — hapus revisinya dulu, atau cukup biarkan berstatus batal.'); setHapusId(null); return; }
     const { data, error } = await sb.from('quotations').delete().eq('id', q.id).select('id');
     if (error || !data?.length) { setErr(error?.message ?? 'Tidak bisa menghapus (hanya pembuat tender / admin).'); setHapusId(null); return; }
-    setHapusId(null); setErr(null); muat();
+    setHapusId(null); setErr(null); await sinkronTender(); muat();
   }
   /** Data PDF dari quotation tersimpan atau draft yang sedang diedit; draft diberi watermark. */
   async function dataPdf(q: Draft & { status?: string }): Promise<QuotationPdfData> {
