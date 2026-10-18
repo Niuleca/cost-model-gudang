@@ -5,14 +5,16 @@ import type { DataExport } from '@/lib/exportTender';
 
 type Pratinjau = { nama: string; baris: number; kolom: number; rows: (string | number | null)[][]; gaya?: ({ bg?: string; b?: boolean; pct?: boolean } | null)[][] };
 const KET: Record<string, string> = {
-  'Ringkasan': 'Cost, selling, profit, GP, headcount, luas, rate card, biaya per kelompok, red flag',
-  'Input': 'Data tender & key assumption',
-  'Volume': 'Volume, volume desain, profil order, order admin',
-  'Process Design': 'Aktivitas, rincian per task, Man Power & MHE Summary, kalender',
-  'Biaya Manpower': 'Format sheet manpower dengan rumus Excel aktif + skema kenaikan',
-  'Space & MHE': 'Hasil space & MHE + input MHE',
-  'Biaya': 'Semua baris biaya per bulan + biaya lain & listrik',
-  'Rate & Simulasi': 'Rate card, margin total, simulasi, tarif storage alternatif',
+  '0 Ringkasan': 'KPI, rate card, porsi biaya, opex vs capex — semua merujuk sheet perhitungan',
+  '1 Key Assumption': 'Kontrak, shift, kalender, jam tersedia MP/MHE, produktivitas, keuangan, margin, UMK',
+  '2 Volume': 'Rata-rata, peak, komitmen → faktor peak, volume desain per hari/shift',
+  '3 Process Design': 'Workload → RfR → man hour → FTE per task · Man Power & MHE Summary · indirect',
+  '4 Biaya Manpower': 'Gaji (UMK × % level), BPJS, THR, kompensasi, fee, eskalasi per tahun',
+  '5 Space & MHE': 'Luas, sewa gudang, racking, MHE sewa/beli, listrik',
+  '6 Interest cost': 'Pinjaman bank: pokok × bunga × tenor ÷ kontrak',
+  '7 IT & Biaya lain': 'Bulanan, depresiasi, amortisasi, startup & implementation otomatis',
+  '8 Rincian Biaya': 'Semua baris biaya (rujukan ke sheet sumber) + alokasi ke layanan, porsi kategori, opex/capex',
+  '9 Rate Card': 'Biaya per risiko, margin, PPh gross-up, tarif (pembulatan), simulasi pendapatan',
   'Master Data': 'UMK, payroll, finance, margin, jabatan, hari libur yang dipakai',
   'Data Mentah': 'Seluruh isi asumsi & hasil (path → nilai) untuk audit',
 };
@@ -58,7 +60,7 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
         </div>
       </div>
       <p className="small muted">Tender dihitung ulang dengan data master terbaru, lalu disusun menjadi workbook <b>{namaFile}</b>. Review isi tiap sheet di bawah, hapus centang sheet yang tidak perlu, lalu unduh.
-        Sheet <b>Biaya Manpower</b> berisi rumus aktif — di Excel, ubah sel kuning untuk simulasi.</p>
+        Semua angka hasil adalah <b>rumus Excel</b> yang saling terhubung mengikuti langkah di web (1 → 9). Ubah sel putih tulang (input) di Excel untuk simulasi; ringkasan ikut berubah.</p>
 
       {!pv && <div className="umk-box"><span className="small">Tekan <b>Siapkan review</b> untuk melihat isi file sebelum diunduh.</span></div>}
 
