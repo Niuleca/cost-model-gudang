@@ -68,6 +68,7 @@ function LoginForm() {
           {mode !== 'masuk' && <button type="button" className="ghost" onClick={() => setMode('masuk')}>Sudah punya akun</button>}
           {mode !== 'daftar' && <button type="button" className="ghost" onClick={() => setMode('daftar')}>Buat akun</button>}
           {mode !== 'lupa' && <button type="button" className="ghost" onClick={() => setMode('lupa')}>Lupa password</button>}
+          <a className="btn ghost" href="/panduan-leca.pdf" target="_blank" rel="noopener">? Cara penggunaan</a>
         </div>
       </form>
       <p className="small" style={{ color: 'var(--g400)', marginTop: 16 }}>Leca · dibuat oleh esapanghegar</p>

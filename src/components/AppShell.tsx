@@ -105,6 +105,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <nav aria-label="Menu utama" ref={navRef} className="topnav">
           {(!profile || profile.status === undefined || profile.status === 'aktif') && MENU.map(m => <Dropdown key={m.id} {...m} />)}
           <div className="sela" />
+          <a className="btn ghost panduan-btn" href="/panduan-leca.pdf" target="_blank" rel="noopener" title={t('Cara penggunaan')}>? {t('Cara penggunaan')}</a>
           <label className="bahasa-pilih" title={t('Bahasa')}><span aria-hidden="true">🌐</span>
             <select aria-label={t('Bahasa')} value={bahasa} onChange={e => setBahasa(e.target.value as Bahasa)}>
               {BAHASA.map(b => <option key={b.v} value={b.v}>{b.short} · {b.l}</option>)}</select></label>

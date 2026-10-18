@@ -273,3 +273,5 @@ tr[style*="var(--link)"] { background: var(--res-strong) !important; }
 tr.kat-head td { background: var(--surface-2); border-top: 2px solid var(--line); }
 tr.kat-link { cursor: pointer; }
 tr.kat-link:hover td { background: var(--res); }
+
+.panduan-btn { padding: 4px 10px; font-size: 13px; white-space: nowrap; text-decoration: none; }
