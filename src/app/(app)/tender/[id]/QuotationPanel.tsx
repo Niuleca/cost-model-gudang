@@ -310,7 +310,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
         </tbody>
       </table></div>
       <p className="small muted">{bolehApprove
-        ? 'Anda manager / master: quotation yang Anda buat langsung berstatus Approved. Quotation dari Solution Design / Business Development muncul dengan status Menunggu approval — pilih Approve, Revisi, atau Tolak (catatan wajib).'
+        ? 'Anda manager / Super Admin: quotation yang Anda buat langsung berstatus Approved. Quotation dari Solution Design / Business Development muncul dengan status Menunggu approval — pilih Approve, Revisi, atau Tolak (catatan wajib).'
         : 'Alur: simpan draft → Ajukan approval → manager memilih Approve / Revisi / Tolak. Unduh, print & kirim terbuka setelah Approved; sebelum itu hanya pratinjau.'}</p>
       {pratinjau && <PdfPreview blob={pratinjau.blob} judul={pratinjau.data.nomor} onTutup={() => setPratinjau(null)} rilis={pratinjau.rilis} onUnduh={() => unduhQuotationPdf(pratinjau.data)} />}
     </div>

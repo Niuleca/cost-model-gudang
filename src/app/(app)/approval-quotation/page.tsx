@@ -1,5 +1,5 @@
 'use client';
-// Antrean approval quotation untuk manager / master admin: semua quotation berstatus "menunggu" dari SD & BD.
+// Antrean approval quotation untuk manager / Super Admin: semua quotation berstatus "menunggu" dari SD & BD.
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -37,7 +37,7 @@ export default function ApprovalQuotationPage() {
     })();
   }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (profile && !isApprover(profile)) return <p>Halaman ini khusus manager / master admin.</p>;
+  if (profile && !isApprover(profile)) return <p>Halaman ini khusus manager / Super Admin.</p>;
   return (<>
     <div className="head"><div><div className="eyebrow">Tender</div><h1>Approval quotation</h1>
       <p className="muted">Quotation dari Solution Design & Business Development yang menunggu keputusan. Buka tender untuk Approve, Revisi, atau Tolak (catatan wajib).</p></div></div>

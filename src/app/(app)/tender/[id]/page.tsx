@@ -547,7 +547,7 @@ export default function TenderPage() {
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
-      {tab === 'Export' && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>master admin</b> dan <b>manager</b>.</p></div>}
+      {tab === 'Export' && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
       {tab === 'Export' && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={`Leca_${(t.kode ?? t.customer).replace(/[^\w-]+/g, '_')}_lengkap.xlsx`} />}
       {tab !== 'Hasil' && tab !== 'Quotation' && tab !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
     </>

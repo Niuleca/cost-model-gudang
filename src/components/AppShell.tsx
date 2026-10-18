@@ -66,7 +66,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const brand = useBrandingSaya(profile);
   useEffect(() => { brand.muat(); }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Jumlah akun menunggu persetujuan (badge untuk master admin)
+  // Jumlah akun menunggu persetujuan (badge untuk Super Admin)
   const [nPending, setNPending] = useState(0);
   useEffect(() => {
     if (!profile?.is_master) return;
@@ -109,7 +109,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <select aria-label={t('Bahasa')} value={bahasa} onChange={e => setBahasa(e.target.value as Bahasa)}>
               {BAHASA.map(b => <option key={b.v} value={b.v}>{b.short} · {b.l}</option>)}</select></label>
           <Dropdown id="akun" kanan item={profile && profile.status && profile.status !== 'aktif' ? [] : AKUN}
-            label={`${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${profile.is_master ? 'Master admin' : ROLE_LABEL[profile.role]}` : ''}${nPending ? ` (${nPending})` : ''}`} />
+            label={`${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${profile.is_master ? 'Super Admin' : ROLE_LABEL[profile.role]}` : ''}${nPending ? ` (${nPending})` : ''}`} />
         </nav>
       </header>
       {brand.wajib && brand.siap && !brand.lengkap && path !== '/akun' && <div className="notice small" role="alert" style={{ margin: '10px 24px 0' }}>
@@ -119,7 +119,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <h2>{profile.status === 'pending' ? 'Menunggu persetujuan' : 'Pendaftaran ditolak'}</h2>
           {profile.status === 'pending'
             ? <p>Akun <b>{profile.email}</b> sudah terdaftar dan sedang menunggu persetujuan (ACC) Admin. Setelah disetujui dan diberi role, menu Leca akan terbuka — muat ulang halaman ini nanti. Terimakasih<br />CP : 088291919234 / Email : Niuleca@gmail.com</p>
-            : <p>Pendaftaran akun <b>{profile.email}</b> tidak disetujui. Hubungi master admin bila ini keliru.</p>}
+            : <p>Pendaftaran akun <b>{profile.email}</b> tidak disetujui. Hubungi Super Admin bila ini keliru.</p>}
           <div className="row"><button className="ghost" onClick={() => location.reload()}>Muat ulang</button><button onClick={keluar}>Keluar</button></div>
         </div>) : children}</main>
       <footer className="app-foot"><span><b>Leca</b> · {t('cost model, tender & quotation gudang')}</span><span>{t('Dibuat oleh')} <b>esapanghegar</b> · © {new Date().getFullYear()}</span></footer>
