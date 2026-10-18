@@ -529,6 +529,9 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
   marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
   kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number; pajak: Pajak; onPajak: (p: Pajak) => void;
 }) {
+  // Red flag bisa disembunyikan / ditampilkan — pilihan diingat di perangkat ini
+  const [sembunyiFlag, setSembunyiFlagS] = useState<boolean>(() => { try { return localStorage.getItem('leca.sembunyiRedFlag') === '1'; } catch { return false; } });
+  const setSembunyiFlag = (v: boolean) => { setSembunyiFlagS(v); try { localStorage.setItem('leca.sembunyiRedFlag', v ? '1' : '0'); } catch { /* abaikan */ } };
   if (!hasil) return <div className="card"><p>Belum dihitung.</p><div className="row"><button onClick={onHitung}>Hitung sekarang</button></div></div>;
   const h = hasil;
   const kritis = h.redFlags.filter(f => f.level === 'kritis').length;
@@ -551,10 +554,15 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2>Red flag {kritis > 0 ? <span className="pill bad">{kritis} kritis</span> : <span className="pill ok">tidak ada yang kritis</span>}</h2>
+          {h.redFlags.length > 0 && <button className="ghost" aria-expanded={!sembunyiFlag} onClick={() => setSembunyiFlag(!sembunyiFlag)}>
+            {sembunyiFlag ? `▸ Tampilkan (${h.redFlags.length})` : '▾ Sembunyikan'}</button>}
         </div>
         {h.redFlags.length === 0 && <p className="muted">Tidak ada red flag.</p>}
-        {h.redFlags.map((f, i) => <div key={i} className={`flag ${f.level}`}><b className="small">{f.level.toUpperCase()} · {f.kode}</b><div>{f.pesan}</div></div>)}
-        {catatan.length > 0 && <p className="small muted">Catatan master data ikut dimasukkan sebagai red flag MASTER_DATA.</p>}
+        {sembunyiFlag && h.redFlags.length > 0 && <p className="small muted">
+          {(['kritis', 'peringatan', 'info'] as const).map(l => { const n = h.redFlags.filter(f => f.level === l).length; return n ? <span key={l} className={`pill ${l === 'kritis' ? 'bad' : l === 'peringatan' ? 'warn' : 'info'}`} style={{ marginRight: 6 }}>{n} {l}</span> : null; })}
+          disembunyikan — tekan Tampilkan untuk melihat detail.</p>}
+        {!sembunyiFlag && h.redFlags.map((f, i) => <div key={i} className={`flag ${f.level}`}><b className="small">{f.level.toUpperCase()} · {f.kode}</b><div>{f.pesan}</div></div>)}
+        {!sembunyiFlag && catatan.length > 0 && <p className="small muted">Catatan master data ikut dimasukkan sebagai red flag MASTER_DATA.</p>}
       </div>
 
       <HasilKomersial h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} uomRateCard={uomRateCard} onUomRateCard={onUomRateCard} />
