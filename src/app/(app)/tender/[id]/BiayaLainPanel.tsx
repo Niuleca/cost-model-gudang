@@ -25,7 +25,7 @@ function KartuSeksi({ s, rows, items, kontrak, bunga, onUbah, onUbahBanyak, onHa
 }) {
   const pilihan = s.id === 'lainnya' ? items.filter(x => !SEKSI_BIAYA.some(z => z.kategori.includes(x.kategori)) && !['MHE', 'Racking', 'Gudang', 'IT'].includes(x.kategori))
     : items.filter(x => s.kategori.includes(x.kategori));
-  const total = rows.reduce((t, r) => t + biayaBulanBaris(r.b, kontrak, bunga).total, 0);
+  const total = rows.reduce((t, r) => t + biayaBulanBaris(r.b, kontrak, 0).total, 0);
   return (
     <div className="bl-seksi">
       <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -39,7 +39,7 @@ function KartuSeksi({ s, rows, items, kontrak, bunga, onUbah, onUbahBanyak, onHa
         <thead><tr><th>Item</th><th>Mode</th><th className="num">Qty</th><th className="num">Harga satuan</th><th className="num">Umur (bln)</th><th className="num">Nilai</th><th className="num">Biaya/bln</th><th>Risiko</th><th>Alokasi</th><th></th></tr></thead>
         <tbody>{rows.map(({ b, i }) => {
           const it = items.find(x => x.id === b.priceItemId);
-          const c = biayaBulanBaris(b, kontrak, bunga);
+          const c = biayaBulanBaris(b, kontrak, 0);
           return (
             <tr key={i}>
               <td style={{ minWidth: 260 }}>
@@ -98,7 +98,7 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
   }));
   const ubah = (i: number, patch: Partial<Baris>) => ubahBanyak([{ i, patch }]);
   const ringkas = perSeksi.map(({ s, rows }) => {
-    const c = rows.map(r => biayaBulanBaris(r.b, kontrakBulan, bunga));
+    const c = rows.map(r => biayaBulanBaris(r.b, kontrakBulan, 0));
     return { s, n: rows.length, nilai: c.reduce((t, x) => t + x.nilai, 0), total: c.reduce((t, x) => t + x.total, 0) };
   });
   const totalBulan = ringkas.reduce((t, r) => t + r.total, 0);
@@ -116,7 +116,7 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
     || (barisAuto('Implementation cost') && Math.abs(persenHasil('Implementation cost') - startup.persenManpower) > 1e-6));
   const extraStartup = (
     <div className="bl-auto">
-      <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={startup.aktif} onChange={e => onStartup({ ...startup, aktif: e.target.checked })} style={{ width: 'auto' }} /> <b>Hitung otomatis</b> (biaya sekali, diamortisasi {kontrakBulan} bln + bunga modal)</label>
+      <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={startup.aktif} onChange={e => onStartup({ ...startup, aktif: e.target.checked })} style={{ width: 'auto' }} /> <b>Hitung otomatis</b> (biaya sekali, diamortisasi {kontrakBulan} bln; bunga hanya lewat tab Interest cost)</label>
       <div className="tablewrap"><table>
         <thead><tr><th>Item otomatis</th><th className="num">Persen</th><th>Dasar</th><th className="num">Biaya/bln (hasil Hitung)</th></tr></thead>
         <tbody>
@@ -153,7 +153,7 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
         <tbody>
           {ringkas.filter(r => r.n > 0).map(r => <tr key={r.s.id}><td>{r.s.label}</td><td className="num">{r.n}</td><td className="num">{rp(r.nilai)}</td><td className="num">{rp(r.total)}</td></tr>)}
           {ringkas.every(r => r.n === 0) && <tr><td colSpan={4} className="muted">Belum ada biaya lain.</td></tr>}
-          <tr style={{ background: 'var(--link)' }}><td colSpan={3}><b>Total biaya lain per bulan</b> <span className="small muted">(beli & sekali sudah termasuk depresiasi/amortisasi + bunga modal {(bunga * 100).toFixed(1)}%/thn, kontrak {kontrakBulan} bln)</span></td><td className="num"><b>{rp(totalBulan)}</b></td></tr>
+          <tr style={{ background: 'var(--link)' }}><td colSpan={3}><b>Total biaya lain per bulan</b> <span className="small muted">(beli & sekali = depresiasi/amortisasi selama kontrak {kontrakBulan} bln; tanpa bunga — pilih di tab Interest cost)</span></td><td className="num"><b>{rp(totalBulan)}</b></td></tr>
         </tbody>
       </table></div>
       {perSeksi.map(({ s, rows }) => (

@@ -31,7 +31,7 @@ export default function InterestPanel({ nilai, onChange, hasilLive, kontrakBulan
   return (<>
     <div className="card">
       <h2><T>Interest cost</T> — simulasi pinjaman bank</h2>
-      <p className="small muted">Pilih capex atau biaya yang dananya dipinjam dari bank (atau tambah baris manual). Bunga pinjaman dihitung dari pokok × bunga %/thn × tenor,
+      <p className="small muted">Bunga <b>tidak dihitung otomatis</b> — hanya capex / baris manual yang Anda pilih di sini yang dikenai bunga. Bunga pinjaman dihitung dari pokok × bunga %/thn × tenor,
         lalu dibebankan rata selama kontrak <b>{kontrakBulan} bln</b> sebagai kategori biaya <b>Interest cost</b> — ikut ke total cost, rate card, quotation dan export.</p>
       <div className="grid3">
         <label className="f" htmlFor="ic-bunga">Bunga pinjaman (%/tahun)
@@ -41,6 +41,8 @@ export default function InterestPanel({ nilai, onChange, hasilLive, kontrakBulan
             <option value="flat">Flat — bunga atas pokok penuh selama tenor</option>
             <option value="menurun">Menurun — pokok dicicil rata, bunga atas sisa pokok</option>
           </select></label>
+        <label className="row small" style={{ gap: 6, alignSelf: 'end' }}><input type="checkbox" style={{ width: 'auto' }} checked={!!ic.workingCapital} onChange={e => set({ workingCapital: e.target.checked })} />
+          Ikutkan bunga <b>working capital</b> (selisih payment term customer vs AP, dihitung dengan bunga modal master)</label>
         <div className="umk-box"><span className="small muted">Contoh 1 bulan</span>
           <b>Rp100 jt × {persen(ic.bungaTahun, 2)} ÷ 12 = {rp(100_000_000 * ic.bungaTahun / 12)}/bln</b></div>
       </div>
@@ -52,7 +54,7 @@ export default function InterestPanel({ nilai, onChange, hasilLive, kontrakBulan
         {!hasilLive && <p className="muted small">Memuat data master… (daftar muncul setelah data master selesai dimuat)</p>}
         {hasilLive && !sumber.length && <p className="muted small">Belum ada capex di tender ini (semua MHE/racking/IT berstatus sewa). Gunakan baris manual.</p>}
         <p className="small muted">Hanya <b>capex</b> (barang dibeli → depresiasi, biaya sekali → amortisasi). Pokok default = nilai investasinya, bisa diubah di tabel di bawah. Untuk pinjaman lain (mis. sewa gudang dibayar di muka) pakai <b>+ Baris manual</b>.
-          Capex yang dipilih otomatis <b>tidak lagi</b> dikenai “bunga modal” default supaya bunga tidak dihitung dua kali.</p>
+</p>
         <div className="tablewrap" style={{ maxHeight: 460 }}><table>
           <thead><tr><th style={{ width: 36 }} /><th>Capex</th><th className="num">Biaya/bln</th><th className="num">Nilai capex (pokok default)</th></tr></thead>
           <tbody>{kelompok.map(k => [

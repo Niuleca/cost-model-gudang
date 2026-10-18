@@ -20,7 +20,8 @@ export default function ItPanel({ sheet, onChange, kontrakBulan }: { sheet: ItSh
       .then(({ data }: { data: unknown }) => setKatalog((data ?? []) as Katalog[]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const opsi = { kontrakBulan, bungaTahun: bunga };
+  const opsi = { kontrakBulan, bungaTahun: 0 }; // bunga tidak otomatis — pakai tab Interest cost
+  void bunga;
   const r = useMemo(() => ringkasIt(sheet, opsi), [sheet, kontrakBulan, bunga]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (lines: ItLine[]) => onChange({ ...sheet, lines });
   const kelompokAda = KELOMPOK_IT.filter(k => sheet.lines.some(l => l.kelompok === k)).concat(
@@ -36,7 +37,7 @@ export default function ItPanel({ sheet, onChange, kontrakBulan }: { sheet: ItSh
   return (
     <div className="card">
       <h2>Kebutuhan IT (format BAP)</h2>
-      <p className="small muted">Item ditarik dari katalog IT. Bulanan (PUPM, PDPM, Cost/Month, Monthly/Site) dan transaksi masuk biaya bulanan; Yearly ÷ 12; OTC berupa perangkat (hardware, CCTV, device) didepresiasi selama umur ekonomis (maks. masa kontrak); development, cabling & mandays diamortisasi selama kontrak; atau pilih ditagih terpisah di quotation. Biaya OTC/bln sudah termasuk bunga modal {(bunga * 100).toFixed(1)}%/thn atas rata-rata nilai buku. Masa kontrak: {kontrakBulan} bln.</p>
+      <p className="small muted">Item ditarik dari katalog IT. Bulanan (PUPM, PDPM, Cost/Month, Monthly/Site) dan transaksi masuk biaya bulanan; Yearly ÷ 12; OTC berupa perangkat (hardware, CCTV, device) didepresiasi selama umur ekonomis (maks. masa kontrak); development, cabling & mandays diamortisasi selama kontrak; atau pilih ditagih terpisah di quotation. Bunga tidak dihitung otomatis — kalau OTC dibiayai pinjaman, pilih di tab Interest cost. Masa kontrak: {kontrakBulan} bln.</p>
       <div className="grid3">
         <label className="f" htmlFor="bap">Nomor BAP<input id="bap" value={sheet.nomorBap ?? ''} onChange={e => onChange({ ...sheet, nomorBap: e.target.value })} placeholder="BAP-…" /></label>
         <label className="f" htmlFor="kurs">Kurs USD (Rp)<input id="kurs" type="number" value={sheet.kursUsd} onChange={e => onChange({ ...sheet, kursUsd: Number(e.target.value) })} /></label>
@@ -96,7 +97,6 @@ export default function ItPanel({ sheet, onChange, kontrakBulan }: { sheet: ItSh
           <tr><td>Bulanan + tahunan ÷ 12</td><td className="num">{rp(r.setaraBulan)}</td><td></td><td></td></tr>
           <tr><td>Depresiasi perangkat (nilai aset {rp(r.nilaiAset)})</td><td className="num">{rp(r.depresiasiBulan)}</td><td></td><td></td></tr>
           <tr><td>Amortisasi OTC / mandays (nilai {rp(r.nilaiAmortisasi)} ÷ {kontrakBulan} bln)</td><td className="num">{rp(r.amortisasiBulan)}</td><td></td><td></td></tr>
-          <tr><td>Bunga modal ({(bunga * 100).toFixed(1)}%/thn × rata-rata nilai buku)</td><td className="num">{rp(r.bungaBulan)}</td><td></td><td></td></tr>
           <tr><td><b>Total IT per bulan</b></td><td className="num out"><b>{rp(r.totalBulan)}</b></td><td></td><td></td></tr>
           {r.tagihSekali.length > 0 && <tr><td>Ditagih terpisah di quotation</td><td className="num">{rp(r.tagihSekali.reduce((s, x) => s + x.nilai, 0))}</td><td></td><td></td></tr>}
         </tbody>

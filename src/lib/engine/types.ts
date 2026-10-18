@@ -215,6 +215,8 @@ export interface BiayaBaris {
   dasar: string;                    // penjelasan rumus singkat (ketertelusuran)
   /** Diisi bila biaya/bln baris ini direvisi manual: nilai hitungan sistem sebelum direvisi. */
   biayaSistem?: number;
+  /** opex = biaya operasional; capex = depresiasi/amortisasi investasi; interest = bunga yang dipilih (Interest cost) */
+  jenis?: 'opex' | 'capex' | 'interest';
 }
 
 /** Simulasi pinjaman bank: pokok pinjaman × bunga → interest cost masuk ke biaya. */
@@ -233,4 +235,6 @@ export interface InterestCost {
   bungaTahun: number;                 // 0.09 = 9%/thn
   metode: 'flat' | 'menurun';         // flat = bunga atas pokok penuh; menurun = pokok dicicil rata (bunga atas sisa pokok)
   items: InterestItem[];
+  /** Ikutkan bunga working capital (payment term customer > AP hari) — default tidak. */
+  workingCapital?: boolean;
 }

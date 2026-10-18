@@ -160,5 +160,27 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
         </tbody>
       </table></div>
     </div>
+
+    {(() => {
+      const pj = h.perJenis ?? { opex: 0, capex: 0, interest: 0 };
+      const tot = pj.opex + pj.capex + pj.interest || 1;
+      const rows: [string, number, string][] = [
+        ['Opex', pj.opex, 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, overhead, dll.'],
+        ['Capex', pj.capex, `depresiasi/amortisasi investasi (total investasi ${rp(h.investasi)})`],
+        ['Interest cost', pj.interest, 'bunga pinjaman yang dipilih di tab Interest cost'],
+      ];
+      const maks = Math.max(...rows.map(r => r[1]), 1);
+      return <div className="card">
+        <h2>Opex vs capex</h2>
+        <div className="tablewrap"><table>
+          <thead><tr><th>Jenis</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th><th style={{ width: '35%' }}></th></tr></thead>
+          <tbody>
+            {rows.map(([l, v, k]) => <tr key={l}><td><b>{l}</b><div className="small muted">{k}</div></td><td className="num">{rp(v)}</td><td className="num">{rp(v * 12)}</td><td className="num"><b>{persen(v / tot)}</b></td>
+              <td><div className="bar-kat"><i style={{ width: `${(v / maks) * 100}%` }} /></div></td></tr>)}
+            <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{rp(tot)}</b></td><td className="num"><b>{rp(tot * 12)}</b></td><td className="num"><b>100%</b></td><td></td></tr>
+          </tbody>
+        </table></div>
+      </div>;
+    })()}
   </>);
 }
