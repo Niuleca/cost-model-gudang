@@ -87,8 +87,13 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
               <thead><tr><th>Description</th><th>Remarks</th><th className="num">FTE</th><th className="num">Resources</th></tr></thead>
               <tbody>
                 {h.mp.length + ind.length === 0 && <tr><td colSpan={4} className="muted">–</td></tr>}
-                {h.mp.map(r => <tr key={`d-${r.nama}`}><td>{r.nama}{r.merangkap.length > 0 && <div className="small muted">multi-skill: merangkap {r.merangkap.join(', ')}</div>}</td>
-                  <td className="small muted">{r.tkbm ? (/helper|daily|harian/i.test(r.nama) ? 'Daily worker (tidak dirangkap)' : 'TKBM (tidak dirangkap)') : r.resources === 0 ? 'Dirangkap' : r.dirangkap ? 'Direct (sisa dirangkap)' : 'Direct'}</td><td className="num">{f2(r.fte)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>)}
+                {h.mp.map(r => {
+                  const status = r.tkbm ? (/helper|daily|harian/i.test(r.nama) ? 'Daily worker' : 'TKBM')
+                    : r.resources === 0 ? `Dirangkap ${r.dirangkapOleh.join(', ')}` : r.merangkap.length ? 'Direct · multi-skill' : r.dirangkap ? `Direct · sisa dirangkap ${r.dirangkapOleh.join(', ')}` : 'Direct';
+                  return <tr key={`d-${r.nama}`}><td>{r.nama}{r.merangkap.length > 0 && <div className="small muted">merangkap: {r.merangkap.join(', ')}</div>}</td>
+                    <td className="small"><b>{status}</b>{r.catatan.map((c, k) => <div key={k} className="muted">{c}</div>)}</td>
+                    <td className="num">{f2(r.fte)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>;
+                })}
                 {ind.length > 0 && sub('Subtotal direct', f2(h.totalFteMp), h.totalMp)}
                 {ind.map((r, i) => <tr key={`i-${i}`}><td>{r.nama}{r.alat.length > 0 && <div className="small muted">alat: {r.alat.join(', ')}</div>}</td>
                   <td className="small muted">{r.ket === 'Peran tetap' ? 'Peran tetap' : `Indirect · ${r.ket}`}</td><td className="num muted">–</td><td className="num"><b>{r.qty || '–'}</b></td></tr>)}

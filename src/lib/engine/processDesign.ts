@@ -134,7 +134,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
       x.fte += b.fte; x.manHour += b.manHour; x.jamPerArus[b.arus] += b.manHour; m.set(b.resource, x);
     }
     return Array.from(m.values()).map(x => ({
-      ...x, unitIndirect: 0, merangkap: [] as string[], dirangkap: false, tkbm: false,
+      ...x, unitIndirect: 0, merangkap: [] as string[], dirangkap: false, tkbm: false, catatan: [] as string[], dirangkapOleh: [] as string[],
       // alat: dipakai bergantian antar shift → ROUNDUP(FTE). Man power dihitung dengan pooling di bawah.
       resources: x.fte <= 0 ? 0 : jenis === 'Man Power' ? 0 : Math.ceil(x.fte - 1e-9),
     }));
@@ -148,21 +148,46 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   for (const w of beban) {
     if (w <= 0) continue;
     const orang: { host: number; sisaKap: number }[] = [];
+    const nShift = beban.filter(x => x > 0).length;
+    const si = beban.indexOf(w);
+    const pre = nShift > 1 ? `Shift ${si + 1}: ` : '';
+    const f2 = (x: number) => x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const urut = mp.map((r, i) => ({ i, v: r.fte * w })).filter(o => o.v > 1e-9);
     for (const o of urut) {
       const r = mp[o.i];
-      if (isTkbm(r.nama)) { r.resources += Math.ceil(o.v - 1e-9); r.tkbm = true; continue; }
-      r.resources += Math.floor(o.v + 1e-9);
+      if (isTkbm(r.nama)) {
+        const n = Math.ceil(o.v - 1e-9); r.resources += n; r.tkbm = true;
+        r.catatan.push(`${pre}FTE ${f2(o.v)} → ROUNDUP = ${n} orang (non-karyawan, tidak merangkap & tidak dirangkap)`);
+        continue;
+      }
+      const d = Math.floor(o.v + 1e-9); r.resources += d;
+      if (d > 0) r.catatan.push(`${pre}${d} orang tetap dari bagian bulat FTE ${f2(o.v)}`);
     }
     const pecahan = urut.filter(o => !isTkbm(mp[o.i].nama)).map(o => ({ i: o.i, x: o.v - Math.floor(o.v + 1e-9) }))
       .filter(o => o.x > 1e-6).sort((p, q) => q.x - p.x);
     for (const f of pecahan) {
-      const cocok = orang.filter(p => p.sisaKap >= f.x - 1e-9 && bolehRangkap(mp[p.host].nama, mp[f.i].nama, pd.rangkap))
-        .sort((p, q) => p.sisaKap - q.sisaKap)[0];
+      const r = mp[f.i];
+      const boleh = orang.filter(p => bolehRangkap(mp[p.host].nama, r.nama, pd.rangkap));
+      const cocok = boleh.filter(p => p.sisaKap >= f.x - 1e-9).sort((p, q) => p.sisaKap - q.sisaKap)[0];
       if (cocok) {
-        cocok.sisaKap -= f.x; mp[f.i].dirangkap = true;
-        if (!mp[cocok.host].merangkap.includes(mp[f.i].nama)) mp[cocok.host].merangkap.push(mp[f.i].nama);
-      } else { orang.push({ host: f.i, sisaKap: 1 - f.x }); mp[f.i].resources += 1; }
+        const h = mp[cocok.host];
+        r.catatan.push(`${pre}sisa FTE ${f2(f.x)} dirangkap ${h.nama} (sisa waktu ${h.nama} ${f2(cocok.sisaKap)} → ${f2(cocok.sisaKap - f.x)})`);
+        cocok.sisaKap -= f.x; r.dirangkap = true;
+        if (!r.dirangkapOleh.includes(h.nama)) r.dirangkapOleh.push(h.nama);
+        const lbl = `${r.nama} (${f2(f.x)})`;
+        if (!h.merangkap.includes(r.nama)) h.merangkap.push(r.nama);
+        h.catatan.push(`${pre}merangkap ${lbl}`);
+      } else {
+        // Alasan berdiri sendiri
+        const pengizin = mp.filter((x, j) => j !== f.i && !isTkbm(x.nama) && x.fte > 0 && bolehRangkap(x.nama, r.nama, pd.rangkap)).map(x => x.nama);
+        const alasan = boleh.length
+          ? `${boleh.map(p => mp[p.host].nama).join(', ')} tidak punya sisa waktu cukup (perlu ${f2(f.x)})`
+          : pengizin.length
+            ? `belum ada orang lain yang bisa menampung; sisa waktunya ${f2(1 - f.x)} dipakai merangkap role lain (yang boleh merangkapnya di matriks: ${pengizin.join(', ')})`
+            : `di matriks multi-skill tidak ada role yang boleh merangkapnya; sisa waktunya ${f2(1 - f.x)} dipakai merangkap role lain`;
+        r.catatan.push(`${pre}+1 orang untuk sisa FTE ${f2(f.x)} — ${alasan}`);
+        orang.push({ host: f.i, sisaKap: 1 - f.x }); r.resources += 1;
+      }
     }
   }
 
@@ -178,7 +203,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   ] : [];
   for (const r of indirectRows) for (const nama of r.alat) {
     let e = mhe.find(x => x.nama === nama);
-    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0, merangkap: [], dirangkap: false, tkbm: false }; mhe.push(e); }
+    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0, merangkap: [], dirangkap: false, tkbm: false, catatan: [], dirangkapOleh: [] }; mhe.push(e); }
     e.unitIndirect += r.qty; e.resources += r.qty;
   }
   return {
