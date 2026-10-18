@@ -141,7 +141,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     if (!draft) return;
     if (draft.revisi > 0 && !draft.catatan_revisi?.trim()) { setErr('Isi catatan revisi (apa yang berubah dan kenapa).'); return; }
     if (editId) {
-      const { data, error } = await sb.from('quotations').update({ ...draft, status: bolehApprove ? 'approved' : 'draft' }).eq('id', editId).select('id');
+      const { data, error } = await sb.from('quotations').update({ ...draft, status: 'draft' }).eq('id', editId).select('id');
       if (error || !data?.length) { setErr(error?.message ?? 'Tidak tersimpan (hanya pembuat tender / admin).'); return; }
       tutupDraft(); muat(); return;
     }
@@ -315,7 +315,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
         </tbody>
       </table></div>
       <p className="small muted">{bolehApprove
-        ? 'Anda manager / Super Admin: quotation yang Anda buat langsung berstatus Approved. Quotation dari Solution Design / Business Development muncul dengan status Menunggu approval — pilih Approve, Revisi, atau Tolak (catatan wajib).'
+        ? 'Anda manager / Super Admin: quotation baru tersimpan sebagai Draft — cek isinya lalu tekan Approve sendiri (tanpa menunggu orang lain). Quotation dari Solution Design / Business Development muncul dengan status Menunggu approval — pilih Approve, Revisi, atau Tolak (catatan wajib). Batalkan approve mengembalikan ke Menunggu approval.'
         : 'Alur: simpan draft → Ajukan approval → manager memilih Approve / Revisi / Tolak. Unduh, print & kirim terbuka setelah Approved; sebelum itu hanya pratinjau.'}</p>
       {pratinjau && <PdfPreview blob={pratinjau.blob} judul={pratinjau.data.nomor} onTutup={() => setPratinjau(null)} rilis={pratinjau.rilis} onUnduh={() => unduhQuotationPdf(pratinjau.data)} />}
     </div>
