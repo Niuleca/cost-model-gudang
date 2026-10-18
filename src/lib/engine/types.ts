@@ -151,6 +151,8 @@ export interface TenderInput {
   /** Rincian biaya manpower per role (format sheet) + parameter BPJS/THR/kompensasi/management fee. */
   rincianBiayaMp?: Record<string, import('./biayaMp').InputBiayaRole>;
   paramBiayaMp?: Partial<import('./biayaMp').ParamBiayaMp>;
+  levelGaji?: Partial<Record<import('./biayaMp').LevelJabatan, number>>;
+  levelRole?: Record<string, import('./biayaMp').LevelJabatan>;
   /** Kenaikan biaya manpower per tahun kontrak (0.05 = 5%/thn). Biaya/bln = total kontrak ÷ bulan kontrak. */
   eskalasiManpower?: { persenTahun: number; mulai?: string | null };
   advanceSewaBulan: number;

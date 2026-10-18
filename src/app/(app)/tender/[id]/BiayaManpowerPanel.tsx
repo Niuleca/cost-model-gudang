@@ -1,15 +1,18 @@
 'use client';
 import { rp, angka } from '@/lib/format';
-import { ringkasBiayaMp, type InputBiayaRole, type ParamBiayaMp, type RincianBiayaRole } from '@/lib/engine/biayaMp';
+import { ringkasBiayaMp, LEVEL_JABATAN, LEVEL_GAJI_DEFAULT, levelDefault, type InputBiayaRole, type LevelJabatan, type ParamBiayaMp, type RincianBiayaRole } from '@/lib/engine/biayaMp';
 
 const r0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
 const pct = (x: number) => Math.round(x * 100000) / 1000;
 
 /** Rincian biaya manpower — format sheet: gaji → sub total → BPJS/THR/kompensasi/supervisi → total × orang → Sub Total-1 → fee → Sub Total-2. */
-export default function BiayaManpowerPanel({ rows, param, input, onInput, onParam, bisaEdit }: {
+export default function BiayaManpowerPanel({ rows, param, input, onInput, onParam, bisaEdit, umk, lokasi, levelGaji, levelRole, onLevelGaji, onLevelRole }: {
   rows: RincianBiayaRole[]; param: ParamBiayaMp; input: Record<string, InputBiayaRole>;
   onInput: (x: Record<string, InputBiayaRole>) => void; onParam: (p: Partial<ParamBiayaMp>) => void; bisaEdit: boolean;
+  umk: number; lokasi: string; levelGaji: Partial<Record<LevelJabatan, number>>; levelRole: Record<string, LevelJabatan>;
+  onLevelGaji: (x: Partial<Record<LevelJabatan, number>>) => void; onLevelRole: (x: Record<string, LevelJabatan>) => void;
 }) {
+  const lg = { ...LEVEL_GAJI_DEFAULT, ...levelGaji };
   const g = ringkasBiayaMp(rows, param);
   const ubah = (role: string, patch: Partial<InputBiayaRole>) => {
     const cur = { ...(input[role] ?? {}), ...patch };
@@ -29,8 +32,23 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
   return (
     <div className="card" style={{ gap: 10 }}>
       <h2>Rincian biaya manpower</h2>
-      <p className="small muted">Jumlah orang dari Man Power Summary. Kotak kosong = default (gaji pokok = UMK lokasi × faktor jabatan; lisensi & insentif = tunjangan jabatan; hari kerja = Working Days Employee).
+      <p className="small muted">Jumlah orang dari Man Power Summary. Kotak kosong = default (gaji pokok = UMK area × % level jabatan; lisensi & insentif = tunjangan jabatan; hari kerja = Working Days Employee).
         BPJS, THR & kompensasi dihitung dari gaji pokok; gaji dibayar = gaji pokok × actual hari kerja ÷ hari kerja.</p>
+      <h3>Gaji pokok per level jabatan</h3>
+      <div className="tablewrap"><table>
+        <thead><tr><th>Level</th><th>Contoh jabatan</th><th className="num">% dari UMK</th><th className="num">Gaji pokok/bln</th><th className="num">Jabatan di tender ini</th></tr></thead>
+        <tbody>
+          <tr className="pd-sub"><td colSpan={3}><b>UMK {lokasi || 'area project'}</b> <span className="small muted">(dari Area / kab-kota di Key assumption)</span></td><td className="num"><b>{umk ? rp(umk) : 'memuat…'}</b></td><td /></tr>
+          {LEVEL_JABATAN.map(L => <tr key={L.v}>
+            <td><b>{L.l}</b></td><td className="small muted">{L.contoh}</td>
+            <td className="num"><div className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
+              <input type="number" step="any" min={0} value={Math.round(lg[L.v] * 1000) / 10} disabled={!bisaEdit} aria-label={`Persen UMK ${L.l}`}
+                onChange={e => onLevelGaji({ ...levelGaji, [L.v]: Number(e.target.value) / 100 })} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /><span>%</span></div></td>
+            <td className="num"><b>{umk ? rp(umk * lg[L.v]) : '–'}</b></td>
+            <td className="small">{rows.filter(r => r.level === L.v).map(r => r.role).join(', ') || <span className="muted">–</span>}</td>
+          </tr>)}
+        </tbody></table></div>
+      <p className="small muted">Gaji pokok default tiap jabatan = UMK area × % level. Ganti level jabatan di kolom <b>Level</b> pada tabel di bawah; isi kolom Gaji pokok bila ingin angka khusus untuk satu jabatan.</p>
       <div className="row" style={{ alignItems: 'end' }}>
         {pIn('bpjsTk', 'BPJS TK')}{pIn('bpjsKs', 'BPJS KS')}{pIn('bpjsPensiun', 'BPJS Pensiun')}{pIn('thr', 'THR')}{pIn('kompensasi', 'Kompensasi')}{pIn('feePersen', 'Management fee')}
       </div>
@@ -46,17 +64,20 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
       </details>
       <div className="tablewrap"><table className="bmp">
         <thead><tr>
-          <th>No</th><th>Jabatan</th><th>Area</th><th className="num">Gaji pokok</th><th className="num">Hari kerja</th><th className="num">Actual hari kerja</th>
+          <th>No</th><th>Jabatan</th><th>Level</th><th>Area</th><th className="num">Gaji pokok</th><th className="num">Hari kerja</th><th className="num">Actual hari kerja</th>
           <th className="num">Lisensi + Insentif</th><th className="num">Sub total</th><th className="num">BPJS TK ({angka(pct(param.bpjsTk), 2)}%)</th>
           <th className="num">BPJS KS ({angka(pct(param.bpjsKs), 2)}%)</th><th className="num">BPJS Pensiun ({angka(pct(param.bpjsPensiun), 2)}%)</th>
           <th className="num">THR</th><th className="num">Kompensasi</th><th className="num">Supervisi & Operasional</th><th className="num">Total</th>
           <th className="num">Manpower</th><th className="num">TOTAL</th>
         </tr></thead>
         <tbody>
-          {rows.length === 0 && <tr><td colSpan={17} className="muted">Belum ada manpower. Isi aktivitas & peran tetap terlebih dahulu.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={18} className="muted">Belum ada manpower. Isi aktivitas & peran tetap terlebih dahulu.</td></tr>}
           {rows.map((r, i) => <tr key={r.role}>
             <td className="num">{i + 1}</td>
             <td><b>{r.role}</b>{r.manual && <div className="small muted">diubah · <button type="button" className="linkbtn" disabled={!bisaEdit} onClick={() => { const x = { ...input }; delete x[r.role]; onInput(x); }}>reset</button></div>}</td>
+            <td><select aria-label={`Level ${r.role}`} value={r.level} disabled={!bisaEdit} style={{ minWidth: 120 }}
+              onChange={e => { const v = e.target.value as LevelJabatan; const x = { ...levelRole }; if (v === levelDefault(r.role)) delete x[r.role]; else x[r.role] = v; onLevelRole(x); }}>
+              {LEVEL_JABATAN.map(L => <option key={L.v} value={L.v}>{L.l.split(' (')[0]} · {Math.round(lg[L.v] * 100)}%</option>)}</select></td>
             <td><input aria-label={`Area ${r.role}`} value={input[r.role]?.area ?? ''} placeholder={r.area} onChange={e => ubah(r.role, { area: e.target.value || undefined })} disabled={!bisaEdit} style={{ width: 86, minWidth: 86 }} /></td>
             <td className="num">{num(r.role, 'gajiPokok', r.gajiPokok, r.gajiDefault, 96)}</td>
             <td className="num">{num(r.role, 'hariKerja', r.hariKerja, r.hariKerja, 48)}</td>
@@ -69,9 +90,9 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
             <td className="num">{r0(r.total)}</td><td className="num">{r.qty}</td><td className="num"><b>{r0(r.totalQty)}</b></td>
           </tr>)}
           {rows.length > 0 && <>
-            <tr className="pd-sub"><td colSpan={15} className="num"><b>Sub Total Biaya-1</b></td><td className="num"><b>{rows.reduce((s, r) => s + r.qty, 0)}</b></td><td className="num"><b>{r0(g.sub1)}</b></td></tr>
-            <tr><td colSpan={15} className="num">Management Fee {angka(pct(param.feePersen), 2)}%</td><td /><td className="num">{r0(g.fee)}</td></tr>
-            <tr style={{ background: 'var(--link)' }}><td colSpan={15} className="num"><b>Sub Total Biaya-2</b> <span className="small muted">(masuk cost model, sebelum kenaikan tahunan)</span></td><td /><td className="num"><b>{rp(g.sub2)}</b></td></tr>
+            <tr className="pd-sub"><td colSpan={16} className="num"><b>Sub Total Biaya-1</b></td><td className="num"><b>{rows.reduce((s, r) => s + r.qty, 0)}</b></td><td className="num"><b>{r0(g.sub1)}</b></td></tr>
+            <tr><td colSpan={16} className="num">Management Fee {angka(pct(param.feePersen), 2)}%</td><td /><td className="num">{r0(g.fee)}</td></tr>
+            <tr style={{ background: 'var(--link)' }}><td colSpan={16} className="num"><b>Sub Total Biaya-2</b> <span className="small muted">(masuk cost model, sebelum kenaikan tahunan)</span></td><td /><td className="num"><b>{rp(g.sub2)}</b></td></tr>
           </>}
         </tbody>
       </table></div>

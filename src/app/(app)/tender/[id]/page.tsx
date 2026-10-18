@@ -208,7 +208,7 @@ export default function TenderPage() {
   const qtyRole = new Map<string, number>();
   for (const r of pdFull?.mp ?? []) if (r.resources > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.resources);
   for (const r of pdFull?.indirect.rows ?? []) if (r.qty > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.qty);
-  const rincianMp = Array.from(qtyRole, ([role, qty]) => rincianBiayaRole(role, qty, masterMp, a.rincianBiayaMp?.[role], paramMp, a.processDesign?.hariKerjaKaryawan ?? 25, t.kab_kota));
+  const rincianMp = Array.from(qtyRole, ([role, qty]) => rincianBiayaRole(role, qty, masterMp, a.rincianBiayaMp?.[role], paramMp, a.processDesign?.hariKerjaKaryawan ?? 25, t.kab_kota, { levelGaji: a.levelGaji, levelRole: a.levelRole }));
 
   const aksi = (atas: boolean) => (
     <div className="row" style={atas ? undefined : { justifyContent: 'flex-end' }}>
@@ -361,6 +361,8 @@ export default function TenderPage() {
                 kontrakBulan: t.durasi_kontrak_bulan,
               }} />
           <BiayaManpowerPanel rows={rincianMp} param={paramMp} input={a.rincianBiayaMp ?? {}} bisaEdit={bisaEdit}
+            umk={masterMp?.upahMinimum ?? 0} lokasi={t.kab_kota} levelGaji={a.levelGaji ?? {}} levelRole={a.levelRole ?? {}}
+            onLevelGaji={levelGaji => setA({ levelGaji })} onLevelRole={levelRole => setA({ levelRole })}
             onInput={rincianBiayaMp => setA({ rincianBiayaMp })} onParam={p => setA({ paramBiayaMp: { ...(a.paramBiayaMp ?? {}), ...p } })} />
           <ProcessDesignPanel bagian="rincian" aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />

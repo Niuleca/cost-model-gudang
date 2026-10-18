@@ -202,7 +202,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, batasUpahPensiun: m.payroll.batasUpahJp || PARAM_BIAYA_MP_DEFAULT.batasUpahPensiun, batasUpahKs: m.payroll.batasUpahKes || PARAM_BIAYA_MP_DEFAULT.batasUpahKs, ...(t.paramBiayaMp ?? {}) };
   const hariMp = t.processDesign?.hariKerjaKaryawan ?? 25;
   const payroll = manpower.map(mp => {
-    const rc = rincianBiayaRole(mp.roleName, mp.headcount, m, t.rincianBiayaMp?.[mp.roleName], paramMp, hariMp, t.kabKota);
+    const rc = rincianBiayaRole(mp.roleName, mp.headcount, m, t.rincianBiayaMp?.[mp.roleName], paramMp, hariMp, t.kabKota, { levelGaji: t.levelGaji, levelRole: t.levelRole });
     const perOrang = rc.total * (1 + paramMp.feePersen);
     const dasarBulan = perOrang * mp.headcount;
     return { ...mp, upah: bulat(rc.gajiPokok), lisensi: bulat(rc.lisensi), subTotal: bulat(rc.subTotal), bpjsTk: bulat(rc.bpjsTk), bpjsKes: bulat(rc.bpjsKs),

@@ -35,9 +35,12 @@ export interface InputBiayaRole {
 }
 
 export function rincianBiayaRole(role: string, qty: number, m: MasterData | null, input: InputBiayaRole | undefined,
-  param: ParamBiayaMp, hariDefault: number, areaDefault: string) {
+  param: ParamBiayaMp, hariDefault: number, areaDefault: string,
+  level?: { levelGaji?: Partial<Record<LevelJabatan, number>>; levelRole?: Record<string, LevelJabatan> }) {
   const j: JobLevel | undefined = m?.jobLevels.find(x => x.roleName === role);
-  const gajiDefault = m ? Math.round(m.upahMinimum * (j?.faktorUmk ?? 1)) : 0;
+  const lv = faktorGajiRole(role, level?.levelGaji, level?.levelRole);
+  // Gaji pokok default = UMK area project (Key assumption) × % level jabatan
+  const gajiDefault = m ? Math.round(m.upahMinimum * lv.faktor) : 0;
   const gajiPokok = input?.gajiPokok && input.gajiPokok > 0 ? input.gajiPokok : gajiDefault;
   const hariKerja = input?.hariKerja && input.hariKerja > 0 ? input.hariKerja : hariDefault;
   const hariAktual = input?.hariAktual != null && input.hariAktual >= 0 ? input.hariAktual : hariKerja;
@@ -52,7 +55,7 @@ export function rincianBiayaRole(role: string, qty: number, m: MasterData | null
   const kompensasi = gajiPokok * param.kompensasi;
   const total = subTotal + bpjsTk + bpjsKs + bpjsPensiun + thr + kompensasi + supervisi;
   return {
-    role, area: input?.area || areaDefault, gajiPokok, gajiDefault, hariKerja, hariAktual, lisensi, supervisi,
+    role, level: lv.level, faktorLevel: lv.faktor, umk: m?.upahMinimum ?? 0, area: input?.area || areaDefault, gajiPokok, gajiDefault, hariKerja, hariAktual, lisensi, supervisi,
     subTotal, bpjsTk, bpjsKs, bpjsPensiun, thr, kompensasi, total, qty, totalQty: total * qty,
     manual: !!(input && Object.values(input).some(v => v != null && v !== '')),
   };
@@ -63,4 +66,28 @@ export function ringkasBiayaMp(rows: RincianBiayaRole[], param: ParamBiayaMp) {
   const sub1 = rows.reduce((s, r) => s + r.totalQty, 0);
   const fee = sub1 * param.feePersen;
   return { sub1, fee, sub2: sub1 + fee, faktorFee: 1 + param.feePersen };
+}
+
+// ---- Level jabatan → gaji pokok = UMK area project × % level ----
+export type LevelJabatan = 'operasional' | 'admin' | 'supervisor' | 'manager';
+export const LEVEL_JABATAN: { v: LevelJabatan; l: string; contoh: string }[] = [
+  { v: 'operasional', l: 'Operasional (di bawah admin)', contoh: 'Checker, Picker, Packer, Operator RT/Forklift, Helper, TKBM, Security' },
+  { v: 'admin', l: 'Admin / Staff', contoh: 'Admin Inbound/Outbound, Inventory Controller, Stock Controller, QHSE' },
+  { v: 'supervisor', l: 'Supervisor / Leader', contoh: 'Operational SPV, Team Leader, Koordinator' },
+  { v: 'manager', l: 'Manager / Kepala Gudang', contoh: 'Warehouse Manager, Ka Gudang' },
+];
+/** % dari UMK — default, bisa diubah per tender. */
+export const LEVEL_GAJI_DEFAULT: Record<LevelJabatan, number> = { operasional: 1, admin: 1.1, supervisor: 1.5, manager: 2.5 };
+
+export function levelDefault(role: string): LevelJabatan {
+  const r = role.toLowerCase();
+  if (/manager|manajer|kepala|ka\.? ?gudang|head|wh ?m\b/.test(r)) return 'manager';
+  if (/spv|supervisor|leader|koordinator|coordinator|foreman|mandor/.test(r)) return 'supervisor';
+  if (/admin|staff|controller|inventory|qhse|k3|hse|clerk/.test(r)) return 'admin';
+  return 'operasional';
+}
+export function faktorGajiRole(role: string, levelGaji?: Partial<Record<LevelJabatan, number>>, levelRole?: Record<string, LevelJabatan>) {
+  const lv = levelRole?.[role] ?? levelDefault(role);
+  const f = { ...LEVEL_GAJI_DEFAULT, ...(levelGaji ?? {}) }[lv];
+  return { level: lv, faktor: f };
 }
