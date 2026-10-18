@@ -457,9 +457,15 @@ export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: 
     if (kp.cbmPerPalet) out.push({ uom: 'CBM', volume: komitmen * kp.cbmPerPalet, dasar: `palet × ${kp.cbmPerPalet} CBM` });
     if (kp.tonPerPalet) out.push({ uom: 'ton', volume: komitmen * kp.tonPerPalet, dasar: `palet × ${kp.tonPerPalet} ton` });
   }
+  // kg dari ton
+  const ton = out.find(o => o.uom === 'ton');
+  if (ton) out.push({ uom: 'kg', volume: ton.volume * 1000, dasar: `${ton.dasar} × 1.000 kg`, tetap: ton.tetap });
   const seen = new Set<string>();
   return out.filter(o => { const key = o.uom.toLowerCase(); if (seen.has(key) || !(o.volume > 0)) return false; seen.add(key); return true; });
 }
+
+/** Daftar standar satuan tarif untuk dropdown rate card. */
+export const UOM_TARIF_STANDAR = ['palet', 'case', 'karton', 'pcs', 'm²', 'CBM', 'ton', 'kg', 'liter', 'bag', 'pack', 'roll', 'order', 'line', 'unit'];
 
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 /** Skema kenaikan mengikuti kebijakan upah: naik setiap JANUARI (UMK baru) sebesar r, bertingkat tiap tahun.

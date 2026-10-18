@@ -1,4 +1,5 @@
 'use client';
+import { UOM_TARIF_STANDAR } from '@/lib/engine/index.ts';
 import { useState } from 'react';
 import type { HasilTender, Bucket } from '@/lib/engine/index.ts';
 import { rp, angka, persen, BUCKET_LABEL } from '@/lib/format';
@@ -68,14 +69,20 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
         {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>
       <div className="tablewrap"><table>
-        <thead><tr><th>Layanan</th><th>Satuan tarif<div className="small muted" style={{ fontWeight: 400 }}>pilih UoM, harga ikut</div></th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">GP% (input)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
+        <thead><tr><th>Layanan</th><th>Satuan tarif / UoM</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">GP% (input)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
         <tbody>
           {h.rateCard.map(r => {
             const b = r.bucket as Bucket, v = marginManual[b];
-            return <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td>{r.opsiUom && r.opsiUom.length > 1 && onUomRateCard
-                ? <select aria-label={`Satuan tarif ${BUCKET_LABEL[r.bucket]}`} value={r.uom} style={{ minWidth: 150 }}
+            return <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td>{onUomRateCard
+                ? <select aria-label={`Satuan tarif ${BUCKET_LABEL[r.bucket]}`} value={r.uom} style={{ minWidth: 170 }}
                     onChange={e => { const x = { ...(uomRateCard ?? {}) }; if (e.target.value === r.uomArus) delete x[b]; else x[b] = e.target.value; onUomRateCard(x); }}>
-                    {r.opsiUom.map(o => <option key={o.uom} value={o.uom}>per {o.uom}{r.bucket === 'storage' ? '/bulan' : ''} · {rp(o.tarifExcl)}</option>)}</select>
+                    {(() => {
+                      const ada = r.opsiUom ?? [];
+                      const sama = (a: string, c: string) => a.toLowerCase() === c.toLowerCase();
+                      const daftar = [...ada.map(o => o.uom), ...UOM_TARIF_STANDAR.filter(u => !ada.some(o => sama(o.uom, u)))];
+                      return daftar.map(u => { const o = ada.find(x => sama(x.uom, u));
+                        return <option key={u} value={o?.uom ?? u} disabled={!o}>per {u}{r.bucket === 'storage' ? '/bulan' : ''}{o ? ` · ${rp(o.tarifExcl)}` : ' — isi konversi dulu'}</option>; });
+                    })()}</select>
                 : (r.bucket === 'storage' ? `${r.uom}/bulan` : r.uom)}
                 {r.opsiUom?.find(o => o.uom === r.uom)?.dasar && <div className="small muted">{r.opsiUom.find(o => o.uom === r.uom)!.dasar}</div>}</td>
               <td className="num">{angka(r.volumeKomitmen)}</td>
