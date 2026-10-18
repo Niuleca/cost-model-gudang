@@ -199,6 +199,12 @@ export default function TenderPage() {
     setPesan(`Hasil disimpan sebagai versi ${versi}.`);
   }
 
+  // Buka tab Hasil → selalu hitung ulang dari input terbaru (mis. Interest cost, revisi), supaya angka tidak basi
+  useEffect(() => {
+    if (tab !== 'Hasil' || !t) return;
+    hitung(false);
+  }, [tab, !!t]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Margin diubah di tab Hasil → hitung ulang otomatis (tanpa pindah tab)
   const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}]);
   useEffect(() => {
@@ -534,7 +540,7 @@ export default function TenderPage() {
         </div>
       )}
 
-      {tab === 'Hasil' && <HasilPanel hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
+      {tab === 'Hasil' && <HasilPanel belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} />}
@@ -562,9 +568,9 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard }: {
+function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard }: {
   uomRateCard: Partial<Record<Bucket, string>>; onUomRateCard: (u: Partial<Record<Bucket, string>>) => void;
-  hasil: HasilTender | null; catatan: string[]; onSimpan: () => void; onHitung: () => void; gudang: { nama: string; luas_m2: number } | null | undefined;
+  belumDisimpan?: boolean; hasil: HasilTender | null; catatan: string[]; onSimpan: () => void; onHitung: () => void; gudang: { nama: string; luas_m2: number } | null | undefined;
   marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
   kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number; pajak: Pajak; onPajak: (p: Pajak) => void;
 }) {
@@ -590,6 +596,7 @@ function HasilPanel({ hasil, catatan, onSimpan, onHitung, marginManual, onMargin
         ];
         return <div className="kpis kpis-hasil">{kpi.map(([l, v, k]) => <div key={l} className="kpi"><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}</div>)}</div>;
       })()}
+      {belumDisimpan && <p className="notice small">Hasil ini dihitung ulang dari input terbaru dan <b>belum disimpan</b> — tekan <b>Simpan hasil sebagai versi baru</b> supaya quotation & export memakai angka ini.</p>}
       <div className="row hasil-aksi"><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
 
       <div className="card">
