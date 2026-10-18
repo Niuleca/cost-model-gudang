@@ -7,6 +7,9 @@ import { angka } from '@/lib/format';
 const f2 = (x: number) => (x ? x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
 const f0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
 const pct = (x: number) => `${Math.round(x * 100)}%`;
+/** jam desimal → "X jam Y mnt" */
+const jamMenit = (jam: number) => { const m = Math.round(jam * 60); const j = Math.floor(m / 60), r = m % 60; return j ? `${j} jam${r ? ` ${r} mnt` : ''}` : `${r} mnt`; };
+const TIP_FTE = 'FTE = Full Time Equivalent (setara pekerja penuh waktu). 1,00 FTE = 1 orang bekerja penuh selama jam kerja tersedia per bulan. FTE = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan.';
 
 /** Process Design & Resource Calculation (format Excel): kalender kerja MP/MHE, shift, rincian per task, ringkasan MP & MHE. */
 export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift }: {
@@ -25,6 +28,13 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
     <input type="number" step="any" value={Number.isFinite(v) ? v : 0} onChange={e => on(e.target.value === '' ? 0 : Number(e.target.value))}
       style={{ width: w, minWidth: w, textAlign: 'right', background: 'var(--input)' }} />);
   const km = h.kalender.mp, kh = h.kalender.mhe;
+  /** Waktu kerja di balik FTE: man hour per bulan & per hari kerja. */
+  const waktu = (manHour: number, alat = false) => {
+    if (!manHour) return null;
+    const hari = (alat ? kh.hariBulan : km.hariBulan) || 1;
+    return <div className="small muted" style={{ whiteSpace: 'nowrap' }} title={`${angka(manHour, 1)} jam/bln ÷ ${angka(hari, 1)} hari kerja`}>
+      {jamMenit(manHour / hari)}/hari<div>{angka(manHour, 1)} jam/bln</div></div>;
+  };
   const barisKal: { label: string; key?: keyof KalenderResource; mp: number; mhe: number; tebal?: boolean; satuan: string }[] = [
     { label: 'Total hari per tahun', key: 'totalHari', mp: pd.mp.totalHari, mhe: pd.mhe.totalHari, satuan: 'hari' },
     { label: 'Minggu (libur)', key: 'minggu', mp: pd.mp.minggu, mhe: pd.mhe.minggu, satuan: 'hari' },
@@ -59,10 +69,10 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
     <div style={{ minWidth: 0 }}>
       <h3>{judul}</h3>
       <div className="tablewrap"><table className="pd-sum">
-        <thead><tr><th>Description</th><th>Remarks</th><th className="num">FTE</th><th className="num">Resources</th></tr></thead>
+        <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th><th className="num">Resources</th></tr></thead>
         <tbody>
           {rows.length === 0 && <tr><td colSpan={4} className="muted">–</td></tr>}
-          {rows.map(r => <tr key={r.nama}><td>{r.nama}</td><td className="small muted">{remark}{r.unitIndirect ? <div title="unit untuk indirect & peran tetap">+{r.unitIndirect} indirect</div> : null}</td><td className="num">{f2(r.fte)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>)}
+          {rows.map(r => <tr key={r.nama}><td>{r.nama}</td><td className="small muted">{remark}{r.unitIndirect ? <div title="unit untuk indirect & peran tetap">+{r.unitIndirect} indirect</div> : null}</td><td className="num">{f2(r.fte)}{waktu(r.manHour, true)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>)}
           {Array.from({ length: Math.max(0, pad - Math.max(1, rows.length)) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={4}>&nbsp;</td></tr>)}
           <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>{remark}</b></td><td className="num"><b>{f2(tFte)}</b></td><td className="num"><b>{tRes}</b></td></tr>
         </tbody>
@@ -84,7 +94,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
           <div style={{ minWidth: 0 }}>
             <h3>Man Power Summary</h3>
             <div className="tablewrap"><table className="pd-sum">
-              <thead><tr><th>Description</th><th>Remarks</th><th className="num">FTE</th><th className="num">Resources</th></tr></thead>
+              <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th><th className="num">Resources</th></tr></thead>
               <tbody>
                 {h.mp.length + ind.length === 0 && <tr><td colSpan={4} className="muted">–</td></tr>}
                 {h.mp.map(r => {
@@ -92,7 +102,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
                     : r.resources === 0 ? `Dirangkap ${r.dirangkapOleh.join(', ')}` : r.merangkap.length ? 'Direct · multi-skill' : r.dirangkap ? `Direct · sisa dirangkap ${r.dirangkapOleh.join(', ')}` : 'Direct';
                   return <tr key={`d-${r.nama}`}><td>{r.nama}{r.merangkap.length > 0 && <div className="small muted">merangkap: {r.merangkap.join(', ')}</div>}</td>
                     <td className="small"><b>{status}</b>{r.catatan.map((c, k) => <div key={k} className="muted">{c}</div>)}</td>
-                    <td className="num">{f2(r.fte)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>;
+                    <td className="num">{f2(r.fte)}{waktu(r.manHour)}</td><td className="num"><b>{r.resources || '–'}</b></td></tr>;
                 })}
                 {ind.length > 0 && sub('Subtotal direct', f2(h.totalFteMp), h.totalMp)}
                 {ind.map((r, i) => <tr key={`i-${i}`}><td>{r.nama}{r.alat.length > 0 && <div className="small muted">alat: {r.alat.join(', ')}</div>}</td>
@@ -105,6 +115,8 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
           </div>
           <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={n} />
         </div>
+        <p className="small muted"><b>FTE (Full Time Equivalent)</b> = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan ({Math.round(km.jamBulan)} jam MP · {Math.round(kh.jamBulan)} jam MHE).
+          Contoh: 0,79 FTE = {jamMenit(0.79 * km.jamBulan / (km.hariBulan || 1))} kerja per hari dari {jamMenit(km.jamBulan / (km.hariBulan || 1))} jam tersedia. Angka kecil di bawah FTE = waktu kerja per hari & per bulan untuk menyelesaikan volume/order.</p>
         {h.indirect.spvManual && <p className="small muted">Supervisor ({indirect?.roleSupervisor}) mengikuti jumlah yang Anda isi di peran tetap — tidak dihitung otomatis dari span of control.</p>}
         <div className="row small" style={{ justifyContent: 'flex-end' }}>
           <span className="pill ok">Total manpower: {h.totalMp} direct + {totInd} indirect/tetap = <b>{totalOrang} orang</b></span>
@@ -128,7 +140,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
         <thead><tr>
           <th>No</th><th>Task</th><th>Workload driver</th><th>Equipment / role</th><th className="num">Volume/bln</th><th>UoM</th><th className="num">%</th>
           <th className="num">Workload</th><th className="num">Productivity</th><th className="num">RfR (MH)</th><th className="num">Efficiency</th><th className="num">Man hour</th>
-          <th className="num">Man hours tersedia</th><th className="num">Operating</th><th>Resources</th><th className="num">FTE</th><th className="num">Prod. per man</th>
+          <th className="num">Man hours tersedia</th><th className="num">Operating</th><th>Resources</th><th className="num" title={TIP_FTE}>FTE (Full Time Equivalent)</th><th className="num">Prod. per man</th>
         </tr></thead>
         <tbody>
           {grup.length === 0 && <tr><td colSpan={17} className="muted">Belum ada aktivitas. Tambahkan di bagian Aktivitas (VSM) & manpower di bawah.</td></tr>}
