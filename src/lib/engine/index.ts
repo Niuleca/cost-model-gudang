@@ -6,6 +6,7 @@
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
 import { pengaliEfektif } from './types';
+import { PARAM_BIAYA_MP_DEFAULT, rincianBiayaRole } from './biayaMp';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
 } from './types.ts';
@@ -194,15 +195,19 @@ export function hitungTender(t: TenderInput, m: MasterData) {
 
   // ---- 6. Payroll (UC1–UC3) ----
   const P = m.payroll;
-  const biayaPerOrang = (j: JobLevel | undefined) => biayaPerOrangDari(m, j);
   // Eskalasi: biaya tahun ke-y = dasar × (1+r)^(y-1); biaya/bln yang dipakai = total kontrak ÷ bulan kontrak
   const esk = hitungEskalasi(t.eskalasiManpower?.persenTahun ?? 0, t.durasiKontrakBulan, t.eskalasiManpower?.mulai);
+  // Rincian biaya manpower (format sheet): gaji pokok + lisensi → sub total + BPJS TK/KS/Pensiun + THR + kompensasi + supervisi = total/orang;
+  // Σ total × orang = Sub Total-1; × (1 + management fee) = Sub Total-2 → dipakai sebagai biaya manpower.
+  const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, ...(t.paramBiayaMp ?? {}) };
+  const hariMp = t.processDesign?.hariKerjaKaryawan ?? 25;
   const payroll = manpower.map(mp => {
-    const b = biayaPerOrang(jobs.get(mp.roleName));
-    const manual = t.biayaOrangManual?.[mp.roleName];
-    const perOrang = manual != null && manual > 0 ? manual : b.total;
+    const rc = rincianBiayaRole(mp.roleName, mp.headcount, m, t.rincianBiayaMp?.[mp.roleName], paramMp, hariMp, t.kabKota);
+    const perOrang = rc.total * (1 + paramMp.feePersen);
     const dasarBulan = perOrang * mp.headcount;
-    return { ...mp, ...Object.fromEntries(Object.entries(b).map(([k, v]) => [k, bulat(v)])), total: bulat(perOrang), biayaManual: manual != null && manual > 0,
+    return { ...mp, upah: bulat(rc.gajiPokok), lisensi: bulat(rc.lisensi), subTotal: bulat(rc.subTotal), bpjsTk: bulat(rc.bpjsTk), bpjsKes: bulat(rc.bpjsKs),
+      bpjsPensiun: bulat(rc.bpjsPensiun), thr: bulat(rc.thr), kompensasi: bulat(rc.kompensasi), supervisi: bulat(rc.supervisi),
+      totalSebelumFee: bulat(rc.total), fee: bulat(rc.total * paramMp.feePersen), total: bulat(perOrang), biayaManual: rc.manual,
       biayaBulanDasar: bulat(dasarBulan), biayaBulan: bulat(dasarBulan * esk.faktor) };
   });
   const dasarMp = payroll.reduce((s2, p) => s2 + p.biayaBulanDasar, 0);
@@ -232,7 +237,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   let investasi = 0;
 
   for (const p of payroll) tambah(`Manpower — ${p.roleName} (${p.headcount} org)`, 'Manpower', p.biayaBulan, p.alokasi,
-    `${p.headcount} org × Rp${Math.round(p.total).toLocaleString('id-ID')}${p.biayaManual ? ' (manual)' : ''}${esk.faktor > 1.0000001 ? ` × eskalasi ${esk.faktor.toFixed(4)} (rata-rata kontrak)` : ''}`);
+    `${p.headcount} org × Rp${Math.round(p.totalSebelumFee).toLocaleString('id-ID')} + fee ${(paramMp.feePersen * 100).toLocaleString('id-ID')}%${p.biayaManual ? ' (diubah)' : ''}${esk.faktor > 1.0000001 ? ` × eskalasi ${esk.faktor.toFixed(4)} (rata-rata kontrak)` : ''}`);
 
   // Fasilitas
   const alokStorage = normalisasi({ storage: 1 }, { storage: 1 });
@@ -399,7 +404,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   return {
     kalender: { ...kal, hariOperasionalBulan: bulat(kal.hariOperasionalBulan, 2), faktorPengganti: bulat(kal.faktorPengganti, 4) },
     processDesign: pd,
-    volume, space, aktivitas: aktivitasHasil, manpower: payroll, eskalasiManpower, mhe,
+    volume, space, aktivitas: aktivitasHasil, manpower: payroll, eskalasiManpower, paramBiayaMp: paramMp, mhe,
     totalHeadcount: payroll.reduce((sum, p) => sum + p.headcount, 0),
     biaya: baris, perKelompok, totalBiayaBulan: bulat(totalBiaya), investasi: bulat(investasi),
     biayaPerBucket: biayaBucket, rateCard, marginTotal, pajak: { ...pajak, pphPersen: pphRate }, storageAlternatif, simulasi,

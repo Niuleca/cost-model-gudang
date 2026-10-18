@@ -146,8 +146,11 @@ export interface TenderInput {
   marginManual?: Partial<Record<Bucket, number | null>>;
   /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */
   startupAuto?: { aktif: boolean; persenOpex: number; persenManpower: number };
-  /** Biaya per orang per bulan diisi manual (override hitungan UMK/payroll), per role. */
+  /** Biaya per orang per bulan diisi manual (lama — tidak dipakai lagi). */
   biayaOrangManual?: Record<string, number>;
+  /** Rincian biaya manpower per role (format sheet) + parameter BPJS/THR/kompensasi/management fee. */
+  rincianBiayaMp?: Record<string, import('./biayaMp').InputBiayaRole>;
+  paramBiayaMp?: Partial<import('./biayaMp').ParamBiayaMp>;
   /** Kenaikan biaya manpower per tahun kontrak (0.05 = 5%/thn). Biaya/bln = total kontrak ÷ bulan kontrak. */
   eskalasiManpower?: { persenTahun: number; mulai?: string | null };
   advanceSewaBulan: number;

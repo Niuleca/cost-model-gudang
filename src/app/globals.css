@@ -238,3 +238,5 @@ td select { min-width: 96px; }
 .pd-sum.pd-sum-biaya th:nth-child(1) { width: 20%; } .pd-sum.pd-sum-biaya th:nth-child(2) { width: 30%; }
 .pd-sum.pd-sum-biaya th:nth-child(3) { width: 12%; } .pd-sum.pd-sum-biaya th:nth-child(4) { width: 9%; }
 .pd-sum.pd-sum-biaya th:nth-child(5) { width: 16%; } .pd-sum.pd-sum-biaya th:nth-child(6) { width: 13%; }
+.bmp th { white-space: normal; min-width: 70px; font-size: 12px; vertical-align: bottom; }
+.bmp td { white-space: nowrap; }

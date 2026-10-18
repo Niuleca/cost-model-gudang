@@ -4,11 +4,13 @@ import { useParams } from 'next/navigation';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
-import { hitungTender, biayaPerOrangDari, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
+import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { faktorUom, pengaliEfektif } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
+import BiayaManpowerPanel from './BiayaManpowerPanel';
+import { rincianBiayaRole, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { aktivitasDenganOrderAdmin, isAktivitasAdmin } from '@/lib/profilVolume';
 import { useProfile } from '@/lib/useProfile';
 import QuotationPanel from './QuotationPanel';
@@ -192,6 +194,11 @@ export default function TenderPage() {
   const a = t.asumsi;
   const hariOps = a.processDesign?.hariKerjaBulan ?? 25;
   const aktEf = aktivitasDenganOrderAdmin(a.aktivitas, a.volumes, a.profilVolume, hariOps);
+  const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, ...(a.paramBiayaMp ?? {}) };
+  const qtyRole = new Map<string, number>();
+  for (const r of pdFull?.mp ?? []) if (r.resources > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.resources);
+  for (const r of pdFull?.indirect.rows ?? []) if (r.qty > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.qty);
+  const rincianMp = Array.from(qtyRole, ([role, qty]) => rincianBiayaRole(role, qty, masterMp, a.rincianBiayaMp?.[role], paramMp, a.processDesign?.hariKerjaKaryawan ?? 25, t.kab_kota));
 
   const aksi = (atas: boolean) => (
     <div className="row" style={atas ? undefined : { justifyContent: 'flex-end' }}>
@@ -319,13 +326,14 @@ export default function TenderPage() {
           <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)}
               biaya={{
-                perOrangDefault: role => masterMp ? Math.round(biayaPerOrangDari(masterMp, masterMp.jobLevels.find(j => j.roleName === role)).total) : null,
-                manual: a.biayaOrangManual ?? {}, onManual: biayaOrangManual => setA({ biayaOrangManual }),
+                perOrang: role => (rincianMp.find(r => r.role === role)?.total ?? 0) * (1 + paramMp.feePersen),
                 persenTahun: (a.eskalasiManpower ?? ESKALASI_DEFAULT).persenTahun, onPersen: persenTahun => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), persenTahun } }),
                 mulai: a.eskalasiManpower?.mulai ?? null, mulaiDefault: t.tanggal_go_live?.slice(0, 7) ?? null,
                 onMulai: mulai => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), mulai } }),
                 kontrakBulan: t.durasi_kontrak_bulan,
               }} />
+          <BiayaManpowerPanel rows={rincianMp} param={paramMp} input={a.rincianBiayaMp ?? {}} bisaEdit={bisaEdit}
+            onInput={rincianBiayaMp => setA({ rincianBiayaMp })} onParam={p => setA({ paramBiayaMp: { ...(a.paramBiayaMp ?? {}), ...p } })} />
           <ProcessDesignPanel bagian="rincian" aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
           <ProcessDesignPanel bagian="desain" aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}

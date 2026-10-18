@@ -14,8 +14,8 @@ const TIP_FTE = 'FTE = Full Time Equivalent (setara pekerja penuh waktu). 1,00 F
 
 /** Process Design & Resource Calculation (format Excel): kalender kerja MP/MHE, shift, rincian per task, ringkasan MP & MHE. */
 export interface BiayaMpProps {
-  perOrangDefault: (role: string) => number | null;
-  manual: Record<string, number>; onManual: (m: Record<string, number>) => void;
+  /** Biaya per orang per bulan (total + management fee) dari tabel Rincian biaya manpower. */
+  perOrang: (role: string) => number;
   persenTahun: number; onPersen: (p: number) => void; kontrakBulan: number;
   mulai: string | null; mulaiDefault: string | null; onMulai: (m: string | null) => void;
 }
@@ -95,20 +95,11 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
     const ind = h.indirect.rows;
     const totInd = ind.reduce((t, r) => t + r.qty, 0);
     const totalOrang = h.totalMp + totInd;
-    const perOrang = (role: string) => { const m = biaya?.manual[role]; return m != null && m > 0 ? m : (biaya?.perOrangDefault(role) ?? 0); };
+    const perOrang = (role: string) => biaya?.perOrang(role) ?? 0;
     const totDirect = biaya ? h.mp.reduce((t2, r) => t2 + perOrang(r.nama) * r.resources, 0) : 0;
     const totIndirect = biaya ? ind.reduce((t2, r) => t2 + perOrang(r.nama) * r.qty, 0) : 0;
-    const selBiaya = (role: string, qty: number) => {
-      if (!biaya) return null;
-      const def = biaya.perOrangDefault(role);
-      const m = biaya.manual[role];
-      const ubah = (v: number | null) => { const x = { ...biaya.manual }; if (v == null || !(v > 0)) delete x[role]; else x[role] = v; biaya.onManual(x); };
-      return <>
-        <td className="num"><input type="number" min={0} step={1000} aria-label={`Biaya per orang ${role}`} value={m && m > 0 ? m : ''} placeholder={def != null ? String(def) : 'memuat…'}
-          onChange={e => ubah(e.target.value === '' ? null : Number(e.target.value))} style={{ width: 120, minWidth: 120, textAlign: 'right' }} />
-          <div className="small muted">{m && m > 0 ? <>manual · <button type="button" className="linkbtn" onClick={() => ubah(null)}>pakai default {def != null ? rp(def) : ''}</button></> : 'default UMK × jabatan'}</div></td>
-        <td className="num">{qty ? rp(perOrang(role) * qty) : '–'}</td></>;
-    };
+    const selBiaya = (role: string, qty: number) => biaya ? <>
+      <td className="num">{qty ? rp(perOrang(role)) : '–'}</td><td className="num">{qty ? rp(perOrang(role) * qty) : '–'}</td></> : null;
     const esk = biaya ? hitungEskalasi(biaya.persenTahun, biaya.kontrakBulan, biaya.mulai || biaya.mulaiDefault) : null;
     const dasarBln = totDirect + totIndirect;
     const n = Math.max(h.mp.length + ind.length + (ind.length ? 2 : 0), h.mhe.length, 1);
@@ -120,7 +111,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
             <h3>Man Power Summary</h3>
             <div className="tablewrap"><table className={`pd-sum${biaya ? " pd-sum-biaya" : ""}`}>
               <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th><th className="num">Resources</th>
-                {biaya && <><th className="num">Biaya/orang/bln<div className="small muted" style={{ fontWeight: 400 }}>bisa diubah</div></th><th className="num">Total/bln</th></>}</tr></thead>
+                {biaya && <><th className="num">Biaya/orang/bln<div className="small muted" style={{ fontWeight: 400 }}>incl. fee · ubah di Rincian biaya</div></th><th className="num">Total/bln</th></>}</tr></thead>
               <tbody>
                 {h.mp.length + ind.length === 0 && <tr><td colSpan={biaya ? 6 : 4} className="muted">–</td></tr>}
                 {h.mp.map(r => {
@@ -162,7 +153,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
               <tr style={{ background: 'var(--link)' }}><td colSpan={3}><b>Biaya manpower/bln dipakai di cost model</b><div className="small muted">total kontrak ÷ {esk.kontrakBulan} bulan (faktor {esk.faktor.toFixed(4)}×)</div></td>
                 <td className="num"><b>{rp(dasarBln * esk.faktor)}</b></td><td /></tr>
             </tbody></table></div>
-          <p className="small muted">Upah naik setiap Januari (UMK baru) sebesar {(esk.persenTahun * 100).toLocaleString('id-ID')}% dan bertingkat: indeks = (1 + {(esk.persenTahun * 100).toLocaleString('id-ID')}%)^(jumlah Januari yang sudah dilewati). Biaya/orang default = UMK lokasi × faktor jabatan + BPJS + THR + pesangon + tunjangan (+ contingency & fee bila outsourcing), dari master Price Inquiry; isi manual untuk menimpa. Angka ini masuk ke Hasil setelah tekan Hitung.</p>
+          <p className="small muted">Upah naik setiap Januari (UMK baru) sebesar {(esk.persenTahun * 100).toLocaleString('id-ID')}% dan bertingkat: indeks = (1 + {(esk.persenTahun * 100).toLocaleString('id-ID')}%)^(jumlah Januari yang sudah dilewati). Biaya/orang dari tabel Rincian biaya manpower di bawah (gaji pokok + lisensi + BPJS + THR + kompensasi + supervisi, ditambah management fee). Angka ini masuk ke Hasil setelah tekan Hitung.</p>
         </div>}
         <p className="small muted"><b>FTE (Full Time Equivalent)</b> = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan ({Math.round(km.jamBulan)} jam MP · {Math.round(kh.jamBulan)} jam MHE).
           Contoh: 0,79 FTE = {jamMenit(0.79 * km.jamBulan / (km.hariBulan || 1))} kerja per hari dari {jamMenit(km.jamBulan / (km.hariBulan || 1))} jam tersedia. Angka kecil di bawah FTE = waktu kerja per hari & per bulan untuk menyelesaikan volume/order.</p>
