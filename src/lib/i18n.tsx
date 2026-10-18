@@ -41,6 +41,7 @@ const K: Kamus = {
   'Biaya lain': ['Other costs', '기타 비용', 'その他費用'],
   'Hasil': ['Results', '결과', '結果'],
   'Quotation': ['Quotation', '견적서', '見積書'],
+  'Export': ['Export', '내보내기', 'エクスポート'],
   // Tombol
   'Undo': ['Undo', '실행 취소', '元に戻す'],
   'Redo': ['Redo', '다시 실행', 'やり直し'],

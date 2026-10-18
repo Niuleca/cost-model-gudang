@@ -25,8 +25,8 @@ export interface DataExport {
   pd: unknown; rincianMp: RincianBiayaRole[]; paramMp: ParamBiayaMp; profil?: unknown; orderAdmin?: unknown;
 }
 
-export async function exportTenderLengkap(p: DataExport) {
-  const buf = await buatWorkbookTender(p);
+export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
+  const buf = await buatWorkbookTender(p, sheets);
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -35,10 +35,34 @@ export async function exportTenderLengkap(p: DataExport) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-export async function buatWorkbookTender(p: {
-  t: TenderRow; hasil: HasilTender; master: MasterData; catatanMaster: string[];
-  pd: unknown; rincianMp: RincianBiayaRole[]; paramMp: ParamBiayaMp; profil?: unknown; orderAdmin?: unknown;
-}) {
+export const SHEET_EXPORT = ['Ringkasan', 'Input', 'Volume', 'Process Design', 'Biaya Manpower', 'Space & MHE', 'Biaya', 'Rate & Simulasi', 'Master Data', 'Data Mentah'] as const;
+
+/** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya). */
+export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
+  const wb = await susunWorkbook(p);
+  return wb.worksheets.map(ws => {
+    const rows: (string | number | null)[][] = [];
+    let lebar = 0;
+    ws.eachRow({ includeEmpty: true }, (row, i) => {
+      if (i > maksBaris) return;
+      const v = (row.values as unknown[]).slice(1).map(c => {
+        if (c == null) return null;
+        if (typeof c === 'object') { const o = c as { result?: unknown; formula?: string; text?: string }; return (o.result ?? o.text ?? (o.formula ? `=${o.formula}` : null)) as string | number | null; }
+        return c as string | number;
+      });
+      lebar = Math.max(lebar, v.length); rows.push(v);
+    });
+    return { nama: ws.name, baris: ws.rowCount, kolom: lebar, rows };
+  });
+}
+
+export async function buatWorkbookTender(p: DataExport, sheets?: string[]) {
+  const wb = await susunWorkbook(p);
+  if (sheets?.length) for (const ws of [...wb.worksheets]) if (!sheets.includes(ws.name)) wb.removeWorksheet(ws.id);
+  return wb.xlsx.writeBuffer();
+}
+
+async function susunWorkbook(p: DataExport) {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Leca — esapanghegar'; wb.created = new Date();
@@ -161,10 +185,10 @@ export async function buatWorkbookTender(p: {
     p.rincianMp.forEach((r, i) => {
       const n = ws.rowCount + 1;
       ws.addRow([i + 1, r.role, r.level, r.area, r.umk, r.faktorLevel, r.gajiPokok, r.hariKerja, r.hariAktual, r.lisensi,
-        { formula: `G${n}*MIN(1,I${n}/H${n})+J${n}` },
-        { formula: `G${n}*$B$${P}` }, { formula: `MIN(G${n},IF($H$${P}>0,$H$${P},G${n}))*$C$${P}` }, { formula: `MIN(G${n},IF($I$${P}>0,$I$${P},G${n}))*$D$${P}` },
-        { formula: `G${n}*$E$${P}` }, { formula: `G${n}*$F$${P}` }, r.supervisi,
-        { formula: `K${n}+L${n}+M${n}+N${n}+O${n}+P${n}+Q${n}` }, r.qty, r.porsi, { formula: `R${n}*S${n}*T${n}` }]);
+        { formula: `G${n}*MIN(1,I${n}/H${n})+J${n}`, result: r.subTotal },
+        { formula: `G${n}*$B$${P}`, result: r.bpjsTk }, { formula: `MIN(G${n},IF($H$${P}>0,$H$${P},G${n}))*$C$${P}`, result: r.bpjsKs }, { formula: `MIN(G${n},IF($I$${P}>0,$I$${P},G${n}))*$D$${P}`, result: r.bpjsPensiun },
+        { formula: `G${n}*$E$${P}`, result: r.thr }, { formula: `G${n}*$F$${P}`, result: r.kompensasi }, r.supervisi,
+        { formula: `K${n}+L${n}+M${n}+N${n}+O${n}+P${n}+Q${n}`, result: r.total }, r.qty, r.porsi, { formula: `R${n}*S${n}*T${n}`, result: r.totalQty }]);
       const row = ws.getRow(n);
       row.getCell(6).numFmt = '0%'; row.getCell(20).numFmt = '0.00';
       for (const c of [5, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21]) row.getCell(c).numFmt = '#,##0';
@@ -172,9 +196,10 @@ export async function buatWorkbookTender(p: {
       hasilCell(row.getCell(21) as never);
     });
     const akhir = ws.rowCount;
-    const s1 = ws.addRow(['', 'Sub Total Biaya-1', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', { formula: `SUM(S${awal}:S${akhir})` }, '', { formula: `SUM(U${awal}:U${akhir})` }]);
-    const fee = ws.addRow(['', 'Management Fee', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', { formula: `U${s1.number}*$G$${P}` }]);
-    const s2 = ws.addRow(['', 'Sub Total Biaya-2', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', { formula: `U${s1.number}+U${fee.number}` }]);
+    const sub1 = p.rincianMp.reduce((x, r) => x + r.totalQty, 0);
+    const s1 = ws.addRow(['', 'Sub Total Biaya-1', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', { formula: `SUM(S${awal}:S${akhir})`, result: p.rincianMp.reduce((x, r) => x + r.qty, 0) }, '', { formula: `SUM(U${awal}:U${akhir})`, result: sub1 }]);
+    const fee = ws.addRow(['', 'Management Fee', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', { formula: `U${s1.number}*$G$${P}`, result: sub1 * pm.feePersen }]);
+    const s2 = ws.addRow(['', 'Sub Total Biaya-2', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', { formula: `U${s1.number}+U${fee.number}`, result: sub1 * (1 + pm.feePersen) }]);
     for (const r of [s1, fee, s2]) { r.font = { bold: true }; r.getCell(21).numFmt = '#,##0'; hasilCell(r.getCell(21) as never); }
     ws.addRow([]);
     const e = h.eskalasiManpower;
@@ -221,5 +246,5 @@ export async function buatWorkbookTender(p: {
     ws.columns = [{ width: 10 }, { width: 70 }, { width: 30 }];
   }
 
-  return wb.xlsx.writeBuffer();
+  return wb;
 }

@@ -11,6 +11,7 @@ import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { faktorUom, pengaliEfektif } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
+import ExportPanel from './ExportPanel';
 import { rincianBiayaRole, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { aktivitasDenganOrderAdmin, isAktivitasAdmin, orderAdmin } from '@/lib/profilVolume';
 import { useProfile } from '@/lib/useProfile';
@@ -38,7 +39,7 @@ interface Tarif { golongan: string; tarif_kwh: number }
 interface Jab { role_name: string }
 
 const TAB_EXCEL = 'Data project (Excel)' as const;
-const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation'] as const;
+const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Export'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
@@ -212,17 +213,13 @@ export default function TenderPage() {
   for (const r of pdFull?.indirect.rows ?? []) if (r.qty > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.qty);
   const rincianMp = Array.from(qtyRole, ([role, qty]) => rincianBiayaRole(role, qty, masterMp, a.rincianBiayaMp?.[role], paramMp, a.processDesign?.hariKerjaKaryawan ?? 25, t.kab_kota, { levelGaji: a.levelGaji, levelRole: a.levelRole }));
 
-  async function exportLengkap() {
-    if (!t) return;
-    setPesan('Menyiapkan Excel…');
-    try {
-      const { master, catatan } = await muatMaster(sb, t);
-      const h = hitungTender(keInput(t), master);
-      const { exportTenderLengkap } = await import('@/lib/exportTender');
-      await exportTenderLengkap({ t, hasil: h, master, catatanMaster: catatan, pd: pdFull, rincianMp, paramMp,
-        profil: a.profilVolume, orderAdmin: orderAdmin(a.profilVolume, a.volumes, hariOps) });
-      setPesan('Excel diunduh.'); setTimeout(() => setPesan(null), 2500);
-    } catch (e) { setPesan(`Gagal export: ${(e as Error).message}`); }
+  /** Data lengkap untuk tab Export: hitung ulang dengan master terbaru. */
+  async function siapkanExport() {
+    if (!t) throw new Error('Tender belum dimuat');
+    const { master, catatan } = await muatMaster(sb, t);
+    const h = hitungTender(keInput(t), master);
+    return { t, hasil: h, master, catatanMaster: catatan, pd: pdFull, rincianMp, paramMp,
+      profil: a.profilVolume, orderAdmin: orderAdmin(a.profilVolume, a.volumes, hariOps) };
   }
 
   const aksi = (atas: boolean) => (
@@ -233,7 +230,6 @@ export default function TenderPage() {
         <button className="ghost" onClick={redo} disabled={!riwayat.current.depan.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷ {tr('Redo')}</button>
       </>}
       {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor}>{tr(kotor ? 'Simpan input' : 'Tersimpan')}</button>}
-      <button className="ghost" onClick={exportLengkap} title="Unduh semua input, perhitungan, hasil & data master ke Excel">⬇ {tr('Export Excel')}</button>
       <button onClick={() => hitung()}>{tr('Hitung')}</button>
     </div>);
 
@@ -504,7 +500,8 @@ export default function TenderPage() {
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
-      {tab !== 'Hasil' && tab !== 'Quotation' && <div className="aksi-bawah">{aksi(false)}</div>}
+      {tab === 'Export' && <ExportPanel siapkan={siapkanExport} namaFile={`Leca_${(t.kode ?? t.customer).replace(/[^\w-]+/g, '_')}_lengkap.xlsx`} />}
+      {tab !== 'Hasil' && tab !== 'Quotation' && tab !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
     </>
   );
 }

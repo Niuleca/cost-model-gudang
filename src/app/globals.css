@@ -259,3 +259,6 @@ tr[style*="var(--link)"] { background: var(--res-strong) !important; }
 .legend-hasil i { width: 14px; height: 14px; border-radius: 3px; background: var(--res-strong); border: 1px solid var(--res-line); display: inline-block; }
 .bahasa-pilih { display: inline-flex; align-items: center; gap: 4px; align-self: center; margin-right: 6px; }
 .bahasa-pilih select { min-width: 0; width: auto; padding: 4px 6px; font-size: 12px; border-radius: 8px; }
+.xl-prev table { font-size: 12px; }
+.xl-prev td, .xl-prev th { white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; padding: 4px 8px; height: auto; }
+.xl-prev td:first-child, .xl-prev th:first-child { position: sticky; left: 0; background: var(--surface-2); z-index: 1; }
