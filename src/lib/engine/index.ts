@@ -20,7 +20,7 @@ const ARUS_KE_BUCKET: Record<Arus, Bucket> = {
 const RISIKO_DEFAULT: Record<Kelompok, KategoriRisiko> = {
   Manpower: 'Sedang', Fasilitas: 'Rendah', Utilitas: 'Rendah', MHE: 'Sedang', Racking: 'Tinggi',
   IT: 'Sedang', Office: 'Rendah', Consumable: 'Rendah', HSE: 'Rendah', Asuransi: 'Rendah',
-  Startup: 'Tinggi', Finance: 'Rendah', Overhead: 'Rendah', Lainnya: 'Sedang',
+  Startup: 'Tinggi', Finance: 'Rendah', 'Interest cost': 'Rendah', Overhead: 'Rendah', Lainnya: 'Sedang',
 };
 
 const bulat = (x: number, d = 0) => Math.round(x * 10 ** d) / 10 ** d;
@@ -238,10 +238,16 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     const periode = Math.min(u, n);
     if (u > n) flags.push({ level: 'peringatan', kode: 'UMUR_GT_KONTRAK', pesan: `${deskripsi}: umur ${u} bln > kontrak ${n} bln — disusutkan penuh selama kontrak (customer menanggung seluruh nilai). Kalau aset akan dipakai ulang setelah kontrak, pertimbangkan umur penuh.` });
     tambah(`${deskripsi} — depresiasi`, kelompok, nilai / periode, alokasi, `Rp${bulat(nilai).toLocaleString('id-ID')} ÷ ${periode} bln`, risiko);
+    nilaiModal.set(`${deskripsi} — depresiasi`, nilai);
+    if (dibiayaiBank(`${deskripsi} — depresiasi`)) return nilai;   // bunganya dihitung di sheet Interest cost
     tambah(`${deskripsi} — bunga modal`, 'Finance', (nilai / 2) * r, alokasi, `rata-rata nilai buku × ${(m.finance.bungaModalTahun * 100).toFixed(1)}%/thn`);
     return nilai;
   };
   let investasi = 0;
+  // Interest cost (simulasi pinjaman bank): baris yang dibiayai bank tidak lagi kena "bunga modal" default
+  const ic = t.interestCost;
+  const nilaiModal = new Map<string, number>();
+  const dibiayaiBank = (sumber: string) => !!ic?.items.some(x => x.aktif && x.sumber === sumber);
 
   for (const p of payroll) tambah(`Manpower — ${p.roleName} (${p.headcount} org)`, 'Manpower', p.biayaBulan, p.alokasi,
     `${p.headcount} org${p.porsi < 1 ? ` × sharing ${p.porsi.toLocaleString('id-ID')}` : ''} × Rp${Math.round(p.totalSebelumFee).toLocaleString('id-ID')} + fee ${(paramMp.feePersen * 100).toLocaleString('id-ID')}%${p.biayaManual ? ' (diubah)' : ''}${esk.faktor > 1.0000001 ? ` × eskalasi ${esk.faktor.toFixed(4)} (rata-rata kontrak)` : ''}`);
@@ -287,7 +293,8 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     else if (c.mode === 'beli') investasi += capex(c.deskripsi, c.kelompok, nilai, c.umurBulan, alok, c.kategoriRisiko);
     else { // sekali (startup): amortisasi selama kontrak + bunga
       tambah(`${c.deskripsi} — amortisasi`, c.kelompok, nilai / n, alok, `Rp${nilai.toLocaleString('id-ID')} ÷ ${n} bln`, c.kategoriRisiko ?? 'Tinggi');
-      tambah(`${c.deskripsi} — bunga`, 'Finance', (nilai / 2) * r, alok, 'rata-rata saldo × bunga');
+      nilaiModal.set(`${c.deskripsi} — amortisasi`, nilai);
+      if (!dibiayaiBank(`${c.deskripsi} — amortisasi`)) tambah(`${c.deskripsi} — bunga`, 'Finance', (nilai / 2) * r, alok, 'rata-rata saldo × bunga');
       investasi += nilai;
     }
   }
@@ -304,10 +311,36 @@ export function hitungTender(t: TenderInput, m: MasterData) {
       const nilai = persen * dasar;
       if (nilai <= 0) continue;
       tambah(`${nama} (otomatis) — amortisasi`, 'Startup', nilai / n, alokOps, `${(persen * 100).toFixed(0)}% × ${ket} Rp${bulat(dasar).toLocaleString('id-ID')} = Rp${bulat(nilai).toLocaleString('id-ID')} ÷ ${n} bln`);
-      tambah(`${nama} (otomatis) — bunga`, 'Finance', (nilai / 2) * r, alokOps, 'rata-rata saldo × bunga');
+      nilaiModal.set(`${nama} (otomatis) — amortisasi`, nilai);
+      if (!dibiayaiBank(`${nama} (otomatis) — amortisasi`)) tambah(`${nama} (otomatis) — bunga`, 'Finance', (nilai / 2) * r, alokOps, 'rata-rata saldo × bunga');
       investasi += nilai;
     }
   }
+  // ---- 7c. Interest cost: sumber pinjaman (semua baris biaya kecuali finance/overhead) + baris manual ----
+  const sumberPinjaman = baris.filter(b => b.kelompok !== 'Finance' && b.kelompok !== 'Overhead').map(b => {
+    const capexNilai = nilaiModal.get(b.deskripsi);
+    return { deskripsi: b.deskripsi, kelompok: b.kelompok, biayaBulan: b.biayaBulan, jenis: capexNilai != null ? 'capex' as const : 'bulanan' as const,
+      pokokDefault: bulat(capexNilai ?? b.biayaBulan * 12) };
+  });
+  const bungaTahun = Math.max(0, ic?.bungaTahun ?? 0.09);
+  const interestItems = (ic?.items ?? []).filter(x => x.aktif).map(x => {
+    const src = x.sumber ? sumberPinjaman.find(sp => sp.deskripsi === x.sumber) : undefined;
+    const pokok = x.pokok != null && x.pokok >= 0 ? x.pokok : (src?.pokokDefault ?? 0);
+    const tenor = x.tenorBulan && x.tenorBulan > 0 ? x.tenorBulan : n;
+    const rb = bungaTahun / 12;
+    const totalBunga = ic?.metode === 'menurun' ? pokok * rb * (tenor + 1) / 2 : pokok * rb * tenor;
+    return { ...x, sumberDitemukan: !x.sumber || !!src, pokok: bulat(pokok), tenorBulan: tenor, bungaBulanAwal: bulat(pokok * rb), totalBunga: bulat(totalBunga), biayaBulan: bulat(totalBunga / n),
+      alokasi: (src ? baris.find(b => b.deskripsi === src.deskripsi)?.alokasi : undefined) ?? normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 }) };
+  });
+  for (const it of interestItems) {
+    if (!it.sumberDitemukan) { flags.push({ level: 'peringatan', kode: 'INTEREST_SUMBER', pesan: `Interest cost "${it.deskripsi}": baris sumber "${it.sumber}" tidak ada lagi di rincian biaya — pakai pokok manual atau pilih ulang.` }); }
+    tambah(`Interest cost — ${it.deskripsi}`, 'Interest cost', it.biayaBulan, it.alokasi,
+      `pokok Rp${it.pokok.toLocaleString('id-ID')} × ${(bungaTahun * 100).toLocaleString('id-ID')}%/thn × ${it.tenorBulan} bln${ic?.metode === 'menurun' ? ' (pokok dicicil, bunga atas sisa)' : ' (flat)'} = Rp${it.totalBunga.toLocaleString('id-ID')} ÷ ${n} bln kontrak`);
+  }
+  const interestCost = { bungaTahun, metode: ic?.metode ?? 'flat', items: interestItems.map(({ alokasi: _a, ...x }) => x),
+    totalPokok: bulat(interestItems.reduce((a, x) => a + x.pokok, 0)), totalBunga: bulat(interestItems.reduce((a, x) => a + x.totalBunga, 0)),
+    biayaBulan: bulat(interestItems.reduce((a, x) => a + x.biayaBulan, 0)) };
+
   const subtotalOperasi = baris.reduce((sum, b) => sum + b.biayaBulan, 0);
   const selisihHari = t.paymentTermHari - m.finance.apHari;
   if (selisihHari > 0)
@@ -421,6 +454,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     processDesign: pd,
     volume, space, aktivitas: aktivitasHasil, manpower: payroll, eskalasiManpower, paramBiayaMp: paramMp, mhe,
     totalHeadcount: payroll.reduce((sum, p) => sum + p.headcount, 0),
+    sumberPinjaman, interestCost,
     biaya: baris, perKelompok, totalBiayaBulan: bulat(totalBiaya), investasi: bulat(investasi),
     biayaPerBucket: biayaBucket, rateCard, marginTotal, pajak: { ...pajak, pphPersen: pphRate }, storageAlternatif, simulasi,
     redFlags: flags,

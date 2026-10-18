@@ -61,6 +61,7 @@ export interface Asumsi {
   levelRole?: Record<string, import('@/lib/engine/biayaMp').LevelJabatan>;
   uomRateCard?: Partial<Record<import('@/lib/engine/types').Bucket, string>>;
   revisiBiaya?: Record<string, number>;
+  interestCost?: import('@/lib/engine/types').InterestCost;
   eskalasiManpower?: { persenTahun: number; mulai?: string | null };
 }
 
@@ -114,7 +115,7 @@ export function keInput(t: TenderRow): TenderInput {
       sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
-    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, rincianBiayaMp: a.rincianBiayaMp ?? {}, paramBiayaMp: a.paramBiayaMp ?? {}, levelGaji: a.levelGaji ?? {}, levelRole: a.levelRole ?? {}, uomRateCard: a.uomRateCard ?? {}, revisiBiaya: a.revisiBiaya ?? {},
+    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, rincianBiayaMp: a.rincianBiayaMp ?? {}, paramBiayaMp: a.paramBiayaMp ?? {}, levelGaji: a.levelGaji ?? {}, levelRole: a.levelRole ?? {}, uomRateCard: a.uomRateCard ?? {}, revisiBiaya: a.revisiBiaya ?? {}, interestCost: a.interestCost,
     konversiPalet: { cbmPerPalet: a.profilVolume?.param?.cbmPerPalet ?? 1.5, tonPerPalet: a.profilVolume?.param?.tonPerPalet ?? 0.8 }, eskalasiManpower: { ...ESKALASI_DEFAULT, ...(a.eskalasiManpower ?? {}), mulai: a.eskalasiManpower?.mulai || t.tanggal_go_live?.slice(0, 7) || null },
     ...(() => { const sp = stokDariPalet(a.volumes, a.profilVolume); return sp.palet > 0
       ? { stokTon: sp.ton || undefined, stokCbm: sp.cbm || undefined, stokLiter: sp.liter || undefined }

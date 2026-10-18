@@ -12,6 +12,7 @@ import { faktorUom, pengaliEfektif } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
+import InterestPanel from './InterestPanel';
 import { rincianBiayaRole, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { aktivitasDenganOrderAdmin, isAktivitasAdmin, orderAdmin, stokDariPalet } from '@/lib/profilVolume';
 import { useProfile } from '@/lib/useProfile';
@@ -39,7 +40,7 @@ interface Tarif { golongan: string; tarif_kwh: number }
 interface Jab { role_name: string }
 
 const TAB_EXCEL = 'Data project (Excel)' as const;
-const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Export'] as const;
+const TABS = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Export'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
@@ -136,6 +137,12 @@ export default function TenderPage() {
   const [masterMp, setMasterMp] = useState<Awaited<ReturnType<typeof muatMaster>>['master'] | null>(null);
   const kunciMaster = t ? `${t.id}|${t.kab_kota}|${t.provinsi}` : '';
   useEffect(() => { if (!t) return; muatMaster(sb, t).then(r => setMasterMp(r.master)).catch(() => {}); }, [kunciMaster]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hitung langsung untuk sheet Interest cost (daftar sumber pinjaman + hasil bunga live)
+  const hasilInterest = useMemo(() => {
+    if (!t || !masterMp || tab !== 'Interest cost') return null;
+    try { return hitungTender(keInput(t), masterMp); } catch { return null; }
+  }, [t, masterMp, tab]);
 
   // ---- Undo / redo: setiap perubahan input dicatat; ketikan beruntun (< 800 ms) digabung jadi satu langkah ----
   const tRef = useRef<TenderRow | null>(null); tRef.current = t;
@@ -506,6 +513,8 @@ export default function TenderPage() {
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
             : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />
       </>)}
+
+      {tab === 'Interest cost' && <InterestPanel nilai={a.interestCost} onChange={interestCost => setA({ interestCost })} hasilLive={hasilInterest} kontrakBulan={t.durasi_kontrak_bulan} />}
 
       {tab === 'IT' && <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} />}
 

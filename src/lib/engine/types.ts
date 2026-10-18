@@ -7,7 +7,7 @@ export type Bucket = 'storage' | 'handling_in' | 'handling_out' | 'vas' | 'manaj
 export type KategoriRisiko = 'Rendah' | 'Sedang' | 'Tinggi';
 export type Kelompok =
   | 'Manpower' | 'Fasilitas' | 'Utilitas' | 'MHE' | 'Racking' | 'IT'
-  | 'Office' | 'Consumable' | 'HSE' | 'Asuransi' | 'Startup' | 'Finance' | 'Overhead' | 'Lainnya';
+  | 'Office' | 'Consumable' | 'HSE' | 'Asuransi' | 'Startup' | 'Finance' | 'Interest cost' | 'Overhead' | 'Lainnya';
 
 export interface VolumeInput {
   arus: Arus;
@@ -156,6 +156,7 @@ export interface TenderInput {
   uomRateCard?: Partial<Record<Bucket, string>>;
   /** Revisi manual biaya/bln per baris rincian (kunci = deskripsi baris). */
   revisiBiaya?: Record<string, number>;
+  interestCost?: InterestCost;
   /** Konversi palet → CBM/ton untuk opsi UoM rate card (dari parameter profil order). */
   konversiPalet?: { cbmPerPalet: number; tonPerPalet: number };
   levelRole?: Record<string, import('./biayaMp').LevelJabatan>;
@@ -214,4 +215,22 @@ export interface BiayaBaris {
   dasar: string;                    // penjelasan rumus singkat (ketertelusuran)
   /** Diisi bila biaya/bln baris ini direvisi manual: nilai hitungan sistem sebelum direvisi. */
   biayaSistem?: number;
+}
+
+/** Simulasi pinjaman bank: pokok pinjaman × bunga → interest cost masuk ke biaya. */
+export interface InterestItem {
+  id: string;
+  /** Deskripsi baris biaya sumber (mis. "Sewa gudang — X", "Racking SPR (… posisi) — depresiasi"); kosong = baris manual. */
+  sumber?: string;
+  deskripsi: string;
+  /** Pokok pinjaman (Rp). Kosong = default: nilai capex, atau biaya/bln × 12 untuk biaya bulanan. */
+  pokok?: number | null;
+  /** Tenor pinjaman (bulan). Kosong = durasi kontrak. */
+  tenorBulan?: number | null;
+  aktif: boolean;
+}
+export interface InterestCost {
+  bungaTahun: number;                 // 0.09 = 9%/thn
+  metode: 'flat' | 'menurun';         // flat = bunga atas pokok penuh; menurun = pokok dicicil rata (bunga atas sisa pokok)
+  items: InterestItem[];
 }

@@ -37,6 +37,7 @@ const K: Kamus = {
   'Volume': ['Volume', '물량', '物量'],
   'Aktivitas & manpower': ['Activities & manpower', '작업 및 인력', '作業と人員'],
   'Gudang, space & MHE': ['Warehouse, space & MHE', '창고·공간·하역장비', '倉庫・スペース・MHE'],
+  'Interest cost': ['Interest cost', '이자 비용', '支払利息'],
   'IT': ['IT', 'IT', 'IT'],
   'Biaya lain': ['Other costs', '기타 비용', 'その他費用'],
   'Hasil': ['Results', '결과', '結果'],
