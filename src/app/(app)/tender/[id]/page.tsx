@@ -70,6 +70,16 @@ export default function TenderPage() {
   const sb = supabaseBrowser();
   const { profile } = useProfile();
   const [t, setT] = useState<TenderRow | null>(null);
+  // Daftar provinsi / kab-kota + UMK berlaku (sama dengan form Tender baru)
+  const [upahList, setUpahList] = useState<{ provinsi: string; kab_kota: string; upah_berlaku: number; status_verifikasi: string; tahun: number }[]>([]);
+  useEffect(() => {
+    supabaseBrowser().from('upah_minimum_berlaku').select('provinsi, kab_kota, upah_berlaku, status_verifikasi, tahun').order('provinsi').order('kab_kota').order('tahun', { ascending: false }).limit(3000)
+      .then(({ data }: { data: typeof upahList | null }) => {
+        const m = new Map<string, (typeof upahList)[number]>();
+        for (const u of data ?? []) { const k = `${u.provinsi}|${u.kab_kota}`; if (!m.has(k)) m.set(k, u); }
+        setUpahList(Array.from(m.values()));
+      });
+  }, []);
   const [basisRingkas, setBasisRingkas] = useState<'peakBulan' | 'rataRataBulan' | 'komitmenBulan'>('peakBulan');
   const [tab, setTab] = useTabUrl<(typeof TABS)[number] | typeof TAB_EXCEL>([TAB_EXCEL, ...TABS], 'Key assumption');
   const [prods, setProds] = useState<Prod[]>([]);
@@ -242,6 +252,24 @@ export default function TenderPage() {
             <Sel id="ind" label="Industri (benchmark produktivitas)" value={t.industri ?? ''} options={Array.from(new Set(['', ...INDUSTRI, t.industri ?? ''])).map(v => ({ v, l: v || '—' }))} onChange={v => setKol('industri', v || null)} />
             <Txt id="pic" label="PIC / account" value={t.pic ?? ''} onChange={v => setKol('pic', v)} />
             <Txt id="alamat" label="Alamat / site" value={t.alamat_lokasi ?? ''} onChange={v => setKol('alamat_lokasi', v)} />
+            {(() => {
+              const provs = Array.from(new Set(upahList.map(u => u.provinsi)));
+              const kabs = upahList.filter(u => u.provinsi === t.provinsi);
+              const um = upahList.find(u => u.provinsi === t.provinsi && u.kab_kota === t.kab_kota);
+              return <>
+                <label className="f" htmlFor="prov-tender">Provinsi project
+                  <select id="prov-tender" value={t.provinsi} onChange={e => { const p = e.target.value; setT(x => x && ({ ...x, provinsi: p, kab_kota: '' })); catat(); setKotor(true); }}>
+                    {!provs.includes(t.provinsi) && <option value={t.provinsi}>{t.provinsi || '— pilih provinsi —'}</option>}
+                    {provs.map(p => <option key={p}>{p}</option>)}
+                  </select></label>
+                <label className="f" htmlFor="kab-tender">Area / kab-kota (menentukan UMK)
+                  <select id="kab-tender" value={t.kab_kota} onChange={e => setKol('kab_kota', e.target.value)}>
+                    {!kabs.some(k => k.kab_kota === t.kab_kota) && <option value={t.kab_kota}>{t.kab_kota || '— pilih kab/kota —'}</option>}
+                    {kabs.map(k => <option key={k.kab_kota} value={k.kab_kota}>{k.kab_kota} — UMK {rp(k.upah_berlaku)}</option>)}
+                  </select>
+                  <span className="small muted">{um ? <>UMK {um.tahun}: <b>{rp(um.upah_berlaku)}</b> · {um.status_verifikasi} — dipakai sebagai gaji pokok default di Rincian biaya manpower</> : 'Pilih kab/kota agar UMK terisi'}</span></label>
+              </>;
+            })()}
             <Sel id="skema" label="Skema" value={t.skema} options={[{ v: 'Dedicated', l: 'Dedicated' }, { v: 'Shared', l: 'Shared' }]} onChange={v => setKol('skema', v)} />
             <Sel id="aset" label="Skenario aset" value={t.skenario_aset} options={(['Rental', 'Own Asset', 'Built-to-Suit'] as const).map(v => ({ v, l: v }))} onChange={v => setKol('skenario_aset', v)} />
             <Num id="kontrak" label="Durasi kontrak" suffix="bulan" value={t.durasi_kontrak_bulan} onChange={v => setKol('durasi_kontrak_bulan', v)} />
