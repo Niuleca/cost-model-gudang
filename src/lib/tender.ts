@@ -55,7 +55,7 @@ export interface Asumsi {
   processDesign?: ProcessDesignInput;
   profilVolume?: import('@/lib/profilVolume').ProfilVolume;
   biayaOrangManual?: Record<string, number>;
-  eskalasiManpower?: { persenTahun: number };
+  eskalasiManpower?: { persenTahun: number; mulai?: string | null };
 }
 
 /** Project berjalan yang diimpor dari cost model Excel lama (tidak dihitung ulang oleh mesin hitung). */
@@ -108,7 +108,7 @@ export function keInput(t: TenderRow): TenderInput {
       sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
-    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, biayaOrangManual: a.biayaOrangManual ?? {}, eskalasiManpower: a.eskalasiManpower ?? ESKALASI_DEFAULT,
+    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, biayaOrangManual: a.biayaOrangManual ?? {}, eskalasiManpower: { ...ESKALASI_DEFAULT, ...(a.eskalasiManpower ?? {}), mulai: a.eskalasiManpower?.mulai || t.tanggal_go_live?.slice(0, 7) || null },
     stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter,
     metodeManpower: 'excel', processDesign:   // hanya metode FTE (process design) yang dipakai
     { ...PD_DEFAULT, ...(a.processDesign ?? {}) },

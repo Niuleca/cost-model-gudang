@@ -321,7 +321,9 @@ export default function TenderPage() {
               biaya={{
                 perOrangDefault: role => masterMp ? Math.round(biayaPerOrangDari(masterMp, masterMp.jobLevels.find(j => j.roleName === role)).total) : null,
                 manual: a.biayaOrangManual ?? {}, onManual: biayaOrangManual => setA({ biayaOrangManual }),
-                persenTahun: (a.eskalasiManpower ?? ESKALASI_DEFAULT).persenTahun, onPersen: persenTahun => setA({ eskalasiManpower: { persenTahun } }),
+                persenTahun: (a.eskalasiManpower ?? ESKALASI_DEFAULT).persenTahun, onPersen: persenTahun => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), persenTahun } }),
+                mulai: a.eskalasiManpower?.mulai ?? null, mulaiDefault: t.tanggal_go_live?.slice(0, 7) ?? null,
+                onMulai: mulai => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), mulai } }),
                 kontrakBulan: t.durasi_kontrak_bulan,
               }} />
           <ProcessDesignPanel bagian="rincian" aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}

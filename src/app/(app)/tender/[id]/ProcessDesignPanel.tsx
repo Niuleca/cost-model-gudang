@@ -17,6 +17,7 @@ export interface BiayaMpProps {
   perOrangDefault: (role: string) => number | null;
   manual: Record<string, number>; onManual: (m: Record<string, number>) => void;
   persenTahun: number; onPersen: (p: number) => void; kontrakBulan: number;
+  mulai: string | null; mulaiDefault: string | null; onMulai: (m: string | null) => void;
 }
 
 export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift, biaya }: {
@@ -108,7 +109,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
           <div className="small muted">{m && m > 0 ? <>manual · <button type="button" className="linkbtn" onClick={() => ubah(null)}>pakai default {def != null ? rp(def) : ''}</button></> : 'default UMK × jabatan'}</div></td>
         <td className="num">{qty ? rp(perOrang(role) * qty) : '–'}</td></>;
     };
-    const esk = biaya ? hitungEskalasi(biaya.persenTahun, biaya.kontrakBulan) : null;
+    const esk = biaya ? hitungEskalasi(biaya.persenTahun, biaya.kontrakBulan, biaya.mulai || biaya.mulaiDefault) : null;
     const dasarBln = totDirect + totIndirect;
     const n = Math.max(h.mp.length + ind.length + (ind.length ? 2 : 0), h.mhe.length, 1);
     const sub = (l: string, fte: string, v: number, tot?: number) => <tr className="pd-sub"><td colSpan={2}><b>{l}</b></td><td className="num">{fte}</td><td className="num"><b>{v}</b></td>{biaya && <><td /><td className="num"><b>{tot ? rp(tot) : '–'}</b></td></>}</tr>;
@@ -143,19 +144,25 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
         {biaya && esk && <div style={{ minWidth: 0 }}>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
             <h3>Skema biaya manpower selama kontrak</h3>
-            <label className="f" htmlFor="esk-mp">Kenaikan per tahun
+            <div className="row" style={{ alignItems: 'end' }}>
+            <label className="f" htmlFor="esk-mulai">Mulai kontrak
+              <input id="esk-mulai" type="month" value={biaya.mulai || biaya.mulaiDefault || esk.mulai} onChange={e => biaya.onMulai(e.target.value || null)} style={{ minWidth: 150 }} />
+              <span className="small muted">{biaya.mulai ? 'diisi manual' : biaya.mulaiDefault ? 'dari tanggal go-live' : 'go-live kosong → Januari tahun ini'}</span></label>
+            <label className="f" htmlFor="esk-mp">Kenaikan upah tiap Januari
               <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input id="esk-mp" type="number" step="any" min={0} value={Math.round(esk.persenTahun * 1000) / 10}
-                onChange={e => biaya.onPersen(Number(e.target.value) / 100)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /><span>%</span></div></label>
+                onChange={e => biaya.onPersen(Number(e.target.value) / 100)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /><span>%</span></div>
+              <span className="small muted">kebijakan UMK, umumnya 5–7%</span></label>
+            </div>
           </div>
           <div className="tablewrap"><table>
-            <thead><tr><th>Tahun</th><th className="num">Bulan</th><th className="num">Indeks</th><th className="num">Biaya/bln</th><th className="num">Total tahun</th></tr></thead>
-            <tbody>{esk.tahun.map(y => <tr key={y.tahun}><td>Tahun {y.tahun}</td><td className="num">{y.bulan}</td><td className="num">{(y.indeks * 100).toFixed(1)}%</td>
+            <thead><tr><th>Periode</th><th className="num">Bulan</th><th className="num">Indeks</th><th className="num">Biaya/bln</th><th className="num">Total periode</th></tr></thead>
+            <tbody>{esk.tahun.map(y => <tr key={y.tahun}><td><b>{y.tahun}</b> <span className="small muted">{y.dari === y.sampai ? y.dari : `${y.dari} – ${y.sampai}`}{y.ke > 0 ? ` · naik ke-${y.ke}` : ' · upah dasar'}</span></td><td className="num">{y.bulan}</td><td className="num">{(y.indeks * 100).toFixed(1)}%</td>
               <td className="num">{rp(dasarBln * y.indeks)}</td><td className="num">{rp(dasarBln * y.indeks * y.bulan)}</td></tr>)}
               <tr className="pd-sub"><td><b>Total kontrak</b></td><td className="num"><b>{esk.kontrakBulan}</b></td><td /><td /><td className="num"><b>{rp(dasarBln * esk.faktor * esk.kontrakBulan)}</b></td></tr>
               <tr style={{ background: 'var(--link)' }}><td colSpan={3}><b>Biaya manpower/bln dipakai di cost model</b><div className="small muted">total kontrak ÷ {esk.kontrakBulan} bulan (faktor {esk.faktor.toFixed(4)}×)</div></td>
                 <td className="num"><b>{rp(dasarBln * esk.faktor)}</b></td><td /></tr>
             </tbody></table></div>
-          <p className="small muted">Indeks tahun ke-n = (1 + {(esk.persenTahun * 100).toLocaleString('id-ID')}%)^(n−1). Biaya/orang default = UMK lokasi × faktor jabatan + BPJS + THR + pesangon + tunjangan (+ contingency & fee bila outsourcing), dari master Price Inquiry; isi manual untuk menimpa. Angka ini masuk ke Hasil setelah tekan Hitung.</p>
+          <p className="small muted">Upah naik setiap Januari (UMK baru) sebesar {(esk.persenTahun * 100).toLocaleString('id-ID')}% dan bertingkat: indeks = (1 + {(esk.persenTahun * 100).toLocaleString('id-ID')}%)^(jumlah Januari yang sudah dilewati). Biaya/orang default = UMK lokasi × faktor jabatan + BPJS + THR + pesangon + tunjangan (+ contingency & fee bila outsourcing), dari master Price Inquiry; isi manual untuk menimpa. Angka ini masuk ke Hasil setelah tekan Hitung.</p>
         </div>}
         <p className="small muted"><b>FTE (Full Time Equivalent)</b> = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan ({Math.round(km.jamBulan)} jam MP · {Math.round(kh.jamBulan)} jam MHE).
           Contoh: 0,79 FTE = {jamMenit(0.79 * km.jamBulan / (km.hariBulan || 1))} kerja per hari dari {jamMenit(km.jamBulan / (km.hariBulan || 1))} jam tersedia. Angka kecil di bawah FTE = waktu kerja per hari & per bulan untuk menyelesaikan volume/order.</p>

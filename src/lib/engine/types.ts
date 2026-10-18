@@ -149,7 +149,7 @@ export interface TenderInput {
   /** Biaya per orang per bulan diisi manual (override hitungan UMK/payroll), per role. */
   biayaOrangManual?: Record<string, number>;
   /** Kenaikan biaya manpower per tahun kontrak (0.05 = 5%/thn). Biaya/bln = total kontrak ÷ bulan kontrak. */
-  eskalasiManpower?: { persenTahun: number };
+  eskalasiManpower?: { persenTahun: number; mulai?: string | null };
   advanceSewaBulan: number;
   depositBulan: number;
   stokTon?: number;                 // untuk tarif storage alternatif

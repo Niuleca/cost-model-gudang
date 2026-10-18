@@ -196,7 +196,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const P = m.payroll;
   const biayaPerOrang = (j: JobLevel | undefined) => biayaPerOrangDari(m, j);
   // Eskalasi: biaya tahun ke-y = dasar × (1+r)^(y-1); biaya/bln yang dipakai = total kontrak ÷ bulan kontrak
-  const esk = hitungEskalasi(t.eskalasiManpower?.persenTahun ?? 0, t.durasiKontrakBulan);
+  const esk = hitungEskalasi(t.eskalasiManpower?.persenTahun ?? 0, t.durasiKontrakBulan, t.eskalasiManpower?.mulai);
   const payroll = manpower.map(mp => {
     const b = biayaPerOrang(jobs.get(mp.roleName));
     const manual = t.biayaOrangManual?.[mp.roleName];
@@ -423,12 +423,23 @@ export function biayaPerOrangDari(m: MasterData, j: JobLevel | undefined) {
   return { upah, bpjsTk, bpjsKes, thr, pesangon, tunjangan: j?.tunjanganBulan ?? 0, contingency, fee, total: dasar + contingency + fee };
 }
 
-/** Skema kenaikan per tahun kontrak: indeks tahun ke-y = (1+r)^(y-1); faktor = Σ bulan_y × indeks_y ÷ total bulan. */
-export function hitungEskalasi(persenTahun: number, kontrakBulan: number) {
+const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+/** Skema kenaikan mengikuti kebijakan upah: naik setiap JANUARI (UMK baru) sebesar r, bertingkat tiap tahun.
+ *  Mulai kontrak 'YYYY-MM' (default Januari tahun berjalan). Indeks tahun kalender ke-k sejak mulai = (1+r)^k.
+ *  Faktor = Σ (bulan × indeks) ÷ total bulan kontrak → biaya/bln rata-rata selama kontrak. */
+export function hitungEskalasi(persenTahun: number, kontrakBulan: number, mulai?: string | null) {
   const r = Math.max(0, Number(persenTahun) || 0);
   const n = Math.max(1, Math.round(kontrakBulan || 1));
-  const tahun: { tahun: number; bulan: number; indeks: number }[] = [];
-  for (let y = 1, sisa = n; sisa > 0; y++) { const b = Math.min(12, sisa); tahun.push({ tahun: y, bulan: b, indeks: Math.pow(1 + r, y - 1) }); sisa -= b; }
+  const cocok = /^(\d{4})-(\d{2})/.exec(mulai ?? '');
+  const y0 = cocok ? Number(cocok[1]) : new Date().getFullYear();
+  const m0 = cocok ? Math.min(12, Math.max(1, Number(cocok[2]))) : 1;
+  const tahun: { tahun: number; ke: number; bulan: number; indeks: number; dari: string; sampai: string }[] = [];
+  for (let k = 0; k < n; k++) {
+    const idx = m0 - 1 + k, th = y0 + Math.floor(idx / 12), bl = idx % 12;
+    let e = tahun[tahun.length - 1];
+    if (!e || e.tahun !== th) { e = { tahun: th, ke: th - y0, bulan: 0, indeks: Math.pow(1 + r, th - y0), dari: `${BLN[bl]} ${th}`, sampai: '' }; tahun.push(e); }
+    e.bulan++; e.sampai = `${BLN[bl]} ${th}`;
+  }
   const faktor = tahun.reduce((s, y) => s + y.bulan * y.indeks, 0) / n;
-  return { persenTahun: r, kontrakBulan: n, tahun, faktor };
+  return { persenTahun: r, kontrakBulan: n, mulai: `${y0}-${String(m0).padStart(2, '0')}`, tahun, faktor };
 }
