@@ -302,8 +302,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
                   <button onClick={() => setStatus(q, 'approved', { catatan_approval: null })}>Approve</button>
                   <button className="ghost" onClick={() => setPutus({ id: q.id, jenis: 'revisi', note: '' })}>Revisi</button>
                   <button className="danger" onClick={() => setPutus({ id: q.id, jenis: 'ditolak', note: '' })}>Tolak</button></>}
-                <button className="ghost" disabled={sibukPv} onClick={() => lihat(q)}>Pratinjau</button>
-                {bolehRilis(q.status) && <><button onClick={() => unduh(q)}>Unduh PDF</button><button className="ghost" onClick={() => cetak(q)}>🖨 Print</button></>}
+                <button className={bolehRilis(q.status) ? undefined : 'ghost'} disabled={sibukPv} onClick={() => lihat(q)}>{bolehRilis(q.status) ? 'Pratinjau · unduh / print' : 'Pratinjau'}</button>
                 {q.status === 'approved' && <button className="ghost" onClick={() => setStatus(q, 'terkirim')}>Tandai terkirim</button>}
                 {q.status === 'approved' && bolehApprove && (batalId === q.id
                   ? <><button className="danger" onClick={() => { setStatus(q, 'menunggu', { approved_by: null, approved_at: null, catatan_approval: 'Approve dibatalkan — perlu approve ulang' }); setBatalId(null); }}>Yakin batalkan approve</button><button className="ghost" onClick={() => setBatalId(null)}>Tidak</button></>
@@ -326,8 +325,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
         </tbody>
       </table></div>
       <p className="small muted">{bolehApprove
-        ? 'Anda manager / Super Admin: quotation baru tersimpan sebagai Draft — cek isinya lalu tekan Approve sendiri (tanpa menunggu orang lain). Quotation dari Solution Design / Business Development muncul dengan status Menunggu approval — pilih Approve, Revisi, atau Tolak (catatan wajib). Batalkan approve mengembalikan ke Menunggu approval.'
-        : 'Alur: simpan draft → Ajukan approval → manager memilih Approve / Revisi / Tolak. Unduh, print & kirim terbuka setelah Approved; sebelum itu hanya pratinjau.'}</p>
+        ? 'Anda manager / Super Admin: quotation baru tersimpan sebagai Draft — cek isinya lalu tekan Approve sendiri (tanpa menunggu orang lain). Quotation dari Solution Design / Business Development muncul dengan status Menunggu approval — pilih Approve, Revisi, atau Tolak (catatan wajib). Batalkan approve mengembalikan ke Menunggu approval. Unduh & print ada di dalam Pratinjau setelah Approved.'
+        : 'Alur: simpan draft → Ajukan approval → manager memilih Approve / Revisi / Tolak. Unduh & print ada di dalam Pratinjau setelah Approved; sebelum itu hanya pratinjau.'}</p>
       {pratinjau && <PdfPreview blob={pratinjau.blob} judul={pratinjau.data.nomor} onTutup={() => setPratinjau(null)} rilis={pratinjau.rilis} onUnduh={() => unduhQuotationPdf(pratinjau.data)} />}
     </div>
   );
