@@ -18,9 +18,9 @@ interface Quo {
   id: string; nomor: string; tanggal: string; berlaku_sampai: string; kepada: string | null; rate_card: RateRow[];
   term_condition: string; status: string; approved_at: string | null; revisi: number; parent_id: string | null;
   catatan_revisi: string | null; tagihan_sekali: Sekali[]; info_gudang: InfoGudangPdf | null; created_at: string;
-  catatan_approval?: string | null; diputus_at?: string | null;
+  catatan_approval?: string | null; diputus_at?: string | null; diputus_oleh?: string | null; approved_by?: string | null; created_by?: string | null;
 }
-type Draft = Omit<Quo, 'id' | 'status' | 'approved_at' | 'created_at' | 'catatan_approval' | 'diputus_at'>;
+type Draft = Omit<Quo, 'id' | 'status' | 'approved_at' | 'created_at' | 'catatan_approval' | 'diputus_at' | 'diputus_oleh' | 'approved_by' | 'created_by'>;
 interface Tc { id: number; nama: string; isi: string }
 
 const SATUAN: Record<string, (uom: string) => string> = {
@@ -52,6 +52,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const hasil = tender.hasil as HasilTender | null;
   const bolehApprove = isApprover(profile);
   const [batalId, setBatalId] = useState<string | null>(null);
+  const [namaAkun, setNamaAkun] = useState<Record<string, string>>({});
   const [putus, setPutus] = useState<{ id: string; jenis: 'revisi' | 'ditolak'; note: string } | null>(null);
 
   const muat = useCallback(async () => {
@@ -59,7 +60,13 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
       sb.from('quotations').select('*').eq('tender_id', tender.id).order('created_at', { ascending: false }),
       sb.from('tc_templates').select('id, nama, isi').eq('aktif', true),
     ]);
-    setList((q.data ?? []) as Quo[]); setTc((t.data ?? []) as Tc[]);
+    const qs = (q.data ?? []) as Quo[];
+    setList(qs); setTc((t.data ?? []) as Tc[]);
+    const ids = Array.from(new Set(qs.flatMap(x => [x.diputus_oleh, x.approved_by, x.created_by]).filter(Boolean))) as string[];
+    if (ids.length) {
+      const { data: ps } = await sb.from('profiles').select('id, full_name, email').in('id', ids);
+      setNamaAkun(Object.fromEntries(((ps ?? []) as { id: string; full_name: string; email: string }[]).map(p => [p.id, p.full_name || p.email])));
+    }
   }, [tender.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { muat(); }, [muat]);
   // Penanda tangan default dari Profil (menu akun → Profil & password); masih bisa diubah per quotation
@@ -131,7 +138,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
 
   /** Edit quotation draft/batal: dibuka di editor, disimpan ke baris yang sama (batal → kembali draft). */
   function edit(q: Quo) {
-    const { id: _i, status: _s, approved_at: _a, created_at: _c, catatan_approval: _ca, diputus_at: _da, ...isi } = q;
+    const { id: _i, status: _s, approved_at: _a, created_at: _c, catatan_approval: _ca, diputus_at: _da, diputus_oleh: _do, approved_by: _ab, created_by: _cb, ...isi } = q;
     setDraft({ ...isi, rate_card: q.rate_card ?? [], tagihan_sekali: q.tagihan_sekali ?? [] }); setEditId(q.id); setErr(null); setNomorAuto(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -282,7 +289,11 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
           {list.map(q => { const st = STATUS_QUOTATION[q.status] ?? { l: q.status, kelas: 'info' }; const bisaEdit = ['draft', 'revisi', 'ditolak', 'batal'].includes(q.status) || (bolehApprove && q.status === 'menunggu');
             return <tr key={q.id}>
               <td>{q.nomor}</td><td className="num">{q.revisi}</td><td>{tanggal(q.tanggal)}</td><td>{tanggal(q.berlaku_sampai)}</td>
-              <td><span className={`pill ${st.kelas}`}>{st.l}</span></td>
+              <td><span className={`pill ${st.kelas}`}>{st.l}</span>
+                {(() => { const oleh = q.diputus_oleh ?? q.approved_by; const kapan = q.diputus_at ?? q.approved_at;
+                  if (!oleh || !['approved', 'terkirim', 'revisi', 'ditolak'].includes(q.status)) return q.status === 'menunggu' && q.created_by ? <div className="small muted">diajukan oleh {namaAkun[q.created_by] ?? '…'}</div> : null;
+                  const sendiri = oleh === q.created_by;
+                  return <div className="small muted">{q.status === 'revisi' ? 'revisi diminta' : q.status === 'ditolak' ? 'ditolak' : 'di-approve'} oleh <b>{namaAkun[oleh] ?? '…'}</b>{sendiri ? ' (approval sendiri)' : ''}{kapan ? ` · ${new Date(kapan).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}</div>; })()}</td>
               <td className="small">{q.catatan_approval && <div><b>{q.status === 'ditolak' ? 'Alasan tolak' : q.status === 'revisi' ? 'Catatan revisi manager' : 'Catatan manager'}:</b> {q.catatan_approval}</div>}{q.catatan_revisi ?? ''}</td>
               <td><div className="row">
                 {(q.status === 'draft' || q.status === 'revisi') && !bolehApprove && <button onClick={() => setStatus(q, 'menunggu', { catatan_approval: null })}>Ajukan approval</button>}
