@@ -54,8 +54,8 @@ export default function TableEditor(p: Props) {
   const [grup, setGrup] = useState('');
   const nilaiGrup = (r: Row) => (p.kelompok ? String(ambil(r, p.kelompok) ?? '') : '') || 'Tanpa kategori';
 
-  const bolehEdit = !!p.profile && (p.profile.role === 'admin' || p.editorRoles.includes(p.profile.role));
-  const bolehApprove = !!p.profile && (p.profile.role === 'admin' || p.profile.role === 'solution_design');
+  const bolehEdit = !!p.profile && (!!p.profile.is_master || p.profile.role === 'admin' || p.profile.role === 'manager' || p.editorRoles.includes(p.profile.role));
+  const bolehApprove = !!p.profile && (!!p.profile.is_master || ['admin', 'manager', 'solution_design'].includes(p.profile.role));
 
   const muat = useCallback(async () => {
     setLoading(true);

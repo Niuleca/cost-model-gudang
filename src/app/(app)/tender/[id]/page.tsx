@@ -16,6 +16,7 @@ import InterestPanel from './InterestPanel';
 import { rincianBiayaRole, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { aktivitasDenganOrderAdmin, isAktivitasAdmin, orderAdmin, stokDariPalet } from '@/lib/profilVolume';
 import { useProfile } from '@/lib/useProfile';
+import { bolehExport } from '@/lib/akses';
 import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
@@ -214,7 +215,7 @@ export default function TenderPage() {
   }, [kunciMargin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Draft tender hanya bisa diedit pembuatnya (atau admin/master); akun lain hanya melihat. Aturan sama dipasang di database.
-  const bisaEdit = !!t && !!profile && (profile.role === 'admin' || t.created_by === profile.id || !STATUS_DRAFT.includes(t.status));
+  const bisaEdit = !!t && !!profile && (profile.role === 'admin' || profile.role === 'manager' || !!profile.is_master || t.created_by === profile.id || !STATUS_DRAFT.includes(t.status));
 
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
   const spaceH = useMemo(() => {
@@ -272,11 +273,11 @@ export default function TenderPage() {
       {profile && !bisaEdit && <div className="ro-banner" role="note"><b>Hanya lihat</b> · Draft ini dibuat oleh {pembuat ?? 'akun lain'}. Anda bisa melihat isi dan menjalankan Hitung untuk simulasi, tetapi tidak bisa menyimpan perubahan, mengubah status, atau membuat quotation.</div>}
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
         {bisaEdit ? <StatusControl tender={t} onBerubah={st => setT(x => x && ({ ...x, status: st }))} /> : <span />}
-        {profile && (profile.role === 'admin' || (t.created_by === profile.id && STATUS_DRAFT.includes(t.status))) && <HapusTender id={t.id} kode={t.kode ?? t.customer} customer={t.customer} />}
+        {profile && (profile.role === 'admin' || profile.role === 'manager' || (t.created_by === profile.id && STATUS_DRAFT.includes(t.status))) && <HapusTender id={t.id} kode={t.kode ?? t.customer} customer={t.customer} />}
       </div>
 
       <div className="tabs" role="tablist">
-        {([...(a.historis ? [TAB_EXCEL] : []), ...TABS] as ((typeof TABS)[number] | typeof TAB_EXCEL)[]).map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{tr(x)}</button>)}
+        {([...(a.historis ? [TAB_EXCEL] : []), ...TABS.filter(x => x !== 'Export' || bolehExport(profile))] as ((typeof TABS)[number] | typeof TAB_EXCEL)[]).map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{tr(x)}</button>)}
       </div>
 
       {tab === TAB_EXCEL && a.historis && <HistorisPanel h={a.historis} nama={(t.kode ?? t.customer).replace(/[^\w]+/g, '_')} />}
@@ -546,7 +547,8 @@ export default function TenderPage() {
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
-      {tab === 'Export' && <ExportPanel siapkan={siapkanExport} namaFile={`Leca_${(t.kode ?? t.customer).replace(/[^\w-]+/g, '_')}_lengkap.xlsx`} />}
+      {tab === 'Export' && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>master admin</b> dan <b>manager</b>.</p></div>}
+      {tab === 'Export' && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={`Leca_${(t.kode ?? t.customer).replace(/[^\w-]+/g, '_')}_lengkap.xlsx`} />}
       {tab !== 'Hasil' && tab !== 'Quotation' && tab !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
     </>
   );

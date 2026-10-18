@@ -7,7 +7,7 @@ import { hitungListrik, exportListrikExcel, type DataListrik } from '@/lib/listr
 
 interface Sim { id: string; nama: string; is_template: boolean; data: DataListrik; updated_at: string }
 interface Tarif { golongan: string; tarif_kwh: number }
-const PENULIS = ['engineering', 'procurement', 'solution_design', 'admin'];
+const PENULIS = ['engineering', 'procurement', 'solution_design', 'commercial', 'admin', 'manager'];
 const n = (v: string) => (v === '' ? 0 : Number(v));
 
 /** Utilities · Kalkulator kebutuhan listrik (peralatan × ruang → kWh → biaya/bulan), format sama dengan Excel. */

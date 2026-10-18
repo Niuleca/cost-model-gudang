@@ -11,15 +11,15 @@ export const tanggal = (s: string | null | undefined) =>
   !s ? '—' : new Date(s).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export type AppRole =
-  | 'admin' | 'solution_design' | 'commercial' | 'finance'
+  | 'admin' | 'manager' | 'solution_design' | 'commercial' | 'finance'
   | 'hr' | 'procurement' | 'it' | 'engineering' | 'operations';
 
 export const ROLE_LABEL: Record<AppRole, string> = {
-  admin: 'Admin', solution_design: 'Solution Design', commercial: 'Tender / Commercial', finance: 'Finance',
-  hr: 'HR', procurement: 'Procurement', it: 'IT', engineering: 'Engineering', operations: 'Operations',
+  admin: 'Admin', manager: 'Manager', solution_design: 'Solution Design', commercial: 'Business Development', finance: 'Finance',
+  hr: 'HR', procurement: 'Procurement', it: 'IT', engineering: 'Engineering', operations: 'Operational',
 };
 
-export const TIM_TENDER: AppRole[] = ['admin', 'solution_design', 'commercial', 'finance'];
+export const TIM_TENDER: AppRole[] = ['admin', 'manager', 'solution_design', 'commercial', 'finance'];
 
 export const BUCKET_LABEL: Record<string, string> = {
   storage: 'Storage', handling_in: 'Handling In', handling_out: 'Handling Out', vas: 'VAS', manajemen: 'Manajemen',

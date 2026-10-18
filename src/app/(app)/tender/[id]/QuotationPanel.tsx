@@ -8,7 +8,8 @@ import type { Profile } from '@/lib/useProfile';
 import { rp, tanggal, angka, BUCKET_LABEL } from '@/lib/format';
 import { ringkasIt, IT_SHEET_DEFAULT } from '@/lib/it';
 import { unduhQuotationPdf, blobQuotationPdf, type InfoGudangPdf, type QuotationPdfData } from '@/lib/quotationPdf';
-import PdfPreview from './PdfPreview';
+import PdfPreview, { cetakPdf } from './PdfPreview';
+import { isApprover, STATUS_QUOTATION, bolehRilis } from '@/lib/akses';
 import { gambarUntukPdf, useBrandingSaya, BrandingRingkas } from '@/components/BrandingProfil';
 
 interface RateRow { layanan: string; satuan: string; tarif: number; catatan?: string }
@@ -17,8 +18,9 @@ interface Quo {
   id: string; nomor: string; tanggal: string; berlaku_sampai: string; kepada: string | null; rate_card: RateRow[];
   term_condition: string; status: string; approved_at: string | null; revisi: number; parent_id: string | null;
   catatan_revisi: string | null; tagihan_sekali: Sekali[]; info_gudang: InfoGudangPdf | null; created_at: string;
+  catatan_approval?: string | null; diputus_at?: string | null;
 }
-type Draft = Omit<Quo, 'id' | 'status' | 'approved_at' | 'created_at'>;
+type Draft = Omit<Quo, 'id' | 'status' | 'approved_at' | 'created_at' | 'catatan_approval' | 'diputus_at'>;
 interface Tc { id: number; nama: string; isi: string }
 
 const SATUAN: Record<string, (uom: string) => string> = {
@@ -42,13 +44,14 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const kurangBranding = brand.wajib && brand.siap && !brand.lengkap;
   const [hapusId, setHapusId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [pratinjau, setPratinjau] = useState<{ blob: Blob; data: QuotationPdfData } | null>(null);
+  const [pratinjau, setPratinjau] = useState<{ blob: Blob; data: QuotationPdfData; rilis: boolean } | null>(null);
   const [sibukPv, setSibukPv] = useState(false);
   const [tambahIdx, setTambahIdx] = useState('');
   // Nomor otomatis: DDMMYYYY/Customer/Akun/Pembuatan ke-/Urutan hari ini. Berhenti otomatis kalau diketik manual.
   const [nomorAuto, setNomorAuto] = useState<{ pembuatan: number; urutan: number } | null>(null);
   const hasil = tender.hasil as HasilTender | null;
-  const bolehApprove = !!profile && ['commercial', 'finance', 'admin'].includes(profile.role);
+  const bolehApprove = isApprover(profile);
+  const [putus, setPutus] = useState<{ id: string; jenis: 'revisi' | 'ditolak'; note: string } | null>(null);
 
   const muat = useCallback(async () => {
     const [q, t] = await Promise.all([
@@ -126,7 +129,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
 
   /** Edit quotation draft/batal: dibuka di editor, disimpan ke baris yang sama (batal → kembali draft). */
   function edit(q: Quo) {
-    const { id: _i, status: _s, approved_at: _a, created_at: _c, ...isi } = q;
+    const { id: _i, status: _s, approved_at: _a, created_at: _c, catatan_approval: _ca, diputus_at: _da, ...isi } = q;
     setDraft({ ...isi, rate_card: q.rate_card ?? [], tagihan_sekali: q.tagihan_sekali ?? [] }); setEditId(q.id); setErr(null); setNomorAuto(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -136,7 +139,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     if (!draft) return;
     if (draft.revisi > 0 && !draft.catatan_revisi?.trim()) { setErr('Isi catatan revisi (apa yang berubah dan kenapa).'); return; }
     if (editId) {
-      const { data, error } = await sb.from('quotations').update({ ...draft, status: 'draft' }).eq('id', editId).select('id');
+      const { data, error } = await sb.from('quotations').update({ ...draft, status: bolehApprove ? 'approved' : 'draft' }).eq('id', editId).select('id');
       if (error || !data?.length) { setErr(error?.message ?? 'Tidak tersimpan (hanya pembuat tender / admin).'); return; }
       tutupDraft(); muat(); return;
     }
@@ -150,9 +153,11 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     }
     tutupDraft(); muat();
   }
-  async function setStatus(q: Quo, status: string) {
-    const { error } = await sb.from('quotations').update({ status }).eq('id', q.id);
+  async function setStatus(q: Quo, status: string, extra: Record<string, unknown> = {}) {
+    if ((status === 'revisi' || status === 'ditolak') && !String(extra.catatan_approval ?? '').trim()) { setErr('Catatan wajib diisi untuk revisi / tolak.'); return; }
+    const { error } = await sb.from('quotations').update({ status, ...extra }).eq('id', q.id);
     if (error) { setErr(error.message); return; }
+    setPutus(null); setErr(null);
     if (status === 'terkirim') await sb.from('tenders').update({ status: q.revisi > 0 ? 'negosiasi' : 'quotation_terkirim' }).eq('id', tender.id);
     muat();
   }
@@ -165,7 +170,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   /** Data PDF dari quotation tersimpan atau draft yang sedang diedit; draft diberi watermark. */
   async function dataPdf(q: Draft & { status?: string }): Promise<QuotationPdfData> {
     const [logo, ttdImg] = await Promise.all([gambarUntukPdf(branding.logoPath), gambarUntukPdf(branding.ttdPath)]);
-    return { logo, ttd: ttdImg, watermark: !q.status || q.status === 'draft' ? 'DRAFT' : q.status === 'batal' ? 'BATAL' : undefined,
+    return { logo, ttd: ttdImg, watermark: !q.status || ['draft', 'menunggu', 'revisi'].includes(q.status) ? 'DRAFT' : q.status === 'ditolak' ? 'DITOLAK' : q.status === 'batal' ? 'BATAL' : undefined,
       nomor: q.nomor, tanggal: q.tanggal, berlakuSampai: q.berlaku_sampai, kepada: q.kepada ?? tender.customer, customer: tender.customer,
       lokasi: `${tender.kab_kota}, ${tender.provinsi}`, perihal: q.revisi > 0 ? `Revisi ${q.revisi} Penawaran Harga Jasa Pergudangan` : 'Penawaran Harga Jasa Pergudangan',
       rateCard: q.rate_card, tagihanSekali: q.tagihan_sekali ?? [], gudang: q.info_gudang, catatanRevisi: q.catatan_revisi,
@@ -174,11 +179,17 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   }
   async function unduh(q: Quo) {
     if (kurangBranding) { setErr('Unggah logo perusahaan & tanda tangan di Profil dulu sebelum mengunduh PDF.'); return; }
+    if (!bolehRilis(q.status)) { setErr('Quotation harus di-approve manager dulu sebelum diunduh / dicetak.'); return; }
     await unduhQuotationPdf(await dataPdf(q));
+  }
+  async function cetak(q: Quo) {
+    if (kurangBranding) { setErr('Unggah logo perusahaan & tanda tangan di Profil dulu.'); return; }
+    if (!bolehRilis(q.status)) { setErr('Quotation harus di-approve manager dulu sebelum dicetak.'); return; }
+    cetakPdf(await blobQuotationPdf(await dataPdf(q)));
   }
   async function lihat(q: Draft & { status?: string }) {
     setSibukPv(true);
-    try { const data = await dataPdf(q); setPratinjau({ blob: await blobQuotationPdf(data), data }); }
+    try { const data = await dataPdf(q); setPratinjau({ blob: await blobQuotationPdf(data), data, rilis: !!q.status && bolehRilis(q.status) && !kurangBranding }); }
     catch (e) { setErr(`Gagal membuat pratinjau: ${e instanceof Error ? e.message : e}`); }
     finally { setSibukPv(false); }
   }
@@ -263,31 +274,45 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
       </div>
 
       <div className="tablewrap"><table>
-        <thead><tr><th>Nomor</th><th className="num">Rev</th><th>Tanggal</th><th>Berlaku s.d.</th><th>Status</th><th>Catatan revisi</th><th></th></tr></thead>
+        <thead><tr><th>Nomor</th><th className="num">Rev</th><th>Tanggal</th><th>Berlaku s.d.</th><th>Status</th><th>Catatan</th><th></th></tr></thead>
         <tbody>
           {list.length === 0 && <tr><td colSpan={7} className="muted">Belum ada quotation.</td></tr>}
-          {list.map(q => (
-            <tr key={q.id}>
+          {list.map(q => { const st = STATUS_QUOTATION[q.status] ?? { l: q.status, kelas: 'info' }; const bisaEdit = ['draft', 'revisi', 'ditolak', 'batal'].includes(q.status) || (bolehApprove && q.status === 'menunggu');
+            return <tr key={q.id}>
               <td>{q.nomor}</td><td className="num">{q.revisi}</td><td>{tanggal(q.tanggal)}</td><td>{tanggal(q.berlaku_sampai)}</td>
-              <td><span className={`pill ${q.status === 'draft' ? 'warn' : q.status === 'batal' || q.status === 'direvisi' ? 'info' : 'ok'}`}>{q.status}</span></td>
-              <td className="small">{q.catatan_revisi ?? ''}</td>
-              <td className="row">
-                {q.status === 'draft' && bolehApprove && <button onClick={() => setStatus(q, 'approved')}>Approve</button>}
-                {q.status === 'draft' && !bolehApprove && <span className="small muted">Menunggu approve Commercial/Finance</span>}
+              <td><span className={`pill ${st.kelas}`}>{st.l}</span></td>
+              <td className="small">{q.catatan_approval && <div><b>{q.status === 'ditolak' ? 'Alasan tolak' : q.status === 'revisi' ? 'Catatan revisi manager' : 'Catatan manager'}:</b> {q.catatan_approval}</div>}{q.catatan_revisi ?? ''}</td>
+              <td><div className="row">
+                {(q.status === 'draft' || q.status === 'revisi') && !bolehApprove && <button onClick={() => setStatus(q, 'menunggu', { catatan_approval: null })}>Ajukan approval</button>}
+                {q.status === 'menunggu' && !bolehApprove && <span className="small muted">Menunggu approval manager</span>}
+                {['draft', 'menunggu', 'revisi'].includes(q.status) && bolehApprove && <>
+                  <button onClick={() => setStatus(q, 'approved', { catatan_approval: null })}>Approve</button>
+                  <button className="ghost" onClick={() => setPutus({ id: q.id, jenis: 'revisi', note: '' })}>Revisi</button>
+                  <button className="danger" onClick={() => setPutus({ id: q.id, jenis: 'ditolak', note: '' })}>Tolak</button></>}
                 <button className="ghost" disabled={sibukPv} onClick={() => lihat(q)}>Pratinjau</button>
-                {q.status !== 'draft' && <button onClick={() => unduh(q)}>Unduh PDF</button>}
+                {bolehRilis(q.status) && <><button onClick={() => unduh(q)}>Unduh PDF</button><button className="ghost" onClick={() => cetak(q)}>🖨 Print</button></>}
                 {q.status === 'approved' && <button className="ghost" onClick={() => setStatus(q, 'terkirim')}>Tandai terkirim</button>}
                 {(q.status === 'approved' || q.status === 'terkirim') && !draft && <button className="ghost" onClick={() => revisi(q)}>Buat revisi</button>}
-                {!['batal', 'direvisi'].includes(q.status) && <button className="danger" onClick={() => setStatus(q, 'batal')}>Batalkan</button>}
-                {['draft', 'batal'].includes(q.status) && !draft && <button className="ghost" onClick={() => edit(q)}>Edit</button>}
-                {['draft', 'batal'].includes(q.status) && (hapusId === q.id
+                {!['batal', 'direvisi', 'ditolak'].includes(q.status) && <button className="danger" onClick={() => setStatus(q, 'batal')}>Batalkan</button>}
+                {bisaEdit && !draft && <button className="ghost" onClick={() => edit(q)}>Edit</button>}
+                {['draft', 'batal', 'revisi', 'ditolak'].includes(q.status) && (hapusId === q.id
                   ? <><button className="danger" onClick={() => hapusQuotation(q)}>Yakin hapus permanen</button><button className="ghost" onClick={() => setHapusId(null)}>Batal</button></>
                   : <button className="danger" onClick={() => setHapusId(q.id)}>Hapus</button>)}
+              </div>
+              {putus?.id === q.id && <div className="card" style={{ marginTop: 8, gap: 8 }}>
+                <label className="f" htmlFor={`pn-${q.id}`}>{putus.jenis === 'revisi' ? 'Catatan revisi (wajib) — apa yang harus diperbaiki' : 'Alasan penolakan (wajib)'}
+                  <textarea id={`pn-${q.id}`} rows={3} value={putus.note} onChange={e => setPutus({ ...putus, note: e.target.value })} placeholder={putus.jenis === 'revisi' ? 'mis. GP storage terlalu tipis, naikkan ke 18%; cek ulang jumlah forklift' : 'mis. volume customer tidak realistis'} /></label>
+                <div className="row"><button className={putus.jenis === 'ditolak' ? 'danger' : undefined} disabled={!putus.note.trim()} onClick={() => setStatus(q, putus.jenis, { catatan_approval: putus.note.trim() })}>{putus.jenis === 'revisi' ? 'Kirim permintaan revisi' : 'Tolak quotation'}</button>
+                  <button className="ghost" onClick={() => setPutus(null)}>Batal</button></div>
+              </div>}
               </td>
-            </tr>))}
+            </tr>; })}
         </tbody>
       </table></div>
-      {pratinjau && <PdfPreview blob={pratinjau.blob} judul={pratinjau.data.nomor} onTutup={() => setPratinjau(null)} onUnduh={() => kurangBranding ? setErr('Unggah logo & TTD di Profil dulu.') : unduhQuotationPdf(pratinjau.data)} />}
+      <p className="small muted">{bolehApprove
+        ? 'Anda manager / master: quotation yang Anda buat langsung berstatus Approved. Quotation dari Solution Design / Business Development muncul dengan status Menunggu approval — pilih Approve, Revisi, atau Tolak (catatan wajib).'
+        : 'Alur: simpan draft → Ajukan approval → manager memilih Approve / Revisi / Tolak. Unduh, print & kirim terbuka setelah Approved; sebelum itu hanya pratinjau.'}</p>
+      {pratinjau && <PdfPreview blob={pratinjau.blob} judul={pratinjau.data.nomor} onTutup={() => setPratinjau(null)} rilis={pratinjau.rilis} onUnduh={() => unduhQuotationPdf(pratinjau.data)} />}
     </div>
   );
 }

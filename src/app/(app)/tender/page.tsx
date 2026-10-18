@@ -30,7 +30,7 @@ export default function DaftarTender() {
       .then(({ data, error }: { data: Baris[] | null; error: { message: string } | null }) => { if (error) setErr(error.message); else setRows(data ?? []); });
   }, []);
 
-  if (!loading && profile && !['admin', 'solution_design', 'commercial', 'finance'].includes(profile.role)) {
+  if (!loading && profile && !['admin', 'manager', 'solution_design', 'commercial', 'finance'].includes(profile.role)) {
     return (
       <div className="card">
         <h2>Selamat datang, {profile.full_name || profile.email}</h2>

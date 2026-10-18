@@ -11,6 +11,11 @@ export default function AdminPage() {
   const [pesan, setPesan] = useState<string | null>(null);
   const [hapusId, setHapusId] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
+  async function kirimReset(r: Profile) {
+    if (!r.email) return;
+    const { error } = await sb.auth.resetPasswordForEmail(r.email, { redirectTo: `${location.origin}/auth/callback?next=/akun` });
+    setPesan(error ? `Gagal kirim link reset: ${error.message}` : `Link reset password dikirim ke ${r.email}. Pemilik akun membuat password baru sendiri dari link itu.`);
+  }
   async function hapusAkun(r: Profile) {
     setSibuk(true); setPesan(`Menghapus ${r.email}…`);
     // file logo/TTD milik akun ini dihapus dari storage dulu
@@ -35,7 +40,8 @@ export default function AdminPage() {
     <>
       <div className="head"><div><div className="eyebrow">Admin</div><h1>Pengguna & role</h1></div></div>
       <p className="small muted">User baru mendaftar sendiri dari halaman login, lalu master admin meng-ACC dan memberi role di menu <a href="/admin/approval">Approval akun</a>. Role hanya bisa diubah master admin.
-        Master admin bisa <b>menghapus akun</b> secara permanen: login akun itu hilang, tapi tender, quotation & data kerjanya tetap ada dan dialihkan ke akun master yang menghapus; logo & TTD-nya ikut dihapus.</p>
+        Master admin bisa <b>menghapus akun</b> secara permanen: login akun itu hilang, tapi tender, quotation & data kerjanya tetap ada dan dialihkan ke akun master yang menghapus; logo & TTD-nya ikut dihapus.
+        Password tidak bisa dilihat siapa pun (disimpan terenkripsi satu arah) — gunakan <b>Reset password</b> untuk mengirim link pembuatan password baru ke email akun tersebut.</p>
       {pesan && <p className="small" role="status">{pesan}</p>}
       <div className="tablewrap"><table>
         <thead><tr><th>Nama</th><th>User ID</th><th>Email</th><th>Telepon</th><th>Perusahaan</th><th>Status</th><th>Role</th><th /></tr></thead>
@@ -45,9 +51,10 @@ export default function AdminPage() {
             <td><select aria-label={`Role ${r.email}`} value={r.role} onChange={e => ubahRole(r.id, e.target.value as AppRole)} disabled={r.id === profile?.id || !!r.is_master || (profile?.status !== undefined && !profile?.is_master)}>
               {(Object.keys(ROLE_LABEL) as AppRole[]).map(k => <option key={k} value={k}>{ROLE_LABEL[k]}</option>)}
             </select></td>
-            <td>{profile?.is_master && !r.is_pemilik && r.id !== profile.id && (hapusId === r.id
+            <td><div className="row" style={{ gap: 4 }}>{profile?.is_master && r.id !== profile.id && <button className="ghost" onClick={() => kirimReset(r)}>Reset password</button>}
+              {profile?.is_master && !r.is_pemilik && r.id !== profile.id && (hapusId === r.id
               ? <div className="row" style={{ gap: 4 }}><button className="danger" disabled={sibuk} onClick={() => hapusAkun(r)}>Hapus permanen</button><button className="ghost" onClick={() => setHapusId(null)}>Batal</button></div>
-              : <button className="ghost" onClick={() => setHapusId(r.id)}>Hapus</button>)}</td></tr>))}</tbody>
+              : <button className="ghost" onClick={() => setHapusId(r.id)}>Hapus</button>)}</div></td></tr>))}</tbody>
       </table></div>
     </>
   );

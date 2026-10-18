@@ -6,7 +6,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Profile } from '@/lib/useProfile';
 
 export const BUCKET_BRANDING = 'quotation-branding';
-export const ROLE_BRANDING = ['solution_design', 'commercial', 'finance', 'admin'];
+export const ROLE_BRANDING = ['solution_design', 'commercial', 'finance', 'admin', 'manager'];
 type Jenis = 'logo' | 'ttd';
 interface Aset { id: string; jenis: Jenis; nama: string; path: string; created_by: string; created_at: string; url?: string }
 export interface PilihanBranding { logoPath: string | null; ttdPath: string | null }

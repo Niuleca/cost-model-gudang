@@ -22,6 +22,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/tender?grup=draft', label: 'Draft Tender', roles: TIM_TENDER },
     { href: '/perbandingan', label: 'Comparation Tender', roles: TIM_TENDER },
     { href: '/riwayat', label: 'Riwayat Tender', roles: TIM_TENDER },
+    { href: '/approval-quotation', label: 'Approval quotation', roles: ['admin', 'manager'] },
     { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua' },
   ] },
   { id: 'price', label: 'Price Inquiry', item: PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })) },
@@ -53,7 +54,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => { document.removeEventListener('mousedown', tutup); document.removeEventListener('keydown', esc); };
   }, []);
 
-  const boleh = (i: Item) => !profile || i.roles === 'semua' || profile.role === 'admin' || i.roles.includes(profile.role);
+  const boleh = (i: Item) => !profile || i.roles === 'semua' || profile.role === 'admin' || !!profile.is_master || i.roles.includes(profile.role);
   const aktif = (href: string) => {
     const dasar = href.split('?')[0];
     if (dasar === '/') return path === '/';

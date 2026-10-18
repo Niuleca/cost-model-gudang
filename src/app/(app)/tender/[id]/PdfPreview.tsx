@@ -20,7 +20,19 @@ function pdfjs(): Promise<PdfJs> {
 }
 
 /** Pratinjau PDF di halaman (halaman dirender ke canvas — jalan juga di Chrome Android yang tidak bisa menampilkan PDF inline). */
-export default function PdfPreview({ blob, judul, onTutup, onUnduh }: { blob: Blob; judul: string; onTutup: () => void; onUnduh: () => void }) {
+/** Cetak PDF lewat iframe tersembunyi; bila browser tidak mendukung (mis. Android), buka di tab baru untuk dicetak dari sana. */
+export function cetakPdf(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+  if (mobile) { window.open(url, '_blank', 'noopener'); return; }
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  f.src = url;
+  f.onload = () => { try { f.contentWindow?.focus(); f.contentWindow?.print(); } catch { window.open(url, '_blank', 'noopener'); } setTimeout(() => { f.remove(); URL.revokeObjectURL(url); }, 60000); };
+  document.body.appendChild(f);
+}
+
+export default function PdfPreview({ blob, judul, onTutup, onUnduh, onPrint, rilis = true }: { blob: Blob; judul: string; onTutup: () => void; onUnduh: () => void; onPrint?: () => void; rilis?: boolean }) {
   const wadah = useRef<HTMLDivElement>(null);
   const [pesan, setPesan] = useState<string | null>('Menyiapkan pratinjau…');
   const [halaman, setHalaman] = useState(0);
@@ -62,7 +74,10 @@ export default function PdfPreview({ blob, judul, onTutup, onUnduh }: { blob: Bl
           <b className="satu-baris">{judul}</b>
           <span className="small muted">{halaman ? `${halaman} halaman` : ''}</span>
           <span style={{ flex: 1 }} />
-          <button className="ghost" onClick={onUnduh}>Unduh PDF</button>
+          {rilis ? <>
+            <button className="ghost" onClick={onPrint ?? (() => cetakPdf(blob))}>🖨 Print</button>
+            <button className="ghost" onClick={onUnduh}>Unduh PDF</button>
+          </> : <span className="small muted">Print & unduh tersedia setelah di-approve manager</span>}
           <button onClick={onTutup}>Tutup</button>
         </div>
         {pesan && <p className="small" role="status" style={{ padding: 16 }}>{pesan}</p>}

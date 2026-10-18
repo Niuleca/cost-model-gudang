@@ -45,7 +45,7 @@ export default function KategoriBiayaPage() {
     try { return hitungTender(keInput(t), master); } catch { return null; }
   }, [t, master]);
 
-  const bisaEdit = !!t && !!profile && (profile.role === 'admin' || t.created_by === profile.id || !STATUS_DRAFT.includes(t.status));
+  const bisaEdit = !!t && !!profile && (profile.role === 'admin' || profile.role === 'manager' || !!profile.is_master || t.created_by === profile.id || !STATUS_DRAFT.includes(t.status));
   const baris = (h?.biaya ?? []).filter(b => b.kelompok === kelompok);
   const totKat = baris.reduce((s, b) => s + b.biayaBulan, 0);
   const totKatSistem = baris.reduce((s, b) => s + (b.biayaSistem ?? b.biayaBulan), 0);

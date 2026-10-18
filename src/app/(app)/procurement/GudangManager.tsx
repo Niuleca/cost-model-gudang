@@ -35,8 +35,8 @@ export default function GudangManager() {
   const [fProv, setFProv] = useState('');
   const [impor, setImpor] = useState<{ baru: Form[]; ubah: Form[]; file: string; diabaikan: string[] } | null>(null);
   const [sibuk, setSibuk] = useState<string | null>(null);
-  const bolehEdit = !!profile && ['procurement', 'admin', 'solution_design'].includes(profile.role);
-  const bolehApprove = !!profile && ['solution_design', 'admin'].includes(profile.role);
+  const bolehEdit = !!profile && ['procurement', 'admin', 'manager', 'solution_design', 'commercial'].includes(profile.role);
+  const bolehApprove = !!profile && ['solution_design', 'admin', 'manager'].includes(profile.role);
 
   const muat = useCallback(async () => {
     const { data, error } = await sb.from('warehouses').select('*').order('updated_at', { ascending: false });
