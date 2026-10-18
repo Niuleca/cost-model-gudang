@@ -141,6 +141,18 @@ async function susunWorkbook(p: DataExport) {
   const kv = (ws: WS, pasangan: [string, unknown][], judulTabel?: string, jenis: Jenis = 'hasil') => {
     tulisTabel(ws, judulTabel, ['Item', 'Nilai'], pasangan.map(([k, v]) => [k, v]), jenis);
   };
+  const LAYANAN: Record<string, string> = { storage: 'Storage', handling_in: 'Handling In', handling_out: 'Handling Out', vas: 'VAS', manajemen: 'Manajemen' };
+  /** Rate card rapi: kolom yang dibaca orang di depan (layanan, satuan, volume, biaya, GP, tarif). */
+  const rateCardRapi = () => (h.rateCard as unknown as Baris[]).map(r => ({
+    'Layanan': LAYANAN[String(r.bucket)] ?? r.bucket,
+    'Satuan tarif / UoM': r.bucket === 'storage' ? `${r.uom}/bulan` : r.uom,
+    'Volume tarif/bln': r.volumeTarif ?? r.volumeKomitmen,
+    'Biaya/bln (Rp)': r.biayaBulan, 'Biaya/unit (Rp)': r.biayaPerUnit,
+    'GP %': r.gpPersen, 'Harga/bln (Rp)': r.hargaBulan,
+    'Tarif excl. PPN (Rp)': r.tarifPerUnit, 'PPN/unit (Rp)': r.ppnPerUnit, 'Tarif incl. PPN (Rp)': r.tarifInclPpn,
+    'Tarif quotation (Rp)': r.tarifQuote,
+    'Pilihan satuan lain': Array.isArray(r.opsiUom) ? (r.opsiUom as Baris[]).map(o => `${o.uom}: Rp${Math.round(Number(o.tarifExcl ?? 0)).toLocaleString('id-ID')}`).join(' · ') : '',
+  }));
   const lebar = (ws: WS, w = 18) => { ws.columns.forEach((c, i) => { c.width = i === 0 ? Math.max(w + 10, 28) : w; }); };
   const hasilCell = (c: { fill: unknown; font: unknown }) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HASIL } }; c.font = { bold: true, color: { argb: HASIL_INK } }; };
 
@@ -163,7 +175,7 @@ async function susunWorkbook(p: DataExport) {
       ['Biaya manpower/bln (rata-rata kontrak)', h.eskalasiManpower?.rataBulan], ['Faktor kenaikan manpower', h.eskalasiManpower?.faktor],
       ['Pajak', `PPh ${h.pajak?.pph ?? '-'} (${((h.pajak?.pphPersen ?? 0) * 100).toLocaleString('id-ID')}%) · PPN ${h.pajak?.ppn ?? '-'} (${((h.pajak?.ppnPersen ?? 0) * 100).toLocaleString('id-ID')}%)`],
     ], 'Hasil utama');
-    tabel(ws, h.rateCard as unknown[], 'Rate card');
+    tabel(ws, rateCardRapi(), 'Rate card');
     tabel(ws, Object.entries(h.perKelompok).map(([kelompok, biayaBulan]) => ({ kelompok, biayaBulan, porsi: h.totalBiayaBulan ? biayaBulan / h.totalBiayaBulan : 0 })), 'Biaya per kelompok');
     tabel(ws, h.redFlags as unknown[], 'Red flag / catatan');
     if (p.catatanMaster.length) tabel(ws, p.catatanMaster.map(c => ({ catatan: c })), 'Catatan master data');
@@ -263,8 +275,9 @@ async function susunWorkbook(p: DataExport) {
   // 6. Space, MHE, biaya, simulasi
   { const ws = wb.addWorksheet('Space & MHE'); judul(ws, 'Space & MHE'); kv(ws, Object.entries(ratakan(h.space ?? {})), 'Space (hasil)'); tabel(ws, h.mhe as unknown[], 'MHE (hasil)'); tabel(ws, t.asumsi.mhe, 'MHE (input)', 'input'); lebar(ws); }
   { const ws = wb.addWorksheet('Biaya'); judul(ws, 'Baris biaya per bulan', 'Alokasi = porsi ke bucket storage / handling in / handling out / VAS / manajemen'); tabel(ws, h.biaya as unknown[]); tabel(ws, t.asumsi.costLines, 'Biaya lain (input)', 'input'); tabel(ws, t.asumsi.listrik, 'Listrik peralatan (input)', 'input'); lebar(ws); }
-  { const ws = wb.addWorksheet('Rate & Simulasi'); judul(ws, 'Rate card, margin & simulasi'); tabel(ws, h.rateCard as unknown[], 'Rate card');
-    kv(ws, Object.entries(ratakan(h.marginTotal)), 'Margin total'); tabel(ws, h.simulasi as unknown[], 'Simulasi (komitmen / rata-rata / peak)'); tabel(ws, (h.storageAlternatif ?? []) as unknown[], 'Tarif storage alternatif'); lebar(ws); }
+  { const ws = wb.addWorksheet('Rate & Simulasi'); judul(ws, 'Rate card, margin & simulasi'); tabel(ws, rateCardRapi(), 'Rate card');
+    kv(ws, Object.entries(ratakan(h.marginTotal)), 'Margin total'); tabel(ws, h.simulasi as unknown[], 'Simulasi (komitmen / rata-rata / peak)'); tabel(ws, (h.storageAlternatif ?? []) as unknown[], 'Tarif storage alternatif');
+    tabel(ws, (h.rateCard as unknown as Baris[]).map(({ opsiUom, ...r }) => ({ ...r, opsiUom: Array.isArray(opsiUom) ? (opsiUom as Baris[]).map(o => `${o.uom}=${o.volume}`).join('; ') : '' })), 'Rate card — detail mesin hitung'); lebar(ws); }
 
   // 7. Master data yang dipakai
   {
