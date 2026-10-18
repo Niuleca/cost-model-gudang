@@ -28,7 +28,7 @@ function LoginForm() {
       } else if (mode === 'daftar') {
         const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: nama }, emailRedirectTo: redirect } });
         if (error) throw error;
-        setPesan('Akun dibuat. Cek email untuk konfirmasi. Setelah itu akun menunggu persetujuan (ACC) master admin sebelum bisa dipakai.');
+        setPesan('Akun dibuat. Cek email untuk konfirmasi. Setelah itu akun menunggu persetujuan (ACC) Admin sebelum bisa dipakai. Terimakasih\nCP : 088291919234 / Email : Niuleca@gmail.com');
       } else {
         const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${redirect}?next=/akun` });
         if (error) throw error;
@@ -62,7 +62,7 @@ function LoginForm() {
               value={password} onChange={e => setPassword(e.target.value)} required />
           </label>
         )}
-        {pesan && <p className="small" role="status">{pesan}</p>}
+        {pesan && <p className="small" role="status" style={{ whiteSpace: 'pre-line' }}>{pesan}</p>}
         <button type="submit" disabled={sibuk}>{sibuk ? 'Memproses…' : mode === 'masuk' ? 'Masuk' : mode === 'daftar' ? 'Buat akun' : 'Kirim link reset'}</button>
         <div className="row small">
           {mode !== 'masuk' && <button type="button" className="ghost" onClick={() => setMode('masuk')}>Sudah punya akun</button>}

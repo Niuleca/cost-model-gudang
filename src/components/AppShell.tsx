@@ -118,7 +118,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="card" style={{ maxWidth: 560, margin: '40px auto' }}>
           <h2>{profile.status === 'pending' ? 'Menunggu persetujuan' : 'Pendaftaran ditolak'}</h2>
           {profile.status === 'pending'
-            ? <p>Akun <b>{profile.email}</b> sudah terdaftar dan sedang menunggu persetujuan master admin. Setelah disetujui dan diberi role, menu Leca akan terbuka — muat ulang halaman ini nanti.</p>
+            ? <p>Akun <b>{profile.email}</b> sudah terdaftar dan sedang menunggu persetujuan (ACC) Admin. Setelah disetujui dan diberi role, menu Leca akan terbuka — muat ulang halaman ini nanti. Terimakasih<br />CP : 088291919234 / Email : Niuleca@gmail.com</p>
             : <p>Pendaftaran akun <b>{profile.email}</b> tidak disetujui. Hubungi master admin bila ini keliru.</p>}
           <div className="row"><button className="ghost" onClick={() => location.reload()}>Muat ulang</button><button onClick={keluar}>Keluar</button></div>
         </div>) : children}</main>
