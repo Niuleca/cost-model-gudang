@@ -51,6 +51,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const [nomorAuto, setNomorAuto] = useState<{ pembuatan: number; urutan: number } | null>(null);
   const hasil = tender.hasil as HasilTender | null;
   const bolehApprove = isApprover(profile);
+  const [batalId, setBatalId] = useState<string | null>(null);
   const [putus, setPutus] = useState<{ id: string; jenis: 'revisi' | 'ditolak'; note: string } | null>(null);
 
   const muat = useCallback(async () => {
@@ -293,6 +294,9 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
                 <button className="ghost" disabled={sibukPv} onClick={() => lihat(q)}>Pratinjau</button>
                 {bolehRilis(q.status) && <><button onClick={() => unduh(q)}>Unduh PDF</button><button className="ghost" onClick={() => cetak(q)}>🖨 Print</button></>}
                 {q.status === 'approved' && <button className="ghost" onClick={() => setStatus(q, 'terkirim')}>Tandai terkirim</button>}
+                {q.status === 'approved' && bolehApprove && (batalId === q.id
+                  ? <><button className="danger" onClick={() => { setStatus(q, 'menunggu', { approved_by: null, approved_at: null, catatan_approval: 'Approve dibatalkan — perlu approve ulang' }); setBatalId(null); }}>Yakin batalkan approve</button><button className="ghost" onClick={() => setBatalId(null)}>Tidak</button></>
+                  : <button className="ghost" onClick={() => setBatalId(q.id)}>Batalkan approve</button>)}
                 {(q.status === 'approved' || q.status === 'terkirim') && !draft && <button className="ghost" onClick={() => revisi(q)}>Buat revisi</button>}
                 {!['batal', 'direvisi', 'ditolak'].includes(q.status) && <button className="danger" onClick={() => setStatus(q, 'batal')}>Batalkan</button>}
                 {bisaEdit && !draft && <button className="ghost" onClick={() => edit(q)}>Edit</button>}
