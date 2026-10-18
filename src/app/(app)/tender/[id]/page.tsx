@@ -13,7 +13,7 @@ import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
 import { rincianBiayaRole, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
-import { aktivitasDenganOrderAdmin, isAktivitasAdmin, orderAdmin } from '@/lib/profilVolume';
+import { aktivitasDenganOrderAdmin, isAktivitasAdmin, orderAdmin, stokDariPalet } from '@/lib/profilVolume';
 import { useProfile } from '@/lib/useProfile';
 import QuotationPanel from './QuotationPanel';
 import GudangPicker from './GudangPicker';
@@ -349,12 +349,29 @@ export default function TenderPage() {
           <p className="small muted">Per hari = per bulan ÷ {hariOps} hari operasional (Working Days di Process Design); per tahun = per bulan × 12.
             {a.volumes.some(v => (v.konversi?.per1 ?? 0) > 0) && ' Aktivitas dengan UoM case/pcs (mis. Case Picking per karton) otomatis memakai konversi ini bila pengali UoM-nya 1.'}</p>
           <div className="row"><button className="ghost" onClick={() => setA({ volumes: [...a.volumes, { arus: 'vas', uom: 'karton', rataRataBulan: 0, peakBulan: 0, komitmenBulan: 0 }] })}>Tambah baris volume</button></div>
-          <h3><T>Stok untuk tarif storage alternatif</T></h3>
-          <div className="grid3">
-            <Num id="ton" label="Stok rata-rata" suffix="ton" value={a.stokTon} onChange={v => setA({ stokTon: v })} />
-            <Num id="cbm" label="Stok rata-rata" suffix="CBM" value={a.stokCbm} onChange={v => setA({ stokCbm: v })} />
-            <Num id="liter" label="Stok rata-rata" suffix="liter" value={a.stokLiter} onChange={v => setA({ stokLiter: v })} />
-          </div>
+          {(() => {
+            const sp = stokDariPalet(a.volumes, a.profilVolume);
+            const pm = sp.param;
+            const setP = (patch: Partial<typeof pm>) => setA({ profilVolume: { inbound: [], outbound: [], ...(a.profilVolume ?? {}), param: { ...pm, ...patch } } });
+            return <>
+              <h3><T>Parameter muatan</T></h3>
+              <p className="small muted">Satu sumber untuk <b>tarif storage alternatif</b> (per kg / CBM / liter) dan <b>Profil order</b> (cek muatan kendaraan). Isi per palet dan per case; total stok dihitung otomatis.</p>
+              <div className="grid3">
+                <Num id="kgplt" label="Berat per palet" suffix="kg" value={Math.round(pm.tonPerPalet * 1000 * 100) / 100} onChange={v => setP({ tonPerPalet: v / 1000 })} />
+                <Num id="cbmplt" label="Volume per palet" suffix="CBM" value={pm.cbmPerPalet} onChange={v => setP({ cbmPerPalet: v })} />
+                <Num id="ltrplt" label="Isi cair per palet" suffix="liter, opsional" value={pm.literPerPalet ?? 0} onChange={v => setP({ literPerPalet: v })} />
+                <Num id="kgcs" label="Berat per case" suffix="kg" value={pm.kgPerCase} onChange={v => setP({ kgPerCase: v })} />
+                <Num id="cbmcs" label="Volume per case" suffix="CBM" value={pm.cbmPerCase} onChange={v => setP({ cbmPerCase: v })} />
+              </div>
+              <div className="umk-box">
+                <div><div className="small muted">Stok rata-rata</div><b>{angka(sp.palet)} palet</b></div>
+                <div><div className="small muted">Berat</div><b>{angka(sp.kg)} kg</b> <span className="small muted">({angka(sp.ton, 1)} ton)</span></div>
+                <div><div className="small muted">Volume</div><b>{angka(sp.cbm, 1)} CBM</b></div>
+                {sp.liter > 0 && <div><div className="small muted">Cair</div><b>{angka(sp.liter)} liter</b></div>}
+                <div className="small muted" style={{ flex: 1, minWidth: 200 }}>{sp.palet > 0 ? 'Dipakai untuk tarif storage per kg / CBM / liter di Hasil (rate card & storage alternatif).' : 'UoM Storage bukan palet — ubah ke palet agar stok kg/CBM terhitung otomatis.'}</div>
+              </div>
+            </>;
+          })()}
         </div>
       )}
 

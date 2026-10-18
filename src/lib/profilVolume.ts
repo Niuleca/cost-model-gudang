@@ -43,7 +43,8 @@ export interface BarisProfil {
   /** lama (versi qty/bln) — diabaikan */
   qty?: number;
 }
-export interface ParamProfil { tonPerPalet: number; cbmPerPalet: number; cbmPerCase: number; kgPerCase: number; inputAdminPerMobil?: number }
+/** Parameter muatan (satu sumber untuk profil order & tarif storage alternatif). tonPerPalet disimpan dalam ton, ditampilkan sebagai kg. */
+export interface ParamProfil { tonPerPalet: number; cbmPerPalet: number; cbmPerCase: number; kgPerCase: number; literPerPalet?: number; inputAdminPerMobil?: number }
 export interface ProfilVolume {
   inbound: BarisProfil[];
   outbound: BarisProfil[];
@@ -88,7 +89,7 @@ export function hitungProfil(rows: BarisProfil[], paletHari: number, param: Para
     if (isKont) {
       const tk = r.tonPerKontainer ?? TON_KONTAINER[r.moda as keyof typeof TON_KONTAINER];
       qty = tk > 0 ? ton / tk : 0; satuan = 'kontainer';
-      ket = `${f(palet)} plt × ${f(tp)} t = ${f(ton)} t ÷ ${f(tk)} t/kont`;
+      ket = `${f(palet)} plt × ${f(tp * 1000)} kg = ${f(ton * 1000)} kg ÷ ${f(tk * 1000)} kg/kont`;
     } else if (r.moda === 'case') {
       qty = palet * cpp; satuan = 'case';
       cbm = qty * param.cbmPerCase; ton = qty * param.kgPerCase / 1000;
@@ -167,3 +168,11 @@ export function aktivitasDenganOrderAdmin<T extends AktivitasInput>(aktivitas: T
 }
 
 const f = (x: number) => (Math.round(x * 100) / 100).toLocaleString('id-ID');
+
+/** Stok rata-rata dalam kg/ton, CBM, liter = stok palet (baris Storage, rata-rata) × parameter muatan per palet. */
+export function stokDariPalet(volumes: VolumeInput[], profil: ProfilVolume | undefined) {
+  const param = { ...PARAM_DEFAULT, ...(profil?.param ?? {}) };
+  const st = volumes.find(v => v.arus === 'storage');
+  const palet = st && /^pal(l)?et$/i.test(st.uom.trim()) ? Number(st.rataRataBulan) || 0 : 0;
+  return { palet, ton: palet * param.tonPerPalet, kg: palet * param.tonPerPalet * 1000, cbm: palet * param.cbmPerPalet, liter: palet * (param.literPerPalet ?? 0), param };
+}

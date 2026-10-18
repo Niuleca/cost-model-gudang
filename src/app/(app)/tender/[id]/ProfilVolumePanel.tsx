@@ -56,7 +56,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                   {n(r.persen ? Math.round(r.persen * 1000) / 10 : 0, v => set(i, { persen: v / 100 }), 64)}<span className="small">%</span></div></td>
                 <td className="num"><b>{angka(x.paletHari, 1)}</b></td>
                 <td><div className="row small" style={{ flexWrap: 'nowrap', gap: 4 }}>
-                  {isKont && <>{n(r.tonPerKontainer, v => set(i, { tonPerKontainer: v }), 60, String(TON_KONTAINER[r.moda as keyof typeof TON_KONTAINER]))}<span className="muted">t/kont</span></>}
+                  {isKont && <>{n(r.tonPerKontainer, v => set(i, { tonPerKontainer: v }), 60, String(TON_KONTAINER[r.moda as keyof typeof TON_KONTAINER]))}<span className="muted">ton/kont</span></>}
                   {r.moda === 'palet' && <span className="muted">—</span>}
                   {(r.moda === 'case' || r.moda === 'unit') && <>{n(r.casePerPalet, v => set(i, { casePerPalet: v }), 60, vp.cpp ? String(vp.cpp) : 'case')}<span className="muted">case/plt</span></>}
                   {r.moda === 'unit' && <>{n(r.unitPerCase, v => set(i, { unitPerCase: v }), 60, vp.upc ? String(vp.upc) : r.satuanUnit ?? 'pcs')}<span className="muted">/case</span></>}
@@ -64,13 +64,13 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                 <td className="num"><b>{angka(x.qtyHari, x.qtyHari < 10 ? 1 : 0)}</b><div className="small muted">{x.satuan}</div></td>
                 <td>{isKont ? <span className="small muted">{m?.kendaraan ?? 'kontainer'}</span>
                   : <select aria-label="Kendaraan" value={r.kendaraan ?? kendaraan[0].nama} onChange={e => set(i, { kendaraan: e.target.value })} style={{ minWidth: 150 }}>
-                    {kendaraan.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {k.ton} t</option>)}</select>}</td>
+                    {kendaraan.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('id-ID')} kg</option>)}</select>}</td>
                 <td className="num">{m ? <><b>{m.bulat}</b><div className="small muted">({angka(m.perHari, 2)}) · {angka(m.perBulan)}/bln</div></> : '–'}</td>
                 <td className="small">{m && !isKont && <>
                   {r.moda === 'palet' && <div>{angka(m.paletTrip, 1)} / {m.kap.palet} palet</div>}
                   <div>CBM {angka(m.cbmTrip, 1)} / {m.kap.cbm} m³ <span className={`pill ${m.cbmCukup ? 'ok' : 'bad'}`}>{m.cbmCukup ? 'cukup' : 'tidak cukup'}</span></div>
-                  <div>Ton {angka(m.tonTrip, 2)} / {m.kap.ton} t <span className={`pill ${m.tonCukup ? 'ok' : 'bad'}`}>{m.tonCukup ? 'cukup' : 'overload'}</span></div>
-                  <div className="muted">pembatas: {m.pembatas}{r.moda === 'palet' && m.maksPaletCbm < m.kap.palet && ` · CBM hanya muat ${m.maksPaletCbm} palet`}</div>
+                  <div>Berat {angka(m.tonTrip * 1000)} / {angka(m.kap.ton * 1000)} kg <span className={`pill ${m.tonCukup ? 'ok' : 'bad'}`}>{m.tonCukup ? 'cukup' : 'overload'}</span></div>
+                  <div className="muted">pembatas: {m.pembatas === 'ton' ? 'berat' : m.pembatas}{r.moda === 'palet' && m.maksPaletCbm < m.kap.palet && ` · CBM hanya muat ${m.maksPaletCbm} palet`}</div>
                 </>}{m && isKont && <span className="muted">{angka(x.qtyHari, 2)} kontainer/hari</span>}</td>
                 <td><button className="danger" onClick={() => onChange({ ...p, [arus]: rows.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>;
@@ -92,15 +92,13 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
     <div className="card" style={{ gap: 12 }}>
       <h2><T>Profil order inbound & outbound (per hari)</T></h2>
       <p className="small muted">Mengikuti volume di tabel Volume: volume per bulan ÷ hari operasional = palet per hari, lalu dipecah per moda sesuai porsi (%).
-        Kontainer = ton ÷ ton per kontainer; case = palet × case/palet; pcs = × isi per case. Mobil per hari = kebutuhan terbesar antara palet, CBM, dan ton dibanding kapasitas kendaraan (dibulatkan ke atas per moda).</p>
+        Kontainer = ton ÷ ton per kontainer; case = palet × case/palet; pcs = × isi per case. Mobil per hari = kebutuhan terbesar antara palet, CBM, dan berat (kg) dibanding kapasitas kendaraan (dibulatkan ke atas per moda).</p>
       <div className="row" style={{ alignItems: 'end' }}>
         <label className="f">Basis volume
           <select value={basis} onChange={e => onChange({ ...p, basis: e.target.value as BasisVolume })} style={{ minWidth: 170 }}>
             {BASIS.map(b => <option key={b.v} value={b.v}>{b.l}</option>)}</select></label>
-        <label className="f">Ton per palet {n(p.param.tonPerPalet, v => setParam('tonPerPalet', v), 90)}</label>
-        <label className="f">CBM per palet {n(p.param.cbmPerPalet, v => setParam('cbmPerPalet', v), 90)}</label>
-        <label className="f">CBM per case {n(p.param.cbmPerCase, v => setParam('cbmPerCase', v), 90)}</label>
-        <label className="f">Kg per case {n(p.param.kgPerCase, v => setParam('kgPerCase', v), 90)}</label>
+        <span className="small muted" style={{ alignSelf: 'center' }}>Muatan: <b>{(p.param.tonPerPalet * 1000).toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerPalet.toLocaleString('id-ID')} CBM</b> per palet ·
+          {' '}<b>{p.param.kgPerCase.toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerCase.toLocaleString('id-ID')} CBM</b> per case — diatur di <b>Parameter muatan</b> di atas</span>
         <label className="f" title="Inbound: barang masuk + put away; outbound: picking + barang keluar">Input admin per mobil {n(p.param.inputAdminPerMobil ?? 2, v => setParam('inputAdminPerMobil', v), 90)}</label>
         <span className="small muted">Hari operasional {hariBulan}/bln (Working Days di Process Design)</span>
       </div>
@@ -124,10 +122,10 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
       <details>
         <summary className="small">Kapasitas kendaraan (bisa diubah)</summary>
         <div className="tablewrap"><table>
-          <thead><tr><th>Kendaraan</th><th className="num">Palet</th><th className="num">CBM</th><th className="num">Ton</th></tr></thead>
+          <thead><tr><th>Kendaraan</th><th className="num">Palet</th><th className="num">CBM</th><th className="num">Berat (kg)</th></tr></thead>
           <tbody>{kendaraan.map((k, i) => {
             const uk = (patch: Partial<Kendaraan>) => onChange({ ...p, kendaraan: kendaraan.map((x, j) => j === i ? { ...x, ...patch } : x) });
-            return <tr key={k.nama}><td>{k.nama}</td><td className="num">{n(k.palet, v => uk({ palet: v }), 70)}</td><td className="num">{n(k.cbm, v => uk({ cbm: v }), 70)}</td><td className="num">{n(k.ton, v => uk({ ton: v }), 70)}</td></tr>;
+            return <tr key={k.nama}><td>{k.nama}</td><td className="num">{n(k.palet, v => uk({ palet: v }), 70)}</td><td className="num">{n(k.cbm, v => uk({ cbm: v }), 70)}</td><td className="num">{n(k.ton * 1000, v => uk({ ton: v / 1000 }), 80)}</td></tr>;
           })}</tbody></table></div>
         {p.kendaraan?.length ? <button className="ghost" onClick={() => onChange({ ...p, kendaraan: undefined })}>Kembalikan kapasitas default</button> : null}
       </details>

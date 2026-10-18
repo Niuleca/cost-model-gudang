@@ -380,7 +380,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const storageAlternatif = st ? [
     { uom: 'palet posisi', tarif: st.tarifPerUnit },
     { uom: 'm²', tarif: roundupHarga(st.hargaBulan / Math.max(1, space.totalM2)) },
-    ...(t.stokTon ? [{ uom: 'ton', tarif: roundupHarga(st.hargaBulan / t.stokTon) }] : []),
+    ...(t.stokTon ? [{ uom: 'kg', tarif: roundupHarga(st.hargaBulan / (t.stokTon * 1000)) }] : []),
     ...(t.stokCbm ? [{ uom: 'CBM', tarif: roundupHarga(st.hargaBulan / t.stokCbm) }] : []),
     ...(t.stokLiter ? [{ uom: 'liter', tarif: roundupHarga(st.hargaBulan / t.stokLiter) }] : []),
   ] : [];
@@ -457,15 +457,14 @@ export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: 
     if (kp.cbmPerPalet) out.push({ uom: 'CBM', volume: komitmen * kp.cbmPerPalet, dasar: `palet × ${kp.cbmPerPalet} CBM` });
     if (kp.tonPerPalet) out.push({ uom: 'ton', volume: komitmen * kp.tonPerPalet, dasar: `palet × ${kp.tonPerPalet} ton` });
   }
-  // kg dari ton
-  const ton = out.find(o => o.uom === 'ton');
-  if (ton) out.push({ uom: 'kg', volume: ton.volume * 1000, dasar: `${ton.dasar} × 1.000 kg`, tetap: ton.tetap });
+  // Berat dipakai dalam kg (bukan ton)
+  for (const o of out) if (o.uom === 'ton') { o.uom = 'kg'; o.volume *= 1000; o.dasar = o.dasar.replace(/ton/g, 'kg').replace(/× ([\d.,]+) kg/, (_m, x) => `× ${(Number(String(x).replace(',', '.')) * 1000).toLocaleString('id-ID')} kg`); }
   const seen = new Set<string>();
   return out.filter(o => { const key = o.uom.toLowerCase(); if (seen.has(key) || !(o.volume > 0)) return false; seen.add(key); return true; });
 }
 
 /** Daftar standar satuan tarif untuk dropdown rate card. */
-export const UOM_TARIF_STANDAR = ['palet', 'case', 'karton', 'pcs', 'm²', 'CBM', 'ton', 'kg', 'liter', 'bag', 'pack', 'roll', 'order', 'line', 'unit'];
+export const UOM_TARIF_STANDAR = ['palet', 'case', 'karton', 'pcs', 'm²', 'CBM', 'kg', 'liter', 'bag', 'pack', 'roll', 'order', 'line', 'unit'];
 
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 /** Skema kenaikan mengikuti kebijakan upah: naik setiap JANUARI (UMK baru) sebesar r, bertingkat tiap tahun.

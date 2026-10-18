@@ -111,6 +111,7 @@ const K: Kamus = {
   'Faktor': ['Factors', '계수', '係数'],
   '% gaji pokok per level jabatan': ['% base salary per job level', '직급별 기본급 비율', '職位別基本給（%）'],
   'Volume admin (order)': ['Admin volume (orders)', '관리 물량 (오더)', '事務作業量（オーダー）'],
+  'Parameter muatan': ['Load parameters', '적재 기준', '積載パラメータ'],
   // Dashboard
   'Ringkasan tender': ['Tender summary', '입찰 요약', '入札サマリー'],
   'Pipeline aktif': ['Active pipeline', '진행 중 파이프라인', '進行中パイプライン'],

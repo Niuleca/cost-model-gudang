@@ -1,4 +1,4 @@
-import { aktivitasDenganOrderAdmin } from '@/lib/profilVolume';
+import { aktivitasDenganOrderAdmin, stokDariPalet } from '@/lib/profilVolume';
 import { PD_DEFAULT, type ProcessDesignInput } from '@/lib/engine/processDesign';
 // Penghubung antara database (Supabase) dan mesin hitung.
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -115,7 +115,9 @@ export function keInput(t: TenderRow): TenderInput {
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
     listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, rincianBiayaMp: a.rincianBiayaMp ?? {}, paramBiayaMp: a.paramBiayaMp ?? {}, levelGaji: a.levelGaji ?? {}, levelRole: a.levelRole ?? {}, uomRateCard: a.uomRateCard ?? {},
     konversiPalet: { cbmPerPalet: a.profilVolume?.param?.cbmPerPalet ?? 1.5, tonPerPalet: a.profilVolume?.param?.tonPerPalet ?? 0.8 }, eskalasiManpower: { ...ESKALASI_DEFAULT, ...(a.eskalasiManpower ?? {}), mulai: a.eskalasiManpower?.mulai || t.tanggal_go_live?.slice(0, 7) || null },
-    stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter,
+    ...(() => { const sp = stokDariPalet(a.volumes, a.profilVolume); return sp.palet > 0
+      ? { stokTon: sp.ton || undefined, stokCbm: sp.cbm || undefined, stokLiter: sp.liter || undefined }
+      : { stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter }; })(),
     metodeManpower: 'excel', processDesign:   // hanya metode FTE (process design) yang dipakai
     { ...PD_DEFAULT, ...(a.processDesign ?? {}) },
   };
