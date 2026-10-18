@@ -34,11 +34,15 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
       <h2>Rincian biaya manpower</h2>
       <p className="small muted">Jumlah orang dari Man Power Summary. Kotak kosong = default (gaji pokok = UMK area × % level jabatan; lisensi & insentif = tunjangan jabatan; hari kerja = Working Days Employee).
         BPJS, THR & kompensasi dihitung dari gaji pokok; gaji dibayar = gaji pokok × actual hari kerja ÷ hari kerja.</p>
-      <h3>Gaji pokok per level jabatan</h3>
+      <div className="umk-box">
+        <div><div className="small muted">UMK area project</div><b style={{ fontSize: 18 }}>{umk ? rp(umk) : 'memuat…'}</b><span className="small muted"> /bln</span></div>
+        <div><div className="small muted">Area</div><b>{lokasi || '—'}</b></div>
+        <div className="small muted" style={{ flex: 1, minWidth: 220 }}>Diambil dari <b>Area / kab-kota</b> di Key assumption. Ganti area di sana untuk mengubah UMK; semua jabatan di tabel ini ikut area project.</div>
+      </div>
+      <h3>% gaji pokok per level jabatan</h3>
       <div className="tablewrap"><table>
-        <thead><tr><th>Level</th><th>Contoh jabatan</th><th className="num">% dari UMK</th><th className="num">Gaji pokok/bln</th><th className="num">Jabatan di tender ini</th></tr></thead>
+        <thead><tr><th>Level</th><th>Contoh jabatan</th><th className="num">% dari UMK</th><th className="num">Gaji pokok/bln</th><th>Jabatan di tender ini</th></tr></thead>
         <tbody>
-          <tr className="pd-sub"><td colSpan={3}><b>UMK {lokasi || 'area project'}</b> <span className="small muted">(dari Area / kab-kota di Key assumption)</span></td><td className="num"><b>{umk ? rp(umk) : 'memuat…'}</b></td><td /></tr>
           {LEVEL_JABATAN.map(L => <tr key={L.v}>
             <td><b>{L.l}</b></td><td className="small muted">{L.contoh}</td>
             <td className="num"><div className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
@@ -64,21 +68,22 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
       </details>
       <div className="tablewrap"><table className="bmp">
         <thead><tr>
-          <th>No</th><th>Jabatan</th><th>Level</th><th>Area</th><th className="num">Gaji pokok</th><th className="num">Hari kerja</th><th className="num">Actual hari kerja</th>
+          <th>No</th><th>Jabatan</th><th>Area</th><th className="num">UMK</th><th>Level · % UMK</th><th className="num">Gaji pokok</th><th className="num">Hari kerja</th><th className="num">Actual hari kerja</th>
           <th className="num">Lisensi + Insentif</th><th className="num">Sub total</th><th className="num">BPJS TK ({angka(pct(param.bpjsTk), 2)}%)</th>
           <th className="num">BPJS KS ({angka(pct(param.bpjsKs), 2)}%)</th><th className="num">BPJS Pensiun ({angka(pct(param.bpjsPensiun), 2)}%)</th>
           <th className="num">THR</th><th className="num">Kompensasi</th><th className="num">Supervisi & Operasional</th><th className="num">Total</th>
           <th className="num">Manpower</th><th className="num">TOTAL</th>
         </tr></thead>
         <tbody>
-          {rows.length === 0 && <tr><td colSpan={18} className="muted">Belum ada manpower. Isi aktivitas & peran tetap terlebih dahulu.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={19} className="muted">Belum ada manpower. Isi aktivitas & peran tetap terlebih dahulu.</td></tr>}
           {rows.map((r, i) => <tr key={r.role}>
             <td className="num">{i + 1}</td>
             <td><b>{r.role}</b>{r.manual && <div className="small muted">diubah · <button type="button" className="linkbtn" disabled={!bisaEdit} onClick={() => { const x = { ...input }; delete x[r.role]; onInput(x); }}>reset</button></div>}</td>
+            <td className="small">{lokasi || r.area}</td>
+            <td className="num">{r0(r.umk)}</td>
             <td><select aria-label={`Level ${r.role}`} value={r.level} disabled={!bisaEdit} style={{ minWidth: 120 }}
               onChange={e => { const v = e.target.value as LevelJabatan; const x = { ...levelRole }; if (v === levelDefault(r.role)) delete x[r.role]; else x[r.role] = v; onLevelRole(x); }}>
               {LEVEL_JABATAN.map(L => <option key={L.v} value={L.v}>{L.l.split(' (')[0]} · {Math.round(lg[L.v] * 100)}%</option>)}</select></td>
-            <td><input aria-label={`Area ${r.role}`} value={input[r.role]?.area ?? ''} placeholder={r.area} onChange={e => ubah(r.role, { area: e.target.value || undefined })} disabled={!bisaEdit} style={{ width: 86, minWidth: 86 }} /></td>
             <td className="num">{num(r.role, 'gajiPokok', r.gajiPokok, r.gajiDefault, 96)}</td>
             <td className="num">{num(r.role, 'hariKerja', r.hariKerja, r.hariKerja, 48)}</td>
             <td className="num">{num(r.role, 'hariAktual', r.hariAktual, r.hariAktual, 48)}</td>
@@ -90,9 +95,9 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
             <td className="num">{r0(r.total)}</td><td className="num">{r.qty}</td><td className="num"><b>{r0(r.totalQty)}</b></td>
           </tr>)}
           {rows.length > 0 && <>
-            <tr className="pd-sub"><td colSpan={16} className="num"><b>Sub Total Biaya-1</b></td><td className="num"><b>{rows.reduce((s, r) => s + r.qty, 0)}</b></td><td className="num"><b>{r0(g.sub1)}</b></td></tr>
-            <tr><td colSpan={16} className="num">Management Fee {angka(pct(param.feePersen), 2)}%</td><td /><td className="num">{r0(g.fee)}</td></tr>
-            <tr style={{ background: 'var(--link)' }}><td colSpan={16} className="num"><b>Sub Total Biaya-2</b> <span className="small muted">(masuk cost model, sebelum kenaikan tahunan)</span></td><td /><td className="num"><b>{rp(g.sub2)}</b></td></tr>
+            <tr className="pd-sub"><td colSpan={17} className="num"><b>Sub Total Biaya-1</b></td><td className="num"><b>{rows.reduce((s, r) => s + r.qty, 0)}</b></td><td className="num"><b>{r0(g.sub1)}</b></td></tr>
+            <tr><td colSpan={17} className="num">Management Fee {angka(pct(param.feePersen), 2)}%</td><td /><td className="num">{r0(g.fee)}</td></tr>
+            <tr style={{ background: 'var(--link)' }}><td colSpan={17} className="num"><b>Sub Total Biaya-2</b> <span className="small muted">(masuk cost model, sebelum kenaikan tahunan)</span></td><td /><td className="num"><b>{rp(g.sub2)}</b></td></tr>
           </>}
         </tbody>
       </table></div>

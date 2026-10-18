@@ -55,7 +55,7 @@ export function rincianBiayaRole(role: string, qty: number, m: MasterData | null
   const kompensasi = gajiPokok * param.kompensasi;
   const total = subTotal + bpjsTk + bpjsKs + bpjsPensiun + thr + kompensasi + supervisi;
   return {
-    role, level: lv.level, faktorLevel: lv.faktor, umk: m?.upahMinimum ?? 0, area: input?.area || areaDefault, gajiPokok, gajiDefault, hariKerja, hariAktual, lisensi, supervisi,
+    role, level: lv.level, faktorLevel: lv.faktor, umk: m?.upahMinimum ?? 0, area: areaDefault /* dikunci ke area project */, gajiPokok, gajiDefault, hariKerja, hariAktual, lisensi, supervisi,
     subTotal, bpjsTk, bpjsKs, bpjsPensiun, thr, kompensasi, total, qty, totalQty: total * qty,
     manual: !!(input && Object.values(input).some(v => v != null && v !== '')),
   };

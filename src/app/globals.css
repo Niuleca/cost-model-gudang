@@ -240,3 +240,4 @@ td select { min-width: 96px; }
 .pd-sum.pd-sum-biaya th:nth-child(5) { width: 16%; } .pd-sum.pd-sum-biaya th:nth-child(6) { width: 13%; }
 .bmp th { white-space: normal; min-width: 70px; font-size: 12px; vertical-align: bottom; }
 .bmp td { white-space: nowrap; }
+.umk-box { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; padding: 12px 14px; border: 1px solid var(--g200, #e5e7eb); border-radius: 12px; background: var(--g50, #f8f9fa); }
