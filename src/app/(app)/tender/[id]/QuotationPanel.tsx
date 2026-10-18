@@ -9,7 +9,7 @@ import { rp, tanggal, angka, BUCKET_LABEL } from '@/lib/format';
 import { ringkasIt, IT_SHEET_DEFAULT } from '@/lib/it';
 import { unduhQuotationPdf, blobQuotationPdf, type InfoGudangPdf, type QuotationPdfData } from '@/lib/quotationPdf';
 import PdfPreview from './PdfPreview';
-import BrandingPanel, { gambarUntukPdf, type PilihanBranding } from './BrandingPanel';
+import { gambarUntukPdf, useBrandingSaya, BrandingRingkas } from '@/components/BrandingProfil';
 
 interface RateRow { layanan: string; satuan: string; tarif: number; catatan?: string }
 interface Sekali { deskripsi: string; nilai: number }
@@ -37,7 +37,9 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [ttd, setTtd] = useState({ nama: profile?.full_name ?? '', jabatan: 'Solution Design', perusahaan: 'PT LX Pantos Indonesia' });
   const [err, setErr] = useState<string | null>(null);
-  const [branding, setBranding] = useState<PilihanBranding>({ logoPath: null, ttdPath: null });
+  const brand = useBrandingSaya(profile);
+  const branding = brand.pilihan;
+  const kurangBranding = brand.wajib && brand.siap && !brand.lengkap;
   const [hapusId, setHapusId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [pratinjau, setPratinjau] = useState<{ blob: Blob; data: QuotationPdfData } | null>(null);
@@ -96,6 +98,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   }
 
   async function mulai() {
+    if (kurangBranding) { setErr('Unggah logo perusahaan & tanda tangan di Profil dulu sebelum membuat quotation.'); return; }
     if (!hasil || !cekKritis(hasil)) return;
     const hari = new Date();
     const urutan = await urutanHariIni();
@@ -169,7 +172,10 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
       durasiBulan: tender.durasi_kontrak_bulan, termasukPpn: (tender.asumsi.pajak?.ppn ?? 'exclude') === 'include', ppnPersen: tender.asumsi.pajak?.ppnPersen ?? 0.11,
       termCondition: q.term_condition, penandatangan: ttd.nama, jabatan: ttd.jabatan, perusahaan: ttd.perusahaan };
   }
-  async function unduh(q: Quo) { await unduhQuotationPdf(await dataPdf(q)); }
+  async function unduh(q: Quo) {
+    if (kurangBranding) { setErr('Unggah logo perusahaan & tanda tangan di Profil dulu sebelum mengunduh PDF.'); return; }
+    await unduhQuotationPdf(await dataPdf(q));
+  }
   async function lihat(q: Draft & { status?: string }) {
     setSibukPv(true);
     try { const data = await dataPdf(q); setPratinjau({ blob: await blobQuotationPdf(data), data }); }
@@ -183,7 +189,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     <div className="card">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2>Quotation</h2>
-        {!draft && <button onClick={mulai} disabled={!hasil}>Buat quotation baru dari hasil tersimpan</button>}
+        {!draft && <button onClick={mulai} disabled={!hasil || kurangBranding} title={kurangBranding ? 'Unggah logo & TTD di Profil dulu' : undefined}>Buat quotation baru dari hasil tersimpan</button>}
       </div>
       {!hasil && <p className="muted">Simpan hasil hitung dulu di tab Hasil.</p>}
       {err && <p className="error small" role="alert">{err}</p>}
@@ -249,7 +255,12 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
         <label className="f" htmlFor="ttdj">Jabatan<input id="ttdj" value={ttd.jabatan} onChange={e => setTtd({ ...ttd, jabatan: e.target.value })} /></label>
         <label className="f" htmlFor="ttdp">Perusahaan<input id="ttdp" value={ttd.perusahaan} onChange={e => setTtd({ ...ttd, perusahaan: e.target.value })} /></label>
       </div>
-      <BrandingPanel profile={profile} onPilih={setBranding} />
+      <div className="card" style={{ gap: 10 }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}><h3>Logo & tanda tangan PDF</h3>
+          <span className="small muted">Milik akun Anda · kelola di <Link href="/akun#branding">Profil</Link></span></div>
+        {kurangBranding && <p className="notice small" role="alert"><b>Wajib:</b> unggah {[!brand.logo && 'logo perusahaan', !brand.ttd && 'tanda tangan'].filter(Boolean).join(' & ')} di <Link href="/akun#branding">Profil</Link> dulu sebelum membuat quotation / unduh PDF.</p>}
+        <BrandingRingkas logo={brand.logo} ttd={brand.ttd} />
+      </div>
 
       <div className="tablewrap"><table>
         <thead><tr><th>Nomor</th><th className="num">Rev</th><th>Tanggal</th><th>Berlaku s.d.</th><th>Status</th><th>Catatan revisi</th><th></th></tr></thead>
@@ -276,7 +287,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
             </tr>))}
         </tbody>
       </table></div>
-      {pratinjau && <PdfPreview blob={pratinjau.blob} judul={pratinjau.data.nomor} onTutup={() => setPratinjau(null)} onUnduh={() => unduhQuotationPdf(pratinjau.data)} />}
+      {pratinjau && <PdfPreview blob={pratinjau.blob} judul={pratinjau.data.nomor} onTutup={() => setPratinjau(null)} onUnduh={() => kurangBranding ? setErr('Unggah logo & TTD di Profil dulu.') : unduhQuotationPdf(pratinjau.data)} />}
     </div>
   );
 }

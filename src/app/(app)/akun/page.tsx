@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useProfile } from '@/lib/useProfile';
 import { ROLE_LABEL } from '@/lib/format';
+import BrandingProfil from '@/components/BrandingProfil';
 
 export default function AkunPage() {
   const { profile } = useProfile();
@@ -58,6 +59,7 @@ export default function AkunPage() {
         {pesanProfil && <p className="small" role="status">{pesanProfil}</p>}
         <div className="row"><button type="submit" disabled={!profile}>Simpan profil</button></div>
       </form>
+      <BrandingProfil profile={profile} />
       <form className="card" onSubmit={gantiEmail} style={{ maxWidth: 560 }}>
         <h2>Ganti email</h2>
         <p className="small muted">Email sekarang: <b>{profile?.email}</b>. Email baru dipakai untuk login setelah Anda mengklik link konfirmasi yang dikirim ke email baru.</p>

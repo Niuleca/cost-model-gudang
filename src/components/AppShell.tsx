@@ -8,6 +8,7 @@ import { useProfile } from '@/lib/useProfile';
 import { ROLE_LABEL, TIM_TENDER, type AppRole } from '@/lib/format';
 import { PRICE_PAGES, PROD_PAGES } from '@/lib/masterTabs';
 import { BAHASA, useBahasa, type Bahasa } from '@/lib/i18n';
+import { useBrandingSaya } from './BrandingProfil';
 
 type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: boolean };
 const MENU: { id: string; label: string; item: Item[] }[] = [
@@ -62,6 +63,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return path === dasar || path.startsWith(dasar + '/');
   };
 
+  const brand = useBrandingSaya(profile);
+  useEffect(() => { brand.muat(); }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
   // Jumlah akun menunggu persetujuan (badge untuk master admin)
   const [nPending, setNPending] = useState(0);
   useEffect(() => {
@@ -108,6 +111,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             label={`${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${profile.is_master ? 'Master admin' : ROLE_LABEL[profile.role]}` : ''}${nPending ? ` (${nPending})` : ''}`} />
         </nav>
       </header>
+      {brand.wajib && brand.siap && !brand.lengkap && path !== '/akun' && <div className="notice small" role="alert" style={{ margin: '10px 24px 0' }}>
+        <b>Lengkapi profil:</b> unggah {[!brand.logo && 'logo perusahaan', !brand.ttd && 'tanda tangan'].filter(Boolean).join(' & ')} Anda — wajib sebelum membuat quotation. <Link href="/akun#branding">Unggah sekarang →</Link></div>}
       <main className="main">{profile && (profile.status === 'pending' || profile.status === 'ditolak') ? (
         <div className="card" style={{ maxWidth: 560, margin: '40px auto' }}>
           <h2>{profile.status === 'pending' ? 'Menunggu persetujuan' : 'Pendaftaran ditolak'}</h2>
