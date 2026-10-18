@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { T } from '@/lib/i18n';
 import type { DataExport } from '@/lib/exportTender';
 
-type Pratinjau = { nama: string; baris: number; kolom: number; rows: (string | number | null)[][] };
+type Pratinjau = { nama: string; baris: number; kolom: number; rows: (string | number | null)[][]; gaya?: ({ bg?: string; b?: boolean; pct?: boolean } | null)[][] };
 const KET: Record<string, string> = {
   'Ringkasan': 'Cost, selling, profit, GP, headcount, luas, rate card, biaya per kelompok, red flag',
   'Input': 'Data tender & key assumption',
@@ -17,7 +17,7 @@ const KET: Record<string, string> = {
   'Data Mentah': 'Seluruh isi asumsi & hasil (path → nilai) untuk audit',
 };
 const kolom = (c: number) => { let s = ''; c++; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
-const fmt = (v: string | number | null) => v == null ? '' : typeof v === 'number' ? (Math.abs(v) >= 1000 || Number.isInteger(v) ? Math.round(v).toLocaleString('id-ID') : v.toLocaleString('id-ID', { maximumFractionDigits: 4 })) : String(v);
+const fmt = (v: string | number | null) => v == null ? '' : typeof v === 'number' ? (Math.abs(v) >= 10000 ? Math.round(v).toLocaleString('id-ID') : Number.isInteger(v) ? String(v) : v.toLocaleString('id-ID', { maximumFractionDigits: 4 })) : String(v);
 
 /** Tab Export: siapkan data → review isi tiap sheet → pilih sheet → unduh .xlsx. */
 export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Promise<DataExport>; namaFile: string }) {
@@ -77,12 +77,14 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
           <div className="tabs" role="tablist" style={{ marginBottom: 8 }}>
             {pv.map((x, i) => <button key={x.nama} role="tab" aria-selected={i === aktif} className={i === aktif ? 'on' : ''} onClick={() => setAktif(i)}>{x.nama}</button>)}
           </div>
-          <p className="small muted">Pratinjau sheet <b>{sh.nama}</b>{sh.baris > sh.rows.length ? ` — ${sh.rows.length} dari ${sh.baris.toLocaleString('id-ID')} baris pertama` : ''}. Angka hasil rumus ditampilkan sebagai nilai.</p>
+          <p className="small muted">Pratinjau sheet <b>{sh.nama}</b>{sh.baris > sh.rows.length ? ` — ${sh.rows.length} dari ${sh.baris.toLocaleString('id-ID')} baris pertama` : ''}. Warna & angka sama seperti di file Excel (header rumus/hasil silver · header input abu-abu muda · isi input putih tulang · isi hasil abu-abu).</p>
           <div className="tablewrap xl-prev" style={{ maxHeight: '65vh' }}><table>
             <thead><tr><th className="num">#</th>{Array.from({ length: Math.min(sh.kolom, 40) }, (_, c) => <th key={c} className="num">{kolom(c)}</th>)}</tr></thead>
             <tbody>{sh.rows.map((r, i) => <tr key={i}>
               <td className="num muted small">{i + 1}</td>
-              {Array.from({ length: Math.min(sh.kolom, 40) }, (_, c) => { const v = r[c] ?? null; return <td key={c} className={typeof v === 'number' ? 'num' : undefined}>{fmt(v)}</td>; })}
+              {Array.from({ length: Math.min(sh.kolom, 40) }, (_, c) => { const v = r[c] ?? null; const g = sh.gaya?.[i]?.[c];
+                return <td key={c} className={typeof v === 'number' ? 'num' : undefined} style={g ? { background: g.bg, fontWeight: g.b ? 700 : undefined } : undefined}>
+                  {g?.pct && typeof v === 'number' ? `${(v * 100).toLocaleString('id-ID', { maximumFractionDigits: 2 })}%` : fmt(v)}</td>; })}
             </tr>)}</tbody>
           </table></div>
         </div>}

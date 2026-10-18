@@ -41,10 +41,13 @@ export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
 export const SHEET_EXPORT = ['Ringkasan', 'Input', 'Volume', 'Process Design', 'Biaya Manpower', 'Space & MHE', 'Biaya', 'Rate & Simulasi', 'Master Data', 'Data Mentah'] as const;
 
 /** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya). */
+export type GayaSel = { bg?: string; b?: boolean; pct?: boolean } | null;
+/** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya) + warna/huruf tebal sel. */
 export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
   const wb = await susunWorkbook(p);
   return wb.worksheets.map(ws => {
     const rows: (string | number | null)[][] = [];
+    const gaya: GayaSel[][] = [];
     let lebar = 0;
     ws.eachRow({ includeEmpty: true }, (row, i) => {
       if (i > maksBaris) return;
@@ -53,9 +56,18 @@ export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
         if (typeof c === 'object') { const o = c as { result?: unknown; formula?: string; text?: string }; return (o.result ?? o.text ?? (o.formula ? `=${o.formula}` : null)) as string | number | null; }
         return c as string | number;
       });
-      lebar = Math.max(lebar, v.length); rows.push(v);
+      const n = Math.max(v.length, row.cellCount);
+      const g: GayaSel[] = [];
+      for (let c = 1; c <= n; c++) {
+        const cell = row.getCell(c);
+        const argb = (cell.fill as { fgColor?: { argb?: string } } | undefined)?.fgColor?.argb;
+        const b = !!(cell.font as { bold?: boolean } | undefined)?.bold || !!(row.font as { bold?: boolean } | undefined)?.bold;
+        const pct = typeof cell.numFmt === 'string' && cell.numFmt.includes('%');
+        g.push(argb || b || pct ? { bg: argb ? `#${argb.slice(-6)}` : undefined, b, pct } : null);
+      }
+      lebar = Math.max(lebar, n); rows.push(v); gaya.push(g);
     });
-    return { nama: ws.name, baris: ws.rowCount, kolom: lebar, rows };
+    return { nama: ws.name, baris: ws.rowCount, kolom: lebar, rows, gaya };
   });
 }
 
@@ -109,7 +121,11 @@ async function susunWorkbook(p: DataExport) {
       cell.font = { bold: true, color: { argb: TINTA } }; cell.border = { top: garis, bottom: garis, left: garis, right: garis }; cell.alignment = { vertical: 'middle', wrapText: true }; }
     for (let i = awal + 1; i <= awal + nBaris; i++) {
       const row = ws.getRow(i);
+      const label = String(row.getCell(1).value ?? '');
       for (let c = 1; c <= cols.length; c++) { const cell = row.getCell(c); formatAngka(cell as never);
+        // Persentase: kolom ber-header persen/GP/margin/porsi, atau baris kv yang labelnya persen
+        const kunci = cols.length === 2 && c === 2 ? label : cols[c - 1];
+        if (typeof cell.value === 'number' && Math.abs(cell.value) <= 2 && /persen|%|gp|margin|markup|porsi|utilisasi|efisiensi|faktorproduktivitas/i.test(kunci) && !/rp\)|bulan|biaya|harga|pendapatan/i.test(kunci)) cell.numFmt = '0.00%';
         if (jenis !== 'netral') isi(cell as never, jenis === 'input' ? SEL_INPUT : SEL_HASIL);
         cell.border = { top: garis, bottom: garis, left: garis, right: garis }; }
     }
@@ -140,12 +156,12 @@ async function susunWorkbook(p: DataExport) {
     ws.addRow([]);
     const mt = h.marginTotal;
     kv(ws, [
-      ['Cost per bulan (Rp)', mt.biayaBulan], ['Selling per bulan (Rp)', mt.hargaBulan], ['Profit per bulan (Rp)', mt.margin], ['GP %', mt.gpPersen],
+      ['Cost per bulan (Rp)', mt.biayaBulan], ['Selling per bulan (Rp)', mt.hargaBulan], ['Profit per bulan (Rp)', mt.hargaBulan - mt.biayaBulan], ['GP %', mt.gpPersen], ['Markup %', mt.margin],
       ['Cost per tahun (Rp)', mt.biayaBulan * 12], ['Selling per tahun (Rp)', mt.hargaBulan * 12],
       ['Total biaya per bulan (semua baris)', h.totalBiayaBulan], ['Investasi (Rp)', h.investasi],
       ['Total headcount', h.totalHeadcount], ['Luas gudang (m²)', h.space?.totalM2],
       ['Biaya manpower/bln (rata-rata kontrak)', h.eskalasiManpower?.rataBulan], ['Faktor kenaikan manpower', h.eskalasiManpower?.faktor],
-      ['Pajak', h.pajak],
+      ['Pajak', `PPh ${h.pajak?.pph ?? '-'} (${((h.pajak?.pphPersen ?? 0) * 100).toLocaleString('id-ID')}%) · PPN ${h.pajak?.ppn ?? '-'} (${((h.pajak?.ppnPersen ?? 0) * 100).toLocaleString('id-ID')}%)`],
     ], 'Hasil utama');
     tabel(ws, h.rateCard as unknown[], 'Rate card');
     tabel(ws, Object.entries(h.perKelompok).map(([kelompok, biayaBulan]) => ({ kelompok, biayaBulan, porsi: h.totalBiayaBulan ? biayaBulan / h.totalBiayaBulan : 0 })), 'Biaya per kelompok');
