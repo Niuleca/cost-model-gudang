@@ -14,7 +14,8 @@ const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { s
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
 export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak }: {
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard }: {
+  uomRateCard?: Partial<Record<Bucket, string>>; onUomRateCard?: (u: Partial<Record<Bucket, string>>) => void;
   h: HasilTender; marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
   kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number;
   pajak: Pajak; onPajak: (p: Pajak) => void;
@@ -67,11 +68,17 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
         {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>
       <div className="tablewrap"><table>
-        <thead><tr><th>Layanan</th><th>Satuan</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">GP% (input)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
+        <thead><tr><th>Layanan</th><th>Satuan tarif<div className="small muted" style={{ fontWeight: 400 }}>pilih UoM, harga ikut</div></th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">GP% (input)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
         <tbody>
           {h.rateCard.map(r => {
             const b = r.bucket as Bucket, v = marginManual[b];
-            return <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td>{r.bucket === 'storage' ? `${r.uom}/bulan` : r.uom}</td><td className="num">{angka(r.volumeKomitmen)}</td>
+            return <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td>{r.opsiUom && r.opsiUom.length > 1 && onUomRateCard
+                ? <select aria-label={`Satuan tarif ${BUCKET_LABEL[r.bucket]}`} value={r.uom} style={{ minWidth: 150 }}
+                    onChange={e => { const x = { ...(uomRateCard ?? {}) }; if (e.target.value === r.uomArus) delete x[b]; else x[b] = e.target.value; onUomRateCard(x); }}>
+                    {r.opsiUom.map(o => <option key={o.uom} value={o.uom}>per {o.uom}{r.bucket === 'storage' ? '/bulan' : ''} · {rp(o.tarifExcl)}</option>)}</select>
+                : (r.bucket === 'storage' ? `${r.uom}/bulan` : r.uom)}
+                {r.opsiUom?.find(o => o.uom === r.uom)?.dasar && <div className="small muted">{r.opsiUom.find(o => o.uom === r.uom)!.dasar}</div>}</td>
+              <td className="num">{angka(r.volumeKomitmen)}</td>
               <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaPerUnit)}</td>
               <td className="num"><input aria-label={`Margin ${BUCKET_LABEL[r.bucket]}`} type="number" step="0.1" value={v == null ? '' : Math.round(v * 1000) / 10}
                 placeholder={(Math.round((r.gpDefault ?? 0) * 1000) / 10).toString()} onChange={e => setM(b, e.target.value)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /> %

@@ -152,6 +152,10 @@ export interface TenderInput {
   rincianBiayaMp?: Record<string, import('./biayaMp').InputBiayaRole>;
   paramBiayaMp?: Partial<import('./biayaMp').ParamBiayaMp>;
   levelGaji?: Partial<Record<import('./biayaMp').LevelJabatan, number>>;
+  /** UoM tarif per layanan di rate card (palet, case, pcs, CBM, ton, m²). Kosong = UoM volume arus. */
+  uomRateCard?: Partial<Record<Bucket, string>>;
+  /** Konversi palet → CBM/ton untuk opsi UoM rate card (dari parameter profil order). */
+  konversiPalet?: { cbmPerPalet: number; tonPerPalet: number };
   levelRole?: Record<string, import('./biayaMp').LevelJabatan>;
   /** Kenaikan biaya manpower per tahun kontrak (0.05 = 5%/thn). Biaya/bln = total kontrak ÷ bulan kontrak. */
   eskalasiManpower?: { persenTahun: number; mulai?: string | null };

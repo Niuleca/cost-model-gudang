@@ -37,7 +37,7 @@ function normalisasi(a: Partial<Record<Bucket, number>> | undefined, fallback: P
 /** Pembulatan harga jual: ke atas ke 10 (di bawah 1.000) atau 100 (di atasnya). */
 export function roundupHarga(x: number): number {
   if (!isFinite(x) || x <= 0) return 0;
-  const step = x < 1000 ? 10 : 100;
+  const step = x < 100 ? 1 : x < 1000 ? 10 : 100;  // tarif kecil (per pcs/case) dibulatkan halus agar tidak melonjak
   return Math.ceil(x / step) * step;
 }
 
@@ -347,16 +347,22 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     const v = volArus(bucketKeArus[b]);
     const komitmen = v?.komitmenBulan ?? 0;
     if (biaya > 0 && komitmen <= 0) flags.push({ level: 'kritis', kode: 'KOMITMEN_NOL', pesan: `Biaya ${b} ada tetapi volume komitmen ${bucketKeArus[b]} = 0, tarif tidak bisa dihitung.` });
-    const tarif = komitmen > 0 ? harga / komitmen : 0;
+    // Opsi UoM tarif: volume komitmen dikonversi ke palet / case / pcs / CBM / ton (+ m² untuk storage)
+    const opsiUom = opsiUomRateCard(b, v, komitmen, space.totalM2, t.konversiPalet, { ton: t.stokTon, cbm: t.stokCbm, liter: t.stokLiter })
+      .map(o => ({ ...o, tarifExcl: o.volume > 0 ? roundupHarga(harga / o.volume) : 0 }));
+    const dipilih = opsiUom.find(o => o.uom === t.uomRateCard?.[b]) ?? opsiUom[0];
+    const volTarif = dipilih?.volume ?? komitmen;
+    const tarif = volTarif > 0 ? harga / volTarif : 0;
     const tarifExcl = roundupHarga(tarif);
     const tarifIncl = roundupHarga(tarifExcl * (1 + ppn));
     return {
-      bucket: b, uom: v?.uom ?? '-', biayaBulan: bulat(biaya), hargaBulan: bulat(harga),
+      bucket: b, uom: dipilih?.uom ?? v?.uom ?? '-', uomArus: v?.uom ?? '-', opsiUom, volumeTarif: volTarif,
+      volumeTetap: !!dipilih?.tetap, rasioUom: komitmen > 0 && !dipilih?.tetap ? volTarif / komitmen : 1, biayaBulan: bulat(biaya), hargaBulan: bulat(harga),
       marginEfektif: biaya > 0 ? bulat(hargaSebelumPph / biaya - 1, 4) : 0,
       marginDefault: biaya > 0 ? bulat(hargaDefault / biaya - 1, 4) : 0, marginManual: manual, hargaSebelumPph: bulat(hargaSebelumPph),
       gpPersen: hargaSebelumPph > 0 ? bulat(1 - biaya / hargaSebelumPph, 4) : 0,                       // GP% atas pendapatan (sebelum PPh)
       gpDefault: hargaDefault > 0 ? bulat(1 - biaya / hargaDefault, 4) : 0,
-      volumeKomitmen: komitmen, biayaPerUnit: komitmen > 0 ? bulat(biaya / komitmen, 2) : 0,
+      volumeKomitmen: volTarif, volumeKomitmenArus: komitmen, biayaPerUnit: volTarif > 0 ? bulat(biaya / volTarif, 2) : 0,
       tarifPerUnit: tarifExcl,                       // tarif belum PPN (dasar pendapatan)
       tarifInclPpn: tarifIncl, ppnPerUnit: tarifIncl - tarifExcl,
       tarifQuote: pajak.ppn === 'include' ? tarifIncl : tarifExcl,   // tarif yang ditampilkan di penawaran
@@ -383,7 +389,9 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const totalBiaya = baris.reduce((sum, b) => sum + b.biayaBulan, 0);
   const pendapatan = (skenario: 'komitmenBulan' | 'rataRataBulan' | 'peakBulan') => rateCard.reduce((sum, rc) => {
     const v = volArus(bucketKeArus[rc.bucket]);
-    return sum + rc.tarifPerUnit * (v ? v[skenario] : 0);
+    // Volume dalam UoM tarif: proporsional terhadap volume arus (palet→case/pcs/CBM/ton), kecuali basis tetap (m², stok rata-rata)
+    const vol = rc.volumeTetap ? rc.volumeTarif : (v ? v[skenario] : 0) * rc.rasioUom;
+    return sum + rc.tarifPerUnit * vol;
   }, 0);
   const simulasi = (['komitmenBulan', 'rataRataBulan', 'peakBulan'] as const).map(sk => {
     const rev = pendapatan(sk) * (1 - pphRate);          // pendapatan bersih setelah PPh 23 dipotong customer (PPN bukan pendapatan)
@@ -426,6 +434,31 @@ export function biayaPerOrangDari(m: MasterData, j: JobLevel | undefined) {
   const contingency = j?.isOutsourcing ? dasar * P.contingencyOs : 0;
   const fee = j?.isOutsourcing ? (dasar + contingency) * P.feeOs : 0;
   return { upah, bpjsTk, bpjsKes, thr, pesangon, tunjangan: j?.tunjanganBulan ?? 0, contingency, fee, total: dasar + contingency + fee };
+}
+
+/** Opsi UoM untuk tarif layanan — volume per bulan dalam tiap UoM. */
+export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: string; per1: number; uom2: string; per2: number } } | undefined, komitmen: number,
+  luasM2: number, kp?: { cbmPerPalet: number; tonPerPalet: number }, stok?: { ton?: number; cbm?: number; liter?: number }) {
+  const out: { uom: string; volume: number; dasar: string; tetap?: boolean }[] = [];
+  const u = v?.uom ?? 'unit';
+  out.push({ uom: u, volume: komitmen, dasar: `volume komitmen ${u}` });
+  const k = v?.konversi;
+  const isPalet = /^pal(l)?et$/i.test(u);
+  if (k && k.per1 > 0 && k.uom1) out.push({ uom: k.uom1, volume: komitmen * k.per1, dasar: `${u} × ${k.per1} ${k.uom1}` });
+  if (k && k.per1 > 0 && k.per2 > 0 && k.uom2) out.push({ uom: k.uom2, volume: komitmen * k.per1 * k.per2, dasar: `${u} × ${k.per1} × ${k.per2} ${k.uom2}` });
+  if (b === 'storage') {
+    if (luasM2 > 0) out.push({ uom: 'm²', volume: luasM2, dasar: 'luas gudang (m²)', tetap: true });
+    if (stok?.cbm) out.push({ uom: 'CBM', volume: stok.cbm, dasar: 'stok rata-rata (CBM)', tetap: true });
+    else if (isPalet && kp?.cbmPerPalet) out.push({ uom: 'CBM', volume: komitmen * kp.cbmPerPalet, dasar: `palet × ${kp.cbmPerPalet} CBM` });
+    if (stok?.ton) out.push({ uom: 'ton', volume: stok.ton, dasar: 'stok rata-rata (ton)', tetap: true });
+    else if (isPalet && kp?.tonPerPalet) out.push({ uom: 'ton', volume: komitmen * kp.tonPerPalet, dasar: `palet × ${kp.tonPerPalet} ton` });
+    if (stok?.liter) out.push({ uom: 'liter', volume: stok.liter, dasar: 'stok rata-rata (liter)', tetap: true });
+  } else if (isPalet && kp) {
+    if (kp.cbmPerPalet) out.push({ uom: 'CBM', volume: komitmen * kp.cbmPerPalet, dasar: `palet × ${kp.cbmPerPalet} CBM` });
+    if (kp.tonPerPalet) out.push({ uom: 'ton', volume: komitmen * kp.tonPerPalet, dasar: `palet × ${kp.tonPerPalet} ton` });
+  }
+  const seen = new Set<string>();
+  return out.filter(o => { const key = o.uom.toLowerCase(); if (seen.has(key) || !(o.volume > 0)) return false; seen.add(key); return true; });
 }
 
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
