@@ -1,4 +1,5 @@
 'use client';
+import { T, useT } from '@/lib/i18n';
 import { rp, angka } from '@/lib/format';
 import { ringkasBiayaMp, LEVEL_JABATAN, LEVEL_GAJI_DEFAULT, levelDefault, type InputBiayaRole, type LevelJabatan, type ParamBiayaMp, type RincianBiayaRole } from '@/lib/engine/biayaMp';
 
@@ -31,7 +32,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
 
   return (
     <div className="card" style={{ gap: 10 }}>
-      <h2>Rincian biaya manpower</h2>
+      <h2><T>Rincian biaya manpower</T></h2>
       <p className="small muted">Jumlah orang dari Man Power Summary. Kotak kosong = default (gaji pokok = UMK area × % level jabatan; lisensi & insentif = tunjangan jabatan; hari kerja = Working Days Employee).
         BPJS, THR & kompensasi dihitung dari gaji pokok; <b>Sharing</b> = biaya orang dibagi beberapa project (0,5 = pegang 2 project, 0,25 = 4 project); gaji dibayar = gaji pokok × actual hari kerja ÷ hari kerja.</p>
       <div className="umk-box">
@@ -39,7 +40,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
         <div><div className="small muted">Area</div><b>{lokasi || '—'}</b></div>
         <div className="small muted" style={{ flex: 1, minWidth: 220 }}>Diambil dari <b>Area / kab-kota</b> di Key assumption. Ganti area di sana untuk mengubah UMK; semua jabatan di tabel ini ikut area project.</div>
       </div>
-      <h3>% gaji pokok per level jabatan</h3>
+      <h3><T>% gaji pokok per level jabatan</T></h3>
       <div className="tablewrap"><table>
         <thead><tr><th>Level</th><th>Contoh jabatan</th><th className="num">% dari UMK</th><th className="num">Gaji pokok/bln</th><th>Jabatan di tender ini</th></tr></thead>
         <tbody>

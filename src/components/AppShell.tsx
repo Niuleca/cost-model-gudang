@@ -7,6 +7,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { useProfile } from '@/lib/useProfile';
 import { ROLE_LABEL, TIM_TENDER, type AppRole } from '@/lib/format';
 import { PRICE_PAGES, PROD_PAGES } from '@/lib/masterTabs';
+import { BAHASA, useBahasa, type Bahasa } from '@/lib/i18n';
 
 type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: boolean };
 const MENU: { id: string; label: string; item: Item[] }[] = [
@@ -38,6 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const { profile } = useProfile();
+  const { bahasa, setBahasa, t } = useBahasa();
   const [buka, setBuka] = useState<string | null>(null);
   const navRef = useRef<HTMLElement>(null);
 
@@ -70,13 +72,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <div className={`dd${buka === id ? ' open' : ''}`} onMouseEnter={() => window.matchMedia('(hover: hover)').matches && setBuka(id)} onMouseLeave={() => window.matchMedia('(hover: hover)').matches && setBuka(null)}>
         <button className={`ddbtn${on ? ' on' : ''}`} aria-haspopup="true" aria-expanded={buka === id} onClick={() => setBuka(buka === id ? null : id)}>
-          {label} <span aria-hidden="true" className="caret">▾</span>
+          {t(label)} <span aria-hidden="true" className="caret">▾</span>
         </button>
         {buka === id && (
           <div className={`ddmenu${kanan ? ' kanan' : ''}`} role="menu">
             {isi.map(i => (
-              <Link key={i.href} role="menuitem" href={i.href} className={`${aktif(i.href) ? 'on' : ''}${i.pisah ? ' pisah' : ''}`}>{i.label}</Link>))}
-            {kanan && <button role="menuitem" className="ddkeluar" onClick={keluar}>Keluar</button>}
+              <Link key={i.href} role="menuitem" href={i.href} className={`${aktif(i.href) ? 'on' : ''}${i.pisah ? ' pisah' : ''}`}>{t(i.label)}</Link>))}
+            {kanan && <button role="menuitem" className="ddkeluar" onClick={keluar}>{t('Keluar')}</button>}
           </div>)}
       </div>);
   };
@@ -88,12 +90,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <nav aria-label="Menu utama" ref={navRef} className="topnav">
           {MENU.map(m => <Dropdown key={m.id} {...m} />)}
           <div className="sela" />
+          <label className="bahasa-pilih" title={t('Bahasa')}><span aria-hidden="true">🌐</span>
+            <select aria-label={t('Bahasa')} value={bahasa} onChange={e => setBahasa(e.target.value as Bahasa)}>
+              {BAHASA.map(b => <option key={b.v} value={b.v}>{b.short} · {b.l}</option>)}</select></label>
           <Dropdown id="akun" kanan item={AKUN}
             label={`${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${ROLE_LABEL[profile.role]}` : ''}`} />
         </nav>
       </header>
       <main className="main">{children}</main>
-      <footer className="app-foot"><span><b>Leca</b> · cost model, tender & quotation gudang</span><span>Dibuat oleh <b>esapanghegar</b> · © {new Date().getFullYear()}</span></footer>
+      <footer className="app-foot"><span><b>Leca</b> · {t('cost model, tender & quotation gudang')}</span><span>{t('Dibuat oleh')} <b>esapanghegar</b> · © {new Date().getFullYear()}</span></footer>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 'use client';
+import { T, useT } from '@/lib/i18n';
 import type { VolumeInput } from '@/lib/engine/types';
 import { angka } from '@/lib/format';
 import {
@@ -89,7 +90,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
 
   return (
     <div className="card" style={{ gap: 12 }}>
-      <h2>Profil order inbound & outbound (per hari)</h2>
+      <h2><T>Profil order inbound & outbound (per hari)</T></h2>
       <p className="small muted">Mengikuti volume di tabel Volume: volume per bulan ÷ hari operasional = palet per hari, lalu dipecah per moda sesuai porsi (%).
         Kontainer = ton ÷ ton per kontainer; case = palet × case/palet; pcs = × isi per case. Mobil per hari = kebutuhan terbesar antara palet, CBM, dan ton dibanding kapasitas kendaraan (dibulatkan ke atas per moda).</p>
       <div className="row" style={{ alignItems: 'end' }}>
@@ -109,7 +110,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
         const oa = orderAdmin(p, volumes, hariBulan);
         if (!oa.inbound.mobilHari && !oa.outbound.mobilHari) return null;
         return <div style={{ minWidth: 0 }}>
-          <h3>Volume admin (order)</h3>
+          <h3><T>Volume admin (order)</T></h3>
           <div className="tablewrap"><table>
             <thead><tr><th>Arus</th><th className="num">Mobil/hari</th><th className="num">Input admin per mobil</th><th className="num">Order/hari</th><th className="num">Order/bln</th><th>Keterangan</th></tr></thead>
             <tbody>{(['inbound', 'outbound'] as const).map(ar => <tr key={ar}>

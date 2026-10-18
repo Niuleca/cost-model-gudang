@@ -1,4 +1,5 @@
 'use client';
+import { T, useT } from '@/lib/i18n';
 import { useMemo } from 'react';
 import type { AktivitasInput, VolumeInput } from '@/lib/engine/types';
 import { hitungProcessDesign, bolehRangkap, isTkbm, PD_DEFAULT, type IndirectInput, type KalenderResource, type ProcessDesignInput } from '@/lib/engine/processDesign';
@@ -76,7 +77,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
 
   const Ringkas = ({ judul, rows, remark, tFte, tRes, pad = 0 }: { judul: string; rows: typeof h.mp; remark: string; tFte: number; tRes: number; pad?: number }) => (
     <div style={{ minWidth: 0 }}>
-      <h3>{judul}</h3>
+      <h3><T>{judul}</T></h3>
       <div className="tablewrap"><table className="pd-sum">
         <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th><th className="num">Resources</th></tr></thead>
         <tbody>
@@ -108,7 +109,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
       <div className="card" style={{ gap: 10 }}>
         <div className={`pd-dua${biaya ? " tumpuk" : ""}`}>
           <div style={{ minWidth: 0 }}>
-            <h3>Man Power Summary</h3>
+            <h3><T>Man Power Summary</T></h3>
             <div className="tablewrap"><table className={`pd-sum${biaya ? " pd-sum-biaya" : ""}`}>
               <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th><th className="num">Resources</th>
                 {biaya && <><th className="num">Biaya/orang/bln<div className="small muted" style={{ fontWeight: 400 }}>incl. fee · ubah di Rincian biaya</div></th><th className="num">Total/bln</th></>}</tr></thead>
@@ -134,7 +135,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
         </div>
         {biaya && esk && <div style={{ minWidth: 0 }}>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
-            <h3>Skema biaya manpower selama kontrak</h3>
+            <h3><T>Skema biaya manpower selama kontrak</T></h3>
             <div className="row" style={{ alignItems: 'end' }}>
             <label className="f" htmlFor="esk-mulai">Mulai kontrak
               <input id="esk-mulai" type="month" value={biaya.mulai || biaya.mulaiDefault || esk.mulai} onChange={e => biaya.onMulai(e.target.value || null)} style={{ minWidth: 150 }} />
@@ -176,7 +177,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
   if (bagian === 'rincian') return (
     <div className="card" style={{ gap: 10 }}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h2>Rincian per task</h2>
+        <h2><T>Rincian per task</T></h2>
         <div className="row small">
           <span className="pill ok">Man Power {h.totalMp} org · FTE {f2(h.totalFteMp)}</span>
           <span className="pill info">Equipment {h.totalMhe} unit · FTE {f2(h.totalFteMhe)}</span>
@@ -211,10 +212,10 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
 
   return (
     <div className="card" style={{ gap: 14 }}>
-      <h2>Process Design & Resource Calculation</h2>
+      <h2><T>Process Design & Resource Calculation</T></h2>
       <div className="pd-atas">
         <div style={{ minWidth: 0 }}>
-          <h3>Working day</h3>
+          <h3><T>Working day</T></h3>
           <div className="tablewrap"><table>
             <thead><tr><th>Working day</th><th className="num">Man Power</th><th className="num">MHE</th><th></th></tr></thead>
             <tbody>{barisKal.map(b => (
@@ -229,7 +230,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
         <div style={{ display: 'grid', gap: 14, alignContent: 'start', minWidth: 0 }}>
           <div className="pd-ringkas">
             <div style={{ minWidth: 0 }}>
-              <h3>Workload shift</h3>
+              <h3><T>Workload shift</T></h3>
               <table className="pd-shift"><tbody>
                 <tr><td>Number of working shift</td><td className="num">
                   <select aria-label="Jumlah shift" value={jumlahShift} onChange={e => onShift(Number(e.target.value))} style={{ width: 64, minWidth: 64 }}>{[1, 2, 3].map(n => <option key={n}>{n}</option>)}</select></td><td>Shift</td></tr>
@@ -245,7 +246,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
               </tbody></table>
             </div>
             <div style={{ minWidth: 0 }}>
-              <h3>Faktor</h3>
+              <h3><T>Faktor</T></h3>
               <table className="pd-shift"><tbody>
                 <tr><td>Produktivitas faktor</td><td className="num">{inp(Math.round(faktorProduktivitas * 1000) / 10, v => onFaktor({ faktorProduktivitas: v / 100 }))}%</td></tr>
                 <tr><td>Efficiency</td><td className="num">{inp(Math.round(efisiensi * 1000) / 10, v => onFaktor({ efisiensi: v / 100 }))}%</td></tr>
@@ -274,7 +275,7 @@ function MatriksRangkap({ roles, matriks, onChange }: { roles: string[]; matriks
   return (
     <div style={{ minWidth: 0 }}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h3>Matriks multi-skill (siapa boleh merangkap siapa)</h3>
+        <h3><T>Matriks multi-skill (siapa boleh merangkap siapa)</T></h3>
         {diubah && <button className="ghost" onClick={() => onChange(undefined)}>Kembalikan ke default</button>}
       </div>
       <p className="small muted">Centang = role di baris boleh merangkap pekerjaan role di kolom. Default: Checker ↔ Picker ↔ Operator RT/CB; Admin hanya Picker & Checker (tidak operator);

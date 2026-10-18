@@ -1,4 +1,5 @@
 'use client';
+import { T, useT } from '@/lib/i18n';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -14,7 +15,7 @@ interface Ov {
 
 const grup = (s: string) => MENANG.includes(s) ? 'menang' : KALAH.includes(s) ? 'kalah' : DROP.includes(s) ? 'drop' : 'pipeline';
 
-/** Menu 15 · Dashboard: customer, pipeline, menang/kalah/drop, sebaran per provinsi. */
+/** Dashboard ringkas: nilai pipeline, GP, win rate, tender yang perlu tindakan, keputusan terakhir. */
 export default function Dashboard() {
   const { profile, loading } = useProfile();
   const [rows, setRows] = useState<Ov[]>([]);
@@ -43,21 +44,17 @@ export default function Dashboard() {
       nilaiPipeline, nilaiMenang, eksekusi: data.filter(r => ['implementasi', 'go_live'].includes(r.status)).length };
   }, [data]);
 
-  const perProvinsi = useMemo(() => {
-    const m = new Map<string, { total: number; pipeline: number; menang: number; kalah: number; drop: number }>();
-    for (const r of data) {
-      const x = m.get(r.provinsi) ?? { total: 0, pipeline: 0, menang: 0, kalah: 0, drop: 0 };
-      x.total++; x[grup(r.status)]++; m.set(r.provinsi, x);
-    }
-    return Array.from(m.entries()).sort((a, b) => b[1].total - a[1].total);
-  }, [data]);
-  const maks = Math.max(1, ...perProvinsi.flatMap(([, v]) => [v.pipeline, v.menang, v.kalah, v.drop]));
-
-  const perIndustri = useMemo(() => {
-    const m = new Map<string, { menang: number; kalah: number; drop: number; pipeline: number }>();
-    for (const r of data) { const key = r.industri ?? 'Belum diisi'; const x = m.get(key) ?? { menang: 0, kalah: 0, drop: 0, pipeline: 0 }; x[grup(r.status)]++; m.set(key, x); }
-    return Array.from(m.entries()).sort((a, b) => (b[1].menang + b[1].kalah + b[1].drop + b[1].pipeline) - (a[1].menang + a[1].kalah + a[1].drop + a[1].pipeline));
-  }, [data]);
+  // Rata-rata GP pipeline (tertimbang pendapatan) & tender yang perlu tindakan
+  const pipe = useMemo(() => data.filter(r => PIPELINE.includes(r.status)), [data]);
+  const gpRata = useMemo(() => {
+    const ada = pipe.filter(r => r.gp_persen != null && Number(r.pendapatan_bulan) > 0);
+    const tot = ada.reduce((s2, r) => s2 + Number(r.pendapatan_bulan), 0);
+    return tot ? ada.reduce((s2, r) => s2 + Number(r.gp_persen) * Number(r.pendapatan_bulan), 0) / tot : null;
+  }, [pipe]);
+  const GP_MIN = 0.1;
+  const perhatian = useMemo(() => pipe.map(r => ({ r, alasan: r.pendapatan_bulan == null ? 'Belum dihitung' : Number(r.gp_persen ?? 0) < GP_MIN ? `GP ${persen(r.gp_persen)} di bawah ${persen(GP_MIN, 0)}` : null }))
+    .filter(x => x.alasan).slice(0, 8), [pipe]);
+  const nilaiBulanPipeline = pipe.reduce((s2, r) => s2 + Number(r.pendapatan_bulan ?? 0), 0);
 
   if (!loading && profile && !TIM_TENDER.includes(profile.role)) {
     return (
@@ -68,54 +65,52 @@ export default function Dashboard() {
     );
   }
 
-  const sel = (v: number) => v === 0 ? undefined : { background: `color-mix(in srgb, var(--accent) ${Math.round(12 + 70 * v / maks)}%, var(--surface))`, color: v / maks > 0.55 ? 'var(--accent-ink)' : undefined };
-  const keputusan = data.filter(r => ['menang', 'kalah', 'drop', 'batal'].includes(r.status)).slice(0, 8);
+  const keputusan = data.filter(r => ['menang', 'kalah', 'drop', 'batal'].includes(r.status)).slice(0, 6);
+  const gpPill = (g: number | null) => g == null ? 'info' : g < GP_MIN ? 'bad' : g < 0.15 ? 'warn' : 'ok';
 
   return (
     <>
       <div className="head">
-        <div><div className="eyebrow">Menu 15 · Dashboard</div><h1>Ringkasan tender & project</h1></div>
-        <label className="f" htmlFor="th">Tahun dibuat
+        <div><div className="eyebrow">Dashboard</div><h1><T>Ringkasan tender</T></h1></div>
+        <label className="f" htmlFor="th"><T>Tahun dibuat</T>
           <select id="th" value={tahun} onChange={e => setTahun(e.target.value)} style={{ minWidth: 140 }}><option value="">Semua</option>{tahunList.map(t => <option key={t}>{t}</option>)}</select></label>
       </div>
       {err && <p className="error">{err}</p>}
 
       <div className="kpis">
-        <div className="kpi"><span className="small muted">Customer</span><b>{k.customer}</b><span className="small muted">{data.length} tender</span></div>
-        <div className="kpi"><span className="small muted">Pipeline aktif</span><b>{k.pipeline}</b><span className="small muted">nilai kontrak {rp(k.nilaiPipeline)}</span></div>
-        <div className="kpi"><span className="small muted">Menang</span><b>{k.menang}</b><span className="small muted">nilai kontrak {rp(k.nilaiMenang)}</span></div>
-        <div className="kpi"><span className="small muted">Kalah</span><b>{k.kalah}</b></div>
-        <div className="kpi"><span className="small muted">Drop / batal</span><b>{k.drop}</b></div>
-        <div className="kpi"><span className="small muted">Win rate (menang ÷ diputus)</span><b>{k.winRate == null ? '—' : persen(k.winRate, 0)}</b></div>
-        <div className="kpi"><span className="small muted">Sedang dieksekusi</span><b>{k.eksekusi}</b><span className="small muted">implementasi + go-live</span></div>
+        <div className="kpi"><span className="small muted"><T>Pipeline aktif</T></span><b>{k.pipeline} tender</b><span className="small muted">selling {rp(nilaiBulanPipeline)}/bln</span></div>
+        <div className="kpi"><span className="small muted"><T>Nilai kontrak pipeline</T></span><b>{rp(k.nilaiPipeline)}</b><span className="small muted">selling/bln × durasi kontrak</span></div>
+        <div className="kpi"><span className="small muted"><T>Rata-rata GP pipeline</T></span><b>{gpRata == null ? '—' : persen(gpRata)}</b><span className="small muted">tertimbang pendapatan</span></div>
+        <div className="kpi"><span className="small muted"><T>Menang</T></span><b>{k.menang}</b><span className="small muted">nilai kontrak {rp(k.nilaiMenang)}</span></div>
+        <div className="kpi"><span className="small muted"><T>Win rate</T></span><b>{k.winRate == null ? '—' : persen(k.winRate, 0)}</b><span className="small muted">{k.menang} menang · {k.kalah} kalah · {k.drop} drop</span></div>
       </div>
 
       <div className="card">
-        <h2>Sebaran per provinsi</h2>
-        <p className="small muted">Warna makin gelap = makin banyak tender. Arahkan kursor ke sel untuk detail.</p>
+        <div className="row" style={{ justifyContent: 'space-between' }}><h2><T>Pipeline berjalan</T></h2><Link className="btn ghost" href="/tender"><T>Semua tender</T></Link></div>
         <div className="tablewrap"><table>
-          <thead><tr><th>Provinsi</th><th className="num">Total</th><th className="num">Pipeline</th><th className="num">Menang</th><th className="num">Kalah</th><th className="num">Drop</th><th className="num">Win rate</th></tr></thead>
+          <thead><tr><th>Kode</th><th>Customer</th><th>Lokasi</th><th>Status</th><th className="num">Selling/bln</th><th className="num">GP</th><th className="num">Kontrak</th></tr></thead>
           <tbody>
-            {perProvinsi.length === 0 && <tr><td colSpan={7} className="muted">Belum ada tender.</td></tr>}
-            {perProvinsi.map(([p, v]) => (
-              <tr key={p}>
-                <td>{p}</td><td className="num"><b>{v.total}</b></td>
-                {(['pipeline', 'menang', 'kalah', 'drop'] as const).map(g => (
-                  <td key={g} className="num" style={sel(v[g])} title={`${p} · ${g}: ${v[g]} tender`}>{v[g] || ''}</td>))}
-                <td className="num">{v.menang + v.kalah ? persen(v.menang / (v.menang + v.kalah), 0) : '—'}</td>
-              </tr>))}
+            {pipe.length === 0 && <tr><td colSpan={7} className="muted">Tidak ada tender berjalan.</td></tr>}
+            {pipe.slice(0, 15).map(r => (
+              <tr key={r.id}><td><Link href={`/tender/${r.id}`}>{r.kode}</Link></td><td>{r.customer}</td><td className="small">{r.kab_kota}</td>
+                <td><span className={`pill ${pillStatus(r.status)}`}>{labelStatus(r.status)}</span></td>
+                <td className="num out">{rp(r.pendapatan_bulan)}</td><td className="num"><span className={`pill ${gpPill(r.gp_persen)}`}>{persen(r.gp_persen)}</span></td>
+                <td className="num small">{r.durasi_kontrak_bulan} bln</td></tr>))}
           </tbody>
         </table></div>
       </div>
 
       <div className="grid2">
         <div className="card">
-          <h2>Per industri</h2>
-          <table><thead><tr><th>Industri</th><th className="num">Pipeline</th><th className="num">Menang</th><th className="num">Kalah</th><th className="num">Drop</th></tr></thead>
-            <tbody>{perIndustri.map(([i, v]) => <tr key={i}><td>{i}</td><td className="num">{v.pipeline}</td><td className="num">{v.menang}</td><td className="num">{v.kalah}</td><td className="num">{v.drop}</td></tr>)}</tbody></table>
+          <h2><T>Perlu tindakan</T></h2>
+          <p className="small muted">Tender berjalan yang belum dihitung atau GP-nya di bawah {persen(GP_MIN, 0)}.</p>
+          {perhatian.length === 0 && <p className="small" style={{ color: 'var(--ok)' }}>Semua tender berjalan sudah dihitung dan GP aman.</p>}
+          <table><tbody>{perhatian.map(({ r, alasan }) => (
+            <tr key={r.id}><td><Link href={`/tender/${r.id}`}>{r.customer}</Link><div className="small muted">{r.kode}</div></td>
+              <td className="small"><span className={`pill ${alasan === 'Belum dihitung' ? 'warn' : 'bad'}`}>{alasan}</span></td></tr>))}</tbody></table>
         </div>
         <div className="card">
-          <h2>Keputusan terakhir</h2>
+          <h2><T>Keputusan terakhir</T></h2>
           {keputusan.length === 0 && <p className="muted small">Belum ada tender yang diputus.</p>}
           <table><tbody>{keputusan.map(r => (
             <tr key={r.id}>
@@ -123,18 +118,8 @@ export default function Dashboard() {
               <td><span className={`pill ${pillStatus(r.status)}`}>{labelStatus(r.status)}</span></td>
               <td className="small">{tanggal(r.tanggal_keputusan)}</td>
             </tr>))}</tbody></table>
+          <p className="small muted" style={{ marginTop: 8 }}>Sebaran per provinsi & industri ada di menu <Link href="/heatmap">Heatmap</Link>.</p>
         </div>
-      </div>
-
-      <div className="card">
-        <h2>Pipeline berjalan</h2>
-        <div className="tablewrap"><table>
-          <thead><tr><th>Kode</th><th>Customer</th><th>Lokasi</th><th>Status</th><th className="num">Pendapatan/bln</th><th className="num">GP</th></tr></thead>
-          <tbody>{data.filter(r => PIPELINE.includes(r.status)).slice(0, 15).map(r => (
-            <tr key={r.id}><td><Link href={`/tender/${r.id}`}>{r.kode}</Link></td><td>{r.customer}</td><td>{r.kab_kota}</td>
-              <td><span className={`pill ${pillStatus(r.status)}`}>{labelStatus(r.status)}</span></td>
-              <td className="num">{rp(r.pendapatan_bulan)}</td><td className="num">{persen(r.gp_persen)}</td></tr>))}</tbody>
-        </table></div>
       </div>
     </>
   );
