@@ -204,8 +204,8 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const payroll = manpower.map(mp => {
     const rc = rincianBiayaRole(mp.roleName, mp.headcount, m, t.rincianBiayaMp?.[mp.roleName], paramMp, hariMp, t.kabKota, { levelGaji: t.levelGaji, levelRole: t.levelRole });
     const perOrang = rc.total * (1 + paramMp.feePersen);
-    const dasarBulan = perOrang * mp.headcount;
-    return { ...mp, upah: bulat(rc.gajiPokok), lisensi: bulat(rc.lisensi), subTotal: bulat(rc.subTotal), bpjsTk: bulat(rc.bpjsTk), bpjsKes: bulat(rc.bpjsKs),
+    const dasarBulan = perOrang * mp.headcount * rc.porsi;
+    return { ...mp, skema: rc.skema, porsi: rc.porsi, upah: bulat(rc.gajiPokok), lisensi: bulat(rc.lisensi), subTotal: bulat(rc.subTotal), bpjsTk: bulat(rc.bpjsTk), bpjsKes: bulat(rc.bpjsKs),
       bpjsPensiun: bulat(rc.bpjsPensiun), thr: bulat(rc.thr), kompensasi: bulat(rc.kompensasi), supervisi: bulat(rc.supervisi),
       totalSebelumFee: bulat(rc.total), fee: bulat(rc.total * paramMp.feePersen), total: bulat(perOrang), biayaManual: rc.manual,
       biayaBulanDasar: bulat(dasarBulan), biayaBulan: bulat(dasarBulan * esk.faktor) };
@@ -237,7 +237,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   let investasi = 0;
 
   for (const p of payroll) tambah(`Manpower — ${p.roleName} (${p.headcount} org)`, 'Manpower', p.biayaBulan, p.alokasi,
-    `${p.headcount} org × Rp${Math.round(p.totalSebelumFee).toLocaleString('id-ID')} + fee ${(paramMp.feePersen * 100).toLocaleString('id-ID')}%${p.biayaManual ? ' (diubah)' : ''}${esk.faktor > 1.0000001 ? ` × eskalasi ${esk.faktor.toFixed(4)} (rata-rata kontrak)` : ''}`);
+    `${p.headcount} org${p.porsi < 1 ? ` × sharing ${p.porsi.toLocaleString('id-ID')}` : ''} × Rp${Math.round(p.totalSebelumFee).toLocaleString('id-ID')} + fee ${(paramMp.feePersen * 100).toLocaleString('id-ID')}%${p.biayaManual ? ' (diubah)' : ''}${esk.faktor > 1.0000001 ? ` × eskalasi ${esk.faktor.toFixed(4)} (rata-rata kontrak)` : ''}`);
 
   // Fasilitas
   const alokStorage = normalisasi({ storage: 1 }, { storage: 1 });

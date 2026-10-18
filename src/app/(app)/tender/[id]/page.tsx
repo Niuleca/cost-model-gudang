@@ -354,7 +354,7 @@ export default function TenderPage() {
           <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)}
               biaya={{
-                perOrang: role => (rincianMp.find(r => r.role === role)?.total ?? 0) * (1 + paramMp.feePersen),
+                perOrang: role => { const r = rincianMp.find(x => x.role === role); return (r?.total ?? 0) * (r?.porsi ?? 1) * (1 + paramMp.feePersen); },
                 persenTahun: (a.eskalasiManpower ?? ESKALASI_DEFAULT).persenTahun, onPersen: persenTahun => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), persenTahun } }),
                 mulai: a.eskalasiManpower?.mulai ?? null, mulaiDefault: t.tanggal_go_live?.slice(0, 7) ?? null,
                 onMulai: mulai => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), mulai } }),

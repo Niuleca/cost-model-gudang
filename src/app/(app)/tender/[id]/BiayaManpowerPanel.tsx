@@ -33,7 +33,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
     <div className="card" style={{ gap: 10 }}>
       <h2>Rincian biaya manpower</h2>
       <p className="small muted">Jumlah orang dari Man Power Summary. Kotak kosong = default (gaji pokok = UMK area × % level jabatan; lisensi & insentif = tunjangan jabatan; hari kerja = Working Days Employee).
-        BPJS, THR & kompensasi dihitung dari gaji pokok; gaji dibayar = gaji pokok × actual hari kerja ÷ hari kerja.</p>
+        BPJS, THR & kompensasi dihitung dari gaji pokok; <b>Sharing</b> = biaya orang dibagi beberapa project (0,5 = pegang 2 project, 0,25 = 4 project); gaji dibayar = gaji pokok × actual hari kerja ÷ hari kerja.</p>
       <div className="umk-box">
         <div><div className="small muted">UMK area project</div><b style={{ fontSize: 18 }}>{umk ? rp(umk) : 'memuat…'}</b><span className="small muted"> /bln</span></div>
         <div><div className="small muted">Area</div><b>{lokasi || '—'}</b></div>
@@ -72,10 +72,10 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
           <th className="num">Lisensi + Insentif</th><th className="num">Sub total</th><th className="num">BPJS TK ({angka(pct(param.bpjsTk), 2)}%)</th>
           <th className="num">BPJS KS ({angka(pct(param.bpjsKs), 2)}%)</th><th className="num">BPJS Pensiun ({angka(pct(param.bpjsPensiun), 2)}%)</th>
           <th className="num">THR</th><th className="num">Kompensasi</th><th className="num">Supervisi & Operasional</th><th className="num">Total</th>
-          <th className="num">Manpower</th><th className="num">TOTAL</th>
+          <th className="num">Manpower</th><th>Dedicated / Sharing</th><th className="num">TOTAL</th>
         </tr></thead>
         <tbody>
-          {rows.length === 0 && <tr><td colSpan={19} className="muted">Belum ada manpower. Isi aktivitas & peran tetap terlebih dahulu.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={20} className="muted">Belum ada manpower. Isi aktivitas & peran tetap terlebih dahulu.</td></tr>}
           {rows.map((r, i) => <tr key={r.role}>
             <td className="num">{i + 1}</td>
             <td><b>{r.role}</b>{r.manual && <div className="small muted">diubah · <button type="button" className="linkbtn" disabled={!bisaEdit} onClick={() => { const x = { ...input }; delete x[r.role]; onInput(x); }}>reset</button></div>}</td>
@@ -92,12 +92,20 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
             <td className="num">{r0(r.bpjsTk)}</td><td className="num">{r0(r.bpjsKs)}</td><td className="num">{r0(r.bpjsPensiun)}</td>
             <td className="num">{r0(r.thr)}</td><td className="num">{r0(r.kompensasi)}</td>
             <td className="num">{num(r.role, 'supervisi', r.supervisi, 0, 80)}</td>
-            <td className="num">{r0(r.total)}</td><td className="num">{r.qty}</td><td className="num"><b>{r0(r.totalQty)}</b></td>
+            <td className="num">{r0(r.total)}</td><td className="num">{r.qty}</td>
+            <td><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+              <select aria-label={`Skema ${r.role}`} value={r.skema} disabled={!bisaEdit} style={{ minWidth: 104 }}
+                onChange={e => ubah(r.role, e.target.value === 'sharing' ? { skema: 'sharing', porsi: input[r.role]?.porsi ?? 0.5 } : { skema: undefined, porsi: undefined })}>
+                <option value="dedicated">Dedicated</option><option value="sharing">Sharing</option></select>
+              {r.skema === 'sharing' && <input type="number" step="any" min={0} max={1} aria-label={`Porsi sharing ${r.role}`} value={input[r.role]?.porsi ?? 0.5} disabled={!bisaEdit}
+                onChange={e => ubah(r.role, { porsi: e.target.value === '' ? undefined : Number(e.target.value) })} style={{ width: 64, minWidth: 64, textAlign: 'right' }} />}
+            </div>{r.skema === 'sharing' && <div className="small muted">{r.porsi > 0 ? `≈ 1/${angka(1 / r.porsi, 1)} project` : '0'} · {angka(r.qtyBiaya, 2)} org dibebankan</div>}</td>
+            <td className="num"><b>{r0(r.totalQty)}</b></td>
           </tr>)}
           {rows.length > 0 && <>
-            <tr className="pd-sub"><td colSpan={17} className="num"><b>Sub Total Biaya-1</b></td><td className="num"><b>{rows.reduce((s, r) => s + r.qty, 0)}</b></td><td className="num"><b>{r0(g.sub1)}</b></td></tr>
-            <tr><td colSpan={17} className="num">Management Fee {angka(pct(param.feePersen), 2)}%</td><td /><td className="num">{r0(g.fee)}</td></tr>
-            <tr style={{ background: 'var(--link)' }}><td colSpan={17} className="num"><b>Sub Total Biaya-2</b> <span className="small muted">(masuk cost model, sebelum kenaikan tahunan)</span></td><td /><td className="num"><b>{rp(g.sub2)}</b></td></tr>
+            <tr className="pd-sub"><td colSpan={17} className="num"><b>Sub Total Biaya-1</b></td><td className="num"><b>{rows.reduce((s, r) => s + r.qty, 0)}</b></td><td className="small muted">{angka(rows.reduce((s, r) => s + r.qtyBiaya, 0), 2)} org dibebankan</td><td className="num"><b>{r0(g.sub1)}</b></td></tr>
+            <tr><td colSpan={17} className="num">Management Fee {angka(pct(param.feePersen), 2)}%</td><td /><td /><td className="num">{r0(g.fee)}</td></tr>
+            <tr style={{ background: 'var(--link)' }}><td colSpan={17} className="num"><b>Sub Total Biaya-2</b> <span className="small muted">(masuk cost model, sebelum kenaikan tahunan)</span></td><td /><td /><td className="num"><b>{rp(g.sub2)}</b></td></tr>
           </>}
         </tbody>
       </table></div>

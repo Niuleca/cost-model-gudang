@@ -31,6 +31,9 @@ export interface InputBiayaRole {
   hariKerja?: number;
   hariAktual?: number;
   lisensi?: number;        // lisensi + insentif
+  /** Dedicated = 1 orang penuh untuk project ini; sharing = dibagi beberapa project (porsi 0,5 = 2 project, 0,25 = 4 project). */
+  skema?: 'dedicated' | 'sharing';
+  porsi?: number;
   supervisi?: number;      // supervisi & operasional
 }
 
@@ -54,9 +57,11 @@ export function rincianBiayaRole(role: string, qty: number, m: MasterData | null
   const thr = gajiPokok * param.thr;
   const kompensasi = gajiPokok * param.kompensasi;
   const total = subTotal + bpjsTk + bpjsKs + bpjsPensiun + thr + kompensasi + supervisi;
+  const skema = input?.skema ?? 'dedicated';
+  const porsi = skema === 'sharing' ? Math.min(1, Math.max(0, input?.porsi ?? 0.5)) : 1;
   return {
     role, level: lv.level, faktorLevel: lv.faktor, umk: m?.upahMinimum ?? 0, area: areaDefault /* dikunci ke area project */, gajiPokok, gajiDefault, hariKerja, hariAktual, lisensi, supervisi,
-    subTotal, bpjsTk, bpjsKs, bpjsPensiun, thr, kompensasi, total, qty, totalQty: total * qty,
+    subTotal, bpjsTk, bpjsKs, bpjsPensiun, thr, kompensasi, total, qty, skema, porsi, qtyBiaya: qty * porsi, totalQty: total * qty * porsi,
     manual: !!(input && Object.values(input).some(v => v != null && v !== '')),
   };
 }
