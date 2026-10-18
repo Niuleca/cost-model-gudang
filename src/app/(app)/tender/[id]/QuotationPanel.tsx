@@ -91,7 +91,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   function susunNomor(tgl: string, kepada: string | null, pembuatan: number, urutan: number) {
     const [y, m, d] = tgl.split('-');
     const p3 = (n: number) => String(n).padStart(3, '0');
-    return `${d}${m}${y.slice(2)}/${inisial(kepada || tender.customer)}/${inisial(akun())}/${p3(pembuatan)}/${p3(urutan)}`;
+    const pt = profile?.perusahaan?.trim() ? `${inisial(profile.perusahaan)}/` : '';
+    return `${d}${m}${y.slice(2)}/${pt}${inisial(kepada || tender.customer)}/${inisial(akun())}/${p3(pembuatan)}/${p3(urutan)}`;
   }
   /** Urutan quotation yang dibuat hari ini (semua tender) + 1. */
   async function urutanHariIni() {
@@ -211,7 +212,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
           {draft.revisi > 0 && <p className="notice small">Revisi {draft.revisi}: tarif diambil dari hasil hitung terakhir (v{tender.versi}). Kalau negosiasi mengubah asumsi, ubah input lalu hitung ulang dulu.</p>}
           <div className="grid3">
             <label className="f" htmlFor="qno">Nomor<input id="qno" value={draft.nomor} onChange={e => { setNomorAuto(null); setDraft({ ...draft, nomor: e.target.value }); }} />
-              <span className="small muted">{nomorAuto ? 'Otomatis: ddmmyy / inisial customer / inisial akun / pembuatan ke- / urutan hari ini' : 'Manual'}
+              <span className="small muted">{nomorAuto ? 'Otomatis: ddmmyy / inisial perusahaan Anda / inisial customer / inisial akun / pembuatan ke- / urutan hari ini' : 'Manual'}
                 {!nomorAuto && !editId && <> · <button type="button" className="linkbtn" onClick={async () => { const u = await urutanHariIni(); const p = draft.revisi + 1; setNomorAuto({ pembuatan: p, urutan: u }); setDraft({ ...draft, nomor: susunNomor(draft.tanggal, draft.kepada, p, u) }); }}>pakai otomatis</button></>}</span></label>
             <label className="f" htmlFor="qkpd">Kepada<input id="qkpd" value={draft.kepada ?? ''} onChange={e => setDraft({ ...draft, kepada: e.target.value, nomor: nomorAuto ? susunNomor(draft.tanggal, e.target.value, nomorAuto.pembuatan, nomorAuto.urutan) : draft.nomor })} /></label>
             <label className="f" htmlFor="qbs">Berlaku sampai<input id="qbs" type="date" value={draft.berlaku_sampai} onChange={e => setDraft({ ...draft, berlaku_sampai: e.target.value })} /></label>
