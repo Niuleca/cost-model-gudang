@@ -30,9 +30,9 @@ export interface DataExport {
   pd: unknown; rincianMp: RincianBiayaRole[]; paramMp: ParamBiayaMp; profil?: unknown; orderAdmin?: unknown; nomorQuotation?: string | null;
 }
 
-/** Nama file: Leca_Costmodel_(nomor quotation) — "/" diganti "-" karena tidak boleh di nama file. Tanpa quotation → kode tender. */
+/** Nama file: Leca_Costmodel_nomor-quotation — "/" diganti "-" karena tidak boleh di nama file. Tanpa quotation → kode tender. */
 export const namaFileExport = (nomor: string | null | undefined, cadangan: string) =>
-  `Leca_Costmodel_(${(nomor || cadangan).replace(/[\\/:*?"<>|]+/g, '-').trim()}).xlsx`;
+  `Leca_Costmodel_${(nomor || cadangan).trim().replace(/[\\/:*?"<>|()\s-]+/g, '_').replace(/^_+|_+$/g, '')}.xlsx`;
 
 export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
   const buf = await buatWorkbookTender(p, sheets);
