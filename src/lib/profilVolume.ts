@@ -1,7 +1,7 @@
 // Profil order inbound & outbound — mengikuti volume di tabel Volume:
 // volume/bln (palet eq.) ÷ hari operasional = palet/hari → dipecah per moda dengan % →
 // dikonversi ke satuan moda (kontainer / palet / case / pcs) → jumlah mobil per hari (cek palet, CBM, ton).
-import type { VolumeInput } from '@/lib/engine/types';
+import type { AktivitasInput, VolumeInput } from '@/lib/engine/types';
 
 export type ModaOrder = 'cont20' | 'cont40' | 'cont40hc' | 'palet' | 'case' | 'unit';
 export type BasisVolume = 'peakBulan' | 'rataRataBulan' | 'komitmenBulan';
@@ -43,7 +43,7 @@ export interface BarisProfil {
   /** lama (versi qty/bln) — diabaikan */
   qty?: number;
 }
-export interface ParamProfil { tonPerPalet: number; cbmPerPalet: number; cbmPerCase: number; kgPerCase: number }
+export interface ParamProfil { tonPerPalet: number; cbmPerPalet: number; cbmPerCase: number; kgPerCase: number; inputAdminPerMobil?: number }
 export interface ProfilVolume {
   inbound: BarisProfil[];
   outbound: BarisProfil[];
@@ -51,7 +51,7 @@ export interface ProfilVolume {
   basis?: BasisVolume;
   kendaraan?: Kendaraan[];
 }
-export const PARAM_DEFAULT: ParamProfil = { tonPerPalet: 0.8, cbmPerPalet: 1.5, cbmPerCase: 0.04, kgPerCase: 12 };
+export const PARAM_DEFAULT: ParamProfil = { tonPerPalet: 0.8, cbmPerPalet: 1.5, cbmPerCase: 0.04, kgPerCase: 12, inputAdminPerMobil: 2 };
 
 const isCase = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes(u.trim().toLowerCase());
 
@@ -126,6 +126,44 @@ export function hitungProfil(rows: BarisProfil[], paletHari: number, param: Para
     totalMobilHari: hasil.reduce((s, h) => s + (h.mobil?.perHari ?? 0), 0),
     totalMobilBulat: hasil.reduce((s, h) => s + (h.mobil?.bulat ?? 0), 0),
   };
+}
+
+/** Order admin per arus: mobil/hari (dibulatkan per moda) × input admin per mobil
+ *  (inbound: barang masuk + put away; outbound: picking + barang keluar) → per bulan × hari operasional. */
+export function orderAdmin(profil: ProfilVolume | undefined, volumes: VolumeInput[], hariBulan: number) {
+  const kosong = { mobilHari: 0, orderHari: 0, orderBulan: 0 };
+  if (!profil) return { inbound: kosong, outbound: kosong, perMobil: 2 };
+  const param = { ...PARAM_DEFAULT, ...(profil.param ?? {}) };
+  const perMobil = param.inputAdminPerMobil ?? 2;
+  const kendaraan = profil.kendaraan?.length ? profil.kendaraan : KENDARAAN_DEFAULT;
+  const satu = (arus: 'inbound' | 'outbound') => {
+    const rows = profil[arus] ?? [];
+    if (!rows.length) return kosong;
+    const vp = volumePalet(volumes.find(v => v.arus === arus), profil.basis ?? 'peakBulan');
+    const h = hitungProfil(rows, hariBulan > 0 ? vp.paletBulan / hariBulan : 0, param, kendaraan, { cpp: vp.cpp, upc: vp.upc }, hariBulan);
+    const mobilHari = h.totalMobilBulat, orderHari = mobilHari * perMobil;
+    return { mobilHari, orderHari, orderBulan: orderHari * hariBulan };
+  };
+  return { inbound: satu('inbound'), outbound: satu('outbound'), perMobil };
+}
+
+/** Aktivitas admin (role mengandung "admin", UoM order/line/dokumen, arus inbound/outbound, volume/bln kosong)
+ *  mendapat volume dari order admin profil — dibagi rata bila ada beberapa aktivitas admin di arus yang sama. */
+export const isAktivitasAdmin = (a: Pick<AktivitasInput, 'roleName' | 'uom' | 'arus'>) =>
+  /admin/i.test(a.roleName) && /^(order|line|dokumen|doc|do|transaksi)$/i.test(a.uom.trim()) && (a.arus === 'inbound' || a.arus === 'outbound');
+
+export function aktivitasDenganOrderAdmin<T extends AktivitasInput>(aktivitas: T[], volumes: VolumeInput[], profil: ProfilVolume | undefined, hariBulan: number): (T & { volumeDariProfil?: boolean })[] {
+  const oa = orderAdmin(profil, volumes, hariBulan);
+  const target = (a: T) => isAktivitasAdmin(a) && (a.volumeManual == null || !Number.isFinite(a.volumeManual));
+  const n = { inbound: 0, outbound: 0 } as Record<'inbound' | 'outbound', number>;
+  for (const a of aktivitas) if (target(a)) n[a.arus as 'inbound' | 'outbound']++;
+  return aktivitas.map(a => {
+    if (!target(a)) return a;
+    const arus = a.arus as 'inbound' | 'outbound';
+    const total = oa[arus].orderBulan;
+    if (!total) return a;
+    return { ...a, volumeManual: total / n[arus], volumeDariProfil: true };
+  });
 }
 
 const f = (x: number) => (Math.round(x * 100) / 100).toLocaleString('id-ID');

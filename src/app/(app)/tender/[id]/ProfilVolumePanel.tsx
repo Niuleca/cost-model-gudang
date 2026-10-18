@@ -2,7 +2,7 @@
 import type { VolumeInput } from '@/lib/engine/types';
 import { angka } from '@/lib/format';
 import {
-  hitungProfil, volumePalet, KENDARAAN_DEFAULT, MODA, PARAM_DEFAULT, SATUAN_UNIT, TON_KONTAINER,
+  hitungProfil, volumePalet, orderAdmin, KENDARAAN_DEFAULT, MODA, PARAM_DEFAULT, SATUAN_UNIT, TON_KONTAINER,
   type BarisProfil, type BasisVolume, type Kendaraan, type ProfilVolume,
 } from '@/lib/profilVolume';
 
@@ -100,10 +100,26 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
         <label className="f">CBM per palet {n(p.param.cbmPerPalet, v => setParam('cbmPerPalet', v), 90)}</label>
         <label className="f">CBM per case {n(p.param.cbmPerCase, v => setParam('cbmPerCase', v), 90)}</label>
         <label className="f">Kg per case {n(p.param.kgPerCase, v => setParam('kgPerCase', v), 90)}</label>
+        <label className="f" title="Inbound: barang masuk + put away; outbound: picking + barang keluar">Input admin per mobil {n(p.param.inputAdminPerMobil ?? 2, v => setParam('inputAdminPerMobil', v), 90)}</label>
         <span className="small muted">Hari operasional {hariBulan}/bln (Working Days di Process Design)</span>
       </div>
       {bagian('inbound')}
       {bagian('outbound')}
+      {(() => {
+        const oa = orderAdmin(p, volumes, hariBulan);
+        if (!oa.inbound.mobilHari && !oa.outbound.mobilHari) return null;
+        return <div style={{ minWidth: 0 }}>
+          <h3>Volume admin (order)</h3>
+          <div className="tablewrap"><table>
+            <thead><tr><th>Arus</th><th className="num">Mobil/hari</th><th className="num">Input admin per mobil</th><th className="num">Order/hari</th><th className="num">Order/bln</th><th>Keterangan</th></tr></thead>
+            <tbody>{(['inbound', 'outbound'] as const).map(ar => <tr key={ar}>
+              <td>{ar === 'inbound' ? 'Inbound' : 'Outbound'}</td><td className="num">{oa[ar].mobilHari}</td><td className="num">× {oa.perMobil}</td>
+              <td className="num"><b>{angka(oa[ar].orderHari)}</b></td><td className="num"><b>{angka(oa[ar].orderBulan)}</b></td>
+              <td className="small muted">{ar === 'inbound' ? 'barang masuk + put away' : 'picking + barang keluar'}</td></tr>)}</tbody>
+          </table></div>
+          <p className="small muted">Order/bln otomatis menjadi volume aktivitas admin (role Admin, UoM order/line) di tab Aktivitas & manpower bila kolom Volume/bln-nya kosong. Bila ada beberapa aktivitas admin di satu arus, order dibagi rata.</p>
+        </div>;
+      })()}
       <details>
         <summary className="small">Kapasitas kendaraan (bisa diubah)</summary>
         <div className="tablewrap"><table>
