@@ -70,7 +70,7 @@ export default function TenderBaru() {
         </div>
         {err && <p className="error small">{err}</p>}
         <div className="row"><button type="submit" disabled={sibuk}>{sibuk ? 'Membuat…' : 'Buat tender & lanjut isi asumsi'}</button>
-          <a className="btn ghost" href="/panduan-leca.pdf" target="_blank" rel="noopener">? Baca saya sebelum mulai</a></div>
+          <a className="btn ghost" href="/panduan-leca.pdf" target="_blank" rel="noopener">Baca saya sebelum mulai</a></div>
       </form>
     </>
   );
