@@ -43,6 +43,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const [pratinjau, setPratinjau] = useState<{ blob: Blob; data: QuotationPdfData } | null>(null);
   const [sibukPv, setSibukPv] = useState(false);
   const [tambahIdx, setTambahIdx] = useState('');
+  // Nomor otomatis: DDMMYYYY/Customer/Akun/Pembuatan ke-/Urutan hari ini. Berhenti otomatis kalau diketik manual.
+  const [nomorAuto, setNomorAuto] = useState<{ pembuatan: number; urutan: number } | null>(null);
   const hasil = tender.hasil as HasilTender | null;
   const bolehApprove = !!profile && ['commercial', 'finance', 'admin'].includes(profile.role);
 
@@ -76,26 +78,42 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     setErr(null); return true;
   }
 
-  function mulai() {
+  const tglLokal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const bersih = (t: string) => t.replace(/[\/\\]+/g, '-').replace(/\s+/g, ' ').trim();
+  const akun = () => bersih(profile?.full_name || profile?.email?.split('@')[0] || 'akun');
+  function susunNomor(tgl: string, kepada: string | null, pembuatan: number, urutan: number) {
+    const [y, m, d] = tgl.split('-');
+    return `${d}${m}${y}/${bersih(kepada || tender.customer)}/${akun()}/${pembuatan}/${urutan}`;
+  }
+  /** Urutan quotation yang dibuat hari ini (semua tender) + 1. */
+  async function urutanHariIni() {
+    const awal = new Date(); awal.setHours(0, 0, 0, 0);
+    const { count } = await sb.from('quotations').select('id', { count: 'exact', head: true }).gte('created_at', awal.toISOString());
+    return (count ?? 0) + 1;
+  }
+
+  async function mulai() {
     if (!hasil || !cekKritis(hasil)) return;
     const hari = new Date();
-    const dasar = `Q/${hari.getFullYear()}${String(hari.getMonth() + 1).padStart(2, '0')}/${tender.kode ?? tender.id.slice(0, 6)}`;
-    const nUtama = list.filter(q => !q.parent_id).length + 1;
+    const urutan = await urutanHariIni();
     const { rate, sekali } = dariHasil(hasil);
     const berlaku = new Date(hari); berlaku.setDate(berlaku.getDate() + 30);
-    setDraft({ nomor: `${dasar}/${nUtama}`, tanggal: hari.toISOString().slice(0, 10), berlaku_sampai: berlaku.toISOString().slice(0, 10),
+    setNomorAuto({ pembuatan: 1, urutan });
+    setDraft({ nomor: susunNomor(tglLokal(hari), tender.customer, 1, urutan), tanggal: tglLokal(hari), berlaku_sampai: tglLokal(berlaku),
       kepada: tender.customer, rate_card: rate, term_condition: isiTc(tc[0]?.isi ?? ''), revisi: 0, parent_id: null, catatan_revisi: null,
       tagihan_sekali: sekali, info_gudang: infoGudang(tender.asumsi.gudang, hasil) });
   }
 
-  /** Revisi: tarif diambil ulang dari hasil hitung terakhir, nomor + "Rev.n", T&C ikut versi sebelumnya. */
-  function revisi(q: Quo) {
+  /** Revisi: tarif diambil ulang dari hasil hitung terakhir; nomor pembuatan ke-(revisi+1), T&C ikut versi sebelumnya. */
+  async function revisi(q: Quo) {
     if (!hasil || !cekKritis(hasil)) return;
     const akar = q.parent_id ? list.find(x => x.id === q.parent_id) ?? q : q;
     const n = Math.max(...list.filter(x => x.id === akar.id || x.parent_id === akar.id).map(x => x.revisi)) + 1;
     const { rate, sekali } = dariHasil(hasil);
     const hari = new Date(); const berlaku = new Date(hari); berlaku.setDate(berlaku.getDate() + 30);
-    setDraft({ nomor: `${akar.nomor} Rev.${n}`, tanggal: hari.toISOString().slice(0, 10), berlaku_sampai: berlaku.toISOString().slice(0, 10),
+    const urutan = await urutanHariIni();
+    setNomorAuto({ pembuatan: n + 1, urutan });
+    setDraft({ nomor: susunNomor(tglLokal(hari), q.kepada, n + 1, urutan), tanggal: tglLokal(hari), berlaku_sampai: tglLokal(berlaku),
       kepada: q.kepada, rate_card: rate, term_condition: q.term_condition, revisi: n, parent_id: akar.id, catatan_revisi: '',
       tagihan_sekali: sekali, info_gudang: infoGudang(tender.asumsi.gudang, hasil) ?? q.info_gudang });
   }
@@ -103,10 +121,10 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   /** Edit quotation draft/batal: dibuka di editor, disimpan ke baris yang sama (batal → kembali draft). */
   function edit(q: Quo) {
     const { id: _i, status: _s, approved_at: _a, created_at: _c, ...isi } = q;
-    setDraft({ ...isi, rate_card: q.rate_card ?? [], tagihan_sekali: q.tagihan_sekali ?? [] }); setEditId(q.id); setErr(null);
+    setDraft({ ...isi, rate_card: q.rate_card ?? [], tagihan_sekali: q.tagihan_sekali ?? [] }); setEditId(q.id); setErr(null); setNomorAuto(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-  function tutupDraft() { setDraft(null); setEditId(null); }
+  function tutupDraft() { setDraft(null); setEditId(null); setNomorAuto(null); }
 
   async function simpanDraft() {
     if (!draft) return;
@@ -116,7 +134,9 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
       if (error || !data?.length) { setErr(error?.message ?? 'Tidak tersimpan (hanya pembuat tender / admin).'); return; }
       tutupDraft(); muat(); return;
     }
-    const { error } = await sb.from('quotations').insert({ ...draft, tender_id: tender.id });
+    let nomor = draft.nomor;
+    if (nomorAuto) nomor = susunNomor(draft.tanggal, draft.kepada, nomorAuto.pembuatan, await urutanHariIni());
+    const { error } = await sb.from('quotations').insert({ ...draft, nomor, tender_id: tender.id });
     if (error) { setErr(error.message); return; }
     if (draft.parent_id) {   // versi lama yang masih aktif ditandai direvisi
       const lama = list.filter(x => (x.id === draft.parent_id || x.parent_id === draft.parent_id) && ['approved', 'terkirim', 'draft'].includes(x.status));
@@ -170,8 +190,10 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
           {editId && <p className="notice small"><b>Mengedit {draft.nomor}</b> — disimpan ke quotation yang sama{list.find(x => x.id === editId)?.status === 'batal' ? '; status kembali menjadi draft (perlu approve lagi)' : ''}.</p>}
           {draft.revisi > 0 && <p className="notice small">Revisi {draft.revisi}: tarif diambil dari hasil hitung terakhir (v{tender.versi}). Kalau negosiasi mengubah asumsi, ubah input lalu hitung ulang dulu.</p>}
           <div className="grid3">
-            <label className="f" htmlFor="qno">Nomor<input id="qno" value={draft.nomor} onChange={e => setDraft({ ...draft, nomor: e.target.value })} /></label>
-            <label className="f" htmlFor="qkpd">Kepada<input id="qkpd" value={draft.kepada ?? ''} onChange={e => setDraft({ ...draft, kepada: e.target.value })} /></label>
+            <label className="f" htmlFor="qno">Nomor<input id="qno" value={draft.nomor} onChange={e => { setNomorAuto(null); setDraft({ ...draft, nomor: e.target.value }); }} />
+              <span className="small muted">{nomorAuto ? 'Otomatis: tgl·bln·thn / customer / akun / pembuatan ke- / urutan hari ini' : 'Manual'}
+                {!nomorAuto && !editId && <> · <button type="button" className="linkbtn" onClick={async () => { const u = await urutanHariIni(); const p = draft.revisi + 1; setNomorAuto({ pembuatan: p, urutan: u }); setDraft({ ...draft, nomor: susunNomor(draft.tanggal, draft.kepada, p, u) }); }}>pakai otomatis</button></>}</span></label>
+            <label className="f" htmlFor="qkpd">Kepada<input id="qkpd" value={draft.kepada ?? ''} onChange={e => setDraft({ ...draft, kepada: e.target.value, nomor: nomorAuto ? susunNomor(draft.tanggal, e.target.value, nomorAuto.pembuatan, nomorAuto.urutan) : draft.nomor })} /></label>
             <label className="f" htmlFor="qbs">Berlaku sampai<input id="qbs" type="date" value={draft.berlaku_sampai} onChange={e => setDraft({ ...draft, berlaku_sampai: e.target.value })} /></label>
           </div>
           {draft.revisi > 0 && <label className="f" htmlFor="qrev">Catatan revisi (wajib)<input id="qrev" value={draft.catatan_revisi ?? ''} onChange={e => setDraft({ ...draft, catatan_revisi: e.target.value })} placeholder="mis. volume komitmen naik 1.200 → 1.500 palet; payment term 45 hari" /></label>}
