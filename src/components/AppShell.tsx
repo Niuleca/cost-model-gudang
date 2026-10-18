@@ -31,6 +31,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
 ];
 const AKUN: Item[] = [
   { href: '/admin', label: 'Pengguna & role', roles: ['admin'] },
+  { href: '/admin/approval', label: 'Approval akun', roles: ['admin'] },
   { href: '/master', label: 'Master data (kalender, keuangan, margin, T&C)', roles: 'semua' },
   { href: '/akun', label: 'Profil & password', roles: 'semua' },
 ];
@@ -56,9 +57,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const dasar = href.split('?')[0];
     if (dasar === '/') return path === '/';
     if (dasar === '/produktivitas') return path === '/produktivitas';
+    if (dasar === '/admin') return path === '/admin';
     if (dasar === '/tender') return path === '/tender' || (/^\/tender\/(?!baru)/.test(path));
     return path === dasar || path.startsWith(dasar + '/');
   };
+
+  // Jumlah akun menunggu persetujuan (badge untuk master admin)
+  const [nPending, setNPending] = useState(0);
+  useEffect(() => {
+    if (!profile?.is_master) return;
+    supabaseBrowser().from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      .then(({ count }: { count: number | null }) => setNPending(count ?? 0));
+  }, [profile?.is_master, path]);
 
   async function keluar() {
     await supabaseBrowser().auth.signOut();
@@ -77,7 +87,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {buka === id && (
           <div className={`ddmenu${kanan ? ' kanan' : ''}`} role="menu">
             {isi.map(i => (
-              <Link key={i.href} role="menuitem" href={i.href} className={`${aktif(i.href) ? 'on' : ''}${i.pisah ? ' pisah' : ''}`}>{t(i.label)}</Link>))}
+              <Link key={i.href} role="menuitem" href={i.href} className={`${aktif(i.href) ? 'on' : ''}${i.pisah ? ' pisah' : ''}`}>{t(i.label)}
+                {i.href === '/admin/approval' && nPending > 0 && <span className="pill warn small" style={{ marginLeft: 6 }}>{nPending}</span>}</Link>))}
             {kanan && <button role="menuitem" className="ddkeluar" onClick={keluar}>{t('Keluar')}</button>}
           </div>)}
       </div>);
@@ -88,16 +99,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <header className="topbar">
         <Link href="/" className="brand" aria-label="Leca — beranda"><LecaMark /><span className="brand-nama">Leca</span><span className="brand-oleh">by esapanghegar</span></Link>
         <nav aria-label="Menu utama" ref={navRef} className="topnav">
-          {MENU.map(m => <Dropdown key={m.id} {...m} />)}
+          {(!profile || profile.status === undefined || profile.status === 'aktif') && MENU.map(m => <Dropdown key={m.id} {...m} />)}
           <div className="sela" />
           <label className="bahasa-pilih" title={t('Bahasa')}><span aria-hidden="true">🌐</span>
             <select aria-label={t('Bahasa')} value={bahasa} onChange={e => setBahasa(e.target.value as Bahasa)}>
               {BAHASA.map(b => <option key={b.v} value={b.v}>{b.short} · {b.l}</option>)}</select></label>
-          <Dropdown id="akun" kanan item={AKUN}
-            label={`${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${ROLE_LABEL[profile.role]}` : ''}`} />
+          <Dropdown id="akun" kanan item={profile && profile.status && profile.status !== 'aktif' ? [] : AKUN}
+            label={`${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${profile.is_master ? 'Master admin' : ROLE_LABEL[profile.role]}` : ''}${nPending ? ` (${nPending})` : ''}`} />
         </nav>
       </header>
-      <main className="main">{children}</main>
+      <main className="main">{profile && (profile.status === 'pending' || profile.status === 'ditolak') ? (
+        <div className="card" style={{ maxWidth: 560, margin: '40px auto' }}>
+          <h2>{profile.status === 'pending' ? 'Menunggu persetujuan' : 'Pendaftaran ditolak'}</h2>
+          {profile.status === 'pending'
+            ? <p>Akun <b>{profile.email}</b> sudah terdaftar dan sedang menunggu persetujuan master admin. Setelah disetujui dan diberi role, menu Leca akan terbuka — muat ulang halaman ini nanti.</p>
+            : <p>Pendaftaran akun <b>{profile.email}</b> tidak disetujui. Hubungi master admin bila ini keliru.</p>}
+          <div className="row"><button className="ghost" onClick={() => location.reload()}>Muat ulang</button><button onClick={keluar}>Keluar</button></div>
+        </div>) : children}</main>
       <footer className="app-foot"><span><b>Leca</b> · {t('cost model, tender & quotation gudang')}</span><span>{t('Dibuat oleh')} <b>esapanghegar</b> · © {new Date().getFullYear()}</span></footer>
     </div>
   );

@@ -28,7 +28,7 @@ function LoginForm() {
       } else if (mode === 'daftar') {
         const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: nama }, emailRedirectTo: redirect } });
         if (error) throw error;
-        setPesan('Akun dibuat. Cek email untuk konfirmasi, lalu minta admin mengatur role Anda.');
+        setPesan('Akun dibuat. Cek email untuk konfirmasi. Setelah itu akun menunggu persetujuan (ACC) master admin sebelum bisa dipakai.');
       } else {
         const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${redirect}?next=/akun` });
         if (error) throw error;
