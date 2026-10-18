@@ -21,7 +21,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
     <input type="number" min={0} step="any" aria-label={`${k} ${role}`} value={input[role]?.[k] ?? ''} placeholder={ph ? String(Math.round(ph)) : '0'}
       onChange={e => ubah(role, { [k]: e.target.value === '' ? undefined : Number(e.target.value) })} disabled={!bisaEdit}
       style={{ width: w, minWidth: w, textAlign: 'right' }} title={`dipakai: ${r0(nilai)}`} />);
-  const pIn = (k: keyof ParamBiayaMp, label: string) => (
+  const pIn = (k: 'bpjsTk' | 'bpjsKs' | 'bpjsPensiun' | 'thr' | 'kompensasi' | 'feePersen', label: string) => (
     <label className="f" style={{ minWidth: 0 }}>{label}
       <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input type="number" step="any" min={0} value={pct(param[k])} disabled={!bisaEdit}
         onChange={e => onParam({ [k]: Number(e.target.value) / 100 })} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /><span>%</span></div></label>);
@@ -34,6 +34,16 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
       <div className="row" style={{ alignItems: 'end' }}>
         {pIn('bpjsTk', 'BPJS TK')}{pIn('bpjsKs', 'BPJS KS')}{pIn('bpjsPensiun', 'BPJS Pensiun')}{pIn('thr', 'THR')}{pIn('kompensasi', 'Kompensasi')}{pIn('feePersen', 'Management fee')}
       </div>
+      <details className="small muted">
+        <summary>Dasar aturan default</summary>
+        <ul style={{ margin: '4px 0 4px 18px', padding: 0 }}>
+          <li><b>BPJS TK 5,27%</b> (pemberi kerja) = JHT 3,7% (PP 46/2015) + JKK 1,27% + JKM 0,3% (PP 44/2015). Gudang/penimbunan barang termasuk <b>Kelompok IV – risiko tinggi</b> (Lampiran I PP 44/2015). 0,14% dari JKK direkomposisi ke JKP (PP 6/2025) tanpa menambah iuran.</li>
+          <li><b>BPJS Kesehatan 4%</b> pemberi kerja, upah maksimal {rp(param.batasUpahKs ?? 0)} (Perpres 64/2020).</li>
+          <li><b>BPJS Pensiun 2%</b> pemberi kerja, upah maksimal {rp(param.batasUpahPensiun ?? 0)} (PP 45/2015; batas diperbarui tiap Maret).</li>
+          <li><b>THR 1/12</b> upah per bulan (Permenaker 6/2016) · <b>Kompensasi PKWT 1/12</b> = 1 bulan upah per 12 bulan kontrak (PP 35/2021 Pasal 15–16).</li>
+          <li>Management fee bukan aturan pemerintah — sesuaikan kebijakan perusahaan / tender.</li>
+        </ul>
+      </details>
       <div className="tablewrap"><table className="bmp">
         <thead><tr>
           <th>No</th><th>Jabatan</th><th>Area</th><th className="num">Gaji pokok</th><th className="num">Hari kerja</th><th className="num">Actual hari kerja</th>

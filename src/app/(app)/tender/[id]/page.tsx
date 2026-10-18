@@ -194,7 +194,7 @@ export default function TenderPage() {
   const a = t.asumsi;
   const hariOps = a.processDesign?.hariKerjaBulan ?? 25;
   const aktEf = aktivitasDenganOrderAdmin(a.aktivitas, a.volumes, a.profilVolume, hariOps);
-  const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, ...(a.paramBiayaMp ?? {}) };
+  const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, batasUpahPensiun: masterMp?.payroll.batasUpahJp || PARAM_BIAYA_MP_DEFAULT.batasUpahPensiun, batasUpahKs: masterMp?.payroll.batasUpahKes || PARAM_BIAYA_MP_DEFAULT.batasUpahKs, ...(a.paramBiayaMp ?? {}) };
   const qtyRole = new Map<string, number>();
   for (const r of pdFull?.mp ?? []) if (r.resources > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.resources);
   for (const r of pdFull?.indirect.rows ?? []) if (r.qty > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.qty);

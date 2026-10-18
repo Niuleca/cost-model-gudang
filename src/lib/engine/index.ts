@@ -199,7 +199,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const esk = hitungEskalasi(t.eskalasiManpower?.persenTahun ?? 0, t.durasiKontrakBulan, t.eskalasiManpower?.mulai);
   // Rincian biaya manpower (format sheet): gaji pokok + lisensi → sub total + BPJS TK/KS/Pensiun + THR + kompensasi + supervisi = total/orang;
   // Σ total × orang = Sub Total-1; × (1 + management fee) = Sub Total-2 → dipakai sebagai biaya manpower.
-  const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, ...(t.paramBiayaMp ?? {}) };
+  const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, batasUpahPensiun: m.payroll.batasUpahJp || PARAM_BIAYA_MP_DEFAULT.batasUpahPensiun, batasUpahKs: m.payroll.batasUpahKes || PARAM_BIAYA_MP_DEFAULT.batasUpahKs, ...(t.paramBiayaMp ?? {}) };
   const hariMp = t.processDesign?.hariKerjaKaryawan ?? 25;
   const payroll = manpower.map(mp => {
     const rc = rincianBiayaRole(mp.roleName, mp.headcount, m, t.rincianBiayaMp?.[mp.roleName], paramMp, hariMp, t.kabKota);
