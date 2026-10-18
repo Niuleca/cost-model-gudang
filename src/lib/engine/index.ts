@@ -319,7 +319,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   // ---- 7c. Interest cost: sumber pinjaman (semua baris biaya kecuali finance/overhead) + baris manual ----
   const sumberPinjaman = baris.filter(b => b.kelompok !== 'Finance' && b.kelompok !== 'Overhead').map(b => {
     const capexNilai = nilaiModal.get(b.deskripsi);
-    return { deskripsi: b.deskripsi, kelompok: b.kelompok, biayaBulan: b.biayaBulan, jenis: capexNilai != null ? 'capex' as const : 'bulanan' as const,
+    return { deskripsi: b.deskripsi, kelompok: b.kelompok, biayaBulan: b.biayaBulan, jenis: capexNilai != null ? 'capex' as const : 'opex' as const,
       pokokDefault: bulat(capexNilai ?? b.biayaBulan * 12) };
   });
   const bungaTahun = Math.max(0, ic?.bungaTahun ?? 0.09);
