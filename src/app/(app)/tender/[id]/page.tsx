@@ -342,6 +342,10 @@ export default function TenderPage() {
         <div className="card">
           <h2><T>Volume</T></h2>
           <p className="small muted">Sizing memakai <b>peak</b>. Tarif dihitung dari <b>volume komitmen</b> (MGV). Storage diisi jumlah stok (posisi), arus lain per bulan.</p>
+          {a.volumes.some(v => v.rataRataBulan > 0 && (!(v.peakBulan > 0) || !(v.komitmenBulan > 0))) && <p className="notice small" role="alert">
+            Peak/bln atau Komitmen/bln masih 0, sehingga sizing, ringkasan order, dan tarif ikut 0.{' '}
+            <button className="ghost" onClick={() => setA({ volumes: a.volumes.map(v => v.rataRataBulan > 0 ? { ...v, peakBulan: v.peakBulan > 0 ? v.peakBulan : v.rataRataBulan, komitmenBulan: v.komitmenBulan > 0 ? v.komitmenBulan : v.rataRataBulan } : v) })}>Isi yang kosong = rata-rata/bln</button>
+            {' '}lalu sesuaikan bila peak / komitmen berbeda.</p>}
           <div className="tablewrap"><table>
             <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln</th><th className="num">Faktor peak</th><th title="1 UoM = berapa case/karton">Isi per UoM</th><th title="1 case = berapa pcs">Isi per case</th><th></th></tr></thead>
             <tbody>{a.volumes.map((v, i) => (
@@ -349,7 +353,12 @@ export default function TenderPage() {
                 <td><select aria-label="Arus" value={v.arus} style={{ minWidth: 130 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>
                 <td><select aria-label="UoM" value={v.uom} style={{ minWidth: 100 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { uom: e.target.value }) })}>{UOM.map(u => <option key={u}>{u}</option>)}</select></td>
                 {(['rataRataBulan', 'peakBulan', 'komitmenBulan'] as const).map(k => (
-                  <td key={k} className="num"><input aria-label={k} type="number" step="any" value={v[k]} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { [k]: Number(e.target.value) }) })} /></td>
+                  <td key={k} className="num"><AngkaInput aria-label={k} step="any" min={0} value={v[k]}
+                    style={k !== 'rataRataBulan' && !(v[k] > 0) && v.rataRataBulan > 0 ? { borderColor: 'var(--bad, #c0392b)' } : undefined}
+                    onValue={n => setA({ volumes: ubahArray(a.volumes, i, k === 'rataRataBulan'
+                      // peak & komitmen ikut rata-rata selama masih kosong / sama dengan rata-rata lama
+                      ? { rataRataBulan: n, ...(!(v.peakBulan > 0) || v.peakBulan === v.rataRataBulan ? { peakBulan: n } : {}), ...(!(v.komitmenBulan > 0) || v.komitmenBulan === v.rataRataBulan ? { komitmenBulan: n } : {}) }
+                      : { [k]: n }) })} /></td>
                 ))}
                 <td className="num">{v.rataRataBulan > 0 ? (v.peakBulan / v.rataRataBulan).toFixed(2) + '×' : '—'}</td>
                 {(() => {
