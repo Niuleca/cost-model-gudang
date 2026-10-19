@@ -53,9 +53,16 @@ export interface AktivitasInput {
   volumeManual?: number | null; // override volume per bulan (sebelum %); kosong = peak arus × pengali
 }
 
+/** Headcount peran tetap: qty total, atau qty per shift × shift aktif */
+export const headcountTetap = (p: { qty: number; perShift?: boolean }, shiftAktif: number) =>
+  Math.max(0, Number(p.qty) || 0) * (p.perShift ? Math.max(1, shiftAktif) : 1);
+/** Role yang wajar dipakai sebagai supervisor (span of control) */
+export const isRoleSupervisor = (nama: string) => /\b(spv|supervisor|leader|koordinator|coordinator|kepala|ka\b|manager|foreman|head|chief|mandor)/i.test(nama ?? '');
+
 export interface PeranTetap {
   roleName: string;
-  qty: number;              // headcount total (bukan per shift)
+  qty: number;              // headcount total; bila perShift = true → orang per shift (× shift aktif)
+  perShift?: boolean;
   alat?: string[];          // alat pendukung per orang (mis. PC, HT) — masuk MHE Summary: unit = headcount
   alokasi?: Partial<Record<Bucket, number>>;
 }

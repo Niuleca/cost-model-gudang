@@ -5,7 +5,7 @@
 
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
-import { pengaliEfektif } from './types';
+import { pengaliEfektif, headcountTetap, isRoleSupervisor } from './types';
 import { PARAM_BIAYA_MP_DEFAULT, rincianBiayaRole } from './biayaMp';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
@@ -147,7 +147,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
         alokasi: normalisasi(undefined, { handling_in: 0.4, handling_out: 0.4, storage: 0.2 }) });
     }
     for (const p of t.peranTetap) {
-      manpower.push({ roleName: p.roleName, jenis: 'Tetap', jamPerShift: 0, mpPerShift: 0, headcount: p.qty, utilisasi: 1,
+      manpower.push({ roleName: p.roleName, jenis: 'Tetap', jamPerShift: 0, mpPerShift: p.perShift ? Number(p.qty) || 0 : 0, headcount: headcountTetap(p, shiftAktif), utilisasi: 1,
         alokasi: normalisasi(p.alokasi, { manajemen: 1 }) });
     }
   }
@@ -170,11 +170,15 @@ export function hitungTender(t: TenderInput, m: MasterData) {
       alokasi: normalisasi(undefined, { handling_in: 0.4, handling_out: 0.4, storage: 0.2 }) });
   }
   for (const p of t.peranTetap) {
-    manpower.push({ roleName: p.roleName, jenis: 'Tetap', jamPerShift: 0, mpPerShift: 0, headcount: p.qty, utilisasi: 1,
+    manpower.push({ roleName: p.roleName, jenis: 'Tetap', jamPerShift: 0, mpPerShift: p.perShift ? Number(p.qty) || 0 : 0, headcount: headcountTetap(p, t.jumlahShift), utilisasi: 1,
       alokasi: normalisasi(p.alokasi, { manajemen: 1 }) });
   }
   }
 
+  if (t.spanOfControl > 0 && !t.peranTetap.some(p => p.roleName === t.roleSupervisor)) {
+    if (!isRoleSupervisor(t.roleSupervisor)) flags.push({ level: 'peringatan', kode: 'ROLE_SPV_TIDAK_WAJAR', pesan: `Role supervisor "${t.roleSupervisor}" bukan role supervisi — jumlahnya dihitung dari span of control. Pilih role SPV/Leader, atau masukkan ${t.roleSupervisor} di peran tetap.` });
+    if (t.spanOfControl < 5) flags.push({ level: 'peringatan', kode: 'SPAN_KECIL', pesan: `Span of control ${t.spanOfControl} sangat kecil (1 supervisor per ${t.spanOfControl} orang direct). Umumnya 10–20.` });
+  }
   // ---- 5. MHE ---- (metode Process Design: unit = ROUNDUP(FTE alat); jam tersedia sudah memperhitungkan hari repair)
   const mhe = t.mhe.map(x => {
     const jam = perTool.get(x.tool)?.jamPerShift ?? 0;

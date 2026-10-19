@@ -8,7 +8,7 @@ import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInp
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
-import { faktorUom, pengaliEfektif } from '@/lib/engine/types';
+import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
@@ -50,6 +50,7 @@ const UOM = ['palet', 'case', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pa
 const KELOMPOK: Kelompok[] = ['IT', 'Office', 'Consumable', 'HSE', 'Asuransi', 'Startup', 'Fasilitas', 'Utilitas', 'Racking', 'Lainnya'];
 const RISIKO: KategoriRisiko[] = ['Rendah', 'Sedang', 'Tinggi'];
 const ALOKASI: Record<string, Partial<Record<Bucket, number>>> = {
+  'Manajemen (overhead)': { manajemen: 1 },
   'Merata': { storage: 0.4, handling_in: 0.3, handling_out: 0.3 },
   'Storage': { storage: 1 }, 'Handling in+out': { handling_in: 0.5, handling_out: 0.5 },
   'Inbound': { handling_in: 1 }, 'Outbound': { handling_out: 1 }, 'VAS': { vas: 1 },
@@ -67,8 +68,10 @@ function AlatInput({ value, onChange, ...rest }: { value: string[]; onChange: (v
 /** Isi satu baris aktivitas dari database produktivitas (dipakai saat tambah & saat ganti pilihan aktivitas). */
 const dariProd = (p: Prod) => ({ productivityId: p.id, aktivitas: p.aktivitas, tahap: p.tahap, tool: p.tool, roleName: p.role_name, uom: p.uom,
   prodPerJam: Number(p.prod_per_jam), arus: (p.tahap.toLowerCase().startsWith('outbound') ? 'outbound' : p.tahap.toLowerCase().startsWith('inventory') ? 'storage' : 'inbound') as Arus });
-const namaAlokasi = (a?: Partial<Record<Bucket, number>>) =>
-  Object.entries(ALOKASI).find(([, v]) => JSON.stringify(v) === JSON.stringify(a ?? ALOKASI.Merata))?.[0] ?? 'Merata';
+/** Nama preset alokasi; kosong = Manajemen (sama dengan default engine untuk peran tetap) */
+const kunciAlokasi = (a: Partial<Record<Bucket, number>>) => Object.entries(a).filter(([, v]) => Number(v) > 0).sort(([x], [y]) => x.localeCompare(y)).map(([k, v]) => `${k}:${Number(v)}`).join('|');
+const namaAlokasi = (a?: Partial<Record<Bucket, number>>) => !a || !Object.keys(a).length ? 'Manajemen (overhead)'
+  : Object.entries(ALOKASI).find(([, v]) => kunciAlokasi(v) === kunciAlokasi(a))?.[0] ?? 'Manajemen (overhead)';
 
 export default function TenderPage() {
   const { id } = useParams<{ id: string }>();
@@ -437,24 +440,48 @@ export default function TenderPage() {
         </>}
         <div className="card">
           <h2><T>Indirect & peran tetap</T></h2>
+          {(() => {
+            const shiftN = Math.max(1, t.jumlah_shift || 1);
+            const roleDirect = new Set(a.aktivitas.map(x => x.roleName));
+            const spvOpsi = jabatan.filter(isRoleSupervisor);
+            const spvList = spvOpsi.includes(a.roleSupervisor) || !a.roleSupervisor ? spvOpsi : [a.roleSupervisor, ...spvOpsi];
+            const tetapOpsi = (cur: string) => { const xs = jabatan.filter(j => !roleDirect.has(j)); return cur && !xs.includes(cur) ? [cur, ...xs] : xs; };
+            const spvManual = a.peranTetap.some(p => p.roleName === a.roleSupervisor);
+            const tambah = () => {
+              const pakai = new Set(a.peranTetap.map(p => p.roleName));
+              const role = tetapOpsi('').find(j => !pakai.has(j)) ?? tetapOpsi('')[0] ?? jabatan[0] ?? '';
+              setA({ peranTetap: [...a.peranTetap, { roleName: role, qty: 1, perShift: !isRoleSupervisor(role), alokasi: { manajemen: 1 } }] });
+            };
+            return <>
           <div className="grid3">
             <Num id="span" label="Span of control" suffix="direct per supervisor" value={a.spanOfControl} onChange={v => setA({ spanOfControl: v })} />
-            <Sel id="spv" label="Role supervisor" value={a.roleSupervisor} options={jabatan.map(j => ({ v: j, l: j }))} onChange={v => setA({ roleSupervisor: v })} />
+            <label className="f" htmlFor="spv">Role supervisor (hanya role SPV / Leader / Manager)
+              <select id="spv" value={a.roleSupervisor} onChange={e => setA({ roleSupervisor: e.target.value })}>
+                {spvList.map(j => <option key={j} value={j}>{j}{isRoleSupervisor(j) ? '' : ' — bukan role supervisor'}</option>)}</select></label>
             <label className="f" htmlFor="alat-spv">Alat pendukung supervisor
               <AlatInput id="alat-spv" value={a.alatSupervisor ?? []} onChange={v => setA({ alatSupervisor: v })} /></label>
           </div>
-          <p className="small muted">Supervisor dihitung otomatis = ROUNDUP(direct per shift ÷ span) × shift aktif — kecuali role supervisor sudah Anda isi di tabel peran tetap; maka jumlahnya mengikuti input Anda. Isi span 0 untuk mematikan perhitungan otomatis. Alat pendukung (mis. PC, HT, Scanner RDT) dihitung 1 unit per orang dan masuk ke MHE Summary serta Kebutuhan MHE. Pisahkan dengan koma.</p>
+          {!spvManual && a.spanOfControl > 0 && !isRoleSupervisor(a.roleSupervisor) && <p className="notice small" role="alert"><b>{a.roleSupervisor}</b> bukan role supervisi, tetapi sekarang jumlahnya dihitung dari span of control. Pilih role SPV/Leader di atas; untuk Security, QHSE, admin, dsb. masukkan di tabel peran tetap.</p>}
+          {!spvManual && a.spanOfControl > 0 && a.spanOfControl < 5 && <p className="notice small" role="alert">Span of control <b>{a.spanOfControl}</b> berarti 1 supervisor untuk setiap {a.spanOfControl} orang direct per shift — terlalu kecil. Umumnya 10–20.</p>}
+          <p className="small muted">Supervisor otomatis = ROUNDUP(direct per shift ÷ span) × shift aktif — kecuali role supervisor sudah diisi di tabel peran tetap (maka jumlahnya mengikuti input). Isi span 0 untuk mematikan perhitungan otomatis.
+            Peran tetap: isi <b>Headcount</b> lalu pilih <b>Basis</b> — <i>per shift</i> (mis. Security 1 orang/shift × {shiftN} shift = {shiftN} orang) atau <i>total</i> (mis. 1 Manager untuk seluruh gudang). Dropdown role hanya menampilkan role yang tidak dipakai sebagai direct di Aktivitas. Alat pendukung dihitung 1 unit per orang dan masuk MHE Summary; pisahkan dengan koma.</p>
           <div className="tablewrap"><table>
-            <thead><tr><th>Role</th><th className="num">Headcount</th><th>Alat pendukung</th><th>Alokasi</th><th></th></tr></thead>
+            <thead><tr><th>Role</th><th className="num">Headcount</th><th>Basis</th><th className="num">Total orang</th><th>Alat pendukung</th><th>Alokasi biaya</th><th></th></tr></thead>
             <tbody>{a.peranTetap.map((r, i) => (
               <tr key={i}>
-                <td><select aria-label="Role" value={r.roleName} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { roleName: e.target.value }) })}>{jabatan.map(j => <option key={j}>{j}</option>)}</select></td>
-                <td className="num"><input aria-label="Headcount" type="number" min={0} value={r.qty} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { qty: Number(e.target.value) }) })} /></td>
+                <td><select aria-label="Role" value={r.roleName} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { roleName: e.target.value }) })}>{tetapOpsi(r.roleName).map(j => <option key={j} value={j}>{j}</option>)}</select></td>
+                <td className="num"><input aria-label="Headcount" type="number" min={0} step={1} value={Number.isFinite(r.qty) ? r.qty : 0} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { qty: Math.max(0, Math.round(Number(e.target.value) || 0)) }) })} /></td>
+                <td><select aria-label="Basis headcount" value={r.perShift ? 'shift' : 'total'} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { perShift: e.target.value === 'shift' }) })}>
+                  <option value="total">Total</option><option value="shift">Per shift</option></select></td>
+                <td className="num"><b>{headcountTetap(r, shiftN)}</b>{r.perShift ? <div className="small muted">{r.qty} × {shiftN} shift</div> : null}</td>
                 <td><AlatInput aria-label={`Alat pendukung ${r.roleName}`} value={r.alat ?? []} onChange={v => setA({ peranTetap: ubahArray(a.peranTetap, i, { alat: v }) })} /></td>
-                <td><select aria-label="Alokasi" value={namaAlokasi(r.alokasi)} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { alokasi: ALOKASI[e.target.value] }) })}>{Object.keys(ALOKASI).map(k => <option key={k}>{k}</option>)}</select></td>
+                <td><select aria-label="Alokasi" value={namaAlokasi(r.alokasi)} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { alokasi: ALOKASI[e.target.value] }) })}>{Object.keys(ALOKASI).map(k => <option key={k} value={k}>{k}</option>)}</select></td>
                 <td><button className="danger" onClick={() => setA({ peranTetap: a.peranTetap.filter((_, j) => j !== i) })}>Hapus</button></td>
-              </tr>))}</tbody></table></div>
-          <div className="row"><button className="ghost" onClick={() => setA({ peranTetap: [...a.peranTetap, { roleName: jabatan[0] ?? '', qty: 1 }] })}>Tambah peran tetap</button></div>
+              </tr>))}
+              {!a.peranTetap.length && <tr><td colSpan={7} className="muted small">Belum ada peran tetap.</td></tr>}</tbody></table></div>
+          <div className="row"><button className="ghost" onClick={tambah} disabled={!jabatan.length}>Tambah peran tetap</button></div>
+            </>;
+          })()}
         </div>
         <div className="card">
           <h2><T>Aktivitas (VSM) & manpower</T></h2>

@@ -1,7 +1,7 @@
 // Process Design & Resource Calculation (mengikuti Excel Esa):
 // Volume/bln × % = workload → ÷ (produktivitas × faktor) = RfR (MH) → ÷ efisiensi = man hour
 // → ÷ jam tersedia per bulan (kalender Man Power / MHE) = FTE per resource → ROUNDUP = resources.
-import { pengaliEfektif, type AktivitasInput, type Arus, type VolumeInput } from './types';
+import { pengaliEfektif, headcountTetap, type AktivitasInput, type Arus, type VolumeInput } from './types';
 
 export interface KalenderResource {
   totalHari: number;       // 365
@@ -59,7 +59,7 @@ export function bebanAktif(beban: number[], jumlahShift: number) {
 /** Indirect (supervisor dari span of control) & peran tetap, beserta alat pendukungnya. */
 export interface IndirectInput {
   spanOfControl: number; roleSupervisor: string; alatSupervisor?: string[];
-  peranTetap: { roleName: string; qty: number; alat?: string[] }[];
+  peranTetap: { roleName: string; qty: number; perShift?: boolean; alat?: string[] }[];
 }
 
 /** Role non-karyawan: TKBM / kuli bongkar muat (borongan) dan Helper (daily worker) — tidak bisa multi-skill. */
@@ -199,7 +199,8 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   const spv = indirect && !spvManual && indirect.spanOfControl > 0 && directPerShift > 0 ? Math.ceil(directPerShift / indirect.spanOfControl) * shiftAktif : 0;
   const indirectRows = indirect ? [
     ...(spv ? [{ nama: indirect.roleSupervisor, ket: `Span 1:${indirect.spanOfControl}`, qty: spv, alat: (indirect.alatSupervisor ?? []).filter(Boolean) }] : []),
-    ...indirect.peranTetap.map(r => ({ nama: r.roleName, ket: 'Peran tetap', qty: Number(r.qty) || 0, alat: (r.alat ?? []).filter(Boolean) })),
+    ...indirect.peranTetap.map(r => ({ nama: r.roleName, ket: r.perShift ? `Peran tetap · ${Number(r.qty) || 0}/shift × ${shiftAktif} shift` : 'Peran tetap',
+      qty: headcountTetap(r, shiftAktif), alat: (r.alat ?? []).filter(Boolean) })),
   ] : [];
   for (const r of indirectRows) for (const nama of r.alat) {
     let e = mhe.find(x => x.nama === nama);
