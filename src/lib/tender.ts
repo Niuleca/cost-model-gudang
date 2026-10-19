@@ -1,5 +1,6 @@
 import { aktivitasDenganOrderAdmin, stokDariPalet } from '@/lib/profilVolume';
 import { volumeEfektif } from '@/lib/engine/types';
+import { VSM_DEFAULT } from '@/lib/vsmDefault';
 import { PD_DEFAULT, type ProcessDesignInput } from '@/lib/engine/processDesign';
 // Penghubung antara database (Supabase) dan mesin hitung.
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -90,8 +91,8 @@ export const ASUMSI_DEFAULT: Asumsi = {
     { arus: 'inbound', uom: 'palet', rataRataBulan: 0, peakBulan: 0, komitmenBulan: 0 },
     { arus: 'outbound', uom: 'palet', rataRataBulan: 0, peakBulan: 0, komitmenBulan: 0 },
   ],
-  aktivitas: [],
-  peranTetap: [{ roleName: 'Admin Inbound-Outbound', qty: 1, alokasi: { handling_in: 0.5, handling_out: 0.5 } }],
+  aktivitas: VSM_DEFAULT.map(x => ({ ...x })),
+  peranTetap: [],
   space: { metodeSimpan: 'spr', palletPanjangM: 1.2, palletLebarM: 1.0, levelSimpan: 4, faktorAisle: 1.0, stagingM2PerPalet: 1.8,
     sequencePerShift: 2, fasilitasM2: 60, allowancePersen: 0.1, tarifSewaM2Bulan: 0, hargaRakPerPosisi: 0, umurRakBulan: 120 },
   mhe: [], costLines: [], listrik: [],

@@ -120,8 +120,14 @@ export default function TenderPage() {
     if (stSinkron) row.status = stSinkron;
     row.asumsi = { ...ASUMSI_DEFAULT, ...(row.asumsi ?? {}) };
     row.asumsi.it = { ...IT_SHEET_DEFAULT, ...(row.asumsi.it ?? {}) };
+    // Tender baru / kosong: isi skema default VSM; buang peran tetap default lama "Admin Inbound-Outbound" (admin sudah dihitung di Aktivitas)
+    let disesuaikan = false;
+    if (!row.asumsi.historis && !(row.asumsi.aktivitas ?? []).length) { row.asumsi.aktivitas = skemaVsmDefault((p.data ?? []) as Prod[]); disesuaikan = true; }
+    const pt0 = row.asumsi.peranTetap ?? [];
+    const sisaPt = pt0.filter(r => !(r.roleName === 'Admin Inbound-Outbound' && Number(r.qty) === 1 && !(r.alat ?? []).length));
+    if (sisaPt.length !== pt0.length) { row.asumsi.peranTetap = sisaPt; disesuaikan = true; }
     riwayat.current = { lalu: [], depan: [], terakhir: 0 };
-    setT(row); setProds((p.data ?? []) as Prod[]); setItems((it.data ?? []) as Item[]); setTarif((tf.data ?? []) as Tarif[]);
+    setT(row); if (disesuaikan) setKotor(true); setProds((p.data ?? []) as Prod[]); setItems((it.data ?? []) as Item[]); setTarif((tf.data ?? []) as Tarif[]);
     setJabatan(((jb.data ?? []) as Jab[]).map(j => j.role_name));
     if (row.hasil) setHasil(row.hasil as HasilTender);
     if (row.asumsi.historis && !new URLSearchParams(window.location.search).get('tab')) setTab(TAB_EXCEL);
