@@ -1,6 +1,18 @@
 'use client';
 // Komponen input kecil untuk form tender.
+import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { useT } from '@/lib/i18n';
+
+/** Input angka yang boleh dikosongkan sementara saat mengetik (tidak langsung jadi "0") */
+export function AngkaInput({ value, onValue, bulat, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
+  value: number | undefined; onValue: (v: number) => void; bulat?: boolean;
+}) {
+  const [teks, setTeks] = useState(value == null || Number.isNaN(value) ? '' : String(value));
+  useEffect(() => { if (Number(teks) !== value || (teks === '' && value)) setTeks(value == null || Number.isNaN(value) ? '' : String(value)); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <input {...rest} type="number" inputMode="decimal" value={teks}
+    onChange={e => { const x = e.target.value; setTeks(x); if (x === '' || x === '-') return; const n = Number(x.replace(',', '.')); if (Number.isFinite(n)) onValue(bulat ? Math.round(n) : n); }}
+    onBlur={e => { if (e.target.value === '') { setTeks('0'); onValue(0); } rest.onBlur?.(e); }} />;
+}
 
 export function Num({ id, label, value, onChange, step = 'any', min, suffix, hint }: {
   id: string; label: string; value: number | undefined; onChange: (v: number) => void; step?: string; min?: number; suffix?: string; hint?: string;
@@ -8,7 +20,7 @@ export function Num({ id, label, value, onChange, step = 'any', min, suffix, hin
   const t = useT();
   return (
     <label className="f" htmlFor={id}>{t(label)}{suffix ? ` (${suffix})` : ''}
-      <input id={id} type="number" step={step} min={min} value={value ?? ''} onChange={e => onChange(e.target.value === '' ? 0 : Number(e.target.value))} />
+      <AngkaInput id={id} step={step} min={min} value={value} onValue={onChange} />
       {hint && <span className="small muted">{hint}</span>}
     </label>
   );

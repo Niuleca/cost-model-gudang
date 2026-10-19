@@ -6,7 +6,7 @@ import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
-import { Num, Pct, Txt, Sel, ubahArray } from '@/components/fields';
+import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
@@ -461,7 +461,12 @@ export default function TenderPage() {
             <label className="f" htmlFor="alat-spv">Alat pendukung supervisor
               <AlatInput id="alat-spv" value={a.alatSupervisor ?? []} onChange={v => setA({ alatSupervisor: v })} /></label>
           </div>
-          {!spvManual && a.spanOfControl > 0 && !isRoleSupervisor(a.roleSupervisor) && <p className="notice small" role="alert"><b>{a.roleSupervisor}</b> bukan role supervisi, tetapi sekarang jumlahnya dihitung dari span of control. Pilih role SPV/Leader di atas; untuk Security, QHSE, admin, dsb. masukkan di tabel peran tetap.</p>}
+          {!spvManual && a.spanOfControl > 0 && !isRoleSupervisor(a.roleSupervisor) && <p className="notice small" role="alert"><b>{a.roleSupervisor}</b> bukan role supervisi, tetapi sekarang jumlahnya dihitung dari span of control. Pilih role SPV/Leader di atas; untuk Security, QHSE, admin, dsb. masukkan di tabel peran tetap.
+            {' '}<button className="ghost" onClick={() => {
+              const lama = a.roleSupervisor; const spvBaru = spvOpsi.find(j => a.peranTetap.some(p => p.roleName === j)) ?? spvOpsi[0] ?? 'Operational SPV';
+              const tetap = a.peranTetap.some(p => p.roleName === lama) ? a.peranTetap : [...a.peranTetap, { roleName: lama, qty: 1, perShift: true, alokasi: { manajemen: 1 } }];
+              setA({ roleSupervisor: spvBaru, spanOfControl: a.spanOfControl < 5 ? 15 : a.spanOfControl, peranTetap: tetap });
+            }}>Perbaiki otomatis: {a.roleSupervisor} → peran tetap 1/shift, supervisor → {spvOpsi.find(j => a.peranTetap.some(p => p.roleName === j)) ?? spvOpsi[0] ?? 'Operational SPV'}{a.spanOfControl < 5 ? ', span 15' : ''}</button></p>}
           {!spvManual && a.spanOfControl > 0 && a.spanOfControl < 5 && <p className="notice small" role="alert">Span of control <b>{a.spanOfControl}</b> berarti 1 supervisor untuk setiap {a.spanOfControl} orang direct per shift — terlalu kecil. Umumnya 10–20.</p>}
           <p className="small muted">Supervisor otomatis = ROUNDUP(direct per shift ÷ span) × shift aktif — kecuali role supervisor sudah diisi di tabel peran tetap (maka jumlahnya mengikuti input). Isi span 0 untuk mematikan perhitungan otomatis.
             Peran tetap: isi <b>Headcount</b> lalu pilih <b>Basis</b> — <i>per shift</i> (mis. Security 1 orang/shift × {shiftN} shift = {shiftN} orang) atau <i>total</i> (mis. 1 Manager untuk seluruh gudang). Dropdown role hanya menampilkan role yang tidak dipakai sebagai direct di Aktivitas. Alat pendukung dihitung 1 unit per orang dan masuk MHE Summary; pisahkan dengan koma.</p>
@@ -470,7 +475,7 @@ export default function TenderPage() {
             <tbody>{a.peranTetap.map((r, i) => (
               <tr key={i}>
                 <td><select aria-label="Role" value={r.roleName} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { roleName: e.target.value }) })}>{tetapOpsi(r.roleName).map(j => <option key={j} value={j}>{j}</option>)}</select></td>
-                <td className="num"><input aria-label="Headcount" type="number" min={0} step={1} value={Number.isFinite(r.qty) ? r.qty : 0} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { qty: Math.max(0, Math.round(Number(e.target.value) || 0)) }) })} /></td>
+                <td className="num"><AngkaInput aria-label="Headcount" min={0} step={1} bulat value={r.qty} onValue={v => setA({ peranTetap: ubahArray(a.peranTetap, i, { qty: Math.max(0, v) }) })} /></td>
                 <td><select aria-label="Basis headcount" value={r.perShift ? 'shift' : 'total'} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { perShift: e.target.value === 'shift' }) })}>
                   <option value="total">Total</option><option value="shift">Per shift</option></select></td>
                 <td className="num"><b>{headcountTetap(r, shiftN)}</b>{r.perShift ? <div className="small muted">{r.qty} × {shiftN} shift</div> : null}</td>
