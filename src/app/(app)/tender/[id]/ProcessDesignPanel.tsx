@@ -23,7 +23,7 @@ export interface BiayaMpProps {
 
 export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift, biaya }: {
   biaya?: BiayaMpProps;
-  bagian: 'ringkasan' | 'rincian' | 'desain';
+  bagian: 'ringkasan' | 'rincian' | 'desain' | 'matriks';
   indirect?: IndirectInput;
   aktivitas: AktivitasInput[]; volumes: VolumeInput[]; pd?: ProcessDesignInput; faktorProduktivitas: number; efisiensi: number;
   jumlahShift: number;
@@ -221,6 +221,11 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
       </table></div>
     </div>);
 
+  if (bagian === 'matriks') return h.mp.length < 2 ? null : (
+    <div className="card" style={{ gap: 10 }}>
+      <MatriksRangkap roles={h.mp.map(r => r.nama)} matriks={pd.rangkap} onChange={rangkap => onPd({ ...pd, rangkap })} />
+    </div>);
+
   return (
     <div className="card" style={{ gap: 14 }}>
       <h2><T>Process Design & Resource Calculation</T></h2>
@@ -263,12 +268,12 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
                 <tr><td>Efficiency</td><td className="num">{inp(Math.round(efisiensi * 1000) / 10, v => onFaktor({ efisiensi: v / 100 }))}%</td></tr>
                 <tr><td>Operating (alat dipakai bergantian)<div className="small muted">otomatis = jumlah shift aktif</div></td><td className="num"><b>{h.operating}</b></td></tr>
               </tbody></table>
-              <p className="small muted" style={{ marginTop: 6 }}>Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling sesuai matriks rangkap di bawah. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
+              <p className="small muted" style={{ marginTop: 6 }}>Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling sesuai matriks rangkap di tab Aktivitas & manpower. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
             </div>
           </div>
         </div>
       </div>
-      <MatriksRangkap roles={h.mp.map(r => r.nama)} matriks={pd.rangkap} onChange={rangkap => onPd({ ...pd, rangkap })} />
+      <p className="small muted">Matriks multi-skill (siapa boleh merangkap siapa) ada di tab <b>Aktivitas & manpower</b>.</p>
     </div>
   );
 }

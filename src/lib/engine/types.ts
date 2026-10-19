@@ -67,6 +67,7 @@ export interface AktivitasInput {
   pengaliUom: number;       // konversi uom arus -> uom aktivitas
   alatTambahan?: string[];  // alat pendukung (mis. Scanner RDT) — dihitung FTE-nya di process design
   volumeManual?: number | null; // override volume per bulan (sebelum %); kosong = peak arus × pengali
+  porsiMuat?: { proses: 'unloading' | 'putaway' | 'replenishment' | 'picking' | 'loading'; muat: 'palet' | 'loose' | 'semua' }; // % volume ikut porsi palletize/loose
 }
 
 /** Volume efektif: Peak kosong → rata-rata (lalu komitmen); Komitmen kosong → rata-rata (lalu peak). Input asli tidak diubah. */

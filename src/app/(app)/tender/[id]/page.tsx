@@ -7,7 +7,8 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
-import { skemaVsmDefault, VSM_DEFAULT } from '@/lib/vsmDefault';
+import { skemaVsmDefault, VSM_DEFAULT, tagDariDefault } from '@/lib/vsmDefault';
+import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
@@ -125,6 +126,7 @@ export default function TenderPage() {
     // Tender baru / kosong: isi skema default VSM; buang peran tetap default lama "Admin Inbound-Outbound" (admin sudah dihitung di Aktivitas)
     let disesuaikan = false;
     if (!row.asumsi.historis && !(row.asumsi.aktivitas ?? []).length) { row.asumsi.aktivitas = skemaVsmDefault((p.data ?? []) as Prod[]); disesuaikan = true; }
+    row.asumsi.aktivitas = tagDariDefault(row.asumsi.aktivitas ?? []);
     const pt0 = row.asumsi.peranTetap ?? [];
     const sisaPt = pt0.filter(r => !(r.roleName === 'Admin Inbound-Outbound' && Number(r.qty) === 1 && !(r.alat ?? []).length));
     if (sisaPt.length !== pt0.length) { row.asumsi.peranTetap = sisaPt; disesuaikan = true; }
@@ -240,7 +242,7 @@ export default function TenderPage() {
     const v = (ar: Arus) => paletEkuivalen(volumeEfektif(t.asumsi.volumes).find(x => x.arus === ar)).palet;
     return hitungSpaceExcel(lengkapiSpaceExcel(t.asumsi.space.excel), v('storage'), v('inbound'), v('outbound'), t.jumlah_shift);
   }, [t]);
-  const pdFull = useMemo(() => t ? hitungProcessDesign(aktivitasDenganOrderAdmin(t.asumsi.aktivitas, volumeEfektif(t.asumsi.volumes), t.asumsi.profilVolume, t.asumsi.processDesign?.hariKerjaBulan ?? 25), volumeEfektif(t.asumsi.volumes), { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
+  const pdFull = useMemo(() => t ? hitungProcessDesign(aktivitasDenganOrderAdmin(terapkanPorsiMuat(t.asumsi.aktivitas, t.asumsi.porsiMuat), volumeEfektif(t.asumsi.volumes), t.asumsi.profilVolume, t.asumsi.processDesign?.hariKerjaBulan ?? 25), volumeEfektif(t.asumsi.volumes), { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
     t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift,
     { spanOfControl: t.asumsi.spanOfControl, roleSupervisor: t.asumsi.roleSupervisor, alatSupervisor: t.asumsi.alatSupervisor, peranTetap: t.asumsi.peranTetap }) : null, [t]);
   const pdMhe = pdFull?.mhe ?? [];
@@ -252,7 +254,7 @@ export default function TenderPage() {
   const a = t.asumsi;
   const hariOps = a.processDesign?.hariKerjaBulan ?? 25;
   const volEf = volumeEfektif(a.volumes);
-  const aktEf = aktivitasDenganOrderAdmin(a.aktivitas, volEf, a.profilVolume, hariOps);
+  const aktEf = aktivitasDenganOrderAdmin(terapkanPorsiMuat(a.aktivitas, a.porsiMuat), volEf, a.profilVolume, hariOps);
   const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, batasUpahPensiun: masterMp?.payroll.batasUpahJp || PARAM_BIAYA_MP_DEFAULT.batasUpahPensiun, batasUpahKs: masterMp?.payroll.batasUpahKes || PARAM_BIAYA_MP_DEFAULT.batasUpahKs, ...(a.paramBiayaMp ?? {}) };
   const qtyRole = new Map<string, number>();
   for (const r of pdFull?.mp ?? []) if (r.resources > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.resources);
@@ -348,6 +350,31 @@ export default function TenderPage() {
           </div>
         </div>
       )}
+      {tab === 'Key assumption' && (() => {
+        const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };
+        const dipakai = (pr: string) => a.aktivitas.filter(x => x.porsiMuat?.proses === pr);
+        return <div className="card">
+          <h2><T>Workload palletize vs loose</T></h2>
+          <p className="small muted">Porsi volume yang ditangani <b>palletize</b> vs <b>loose</b> (curah / case) per proses. Aktivitas di tab Aktivitas & manpower yang kolom % volume-nya "Ikut porsi" otomatis memakai angka ini.
+            Replenishment dihitung dari volume <b>case picking</b> (outbound × loose picking), lalu dibagi turun palet vs loose case.</p>
+          <div className="tablewrap"><table>
+            <thead><tr><th>Proses</th><th className="num">Palletize</th><th className="num">Loose</th><th>Keterangan</th><th>Aktivitas yang ikut</th></tr></thead>
+            <tbody>{PROSES_MUAT.map(p => {
+              const v = pm[p.v]; const xs = dipakai(p.v);
+              return <tr key={p.v}><td><b>{p.l}</b></td>
+                <td className="num"><div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}>
+                  <AngkaInput aria-label={`${p.l} palletize %`} min={0} max={100} step="any" value={Math.round(v * 1000) / 10} style={{ width: 70, minWidth: 70 }}
+                    onValue={n => setA({ porsiMuat: { ...pm, [p.v]: Math.min(100, Math.max(0, n)) / 100 } })} />%</div></td>
+                <td className="num"><b>{angka((1 - v) * 100, 1)}%</b></td>
+                <td className="small muted">{p.ket}{p.v === 'replenishment' && <> · basis {angka((1 - pm.picking) * 100, 1)}% outbound</>}</td>
+                <td className="small">{xs.length ? xs.map((x, k) => <div key={k}>{x.aktivitas} <span className="muted">({x.porsiMuat!.muat === 'palet' ? 'palletize' : x.porsiMuat!.muat} · {angka(persenDariPorsi(x.porsiMuat!, pm) * 100, 1)}%)</span></div>) : <span className="muted">belum ada aktivitas</span>}</td></tr>;
+            })}</tbody>
+          </table></div>
+          {a.porsiMuat && <div className="row"><button className="ghost" onClick={() => setA({ porsiMuat: undefined })}>Kembalikan ke default</button></div>}
+        </div>;
+      })()}
+      {tab === 'Key assumption' && <ProcessDesignPanel bagian="desain" aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />}
 
       {tab === 'Volume' && (
         <div className="card">
@@ -465,8 +492,9 @@ export default function TenderPage() {
             onInput={rincianBiayaMp => setA({ rincianBiayaMp })} onParam={p => setA({ paramBiayaMp: { ...(a.paramBiayaMp ?? {}), ...p } })} />
           <ProcessDesignPanel bagian="rincian" aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
-          <ProcessDesignPanel bagian="desain" aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          <ProcessDesignPanel bagian="matriks" aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
+          <p className="small muted">Working day, workload shift, dan faktor produktivitas ada di tab <b>Key assumption</b>.</p>
         </>}
         <div className="card">
           <h2><T>Indirect & peran tetap</T></h2>
@@ -586,7 +614,13 @@ export default function TenderPage() {
                     onChange={e => ub({ volumeManual: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 96, minWidth: 96 }} />
                     {ef?.volumeDariProfil && <div className="small muted" title="Order admin dari Profil order (tab Volume): mobil/hari × input admin per mobil × hari operasional">auto dari profil order</div>}
                     {!ef?.volumeDariProfil && isAktivitasAdmin(x) && x.volumeManual == null && <div className="small muted" title="Isi Profil order di tab Volume agar volume admin terisi otomatis">isi profil order</div>}</td>
-                  <td className="num"><input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>
+                  <td className="num">{x.porsiMuat
+                    ? <div title="Ikut porsi palletize/loose di Key assumption"><b>{angka(persenDariPorsi(x.porsiMuat, a.porsiMuat) * 100, 1)}%</b></div>
+                    : <input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} />}
+                    <select aria-label="Sumber % volume" value={x.porsiMuat ? `${x.porsiMuat.proses}:${x.porsiMuat.muat}` : ''} style={{ minWidth: 150, marginTop: 4 }}
+                      onChange={e => { const o = OPSI_TAG.find(q => q.k === e.target.value); ub(o ? { porsiMuat: o.t } : { porsiMuat: undefined, persenVolume: x.porsiMuat ? persenDariPorsi(x.porsiMuat, a.porsiMuat) : x.persenVolume }); }}>
+                      <option value="">% manual</option>
+                      {OPSI_TAG.map(o => <option key={o.k} value={o.k}>Ikut porsi: {labelTag(o.t)}</option>)}</select></td>
                   <td className="num"><input aria-label="Pengali UoM" type="number" step="any" value={x.pengaliUom} onChange={e => ub({ pengaliUom: Number(e.target.value) })} title="Mis. 1 palet = 40 karton → 40. Biarkan 1 agar memakai konversi di tab Volume." style={{ width: 70, minWidth: 70 }} />
                     {(x.pengaliUom || 1) === 1 && pEf !== 1 && <div className="small muted" title="dari konversi di tab Volume">auto ×{angka(pEf)}</div>}
                     {vArus && faktorUom(vArus, x.uom) == null && (x.pengaliUom || 1) === 1 && <div className="small" style={{ color: 'var(--warn, #b45309)' }} title={`UoM ${x.uom} belum ada di konversi arus (${vArus.uom})`}>isi konversi</div>}</td>
