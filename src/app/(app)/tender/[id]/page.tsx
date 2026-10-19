@@ -302,7 +302,7 @@ export default function TenderPage() {
         {profile && (profile.role === 'admin' || profile.role === 'manager' || (t.created_by === profile.id && STATUS_DRAFT.includes(t.status))) && <HapusTender id={t.id} kode={t.kode ?? t.customer} customer={t.customer} />}
       </div>
 
-      <div className="tabs" role="tablist">
+      <div className="tabs tabs-beku" role="tablist">
         {([...(a.historis ? [TAB_EXCEL] : []), ...TABS.filter(x => x !== 'Export' || bolehExport(profile))] as ((typeof TABS)[number] | typeof TAB_EXCEL)[]).map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{tr(x)}</button>)}
       </div>
 
@@ -389,7 +389,13 @@ export default function TenderPage() {
             <tbody>{a.volumes.map((v, i) => (
               <tr key={i}>
                 <td><select aria-label="Arus" value={v.arus} style={{ minWidth: 130 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>
-                <td><select aria-label="UoM" value={v.uom} style={{ minWidth: 100 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { uom: e.target.value }) })}>{UOM.map(u => <option key={u}>{u}</option>)}</select></td>
+                <td><select aria-label="UoM" value={v.uom} style={{ minWidth: 100 }} onChange={e => {
+                  const u = e.target.value; const k0 = v.konversi;
+                  // pindah palet ↔ case: isi per palet ikut dibawa (1 palet = N case)
+                  const k1 = !k0 ? k0 : isCaseUom(u) && !isCaseUom(v.uom) && !k0.paletIsi && isCaseUom(k0.uom1) && k0.per1 > 0 ? { ...k0, paletIsi: k0.per1 }
+                    : !isCaseUom(u) && isCaseUom(v.uom) && /^pal/i.test(u) && (k0.paletIsi ?? 0) > 0 ? { ...k0, uom1: 'case', per1: k0.paletIsi! } : k0;
+                  setA({ volumes: ubahArray(a.volumes, i, { uom: u, ...(k1 ? { konversi: k1 } : {}) }) });
+                }}>{UOM.map(u => <option key={u}>{u}</option>)}</select></td>
                 {(['rataRataBulan', 'peakBulan', 'komitmenBulan'] as const).map(k => (
                   <td key={k} className="num"><AngkaInput aria-label={k} step="any" min={0} value={v[k]}
                     style={k !== 'rataRataBulan' && !(v[k] > 0) && v.rataRataBulan > 0 ? { borderColor: 'var(--bad, #c0392b)' } : undefined}
@@ -435,7 +441,11 @@ export default function TenderPage() {
             <thead><tr><th>Arus</th><th className="num">Per hari</th><th className="num">Per bulan</th><th className="num">Per tahun</th></tr></thead>
             <tbody>{volEf.map((v, i) => {
               const k = v.konversi; const p1 = k?.per1 || 0, p2 = k?.per2 || 0;
-              const sel = (x: number) => <>{angka(x, x < 100 && x % 1 ? 1 : 0)} {v.uom}{p1 > 0 && <div className="small">{angka(x * p1)} {k!.uom1}</div>}{p1 > 0 && p2 > 0 && <div className="small muted">{angka(x * p1 * p2)} {k!.uom2}</div>}</>;
+              const f = (x: number) => angka(x, x < 100 && x % 1 ? 1 : 0);
+              const sel = isCaseUom(v.uom)
+                // UoM case/karton: dibalik ke palet (1 palet = paletIsi case) + pcs (1 case = per2)
+                ? (x: number) => <>{f(x)} {v.uom}{(k?.paletIsi ?? 0) > 0 && <div className="small">{f(x / k!.paletIsi!)} palet</div>}{p2 > 0 && <div className="small muted">{angka(x * p2)} {k!.uom2}</div>}</>
+                : (x: number) => <>{f(x)} {v.uom}{p1 > 0 && <div className="small">{angka(x * p1)} {k!.uom1}</div>}{p1 > 0 && p2 > 0 && <div className="small muted">{angka(x * p1 * p2)} {k!.uom2}</div>}</>;
               const bln = Number(v[basisRingkas]) || 0;
               const stok = v.arus === 'storage';
               return <tr key={i}><td>{ARUS.find(o => o.v === v.arus)?.l ?? v.arus}{stok && <div className="small muted">stok tersimpan (posisi), bukan arus</div>}</td>
