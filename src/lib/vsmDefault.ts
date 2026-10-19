@@ -11,7 +11,7 @@ const tg = (proses: TagPorsi['proses'], muat: TagPorsi['muat']): TagPorsi => ({ 
 export const VSM_DEFAULT: Baris[] = [
   // Inbound — unloading: curah/loose oleh TKBM, atau palletize dengan forklift counterbalance
   b('Inbound - Receiving', 'Unloading curah / loose case (TKBM)', 'TKBM', 'Manual', 'karton', 350, 'inbound', 0.5, 2, tg('unloading', 'loose')),
-  b('Inbound - Receiving', 'Palletize barang curah (TKBM)', 'TKBM', 'Manual', 'karton', 300, 'inbound', 0.5, 9, tg('unloading', 'loose')),
+  b('Inbound - Receiving', 'Palletize barang curah (TKBM)', 'TKBM', 'Manual', 'karton', 300, 'inbound', 0.5, undefined, tg('unloading', 'loose')),
   b('Inbound - Receiving', 'Unloading palet (forklift counterbalance)', 'Operator Forklift (CBT)', 'CBT', 'palet', 40, 'inbound', 0.5, 1, tg('unloading', 'palet')),
   b('Inbound - Receiving', 'Admin inbound — proses receiving (dokumen & GR)', 'Inbound Admin', 'PC', 'order', 30, 'inbound', 1, 15),
   b('Inbound - Receiving', 'Checker inbound — checking barang & isi tally sheet', 'Checker', 'Manual', 'palet', 60, 'inbound', 1, 5),
@@ -44,7 +44,8 @@ export const VSM_DEFAULT: Baris[] = [
 export function skemaVsmDefault(prods: { id: number; prod_per_jam: number | string; role_name: string; tool: string; uom: string }[]): Baris[] {
   return VSM_DEFAULT.map(x => {
     const p = x.productivityId ? prods.find(y => y.id === x.productivityId) : undefined;
-    return p ? { ...x, prodPerJam: Number(p.prod_per_jam) || x.prodPerJam } : { ...x };
+    // role, tool, UoM & produktivitas mengikuti database Productivity (nama aktivitas tetap versi prosedur)
+    return p ? { ...x, prodPerJam: Number(p.prod_per_jam) || x.prodPerJam, roleName: p.role_name || x.roleName, tool: p.tool || x.tool, uom: p.uom || x.uom } : { ...x };
   });
 }
 

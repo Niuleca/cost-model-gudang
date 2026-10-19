@@ -572,6 +572,21 @@ export default function TenderPage() {
               <span className="muted">Bisa di-Undo.</span>
             </div>
           </div>
+          {(() => {
+            // Aktivitas yang diambil dari database Productivity tetapi data di database sudah berubah (role, tool, UoM, produktivitas)
+            const beda = a.aktivitas.map((x, i) => ({ x, i, p: x.productivityId ? prods.find(q => q.id === x.productivityId) : undefined }))
+              .filter(o => o.p && (o.p.role_name !== o.x.roleName || o.p.tool !== o.x.tool || o.p.uom !== o.x.uom || Number(o.p.prod_per_jam) !== Number(o.x.prodPerJam)));
+            if (!beda.length) return null;
+            const contoh = Array.from(new Set(beda.filter(o => o.p!.role_name !== o.x.roleName).map(o => `${o.x.roleName} → ${o.p!.role_name}`))).slice(0, 4);
+            return <div className="notice small" role="status" style={{ display: 'grid', gap: 6 }}>
+              <div><b>{beda.length} aktivitas berbeda dengan database Productivity</b> (data di tender adalah salinan saat aktivitas ditambahkan).
+                {contoh.length > 0 && <> Role: {contoh.join(' · ')}.</>} Klik sinkronkan agar role, equipment, UoM & produktivitas mengikuti database; volume, %, arus, porsi & urutan tidak berubah.</div>
+              <div className="row"><button className="ghost" onClick={() => setA({ aktivitas: a.aktivitas.map(x => {
+                const p = x.productivityId ? prods.find(q => q.id === x.productivityId) : undefined;
+                return p ? { ...x, roleName: p.role_name, tool: p.tool, uom: p.uom, prodPerJam: Number(p.prod_per_jam) } : x;
+              }) })}>Sinkronkan {beda.length} aktivitas dengan database</button><span className="muted">Bisa di-Undo.</span></div>
+            </div>;
+          })()}
           <TambahAktivitas prods={prods} industri={t.industri} onTambah={p => setA({ aktivitas: [...a.aktivitas, { ...dariProd(p), persenVolume: 1, pengaliUom: 1 }] })} />
           <div className="row">
             <button className="ghost" onClick={() => setA({ aktivitas: [...a.aktivitas, { aktivitas: 'Aktivitas baru', tahap: a.aktivitas.at(-1)?.tahap ?? 'Inbound', tool: 'Manual', roleName: jabatan[0] ?? '',
@@ -616,7 +631,8 @@ export default function TenderPage() {
                   <td><input aria-label="Alat pendukung" list="dl-tool" placeholder="mis. Scanner RDT" value={(x.alatTambahan ?? []).join(', ')}
                     onChange={e => ub({ alatTambahan: e.target.value.split(',').map(t => t.trimStart()) })} onBlur={e => ub({ alatTambahan: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })} style={{ minWidth: 130 }} /></td>
                   <td><select aria-label="Role" value={x.roleName} onChange={e => ub({ roleName: e.target.value })} style={{ minWidth: 160 }}>
-                    {(jabatan.includes(x.roleName) ? jabatan : [x.roleName, ...jabatan]).map(j => <option key={j}>{j}</option>)}</select></td>
+                    {(() => { const semua = Array.from(new Set([...jabatan, ...prods.map(q => q.role_name).filter(Boolean)])).sort(); return (semua.includes(x.roleName) ? semua : [x.roleName, ...semua]); })().map(j => <option key={j}>{j}</option>)}</select>
+                    {x.roleName && jabatan.length > 0 && !jabatan.includes(x.roleName) && <div className="small" style={{ color: 'var(--warn, #b45309)' }} title="Tambahkan role ini di master Jabatan (job level) agar faktor UMK & tunjangan sesuai">belum ada di master Jabatan</div>}</td>
                   <td className="num db"><input aria-label="Produktivitas" type="number" step="any" value={x.prodPerJam} onChange={e => ub({ prodPerJam: Number(e.target.value) })} style={{ width: 80, minWidth: 80 }} /></td>
                   <td><select aria-label="UoM" value={x.uom} style={{ minWidth: 100 }} onChange={e => ub({ uom: e.target.value })}>{(UOM.includes(x.uom) ? UOM : [x.uom, ...UOM]).map(u => <option key={u}>{u}</option>)}</select></td>
                   <td><select aria-label="Arus" value={x.arus} style={{ minWidth: 130 }} title="Alur barang: inbound (masuk), outbound (keluar), storage (penyimpanan), VAS" onChange={e => ub({ arus: e.target.value as Arus })}>{ARUS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select></td>
