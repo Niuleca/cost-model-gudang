@@ -17,7 +17,9 @@ export interface ProcessDesignInput {
   mp: KalenderResource;
   mhe: KalenderResource;
   operatingAlat: number;   // alat dipakai bergantian oleh N shift/grup
-  bebanShift: number[];    // porsi workload shift 1..3
+  bebanShift: number[];    // porsi workload shift 1..3 (storage/VAS & default bila inbound/outbound kosong)
+  bebanShiftInbound?: number[];   // porsi workload inbound per shift
+  bebanShiftOutbound?: number[];  // porsi workload outbound per shift
   /** Matriks multi-skill per tender: role perangkap → daftar role yang boleh ia rangkap. Kosong = pakai aturan default. */
   rangkap?: Record<string, string[]>;
   hariKerjaBulan?: number;     // working days (operasional gudang) per bulan — informasi tabel workload shift
@@ -102,8 +104,15 @@ export function bolehRangkap(perangkap: string, dirangkap: string, matriks?: Rec
 export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: VolumeInput[], pd: ProcessDesignInput,
   faktorProduktivitas: number, efisiensi: number, jumlahShift: number, indirect?: IndirectInput) {
   const kalMp = hitungKalenderResource(pd.mp), kalMhe = hitungKalenderResource(pd.mhe);
-  const beban = bebanAktif(pd.bebanShift, jumlahShift);
-  const operatingAuto = Math.max(1, beban.filter(w => w > 0).length || Math.min(3, Math.max(1, jumlahShift)));
+  // Workload per shift per arus: inbound & outbound bisa berbeda; storage/VAS memakai bebanShift umum
+  const bebanArus: Record<Arus, number[]> = {
+    inbound: bebanAktif(pd.bebanShiftInbound ?? pd.bebanShift, jumlahShift),
+    outbound: bebanAktif(pd.bebanShiftOutbound ?? pd.bebanShift, jumlahShift),
+    storage: bebanAktif(pd.bebanShift, jumlahShift), vas: bebanAktif(pd.bebanShift, jumlahShift),
+  };
+  let beban = bebanArus.storage;   // diganti gabungan tertimbang man hour setelah baris dihitung
+  const aktifUnion = beban.map((_, si) => (Object.values(bebanArus).some(b => (b[si] ?? 0) > 0) ? 1 : 0) as number);
+  const operatingAuto = Math.max(1, aktifUnion.filter(w => w > 0).length || Math.min(3, Math.max(1, jumlahShift)));
   const baris: BarisPD[] = [];
   aktivitas.forEach((a, i) => {
     const v = volumes.find(x => x.arus === a.arus);
@@ -139,6 +148,10 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
       resources: x.fte <= 0 ? 0 : jenis === 'Man Power' ? 0 : Math.ceil(x.fte - 1e-9),
     }));
   };
+  const jamArus: Record<Arus, number> = { inbound: 0, outbound: 0, storage: 0, vas: 0 };
+  for (const b of baris) jamArus[b.arus] += b.manHour;
+  const totJam = Object.values(jamArus).reduce((x, y) => x + y, 0);
+  if (totJam > 0) beban = beban.map((_, si) => (Object.keys(jamArus) as Arus[]).reduce((x, a) => x + (jamArus[a] / totJam) * (bebanArus[a][si] ?? 0), 0));
   const mp = ringkas('Man Power'), mhe = ringkas('Equipment');
 
   // Man power: multi-skill pooling per shift aktif, mengikuti matriks rangkap.
@@ -151,7 +164,11 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
     const nShift = beban.filter(x => x > 0).length;
     const pre = nShift > 1 ? `Shift ${si + 1}: ` : '';
     const f2 = (x: number) => x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const urut = mp.map((r, i) => ({ i, v: r.fte * w })).filter(o => o.v > 1e-9);
+    // FTE role di shift ini = Σ per arus (FTE × porsi jam arus) × workload arus di shift ini
+    const fteShift = (r: typeof mp[number]) => r.manHour > 0
+      ? (Object.keys(r.jamPerArus) as Arus[]).reduce((x, a) => x + r.fte * (r.jamPerArus[a] / r.manHour) * (bebanArus[a][si] ?? 0), 0)
+      : r.fte * w;
+    const urut = mp.map((r, i) => ({ i, v: fteShift(r) })).filter(o => o.v > 1e-9);
     for (const o of urut) {
       const r = mp[o.i];
       if (isTkbm(r.nama)) {
@@ -209,7 +226,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
     e.unitIndirect += r.qty; e.resources += r.qty;
   }
   return {
-    kalender: { mp: kalMp, mhe: kalMhe }, beban, shiftAktifIdx: beban.map((w, i) => w > 0 ? i : -1).filter(i => i >= 0), operating: operatingAuto, baris, mp, mhe,
+    kalender: { mp: kalMp, mhe: kalMhe }, beban, bebanArus, shiftAktifIdx: beban.map((w, i) => w > 0 ? i : -1).filter(i => i >= 0), operating: operatingAuto, baris, mp, mhe,
     indirect: { spv, spvManual, directPerShift, rows: indirectRows, total: indirectRows.reduce((t, r) => t + r.qty, 0) },
     totalFteMp: mp.reduce((s, x) => s + x.fte, 0), totalMp: mp.reduce((s, x) => s + x.resources, 0),
     totalFteMhe: mhe.reduce((s, x) => s + x.fte, 0), totalMhe: mhe.reduce((s, x) => s + x.resources, 0),

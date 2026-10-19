@@ -90,6 +90,12 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
     </div>);
 
   const setBeban = (i: number, v: number) => { const b = [...pd.bebanShift]; while (b.length < 3) b.push(0); b[i] = v / 100; onPd({ ...pd, bebanShift: b }); };
+  type KunciBeban = 'bebanShiftInbound' | 'bebanShiftOutbound' | 'bebanShift';
+  const ambilBeban = (k: KunciBeban) => (k === 'bebanShift' ? pd.bebanShift : pd[k] ?? pd.bebanShift) ?? [];
+  const setBebanArus = (k: KunciBeban, i: number, v: number) => {
+    if (k === 'bebanShift') return setBeban(i, v);
+    const b = [...ambilBeban(k)]; while (b.length < 3) b.push(0); b[i] = v / 100; onPd({ ...pd, [k]: b });
+  };
 
   if (bagian === 'ringkasan') {
     // Man Power Summary = direct (process design) + indirect (supervisor) + peran tetap, dalam satu tabel
@@ -253,13 +259,24 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
                 <tr><td>Working Days</td><td className="num">{inp(pd.hariKerjaBulan ?? 25, v => onPd({ ...pd, hariKerjaBulan: v }))}</td><td></td></tr>
                 <tr><td>Working Days Employee</td><td className="num">{inp(pd.hariKerjaKaryawan ?? 25, v => onPd({ ...pd, hariKerjaKaryawan: v }))}</td><td></td></tr>
                 <tr><td>Group</td><td className="num">{inp(pd.group ?? 1, v => onPd({ ...pd, group: Math.max(1, v) }))}</td><td>Group</td></tr>
+              </tbody></table>
+              <h3 style={{ marginTop: 10 }}><T>Workload per shift</T></h3>
+              <table className="pd-shift"><thead><tr><th>Shift</th><th className="num">Inbound</th><th className="num">Outbound</th><th className="num" title="Storage (cycle count, replenishment) & VAS">Storage / VAS</th><th className="num" title="Gabungan tertimbang man hour per arus">Gabungan</th></tr></thead><tbody>
                 {[0, 1, 2].map(i => (
                   <tr key={i} style={i >= jumlahShift ? { opacity: 0.5 } : undefined}>
-                    {i === 0 && <td rowSpan={3} style={{ verticalAlign: 'middle' }}>Workload</td>}
-                    <td className="num">{inp(Math.round((pd.bebanShift[i] ?? 0) * 1000) / 10, v => setBeban(i, v))}%</td>
-                    <td>Shift {i + 1}{i < jumlahShift ? <span className="small muted"> · dipakai {pct(h.beban[i] ?? 0)}</span> : <span className="small muted"> · tidak aktif</span>}</td>
+                    <td>Shift {i + 1}</td>
+                    {(['bebanShiftInbound', 'bebanShiftOutbound', 'bebanShift'] as KunciBeban[]).map(k => {
+                      const b = ambilBeban(k);
+                      return <td key={k} className="num"><span style={{ whiteSpace: 'nowrap' }}>{inp(Math.round((b[i] ?? 0) * 1000) / 10, v => setBebanArus(k, i, v))}%</span></td>;
+                    })}
+                    <td className="num small">{i < jumlahShift ? <b>{pct(h.beban[i] ?? 0)}</b> : <span className="muted">tidak aktif</span>}</td>
                   </tr>))}
+                <tr className="small muted">{(() => {
+                  const tot = (k: KunciBeban) => ambilBeban(k).slice(0, jumlahShift).reduce((x, y) => x + (Number(y) || 0), 0);
+                  return <><td>Total</td>{(['bebanShiftInbound', 'bebanShiftOutbound', 'bebanShift'] as KunciBeban[]).map(k => <td key={k} className="num" style={Math.abs(tot(k) - 1) > 0.005 ? { color: 'var(--bad, #b91c1c)' } : undefined}>{pct(tot(k))}</td>)}<td /></>;
+                })()}</tr>
               </tbody></table>
+              <p className="small muted" style={{ marginTop: 4 }}>Inbound & outbound bisa berbeda per shift (mis. barang masuk pagi, pengiriman malam). Aktivitas per arus mengikuti porsinya; manpower per shift = Σ FTE arus × % shift. Total tiap kolom sebaiknya 100% (bila tidak, dinormalkan otomatis).</p>
             </div>
             <div style={{ minWidth: 0 }}>
               <h3><T>Faktor</T></h3>
