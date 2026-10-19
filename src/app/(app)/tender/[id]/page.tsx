@@ -194,7 +194,7 @@ export default function TenderPage() {
     const { master, catatan } = await muatMaster(sb, t);
     const h = hitungTender(keInput(t), master);
     for (const c of catatan) h.redFlags.push({ level: 'peringatan', kode: 'MASTER_DATA', pesan: c });
-    setHasil(h); setCatatanMaster(catatan); if (pindahTab) setTab('Hasil'); setPesan(pindahTab ? null : 'Dihitung ulang.'); if (!pindahTab) setTimeout(() => setPesan(null), 2000);
+    setHasil(h); setCatatanMaster(catatan); if (pindahTab) setTab('Hasil'); setPesan(pindahTab ? null : 'Dihitung ulang — hasil terbaru ada di tab Hasil.'); if (!pindahTab) setTimeout(() => setPesan(null), 3000);
   }
 
   async function simpanHasil() {
@@ -270,7 +270,7 @@ export default function TenderPage() {
         <button className="ghost" onClick={redo} disabled={!riwayat.current.depan.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷ {tr('Redo')}</button>
       </>}
       {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor}>{tr(kotor ? 'Simpan input' : 'Tersimpan')}</button>}
-      <button onClick={() => hitung()}>{tr('Hitung')}</button>
+      <button onClick={() => hitung(false)}>{tr('Hitung')}</button>
     </div>);
 
   return (
