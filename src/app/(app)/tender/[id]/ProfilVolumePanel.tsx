@@ -70,10 +70,11 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                     <div className="row small" style={{ flexWrap: 'nowrap', gap: 4, marginTop: 4 }}>{n(r.tonPerKontainer ? r.tonPerKontainer * 1000 : undefined, v => set(i, { tonPerKontainer: v ? v / 1000 : undefined }), 70, m ? String(Math.round(m.kap.ton * 1000)) : 'kg')}<span className="muted">kg maks/kont</span></div></>
                   : <select aria-label="Kendaraan" value={r.kendaraan ?? kendaraan[0].nama} onChange={e => set(i, { kendaraan: e.target.value })} style={{ minWidth: 150 }}>
                     {kendaraan.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('id-ID')} kg</option>)}</select>}</td>
-                <td className="num">{m ? <><b>{m.bulat}</b>{isKont && <div className="small">kontainer</div>}<div className="small muted">({angka(m.perHari, 2)}) · {angka(m.perBulan)}/bln</div></> : '–'}</td>
+                <td className="num">{m ? <><b>{m.bulat}</b>{isKont && <div className="small">kontainer</div>}<div className="small muted">({angka(m.perHari, 2)}) / hari</div><div className="small"><b>{angka(m.bulatBulan)}</b> / bln</div></> : '–'}</td>
                 <td className="small">{m && <>
+                  {mu !== 'palet' && m.casePerMobil > 0 && <div><b>{angka(m.casePerMobil)} case/{isKont ? 'kont' : 'mobil'}</b> <span className="muted">({m.kap.cbm} m³ × {Math.round(m.util * 100)}% ÷ {p.param.cbmPerCase})</span></div>}
                   {mu === 'palet' && <div>{angka(m.paletTrip, 1)} / {m.kap.palet} palet</div>}
-                  <div>CBM {angka(m.cbmTrip, 1)} / {m.kap.cbm} m³ <span className={`pill ${m.cbmCukup ? 'ok' : 'bad'}`}>{m.cbmCukup ? 'cukup' : 'tidak cukup'}</span></div>
+                  <div>CBM {angka(m.cbmTrip, 1)} / {angka(m.cbmEfektif, 1)} m³ <span className={`pill ${m.cbmCukup ? 'ok' : 'bad'}`}>{m.cbmCukup ? 'cukup' : 'tidak cukup'}</span></div>
                   <div>Berat {angka(m.tonTrip * 1000)} / {angka(m.kap.ton * 1000)} kg <span className={`pill ${m.tonCukup ? 'ok' : 'bad'}`}>{m.tonCukup ? 'cukup' : 'overload'}</span></div>
                   <div className="muted">pembatas: {m.pembatas === 'ton' ? 'berat' : m.pembatas}{mu === 'palet' && m.maksPaletCbm < m.kap.palet && ` · CBM hanya muat ${m.maksPaletCbm} palet`}</div>
                 </>}</td>
@@ -81,7 +82,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
               </tr>{m && (() => {
                 const trip = m.bulat || 1, cbm = m.cbmTrip * trip, kg = m.tonTrip * trip * 1000;
                 const cpp = r.casePerPalet || vp.cpp || 0, loose = mu !== 'palet';
-                const nP = loose ? 0 : (m.kap.palet > 0 ? x.paletHari / m.kap.palet : 0), nC = m.kap.cbm > 0 ? cbm / m.kap.cbm : 0, nT = m.kap.ton > 0 ? kg / (m.kap.ton * 1000) : 0;
+                const nP = loose ? 0 : (m.kap.palet > 0 ? x.paletHari / m.kap.palet : 0), nCbmEf = loose && m.casePerMobil > 0 && cpp > 0 ? x.paletHari * cpp / m.casePerMobil : m.cbmEfektif > 0 ? cbm / m.cbmEfektif : 0, nT = m.kap.ton > 0 ? kg / (m.kap.ton * 1000) : 0;
                 const tbl = (l: string, v: string, b?: boolean) => <tr><td>{l}</td><td className="num">{b ? <b>{v}</b> : v}</td></tr>;
                 const beda = loose && cpp > 0 && Math.abs(cpp * p.param.cbmPerCase - p.param.cbmPerPalet) > 0.01;
                 return <tr className="rumus-baris"><td colSpan={9}>
@@ -104,14 +105,18 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                       </tbody></table></div>
                       <div><b>3 · {isKont ? 'Kontainer' : 'Mobil'} per hari</b> <span className="muted">({m.kendaraan}: {m.kap.palet} plt · {m.kap.cbm} m³ · {angka(m.kap.ton * 1000)} kg)</span><table><tbody>
                         {tbl(`Palet: ${loose ? 'tidak dipakai (loose)' : `${angka(x.paletHari, 1)} ÷ ${m.kap.palet}`}`, loose ? '–' : angka(nP, 2), m.pembatas === 'palet')}
-                        {tbl(`CBM: ${angka(cbm, 1)} ÷ ${m.kap.cbm}`, angka(nC, 2), m.pembatas === 'cbm')}
+                        {tbl(`CBM efektif = ${m.kap.cbm} m³ × ${Math.round(m.util * 100)}% (toleransi ${Math.round((1 - m.util) * 100)}%)`, `${angka(m.cbmEfektif, 1)} m³`)}
+                        {loose && m.casePerMobil > 0
+                          ? <>{tbl(`Kapasitas = FLOOR(${angka(m.cbmEfektif, 1)} ÷ ${p.param.cbmPerCase} CBM/case)`, `${angka(m.casePerMobil)} case/${isKont ? 'kont' : 'mobil'}`, true)}
+                              {tbl(`CBM: ${angka(x.paletHari * cpp)} case ÷ ${angka(m.casePerMobil)}`, angka(nCbmEf, 2), m.pembatas === 'cbm')}</>
+                          : tbl(`CBM: ${angka(cbm, 1)} ÷ ${angka(m.cbmEfektif, 1)}`, angka(nCbmEf, 2), m.pembatas === 'cbm')}
                         {tbl(`Berat: ${angka(kg)} ÷ ${angka(m.kap.ton * 1000)}`, angka(nT, 2), m.pembatas === 'ton')}
                         {tbl(`Per hari = ROUNDUP(terbesar ${angka(m.perHari, 2)})`, `${m.bulat} ${isKont ? 'kontainer' : 'mobil'}`, true)}
-                        {tbl(`Per bulan = ${angka(m.perHari, 2)} × ${hariBulan} hari`, angka(m.perBulan))}
+                        {tbl(loose && m.casePerMobil > 0 ? `Per bulan = ${angka(m.qtyBulan)} case/bln ÷ ${angka(m.casePerMobil)} (ROUNDUP)` : `Per bulan = ROUNDUP(${angka(m.perHari, 2)} × ${hariBulan} hari)`, `${angka(m.bulatBulan)} ${isKont ? 'kontainer' : 'mobil'}`, true)}
                       </tbody></table></div>
                       <div><b>4 · Muatan per {isKont ? 'kontainer' : 'mobil'}</b><table><tbody>
                         {!loose && tbl(`Palet = ${angka(x.paletHari, 1)} ÷ ${trip}`, `${angka(m.paletTrip, 1)} / ${m.kap.palet}`)}
-                        {tbl(`CBM = ${angka(cbm, 1)} ÷ ${trip}`, `${angka(m.cbmTrip, 1)} / ${m.kap.cbm} m³`)}
+                        {tbl(`CBM = ${angka(cbm, 1)} ÷ ${trip}`, `${angka(m.cbmTrip, 1)} / ${angka(m.cbmEfektif, 1)} m³ efektif`)}
                         {tbl(`Berat = ${angka(kg)} ÷ ${trip}`, `${angka(m.tonTrip * 1000)} / ${angka(m.kap.ton * 1000)} kg`)}
                         {tbl('Pembatas', m.pembatas === 'ton' ? 'berat' : m.pembatas.toUpperCase(), true)}
                       </tbody></table></div>
@@ -146,6 +151,9 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
         <span className="small muted" style={{ alignSelf: 'center' }}>Muatan: <b>{(p.param.tonPerPalet * 1000).toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerPalet.toLocaleString('id-ID')} CBM</b> per palet ·
           {' '}<b>{p.param.kgPerCase.toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerCase.toLocaleString('id-ID')} CBM</b> per case — diatur di <b>Parameter muatan</b> di atas</span>
         <label className="f" title="Inbound: barang masuk + put away; outbound: picking + barang keluar">Input admin per mobil {n(p.param.inputAdminPerMobil ?? 2, v => setParam('inputAdminPerMobil', v), 90)}</label>
+        <label className="f" title="CBM efektif = CBM kendaraan × pemakaian; sisanya toleransi (ruang tidak terpakai)">Pemakaian ruang muat (CBM)
+          <span className="row" style={{ flexWrap: 'nowrap', gap: 2 }}>{n(Math.round((p.param.utilCbm ?? 0.9) * 1000) / 10, v => setParam('utilCbm', Math.min(100, Math.max(1, v)) / 100), 70)}%
+            <span className="small muted"> · toleransi {Math.round((1 - (p.param.utilCbm ?? 0.9)) * 1000) / 10}%</span></span></label>
         <span className="small muted">Hari operasional {hariBulan}/bln (Working Days di Process Design)</span>
       </div>
       {bagian('inbound')}

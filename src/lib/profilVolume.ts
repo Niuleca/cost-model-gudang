@@ -52,7 +52,8 @@ export interface BarisProfil {
   qty?: number;
 }
 /** Parameter muatan (satu sumber untuk profil order & tarif storage alternatif). tonPerPalet disimpan dalam ton, ditampilkan sebagai kg. */
-export interface ParamProfil { tonPerPalet: number; cbmPerPalet: number; cbmPerCase: number; kgPerCase: number; literPerPalet?: number; inputAdminPerMobil?: number }
+export interface ParamProfil { tonPerPalet: number; cbmPerPalet: number; cbmPerCase: number; kgPerCase: number; literPerPalet?: number; inputAdminPerMobil?: number;
+  /** Pemakaian ruang muat (CBM efektif = CBM kendaraan × utilisasi; sisanya toleransi) — default 90% */ utilCbm?: number }
 export interface ProfilVolume {
   inbound: BarisProfil[];
   outbound: BarisProfil[];
@@ -60,7 +61,7 @@ export interface ProfilVolume {
   basis?: BasisVolume;
   kendaraan?: Kendaraan[];
 }
-export const PARAM_DEFAULT: ParamProfil = { tonPerPalet: 0.8, cbmPerPalet: 1.5, cbmPerCase: 0.04, kgPerCase: 12, inputAdminPerMobil: 2 };
+export const PARAM_DEFAULT: ParamProfil = { tonPerPalet: 0.8, cbmPerPalet: 1.5, cbmPerCase: 0.04, kgPerCase: 12, inputAdminPerMobil: 2, utilCbm: 0.9 };
 
 const isCase = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes(u.trim().toLowerCase());
 
@@ -88,7 +89,9 @@ export function volumePalet(v: VolumeInput | undefined, basis: BasisVolume, para
 export interface HasilBaris {
   paletHari: number; qtyHari: number; satuan: string; ket: string;
   mobil?: { kendaraan: string; perHari: number; bulat: number; perBulan: number; pembatas: 'palet' | 'cbm' | 'ton';
-    paletTrip: number; cbmTrip: number; tonTrip: number; kap: Kendaraan; cbmCukup: boolean; tonCukup: boolean; maksPaletCbm: number };
+    paletTrip: number; cbmTrip: number; tonTrip: number; kap: Kendaraan; cbmCukup: boolean; tonCukup: boolean; maksPaletCbm: number;
+    /** utilisasi CBM, CBM efektif per mobil, kapasitas case per mobil (loose), qty per bulan & mobil per bulan dibulatkan */
+    util: number; cbmEfektif: number; casePerMobil: number; qtyBulan: number; bulatBulan: number };
 }
 
 export function hitungProfil(rows: BarisProfil[], paletHari: number, param: ParamProfil, kendaraan: Kendaraan[],
@@ -118,7 +121,12 @@ export function hitungProfil(rows: BarisProfil[], paletHari: number, param: Para
     if (k && palet > 0) {
       const loose = muatan !== 'palet';
       const nPalet = loose ? 0 : (k.palet > 0 ? palet / k.palet : 0);
-      const nCbm = k.cbm > 0 ? cbm / k.cbm : 0;
+      // Ruang muat dipakai util% (mis. 90%), sisanya toleransi. Loose case: kapasitas = FLOOR(CBM efektif ÷ CBM per case).
+      const util = Math.min(1, Math.max(0.01, param.utilCbm ?? 0.9));
+      const cbmEf = k.cbm * util;
+      const casePerMobil = loose && param.cbmPerCase > 0 ? Math.floor(cbmEf / param.cbmPerCase + 1e-9) : 0;
+      const casesHari = loose ? palet * cpp : 0;
+      const nCbm = loose && casePerMobil > 0 && cpp > 0 ? casesHari / casePerMobil : cbmEf > 0 ? cbm / cbmEf : 0;
       const nTon = k.ton > 0 ? ton / k.ton : 0;
       const top = [{ p: 'palet' as const, n: nPalet }, { p: 'cbm' as const, n: nCbm }, { p: 'ton' as const, n: nTon }].sort((a, b) => b.n - a.n)[0];
       const perHari = top.n;
@@ -126,8 +134,9 @@ export function hitungProfil(rows: BarisProfil[], paletHari: number, param: Para
       const trip = bulat || 1;
       h.mobil = { kendaraan: k.nama, perHari, bulat, perBulan: perHari * hariBulan, pembatas: top.p,
         paletTrip: loose ? 0 : palet / trip, cbmTrip: cbm / trip, tonTrip: ton / trip, kap: k,
-        cbmCukup: cbm / trip <= k.cbm + 1e-9, tonCukup: ton / trip <= k.ton + 1e-9,
-        maksPaletCbm: param.cbmPerPalet > 0 ? Math.floor(k.cbm / param.cbmPerPalet) : 0 };
+        cbmCukup: cbm / trip <= cbmEf + 1e-9, tonCukup: ton / trip <= k.ton + 1e-9,
+        maksPaletCbm: param.cbmPerPalet > 0 ? Math.floor(cbmEf / param.cbmPerPalet) : 0,
+        util, cbmEfektif: cbmEf, casePerMobil, qtyBulan: qty * hariBulan, bulatBulan: Math.ceil(perHari * hariBulan - 1e-9) };
       if (isKont) h.ket = `${ket} → ${f(cbm)} CBM · ${f(ton * 1000)} kg (kap. ${k.cbm} CBM · ${f(k.ton * 1000)} kg${loose ? '' : ` · ${k.palet} plt`})`;
     }
     return h;
