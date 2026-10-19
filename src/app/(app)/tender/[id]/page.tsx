@@ -104,6 +104,7 @@ export default function TenderPage() {
   const setKotor = (v: boolean) => { kotorAkhir.current = v; setKotorS(v); };
   const [pembuat, setPembuat] = useState<string | null>(null);
   const [konfirmVsm, setKonfirmVsm] = useState(false);
+  const seret = useRef<number | null>(null);
 
   const muat = useCallback(async () => {
     const [tr, p, it, tf, jb] = await Promise.all([
@@ -531,18 +532,30 @@ export default function TenderPage() {
           <datalist id="dl-tool">{TOOLS.concat(prods.map(p => p.tool), a.mhe.map(m => m.tool)).filter((v, k, xs) => v && xs.indexOf(v) === k).map(v => <option key={v} value={v} />)}</datalist>
           <datalist id="dl-tahap">{Array.from(new Set([...prods.map(p => p.tahap), ...a.aktivitas.map(x => x.tahap)])).map(v => <option key={v} value={v} />)}</datalist>
           <div className="tablewrap"><table className="akt-edit">
-            <thead><tr><th>Task / tahap</th><th>Aktivitas (workload driver)</th><th>Equipment</th><th>Alat pendukung</th><th>Role (man power)</th><th className="num">Prod/jam</th><th>UoM</th><th title="Alur barang yang menjadi dasar volume aktivitas">Arus (alur barang)</th>
+            <thead><tr><th title="Geser urutan: tombol ▲▼ atau seret nomor baris">Urutan</th><th>Task / tahap</th><th>Aktivitas (workload driver)</th><th>Equipment</th><th>Alat pendukung</th><th>Role (man power)</th><th className="num">Prod/jam</th><th>UoM</th><th title="Alur barang yang menjadi dasar volume aktivitas">Arus (alur barang)</th>
               <th className="num" title="Kosongkan untuk memakai volume peak arus × pengali">Volume/bln</th><th className="num">% volume</th><th className="num">Pengali UoM</th><th></th></tr></thead>
             <tbody>
-              {a.aktivitas.length === 0 && <tr><td colSpan={12} className="muted">Belum ada aktivitas. Tambahkan dari daftar di atas atau baris kosong.</td></tr>}
+              {a.aktivitas.length === 0 && <tr><td colSpan={13} className="muted">Belum ada aktivitas. Tambahkan dari daftar di atas atau baris kosong.</td></tr>}
               {a.aktivitas.map((x, i) => {
                 const ub = (patch: Partial<typeof x>) => setA({ aktivitas: ubahArray(a.aktivitas, i, patch) });
                 const vArus = volEf.find(v => v.arus === x.arus);
                 const pEf = pengaliEfektif(x, vArus);
                 const ef = aktEf[i];
                 const vAuto = ef?.volumeDariProfil ? Number(ef.volumeManual) : (vArus?.peakBulan ?? 0) * pEf;
+                const pindah = (dari: number, ke: number) => {
+                  if (ke < 0 || ke >= a.aktivitas.length || dari === ke) return;
+                  const xs = [...a.aktivitas]; const [m] = xs.splice(dari, 1); xs.splice(ke, 0, m); setA({ aktivitas: xs });
+                };
                 return (
-                <tr key={i}>
+                <tr key={i} onDragOver={e => { if (seret.current != null) e.preventDefault(); }}
+                  onDrop={e => { e.preventDefault(); if (seret.current != null) pindah(seret.current, i); seret.current = null; }}>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <div className="row" style={{ flexWrap: 'nowrap', gap: 2, alignItems: 'center' }}>
+                      <span draggable onDragStart={e => { seret.current = i; e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => { seret.current = null; }}
+                        title="Seret untuk memindah baris" style={{ cursor: 'grab', padding: '0 4px', fontWeight: 600 }}>⋮⋮ {i + 1}</span>
+                      <button className="ghost" style={{ padding: '2px 6px' }} aria-label={`Naikkan baris ${i + 1}`} title="Naikkan" disabled={i === 0} onClick={() => pindah(i, i - 1)}>▲</button>
+                      <button className="ghost" style={{ padding: '2px 6px' }} aria-label={`Turunkan baris ${i + 1}`} title="Turunkan" disabled={i === a.aktivitas.length - 1} onClick={() => pindah(i, i + 1)}>▼</button>
+                    </div></td>
                   <td><input aria-label="Tahap" list="dl-tahap" value={x.tahap} onChange={e => ub({ tahap: e.target.value })} style={{ minWidth: 140 }} /></td>
                   <td><select aria-label="Aktivitas" value={x.productivityId ? String(x.productivityId) : 'manual'} style={{ minWidth: 220 }}
                     onChange={e => { const p = prods.find(q => q.id === Number(e.target.value)); if (p) ub(dariProd(p)); }}>
