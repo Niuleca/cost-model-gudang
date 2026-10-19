@@ -134,7 +134,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
       x.fte += b.fte; x.manHour += b.manHour; x.jamPerArus[b.arus] += b.manHour; m.set(b.resource, x);
     }
     return Array.from(m.values()).map(x => ({
-      ...x, unitIndirect: 0, merangkap: [] as string[], dirangkap: false, tkbm: false, catatan: [] as string[], dirangkapOleh: [] as string[],
+      ...x, unitIndirect: 0, merangkap: [] as string[], dirangkap: false, tkbm: false, catatan: [] as string[], dirangkapOleh: [] as string[], perShift: beban.map(() => 0),
       // alat: dipakai bergantian antar shift → ROUNDUP(FTE). Man power dihitung dengan pooling di bawah.
       resources: x.fte <= 0 ? 0 : jenis === 'Man Power' ? 0 : Math.ceil(x.fte - 1e-9),
     }));
@@ -145,22 +145,21 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   // Tiap role dapat orang tetap = bagian bulat FTE. Sisa pecahan diurutkan dari terbesar; tiap sisa ditumpangkan ke
   // orang multi-skill yang masih punya kapasitas DAN boleh merangkap role itu (best fit); bila tidak ada → orang baru.
   // TKBM & Helper (non-karyawan) tidak ikut: tidak merangkap & tidak dirangkap → ROUNDUP sendiri.
-  for (const w of beban) {
-    if (w <= 0) continue;
+  beban.forEach((w, si) => {
+    if (w <= 0) return;
     const orang: { host: number; sisaKap: number }[] = [];
     const nShift = beban.filter(x => x > 0).length;
-    const si = beban.indexOf(w);
     const pre = nShift > 1 ? `Shift ${si + 1}: ` : '';
     const f2 = (x: number) => x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const urut = mp.map((r, i) => ({ i, v: r.fte * w })).filter(o => o.v > 1e-9);
     for (const o of urut) {
       const r = mp[o.i];
       if (isTkbm(r.nama)) {
-        const n = Math.ceil(o.v - 1e-9); r.resources += n; r.tkbm = true;
+        const n = Math.ceil(o.v - 1e-9); r.resources += n; r.perShift[si] += n; r.tkbm = true;
         r.catatan.push(`${pre}FTE ${f2(o.v)} → ROUNDUP = ${n} orang (non-karyawan, tidak merangkap & tidak dirangkap)`);
         continue;
       }
-      const d = Math.floor(o.v + 1e-9); r.resources += d;
+      const d = Math.floor(o.v + 1e-9); r.resources += d; r.perShift[si] += d;
       if (d > 0) r.catatan.push(`${pre}${d} orang tetap dari bagian bulat FTE ${f2(o.v)}`);
     }
     const pecahan = urut.filter(o => !isTkbm(mp[o.i].nama)).map(o => ({ i: o.i, x: o.v - Math.floor(o.v + 1e-9) }))
@@ -186,10 +185,10 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
             ? `belum ada orang lain yang bisa menampung; sisa waktunya ${f2(1 - f.x)} dipakai merangkap role lain (yang boleh merangkapnya di matriks: ${pengizin.join(', ')})`
             : `di matriks multi-skill tidak ada role yang boleh merangkapnya; sisa waktunya ${f2(1 - f.x)} dipakai merangkap role lain`;
         r.catatan.push(`${pre}+1 orang untuk sisa FTE ${f2(f.x)} — ${alasan}`);
-        orang.push({ host: f.i, sisaKap: 1 - f.x }); r.resources += 1;
+        orang.push({ host: f.i, sisaKap: 1 - f.x }); r.resources += 1; r.perShift[si] += 1;
       }
     }
-  }
+  });
 
   // Indirect: supervisor per shift aktif dari span of control + peran tetap; alat pendukung 1 unit per orang
   const shiftAktif = beban.filter(w => w > 0).length || 1;
@@ -198,17 +197,19 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
   const spvManual = !!indirect && indirect.peranTetap.some(r => r.roleName === indirect.roleSupervisor);
   const spv = indirect && !spvManual && indirect.spanOfControl > 0 && directPerShift > 0 ? Math.ceil(directPerShift / indirect.spanOfControl) * shiftAktif : 0;
   const indirectRows = indirect ? [
-    ...(spv ? [{ nama: indirect.roleSupervisor, ket: `Span 1:${indirect.spanOfControl}`, qty: spv, alat: (indirect.alatSupervisor ?? []).filter(Boolean) }] : []),
+    ...(spv ? [{ nama: indirect.roleSupervisor, ket: `Span 1:${indirect.spanOfControl}`, qty: spv, alat: (indirect.alatSupervisor ?? []).filter(Boolean),
+      perShift: beban.map(w => w > 0 ? spv / shiftAktif : 0) as number[] | null }] : []),
     ...indirect.peranTetap.map(r => ({ nama: r.roleName, ket: r.perShift ? `Peran tetap · ${Number(r.qty) || 0}/shift × ${shiftAktif} shift` : 'Peran tetap',
-      qty: headcountTetap(r, shiftAktif), alat: (r.alat ?? []).filter(Boolean) })),
+      qty: headcountTetap(r, shiftAktif), alat: (r.alat ?? []).filter(Boolean),
+      perShift: r.perShift ? beban.map(w => w > 0 ? Number(r.qty) || 0 : 0) : null as number[] | null })),
   ] : [];
   for (const r of indirectRows) for (const nama of r.alat) {
     let e = mhe.find(x => x.nama === nama);
-    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0, merangkap: [], dirangkap: false, tkbm: false, catatan: [], dirangkapOleh: [] }; mhe.push(e); }
+    if (!e) { e = { nama, fte: 0, manHour: 0, jamPerArus: { inbound: 0, outbound: 0, storage: 0, vas: 0 }, unitIndirect: 0, resources: 0, merangkap: [], dirangkap: false, tkbm: false, catatan: [], dirangkapOleh: [], perShift: beban.map(() => 0) }; mhe.push(e); }
     e.unitIndirect += r.qty; e.resources += r.qty;
   }
   return {
-    kalender: { mp: kalMp, mhe: kalMhe }, beban, operating: operatingAuto, baris, mp, mhe,
+    kalender: { mp: kalMp, mhe: kalMhe }, beban, shiftAktifIdx: beban.map((w, i) => w > 0 ? i : -1).filter(i => i >= 0), operating: operatingAuto, baris, mp, mhe,
     indirect: { spv, spvManual, directPerShift, rows: indirectRows, total: indirectRows.reduce((t, r) => t + r.qty, 0) },
     totalFteMp: mp.reduce((s, x) => s + x.fte, 0), totalMp: mp.reduce((s, x) => s + x.resources, 0),
     totalFteMhe: mhe.reduce((s, x) => s + x.fte, 0), totalMhe: mhe.reduce((s, x) => s + x.resources, 0),

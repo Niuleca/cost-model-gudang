@@ -94,6 +94,14 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
   if (bagian === 'ringkasan') {
     // Man Power Summary = direct (process design) + indirect (supervisor) + peran tetap, dalam satu tabel
     const ind = h.indirect.rows;
+    // Kolom per shift (hanya shift yang punya workload); peran tetap basis "total" tidak dibagi per shift
+    const sIdx: number[] = (h.shiftAktifIdx ?? []).length > 1 ? h.shiftAktifIdx : [];
+    const nS = sIdx.length;
+    const perShiftDirect = sIdx.map(si => h.mp.reduce((t2, r) => t2 + (r.perShift?.[si] ?? 0), 0));
+    const perShiftInd = sIdx.map(si => ind.reduce((t2, r) => t2 + (r.perShift?.[si] ?? 0), 0));
+    const nonShift = ind.filter(r => !r.perShift).reduce((t2, r) => t2 + r.qty, 0);
+    const selShift = (ps?: number[] | null, tebal = false) => sIdx.map(si => <td key={si} className="num">{ps ? (ps[si] ? (tebal ? <b>{ps[si]}</b> : ps[si]) : '–') : <span className="muted small">–</span>}</td>);
+    const colTot = 4 + nS + (biaya ? 2 : 0);
     const totInd = ind.reduce((t, r) => t + r.qty, 0);
     const totalOrang = h.totalMp + totInd;
     const perOrang = (role: string) => biaya?.perOrang(role) ?? 0;
@@ -104,30 +112,32 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
     const esk = biaya ? hitungEskalasi(biaya.persenTahun, biaya.kontrakBulan, biaya.mulai || biaya.mulaiDefault) : null;
     const dasarBln = totDirect + totIndirect;
     const n = Math.max(h.mp.length + ind.length + (ind.length ? 2 : 0), h.mhe.length, 1);
-    const sub = (l: string, fte: string, v: number, tot?: number) => <tr className="pd-sub"><td colSpan={2}><b>{l}</b></td><td className="num">{fte}</td><td className="num"><b>{v}</b></td>{biaya && <><td /><td className="num"><b>{tot ? rp(tot) : '–'}</b></td></>}</tr>;
+    const sub = (l: string, fte: string, v: number, tot?: number, ps?: number[]) => <tr className="pd-sub"><td colSpan={2}><b>{l}</b></td><td className="num">{fte}</td>{sIdx.map((si, k) => <td key={si} className="num"><b>{ps?.[k] ?? '–'}</b></td>)}<td className="num"><b>{v}</b></td>{biaya && <><td /><td className="num"><b>{tot ? rp(tot) : '–'}</b></td></>}</tr>;
     return (
       <div className="card" style={{ gap: 10 }}>
         <div className={`pd-dua${biaya ? " tumpuk" : ""}`}>
           <div style={{ minWidth: 0 }}>
             <h3><T>Man Power Summary</T></h3>
-            <div className="tablewrap"><table className={`pd-sum${biaya ? " pd-sum-biaya" : ""}`}>
-              <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th><th className="num">Resources</th>
+            <div className="tablewrap"><table className={`pd-sum${biaya ? " pd-sum-biaya" : ""}${nS ? " pd-sum-shift" : ""}`}>
+              <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th>
+                {sIdx.map(si => <th key={si} className="num">Shift {si + 1}<div className="small muted" style={{ fontWeight: 400 }}>orang</div></th>)}
+                <th className="num">Resources{nS > 0 && <div className="small muted" style={{ fontWeight: 400 }}>total</div>}</th>
                 {biaya && <><th className="num">Biaya/orang/bln<div className="small muted" style={{ fontWeight: 400 }}>incl. fee · ubah di Rincian biaya</div></th><th className="num">Total/bln</th></>}</tr></thead>
               <tbody>
-                {h.mp.length + ind.length === 0 && <tr><td colSpan={biaya ? 6 : 4} className="muted">–</td></tr>}
+                {h.mp.length + ind.length === 0 && <tr><td colSpan={colTot} className="muted">–</td></tr>}
                 {h.mp.map(r => {
                   const status = r.tkbm ? (/helper|daily|harian/i.test(r.nama) ? 'Daily worker' : 'TKBM')
                     : r.resources === 0 ? `Dirangkap ${r.dirangkapOleh.join(', ')}` : r.merangkap.length ? 'Direct · multi-skill' : r.dirangkap ? `Direct · sisa dirangkap ${r.dirangkapOleh.join(', ')}` : 'Direct';
                   return <tr key={`d-${r.nama}`}><td>{r.nama}{r.merangkap.length > 0 && <div className="small muted">merangkap: {r.merangkap.join(', ')}</div>}</td>
                     <td className="small"><b>{status}</b>{r.catatan.map((c, k) => <div key={k} className="muted">{c}</div>)}</td>
-                    <td className="num">{f2(r.fte)}{waktu(r.manHour)}</td><td className="num"><b>{r.resources || '–'}</b></td>{selBiaya(r.nama, r.resources)}</tr>;
+                    <td className="num">{f2(r.fte)}{waktu(r.manHour)}</td>{selShift(r.perShift)}<td className="num"><b>{r.resources || '–'}</b></td>{selBiaya(r.nama, r.resources)}</tr>;
                 })}
-                {ind.length > 0 && sub('Subtotal direct', f2(h.totalFteMp), h.totalMp, totDirect)}
+                {ind.length > 0 && sub('Subtotal direct', f2(h.totalFteMp), h.totalMp, totDirect, perShiftDirect)}
                 {ind.map((r, i) => <tr key={`i-${i}`}><td>{r.nama}{r.alat.length > 0 && <div className="small muted">alat: {r.alat.join(', ')}</div>}</td>
-                  <td className="small muted">{r.ket === 'Peran tetap' ? 'Peran tetap' : `Indirect · ${r.ket}`}</td><td className="num muted">–</td><td className="num"><b>{r.qty || '–'}</b></td>{selBiaya(r.nama, r.qty)}</tr>)}
-                {ind.length > 0 && sub('Subtotal indirect & peran tetap', '–', totInd, totIndirect)}
-                {Array.from({ length: Math.max(0, n - Math.max(1, h.mp.length + ind.length + (ind.length ? 2 : 0))) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={biaya ? 6 : 4}>&nbsp;</td></tr>)}
-                <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>Head Count</b></td><td className="num"><b>{f2(h.totalFteMp)}</b></td><td className="num"><b>{totalOrang}</b></td>{biaya && <><td /><td className="num"><b>{rp(totDirect + totIndirect)}</b></td></>}</tr>
+                  <td className="small muted">{r.ket.startsWith('Peran tetap') ? r.ket : `Indirect · ${r.ket}`}{nS > 0 && !r.perShift ? <div>non-shift (total, tidak dibagi per shift)</div> : null}</td><td className="num muted">–</td>{selShift(r.perShift)}<td className="num"><b>{r.qty || '–'}</b></td>{selBiaya(r.nama, r.qty)}</tr>)}
+                {ind.length > 0 && sub('Subtotal indirect & peran tetap', '–', totInd, totIndirect, perShiftInd)}
+                {Array.from({ length: Math.max(0, n - Math.max(1, h.mp.length + ind.length + (ind.length ? 2 : 0))) }, (_, i) => <tr key={`pad${i}`} aria-hidden="true"><td colSpan={colTot}>&nbsp;</td></tr>)}
+                <tr style={{ background: 'var(--link)' }}><td><b>Total</b></td><td className="small"><b>Head Count</b>{nS > 0 && nonShift > 0 ? <div className="muted">+ {nonShift} orang non-shift</div> : null}</td><td className="num"><b>{f2(h.totalFteMp)}</b></td>{sIdx.map((si, k) => <td key={si} className="num"><b>{perShiftDirect[k] + perShiftInd[k]}</b></td>)}<td className="num"><b>{totalOrang}</b></td>{biaya && <><td /><td className="num"><b>{rp(totDirect + totIndirect)}</b></td></>}</tr>
               </tbody>
             </table></div>
           </div>

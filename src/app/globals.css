@@ -275,3 +275,9 @@ tr.kat-link { cursor: pointer; }
 tr.kat-link:hover td { background: var(--res); }
 
 .panduan-btn { padding: 4px 10px; font-size: 13px; white-space: nowrap; text-decoration: none; }
+
+/* Man Power Summary dengan kolom per shift */
+.pd-sum.pd-sum-shift { table-layout: auto; min-width: 1060px; }
+.pd-sum.pd-sum-shift th { width: auto !important; }
+.pd-sum.pd-sum-shift th:nth-child(1) { width: 15% !important; } .pd-sum.pd-sum-shift th:nth-child(2) { width: 30% !important; }
+.pd-sum.pd-sum-shift td.num, .pd-sum.pd-sum-shift th.num { white-space: nowrap; }
