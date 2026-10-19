@@ -285,3 +285,8 @@ tr.kat-link:hover td { background: var(--res); }
 /* Freeze menu tab tender: tetap terlihat saat halaman di-scroll (di bawah topbar) */
 .tabs.tabs-beku { position: sticky; top: var(--tinggi-topbar, 58px); z-index: 40; box-shadow: 0 4px 12px rgba(0,0,0,.06); width: 100%; box-sizing: border-box; }
 @media (max-width: 760px) { .tabs.tabs-beku { position: static; box-shadow: none; } }
+
+/* Kolom % volume aktivitas: nilai di atas, sumber (manual / ikut porsi) di bawah, rata kanan dan lebar tetap */
+.sel-persen { display: grid; gap: 4px; justify-items: end; width: 190px; }
+.sel-persen .nilai { font-weight: 700; padding: 4px 0; }
+.sel-persen select { width: 190px; min-width: 190px; font-size: 12px; }

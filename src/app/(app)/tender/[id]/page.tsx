@@ -624,15 +624,17 @@ export default function TenderPage() {
                     onChange={e => ub({ volumeManual: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 96, minWidth: 96 }} />
                     {ef?.volumeDariProfil && <div className="small muted" title="Order admin dari Profil order (tab Volume): mobil/hari × input admin per mobil × hari operasional">auto dari profil order</div>}
                     {!ef?.volumeDariProfil && isAktivitasAdmin(x) && x.volumeManual == null && <div className="small muted" title="Isi Profil order di tab Volume agar volume admin terisi otomatis">isi profil order</div>}</td>
-                  <td className="num">{x.porsiMuat
-                    ? <div title="Ikut porsi palletize/loose di Key assumption"><b>{angka(persenDariPorsi(x.porsiMuat, a.porsiMuat) * 100, 1)}%</b></div>
-                    : <input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} />}
-                    <select aria-label="Sumber % volume" value={x.porsiMuat ? `${x.porsiMuat.proses}:${x.porsiMuat.muat}` : ''} style={{ minWidth: 150, marginTop: 4 }}
+                  <td className="num"><div className="sel-persen">
+                    {x.porsiMuat
+                      ? <div className="nilai" title="Ikut porsi palletize/loose di Key assumption">{angka(persenDariPorsi(x.porsiMuat, a.porsiMuat) * 100, 1)}%</div>
+                      : <div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}><input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /><span className="small">%</span></div>}
+                    <select aria-label="Sumber % volume" title={x.porsiMuat ? `Ikut porsi: ${labelTag(x.porsiMuat)}` : '% diisi manual'} value={x.porsiMuat ? `${x.porsiMuat.proses}:${x.porsiMuat.muat}` : ''}
                       onChange={e => { const o = OPSI_TAG.find(q => q.k === e.target.value); ub(o ? { porsiMuat: o.t } : { porsiMuat: undefined, persenVolume: x.porsiMuat ? persenDariPorsi(x.porsiMuat, a.porsiMuat) : x.persenVolume }); }}>
                       <option value="">% manual</option>
-                      {OPSI_TAG.map(o => <option key={o.k} value={o.k}>Ikut porsi: {labelTag(o.t)}</option>)}</select></td>
+                      {OPSI_TAG.map(o => <option key={o.k} value={o.k}>Porsi {labelTag(o.t)}</option>)}</select>
+                  </div></td>
                   <td className="num"><input aria-label="Pengali UoM" type="number" step="any" value={x.pengaliUom} onChange={e => ub({ pengaliUom: Number(e.target.value) })} title="Mis. 1 palet = 40 karton → 40. Biarkan 1 agar memakai konversi di tab Volume." style={{ width: 70, minWidth: 70 }} />
-                    {(x.pengaliUom || 1) === 1 && pEf !== 1 && <div className="small muted" title="dari konversi di tab Volume">auto ×{angka(pEf)}</div>}
+                    {(x.pengaliUom || 1) === 1 && pEf !== 1 && <div className="small muted" title="dari konversi di tab Volume">{pEf > 0 && pEf < 1 ? `auto ÷${angka(1 / pEf, 1 / pEf % 1 ? 1 : 0)}` : `auto ×${angka(pEf)}`}</div>}
                     {vArus && faktorUom(vArus, x.uom) == null && (x.pengaliUom || 1) === 1 && <div className="small" style={{ color: 'var(--warn, #b45309)' }} title={`UoM ${x.uom} belum ada di konversi arus (${vArus.uom})`}>isi konversi</div>}</td>
                   <td className="row" style={{ flexWrap: 'nowrap', gap: 4 }}>
                     <button className="ghost" title="Duplikat baris" onClick={() => setA({ aktivitas: [...a.aktivitas.slice(0, i + 1), { ...x }, ...a.aktivitas.slice(i + 1)] })}>Salin</button>
