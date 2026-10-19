@@ -283,5 +283,5 @@ tr.kat-link:hover td { background: var(--res); }
 .pd-sum.pd-sum-shift td.num, .pd-sum.pd-sum-shift th.num { white-space: nowrap; }
 
 /* Freeze menu tab tender: tetap terlihat saat halaman di-scroll (di bawah topbar) */
-.tabs.tabs-beku { position: sticky; top: var(--tinggi-topbar, 58px); z-index: 40; box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+.tabs.tabs-beku { position: sticky; top: var(--tinggi-topbar, 58px); z-index: 40; box-shadow: 0 4px 12px rgba(0,0,0,.06); width: 100%; box-sizing: border-box; }
 @media (max-width: 760px) { .tabs.tabs-beku { position: static; box-shadow: none; } }
