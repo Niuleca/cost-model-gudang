@@ -9,7 +9,7 @@ import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, 
 import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
 import { skemaVsmDefault, VSM_DEFAULT } from '@/lib/vsmDefault';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
-import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif } from '@/lib/engine/types';
+import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
@@ -71,6 +71,7 @@ const dariProd = (p: Prod) => ({ productivityId: p.id, aktivitas: p.aktivitas, t
   prodPerJam: Number(p.prod_per_jam), arus: (p.tahap.toLowerCase().startsWith('outbound') ? 'outbound' : p.tahap.toLowerCase().startsWith('inventory') ? 'storage' : 'inbound') as Arus });
 /** Nama preset alokasi; kosong = Manajemen (sama dengan default engine untuk peran tetap) */
 const kunciAlokasi = (a: Partial<Record<Bucket, number>>) => Object.entries(a).filter(([, v]) => Number(v) > 0).sort(([x], [y]) => x.localeCompare(y)).map(([k, v]) => `${k}:${Number(v)}`).join('|');
+const isCaseUom = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes((u ?? '').trim().toLowerCase());
 const namaAlokasi = (a?: Partial<Record<Bucket, number>>) => !a || !Object.keys(a).length ? 'Manajemen (overhead)'
   : Object.entries(ALOKASI).find(([, v]) => kunciAlokasi(v) === kunciAlokasi(a))?.[0] ?? 'Manajemen (overhead)';
 
@@ -236,7 +237,7 @@ export default function TenderPage() {
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
   const spaceH = useMemo(() => {
     if (!t) return null;
-    const v = (ar: Arus) => volumeEfektif(t.asumsi.volumes).find(x => x.arus === ar)?.peakBulan ?? 0;
+    const v = (ar: Arus) => paletEkuivalen(volumeEfektif(t.asumsi.volumes).find(x => x.arus === ar)).palet;
     return hitungSpaceExcel(lengkapiSpaceExcel(t.asumsi.space.excel), v('storage'), v('inbound'), v('outbound'), t.jumlah_shift);
   }, [t]);
   const pdFull = useMemo(() => t ? hitungProcessDesign(aktivitasDenganOrderAdmin(t.asumsi.aktivitas, volumeEfektif(t.asumsi.volumes), t.asumsi.profilVolume, t.asumsi.processDesign?.hariKerjaBulan ?? 25), volumeEfektif(t.asumsi.volumes), { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
@@ -357,7 +358,7 @@ export default function TenderPage() {
             <button className="ghost" onClick={() => setA({ volumes: a.volumes.map(v => v.rataRataBulan > 0 ? { ...v, peakBulan: v.peakBulan > 0 ? v.peakBulan : v.rataRataBulan, komitmenBulan: v.komitmenBulan > 0 ? v.komitmenBulan : v.rataRataBulan } : v) })}>Isi yang kosong = rata-rata/bln</button>
             {' '}lalu sesuaikan bila peak / komitmen berbeda.</p>}
           <div className="tablewrap"><table>
-            <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln</th><th className="num">Faktor peak</th><th title="1 UoM = berapa case/karton">Isi per UoM</th><th title="1 case = berapa pcs">Isi per case</th><th></th></tr></thead>
+            <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln</th><th className="num">Faktor peak</th><th title="Palet: 1 palet = berapa case. Case/karton: 1 palet = berapa karton (dibalik ke palet)">Isi per UoM / per palet</th><th title="1 case = berapa pcs">Isi per case</th><th></th></tr></thead>
             <tbody>{a.volumes.map((v, i) => (
               <tr key={i}>
                 <td><select aria-label="Arus" value={v.arus} style={{ minWidth: 130 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>
@@ -375,12 +376,22 @@ export default function TenderPage() {
                   const k = v.konversi ?? { uom1: 'case', per1: 0, uom2: 'pcs', per2: 0 };
                   const uk = (p: Partial<typeof k>) => setA({ volumes: ubahArray(a.volumes, i, { konversi: { ...k, ...p } }) });
                   return <>
+                    {isCaseUom(v.uom) ? <>
+                    <td><div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><span className="small muted">1 palet =</span>
+                      <input aria-label={`Isi ${v.uom} per palet`} type="number" step="any" min={0} value={k.paletIsi || ''} placeholder="0" onChange={e => uk({ paletIsi: Number(e.target.value) })} style={{ width: 70, minWidth: 70 }} />
+                      <span className="small">{v.uom}</span></div>
+                      {k.paletIsi ? <div className="small muted">= {angka(Number(v.peakBulan) / k.paletIsi, 1)} palet/bln (peak)</div> : <div className="small" style={{ color: 'var(--warn, #b45309)' }}>isi agar bisa dihitung ke palet</div>}</td>
+                    <td><div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><span className="small muted">1 {v.uom} =</span>
+                      <input aria-label={`Isi per ${v.uom}`} type="number" step="any" min={0} value={k.per2 || ''} placeholder="0" onChange={e => uk({ per2: Number(e.target.value) })} style={{ width: 70, minWidth: 70 }} />
+                      <select aria-label="UoM isi kecil" value={k.uom2} onChange={e => uk({ uom2: e.target.value })} style={{ minWidth: 96 }}>{(UOM_ISI.includes(k.uom2) ? UOM_ISI : [k.uom2, ...UOM_ISI]).map(u => <option key={u}>{u}</option>)}</select></div></td>
+                    </> : <>
                     <td><div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><span className="small muted">1 {v.uom} =</span>
                       <input aria-label={`Isi per ${v.uom}`} type="number" step="any" min={0} value={k.per1 || ''} placeholder="0" onChange={e => uk({ per1: Number(e.target.value) })} style={{ width: 70, minWidth: 70 }} />
                       <select aria-label="UoM isi" value={k.uom1} onChange={e => uk({ uom1: e.target.value })} style={{ minWidth: 96 }}>{(UOM_ISI.includes(k.uom1) ? UOM_ISI : [k.uom1, ...UOM_ISI]).map(u => <option key={u}>{u}</option>)}</select></div></td>
                     <td><div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><span className="small muted">1 {k.uom1} =</span>
                       <input aria-label={`Isi per ${k.uom1}`} type="number" step="any" min={0} value={k.per2 || ''} placeholder="0" onChange={e => uk({ per2: Number(e.target.value) })} style={{ width: 70, minWidth: 70 }} />
                       <select aria-label="UoM isi kecil" value={k.uom2} onChange={e => uk({ uom2: e.target.value })} style={{ minWidth: 96 }}>{(UOM_ISI.includes(k.uom2) ? UOM_ISI : [k.uom2, ...UOM_ISI]).map(u => <option key={u}>{u}</option>)}</select></div></td>
+                    </>}
                   </>;
                 })()}
                 <td><button className="danger" onClick={() => setA({ volumes: a.volumes.filter((_, j) => j !== i) })}>Hapus</button></td>
@@ -592,9 +603,9 @@ export default function TenderPage() {
           setKol('warehouse_id', g?.id ?? null);
           setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
         }} />
-        <SpacePanel excel={a.space.excel} ppTotal={volEf.find(v => v.arus === 'storage')?.peakBulan ?? 0}
-          inboundBulan={volEf.find(v => v.arus === 'inbound')?.peakBulan ?? 0} outboundBulan={volEf.find(v => v.arus === 'outbound')?.peakBulan ?? 0}
-          uomIn={volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
+        <SpacePanel excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
+          inboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).palet} outboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).palet}
+          uomIn={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).ok ? 'palet' : volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).ok ? 'palet' : volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
           jumlahShift={t.jumlah_shift} onChange={excel => setA({ space: { ...a.space, excel } })}
           komersial={<BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
             posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}

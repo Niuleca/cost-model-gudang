@@ -16,7 +16,7 @@ export interface VolumeInput {
   peakBulan: number;        // dipakai untuk sizing
   komitmenBulan: number;    // dipakai untuk billing (MGV)
   /** Isi per UoM: 1 [uom] = per1 [uom1]; 1 [uom1] = per2 [uom2]. Mis. 1 palet = 40 case, 1 case = 24 pcs. */
-  konversi?: { uom1: string; per1: number; uom2: string; per2: number };
+  konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; // paletIsi: isi karton/case per palet (UoM volume case)
 }
 
 /** Faktor konversi dari UoM volume arus ke UoM lain (1 bila sama, null bila tidak dikenal). */
@@ -27,9 +27,25 @@ export function faktorUom(v: VolumeInput | undefined, uom: string): number | nul
   if (n(v.uom) === n(uom)) return 1;
   const k = v.konversi;
   if (!k) return null;
+  // Volume dalam case/karton → dibalik ke palet: 1 palet = paletIsi case; 1 case = per2 pcs
+  if (n(v.uom) === 'case') {
+    if (/^pal(l)?et$/i.test(uom.trim())) return k.paletIsi && k.paletIsi > 0 ? 1 / k.paletIsi : null;
+    if (k.uom2 && n(k.uom2) === n(uom) && k.per2 > 0) return k.per2;
+  }
   if (k.uom1 && n(k.uom1) === n(uom) && k.per1 > 0) return k.per1;
   if (k.uom2 && n(k.uom2) === n(uom) && k.per1 > 0 && k.per2 > 0) return k.per1 * k.per2;
   return null;
+}
+
+/** Volume dalam palet ekuivalen: UoM palet = apa adanya; UoM case/karton dibagi isi per palet (bila diisi). */
+export function paletEkuivalen(v: VolumeInput | undefined, basis: 'peakBulan' | 'rataRataBulan' | 'komitmenBulan' = 'peakBulan'): { palet: number; ok: boolean } {
+  if (!v) return { palet: 0, ok: false };
+  const q = Number(v[basis]) || 0;
+  if (/^pal(l)?et$/i.test(v.uom.trim())) return { palet: q, ok: true };
+  const f = faktorUom(v, 'palet');
+  if (f != null && f > 0) return { palet: q * f, ok: true };
+  // case/karton tanpa isi per palet: tidak bisa dihitung ke palet (jangan dianggap palet)
+  return ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes(v.uom.trim().toLowerCase()) ? { palet: 0, ok: false } : { palet: q, ok: false };
 }
 
 /** Pengali efektif aktivitas: pengali manual bila ≠ 1; bila 1 dan UoM aktivitas beda dari UoM arus → pakai konversi Volume. */

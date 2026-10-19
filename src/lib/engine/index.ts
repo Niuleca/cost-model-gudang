@@ -5,7 +5,7 @@
 
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
-import { pengaliEfektif, headcountTetap, isRoleSupervisor } from './types';
+import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen } from './types';
 import { PARAM_BIAYA_MP_DEFAULT, rincianBiayaRole } from './biayaMp';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
@@ -84,9 +84,13 @@ export function hitungTender(t: TenderInput, m: MasterData) {
 
   // ---- 3. Space (UC12) ----
   const s = t.space;
-  const ppDesain = volArus('storage')?.peakBulan ?? 0;
+  const ppDesain = paletEkuivalen(volArus('storage')).palet;
+  for (const ar of ['storage', 'inbound', 'outbound'] as const) {
+    const v = volArus(ar);
+    if (v && !paletEkuivalen(v).ok && !/^pal(l)?et$/i.test(v.uom.trim())) flags.push({ level: 'peringatan', kode: 'KONVERSI_PALET', pesan: `Volume ${ar} dalam ${v.uom}: isi "1 palet = … ${v.uom}" di tab Volume agar space (staging/rak) bisa dihitung.` });
+  }
   // Metode Excel: selective / double deep per bay + staging per sequence + fasilitas → dibulatkan (space rent)
-  const sx = hitungSpaceExcel(lengkapiSpaceExcel(s.excel), ppDesain, volArus('inbound')?.peakBulan ?? 0, volArus('outbound')?.peakBulan ?? 0, t.jumlahShift);
+  const sx = hitungSpaceExcel(lengkapiSpaceExcel(s.excel), ppDesain, paletEkuivalen(volArus('inbound')).palet, paletEkuivalen(volArus('outbound')).palet, t.jumlahShift);
   const storageM2 = sx.sd.footprint + sx.dd.footprint + sx.block.footprint + sx.floor.footprint;
   const totalM2 = sx.spaceRent;
   const space = {

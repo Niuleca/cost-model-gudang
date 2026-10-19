@@ -65,7 +65,7 @@ export const PARAM_DEFAULT: ParamProfil = { tonPerPalet: 0.8, cbmPerPalet: 1.5, 
 const isCase = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes(u.trim().toLowerCase());
 
 /** Volume arus per bulan dalam palet ekuivalen + default isi case/pcs dari konversi Volume. */
-export function volumePalet(v: VolumeInput | undefined, basis: BasisVolume) {
+export function volumePalet(v: VolumeInput | undefined, basis: BasisVolume, param?: ParamProfil) {
   const k = v?.konversi;
   const cppDef = k && k.per1 > 0 && isCase(k.uom1) ? k.per1 : 0;
   const upcDef = k && k.per2 > 0 ? k.per2 : 0;
@@ -73,6 +73,14 @@ export function volumePalet(v: VolumeInput | undefined, basis: BasisVolume) {
   const q = Number(v[basis]) || 0;
   const u = v.uom.trim().toLowerCase();
   if (u === 'palet' || u === 'pallet') return { paletBulan: q, cpp: cppDef, upc: upcDef, ok: true, ket: '' };
+  // UoM volume case/karton: dibalik ke palet memakai isi karton per palet
+  if (isCase(u) && k?.paletIsi && k.paletIsi > 0) return { paletBulan: q / k.paletIsi, cpp: k.paletIsi, upc: k.per2 > 0 ? k.per2 : 0, ok: true, ket: '' };
+  // Belum diisi: perkiraan isi per palet = CBM per palet ÷ CBM per case (parameter muatan)
+  const pr = { ...PARAM_DEFAULT, ...(param ?? {}) };
+  const est = pr.cbmPerCase > 0 ? Math.floor(pr.cbmPerPalet / pr.cbmPerCase) : 0;
+  if (isCase(u) && est > 0) return { paletBulan: q / est, cpp: est, upc: upcDef, ok: true,
+    ket: `UoM volume ${v.uom}: dihitung ${est} ${v.uom}/palet (= ${pr.cbmPerPalet} CBM/palet ÷ ${pr.cbmPerCase} CBM/case). Isi "1 palet = … ${v.uom}" di tabel Volume agar sesuai.` };
+  if (isCase(u)) return { paletBulan: 0, cpp: 0, upc: upcDef, ok: false, ket: `UoM volume ${v.uom} — isi "1 palet = … ${v.uom}" di tabel Volume agar bisa dihitung ke palet` };
   // UoM volume bukan palet: konversi ke palet butuh isi case per palet (k.per1 = isi per uom volume tidak membantu)
   return { paletBulan: 0, cpp: cppDef, upc: upcDef, ok: false, ket: `UoM volume ${v.uom} — ubah ke palet agar bisa dipecah` };
 }
@@ -144,7 +152,7 @@ export function orderAdmin(profil: ProfilVolume | undefined, volumes: VolumeInpu
   const satu = (arus: 'inbound' | 'outbound') => {
     const rows = profil[arus] ?? [];
     if (!rows.length) return kosong;
-    const vp = volumePalet(volumes.find(v => v.arus === arus), profil.basis ?? 'peakBulan');
+    const vp = volumePalet(volumes.find(v => v.arus === arus), profil.basis ?? 'peakBulan', param);
     const h = hitungProfil(rows, hariBulan > 0 ? vp.paletBulan / hariBulan : 0, param, kendaraan, { cpp: vp.cpp, upc: vp.upc }, hariBulan);
     const mobilHari = h.totalMobilBulat, orderHari = mobilHari * perMobil;
     return { mobilHari, orderHari, orderBulan: orderHari * hariBulan };

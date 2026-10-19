@@ -27,7 +27,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
     const rows = p[arus];
     const out = arus === 'outbound';
     const vol = volumes.find(v => v.arus === arus);
-    const vp = volumePalet(vol, basis);
+    const vp = volumePalet(vol, basis, p.param);
     const paletHari = hariBulan > 0 ? vp.paletBulan / hariBulan : 0;
     const h = hitungProfil(rows, paletHari, p.param, kendaraan, { cpp: vp.cpp, upc: vp.upc }, hariBulan);
     const set = (i: number, patch: Partial<BarisProfil>) => onChange({ ...p, [arus]: rows.map((r, j) => j === i ? { ...r, ...patch } : r) });
@@ -38,7 +38,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
           <h3>{out ? 'Outbound (pengiriman · kontainer / land transport)' : 'Inbound (penerimaan · kontainer / land transport)'}</h3>
           <span className="pill info">{angka(vp.paletBulan)} palet/bln ÷ {hariBulan} hari = <b>{angka(paletHari, 1)} palet/hari</b></span>
         </div>
-        {!vp.ok && <p className="small" style={{ color: 'var(--warn, #b45309)' }}>{vp.ket}</p>}
+        {vp.ket && <p className="small" style={{ color: 'var(--warn, #b45309)' }}>{vp.ket}</p>}
         <div className="tablewrap"><table>
           <thead><tr><th>Moda & cara muat</th><th className="num">Porsi</th><th className="num">Palet/hari</th><th>Konversi</th><th className="num">Qty/hari</th>
             <th>Kendaraan</th><th className="num">Mobil/hari</th><th>Cek muatan per mobil</th><th></th></tr></thead>
