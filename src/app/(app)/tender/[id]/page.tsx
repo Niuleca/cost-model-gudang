@@ -609,7 +609,15 @@ export default function TenderPage() {
 
       {tab === 'Interest cost' && <InterestPanel nilai={a.interestCost} onChange={interestCost => setA({ interestCost })} hasilLive={hasilInterest} kontrakBulan={t.durasi_kontrak_bulan} />}
 
-      {tab === 'IT' && <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} />}
+      {tab === 'IT' && <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={(() => {
+        const wc = /admin|spv|supervisor|manager|ka gudang|controller|qhse|k3/i, mj = /spv|supervisor|manager|ka gudang/i;
+        const rows = [...(pdFull?.mp ?? []).map(r => ({ nama: r.nama, n: r.resources })), ...(pdFull?.indirect.rows ?? []).map(r => ({ nama: r.nama, n: r.qty }))];
+        const unit = (re: RegExp) => pdMhe.filter(e => re.test(e.nama)).reduce((x, e) => x + e.resources, 0);
+        return { luasM2: hasil?.space.totalM2 || spaceH?.spaceRent || 0,
+          transaksiBulan: volEf.filter(v => v.arus === 'inbound' || v.arus === 'outbound').reduce((x, v) => x + (Number(v.peakBulan) || 0), 0),
+          userKantor: rows.filter(r => wc.test(r.nama)).reduce((x, r) => x + r.n, 0), manajer: rows.filter(r => mj.test(r.nama)).reduce((x, r) => x + r.n, 0),
+          unitRf: unit(/^(RF|RDT|HHT|scanner)/i), unitPc: unit(/^(PC|komputer|desktop)/i), unitLaptop: unit(/laptop/i) };
+      })()} />}
 
       {tab === 'Biaya lain' && (
         <div className="card">

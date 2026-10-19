@@ -3,15 +3,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { COST_TYPES, KELOMPOK_IT, UMUR_IT_DEFAULT, basisDari, biayaBulanIt, perlakuanDari, ringkasIt, type ItLine, type ItSheet, type PerlakuanSekali } from '@/lib/it';
 import { ubahArray } from '@/components/fields';
+import { itDefault, type DriverIt } from '@/lib/itDefault';
 import { rp } from '@/lib/format';
 
 interface Katalog { id: number; kelompok: string; item: string; deskripsi: string | null; cost_type: string; harga: number; slab_min: number | null; slab_max: number | null; status: string; berlaku_sampai: string | null }
 
 /** Lembar kebutuhan IT per tender, format BAP KLOG: budget vs aktual, per kelompok. */
-export default function ItPanel({ sheet, onChange, kontrakBulan }: { sheet: ItSheet; onChange: (s: ItSheet) => void; kontrakBulan: number }) {
+export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { sheet: ItSheet; onChange: (s: ItSheet) => void; kontrakBulan: number; driver?: DriverIt }) {
   const sb = supabaseBrowser();
   const [katalog, setKatalog] = useState<Katalog[]>([]);
   const [pilih, setPilih] = useState('');
+  const [konfirm, setKonfirm] = useState(false);
   const [bunga, setBunga] = useState(0.1);
   useEffect(() => {
     sb.from('finance_params').select('key, nilai').eq('key', 'bunga_modal_tahun').maybeSingle()
@@ -42,6 +44,24 @@ export default function ItPanel({ sheet, onChange, kontrakBulan }: { sheet: ItSh
         <label className="f" htmlFor="bap">Nomor BAP<input id="bap" value={sheet.nomorBap ?? ''} onChange={e => onChange({ ...sheet, nomorBap: e.target.value })} placeholder="BAP-…" /></label>
         <label className="f" htmlFor="kurs">Kurs USD (Rp)<input id="kurs" type="number" value={sheet.kursUsd} onChange={e => onChange({ ...sheet, kursUsd: Number(e.target.value) })} /></label>
       </div>
+      {driver && (() => {
+        const def = itDefault(driver, katalog);
+        const isi = (ganti: boolean) => { set(ganti ? def : [...sheet.lines, ...def]); setKonfirm(false); };
+        return <div className="notice small" style={{ display: 'grid', gap: 6 }}>
+          <div><b>Default IT dari luas & volume</b> — {def.length} item dari katalog, qty dihitung dari:
+            {' '}luas <b>{Math.round(driver.luasM2).toLocaleString('id-ID')} m²</b> · transaksi <b>{Math.round(driver.transaksiBulan).toLocaleString('id-ID')}/bln</b> · user kantor <b>{driver.userKantor}</b> · SPV/manager <b>{driver.manajer}</b> · RF <b>{driver.unitRf}</b> · PC <b>{driver.unitPc}</b> · laptop <b>{driver.unitLaptop}</b>.
+            {' '}Aturan: CCTV 1 kamera / 200 m² (min. 8), NVR 1 / 32 kamera, printer 1 / 5.000 m², HHT = unit RF, PC & laptop dari MHE Summary, lisensi per user, WMS per transaksi. Semua baris tetap bisa diubah qty / harga atau dihapus; dasar qty tercatat di kolom Catatan.</div>
+          <div className="row">
+            {!sheet.lines.length
+              ? <button className="ghost" disabled={!def.length} onClick={() => isi(true)}>Isi default IT</button>
+              : !konfirm
+                ? <><button className="ghost" disabled={!def.length} onClick={() => setKonfirm(true)}>Ganti dengan default</button>
+                    <button className="ghost" disabled={!def.length} onClick={() => isi(false)}>Tambahkan default di bawah</button></>
+                : <><span>Ganti {sheet.lines.length} baris IT yang ada?</span><button className="danger" onClick={() => isi(true)}>Ya, ganti</button><button className="ghost" onClick={() => setKonfirm(false)}>Batal</button></>}
+            <span className="muted">Bisa di-Undo. Isi luas & volume dulu agar qty sesuai.</span>
+          </div>
+        </div>;
+      })()}
       <div className="row">
         <select aria-label="Item katalog IT" value={pilih} onChange={e => setPilih(e.target.value)} style={{ maxWidth: 520 }}>
           <option value="">Pilih dari katalog IT ({katalog.length})</option>
@@ -55,9 +75,9 @@ export default function ItPanel({ sheet, onChange, kontrakBulan }: { sheet: ItSh
       </div>
 
       <div className="tablewrap"><table>
-        <thead><tr><th>Kelompok</th><th>Item</th><th>Cost type</th><th className="num">Qty</th><th>Mata uang</th><th className="num">Harga budget</th><th className="num">Total budget</th><th className="num">Harga aktual</th><th className="num">Total aktual</th><th>Perlakuan</th><th className="num">Umur (bln)</th><th className="num">Biaya/bln</th><th></th></tr></thead>
+        <thead><tr><th>Kelompok</th><th>Item</th><th>Cost type</th><th className="num">Qty</th><th>Mata uang</th><th className="num">Harga budget</th><th className="num">Total budget</th><th className="num">Harga aktual</th><th className="num">Total aktual</th><th>Perlakuan</th><th className="num">Umur (bln)</th><th className="num">Biaya/bln</th><th>Catatan</th><th></th></tr></thead>
         <tbody>
-          {sheet.lines.length === 0 && <tr><td colSpan={13} className="muted">Belum ada kebutuhan IT.</td></tr>}
+          {sheet.lines.length === 0 && <tr><td colSpan={14} className="muted">Belum ada kebutuhan IT.</td></tr>}
           {kelompokAda.map(g => sheet.lines.map((l, i) => l.kelompok !== g ? null : (
             <tr key={i}>
               <td><select aria-label="Kelompok" value={l.kelompok} onChange={e => set(ubahArray(sheet.lines, i, { kelompok: e.target.value }))}>{KELOMPOK_IT.map(k => <option key={k}>{k}</option>)}</select></td>
@@ -82,6 +102,7 @@ export default function ItPanel({ sheet, onChange, kontrakBulan }: { sheet: ItSh
                   <td className="num" title={c.bunga ? `pokok ${rp(c.pokok)} + bunga ${rp(c.bunga)} · ${c.jenis} ${c.periode} bln` : c.jenis}>{c.total ? rp(c.total) : <span className="small muted">{p === 'tagih' && sekali ? 'di quotation' : '–'}</span>}</td>
                 </>;
               })()}
+              <td><input aria-label="Catatan" value={l.catatan ?? ''} placeholder="dasar qty / keterangan" onChange={e => set(ubahArray(sheet.lines, i, { catatan: e.target.value }))} style={{ minWidth: 200 }} /></td>
               <td><button className="danger" onClick={() => set(sheet.lines.filter((_, j) => j !== i))}>Hapus</button></td>
             </tr>)))}
         </tbody>
