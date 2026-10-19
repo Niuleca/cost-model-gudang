@@ -29,15 +29,29 @@ export const TON_KONTAINER: Record<'cont20' | 'cont40' | 'cont40hc', number> = {
 export interface Kendaraan { nama: string; palet: number; cbm: number; ton: number }
 /** Kapasitas kendaraan default (Indonesia, kira-kira) — bisa diubah per tender. */
 export const KENDARAAN_DEFAULT: Kendaraan[] = [
+  { nama: 'Blind van (Gran Max)', palet: 1, cbm: 3, ton: 0.8 },
+  { nama: 'Pick up (L300 / Carry)', palet: 2, cbm: 4, ton: 1 },
+  { nama: 'CDE bak', palet: 4, cbm: 8, ton: 2.5 },
   { nama: 'CDE (engkel box)', palet: 4, cbm: 9, ton: 2.5 },
+  { nama: 'CDD bak', palet: 6, cbm: 16, ton: 5 },
   { nama: 'CDD box', palet: 6, cbm: 17, ton: 5 },
   { nama: 'CDD long box', palet: 8, cbm: 22, ton: 5 },
+  { nama: 'CDD reefer', palet: 6, cbm: 15, ton: 4 },
+  { nama: 'Fuso bak', palet: 10, cbm: 28, ton: 8 },
   { nama: 'Fuso box', palet: 10, cbm: 31, ton: 8 },
+  { nama: 'Fuso wingbox', palet: 10, cbm: 33, ton: 8 },
+  { nama: 'Tronton box', palet: 14, cbm: 45, ton: 15 },
   { nama: 'Tronton wingbox', palet: 16, cbm: 55, ton: 15 },
+  { nama: 'Tronton reefer', palet: 12, cbm: 40, ton: 12 },
+  { nama: 'Wingbox build-up / Trinton', palet: 20, cbm: 65, ton: 20 },
+  { nama: 'Trailer wingbox (12 m)', palet: 24, cbm: 76, ton: 25 },
   { nama: 'Trailer / kontainer 20ft', palet: 10, cbm: 33, ton: 21 },
   { nama: 'Trailer / kontainer 40ft', palet: 20, cbm: 67, ton: 26 },
   { nama: 'Kontainer 40HC', palet: 20, cbm: 76, ton: 26 },
 ];
+/** Kendaraan default untuk baris land transport yang belum memilih kendaraan. */
+export const KENDARAAN_AWAL = 'CDE (engkel box)';
+export const kendaraanAwal = (ks: Kendaraan[]) => ks.find(x => x.nama === KENDARAAN_AWAL) ?? ks[0];
 
 export interface BarisProfil {
   moda: ModaOrder;
@@ -115,7 +129,7 @@ export function hitungProfil(rows: BarisProfil[], paletHari: number, param: Para
     }
     const kDasar = isKont
       ? kendaraan.find(x => r.moda === 'cont20' ? /20ft/i.test(x.nama) : r.moda === 'cont40hc' ? /40HC/i.test(x.nama) : /40ft/i.test(x.nama) && !/HC/i.test(x.nama))
-      : kendaraan.find(x => x.nama === r.kendaraan) ?? kendaraan[0];
+      : kendaraan.find(x => x.nama === r.kendaraan) ?? kendaraanAwal(kendaraan);
     const k = kDasar && isKont && r.tonPerKontainer ? { ...kDasar, ton: r.tonPerKontainer } : kDasar;
     const h: HasilBaris = { paletHari: palet, qtyHari: qty, satuan, ket };
     if (k && palet > 0) {

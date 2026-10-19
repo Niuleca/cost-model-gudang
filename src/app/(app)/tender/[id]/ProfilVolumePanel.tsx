@@ -4,7 +4,7 @@ import { T, useT } from '@/lib/i18n';
 import type { VolumeInput } from '@/lib/engine/types';
 import { angka } from '@/lib/format';
 import {
-  hitungProfil, volumePalet, orderAdmin, KENDARAAN_DEFAULT, MODA, MUATAN, muatanBaris, PARAM_DEFAULT, SATUAN_UNIT,
+  hitungProfil, volumePalet, orderAdmin, KENDARAAN_DEFAULT, kendaraanAwal, MODA, MUATAN, muatanBaris, PARAM_DEFAULT, SATUAN_UNIT,
   type BarisProfil, type BasisVolume, type Kendaraan, type ProfilVolume,
 } from '@/lib/profilVolume';
 
@@ -68,7 +68,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                 <td className="num"><b>{angka(x.qtyHari, x.qtyHari < 10 ? 1 : 0)}</b><div className="small muted">{x.satuan}</div></td>
                 <td>{isKont ? <><span className="small">{m?.kendaraan ?? 'kontainer'}</span>
                     <div className="row small" style={{ flexWrap: 'nowrap', gap: 4, marginTop: 4 }}>{n(r.tonPerKontainer ? r.tonPerKontainer * 1000 : undefined, v => set(i, { tonPerKontainer: v ? v / 1000 : undefined }), 70, m ? String(Math.round(m.kap.ton * 1000)) : 'kg')}<span className="muted">kg maks/kont</span></div></>
-                  : <select aria-label="Kendaraan" value={r.kendaraan ?? kendaraan[0].nama} onChange={e => set(i, { kendaraan: e.target.value })} style={{ minWidth: 150 }}>
+                  : <select aria-label="Kendaraan" value={kendaraan.some(x => x.nama === r.kendaraan) ? r.kendaraan : kendaraanAwal(kendaraan).nama} onChange={e => set(i, { kendaraan: e.target.value })} style={{ minWidth: 150 }}>
                     {kendaraan.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('id-ID')} kg</option>)}</select>}</td>
                 <td className="num">{m ? <><b>{m.bulat}</b>{isKont && <div className="small">kontainer</div>}<div className="small muted">({angka(m.perHari, 2)}) / hari</div><div className="small"><b>{angka(m.bulatBulan)}</b> / bln</div></> : '–'}</td>
                 <td className="small">{m && <>
@@ -174,14 +174,26 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
         </div>;
       })()}
       <details>
-        <summary className="small">Kapasitas kendaraan (bisa diubah)</summary>
+        <summary className="small">Kapasitas kendaraan (bisa diubah / ditambah) · {kendaraan.length} jenis</summary>
+        <p className="small muted">Kapasitas default adalah perkiraan umum di Indonesia (palet standar 1,2 × 1,0 m); sesuaikan dengan armada vendor. Nama kontainer (20ft / 40ft / 40HC) dipakai otomatis untuk moda kontainer.</p>
         <div className="tablewrap"><table>
-          <thead><tr><th>Kendaraan</th><th className="num">Palet</th><th className="num">CBM</th><th className="num">Berat (kg)</th></tr></thead>
+          <thead><tr><th>Kendaraan</th><th className="num">Palet</th><th className="num">CBM</th><th className="num">Berat (kg)</th><th /></tr></thead>
           <tbody>{kendaraan.map((k, i) => {
             const uk = (patch: Partial<Kendaraan>) => onChange({ ...p, kendaraan: kendaraan.map((x, j) => j === i ? { ...x, ...patch } : x) });
-            return <tr key={k.nama}><td>{k.nama}</td><td className="num">{n(k.palet, v => uk({ palet: v }), 70)}</td><td className="num">{n(k.cbm, v => uk({ cbm: v }), 70)}</td><td className="num">{n(k.ton * 1000, v => uk({ ton: v / 1000 }), 80)}</td></tr>;
+            const bawaan = KENDARAAN_DEFAULT.some(d => d.nama === k.nama);
+            return <tr key={i}><td>{bawaan ? k.nama : <input aria-label="Nama kendaraan" value={k.nama} onChange={e => uk({ nama: e.target.value })} style={{ minWidth: 200 }} />}</td>
+              <td className="num">{n(k.palet, v => uk({ palet: v }), 70)}</td><td className="num">{n(k.cbm, v => uk({ cbm: v }), 70)}</td><td className="num">{n(k.ton * 1000, v => uk({ ton: v / 1000 }), 80)}</td>
+              <td>{!bawaan && <button className="danger" onClick={() => onChange({ ...p, kendaraan: kendaraan.filter((_, j) => j !== i) })}>Hapus</button>}</td></tr>;
           })}</tbody></table></div>
-        {p.kendaraan?.length ? <button className="ghost" onClick={() => onChange({ ...p, kendaraan: undefined })}>Kembalikan kapasitas default</button> : null}
+        <div className="row">
+          <button className="ghost" onClick={() => {
+            let nm = 'Kendaraan baru', k = 2; while (kendaraan.some(x => x.nama === nm)) nm = `Kendaraan baru ${k++}`;
+            onChange({ ...p, kendaraan: [...kendaraan, { nama: nm, palet: 0, cbm: 0, ton: 0 }] });
+          }}>+ Tambah kendaraan</button>
+          {p.kendaraan?.length && KENDARAAN_DEFAULT.some(d => !kendaraan.some(x => x.nama === d.nama))
+            ? <button className="ghost" onClick={() => onChange({ ...p, kendaraan: [...kendaraan, ...KENDARAAN_DEFAULT.filter(d => !kendaraan.some(x => x.nama === d.nama))] })}>Tambahkan jenis default yang belum ada</button> : null}
+          {p.kendaraan?.length ? <button className="ghost" onClick={() => onChange({ ...p, kendaraan: undefined })}>Kembalikan kapasitas default</button> : null}
+        </div>
       </details>
     </div>);
 }
