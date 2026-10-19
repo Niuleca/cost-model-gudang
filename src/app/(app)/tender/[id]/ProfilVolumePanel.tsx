@@ -1,4 +1,5 @@
 'use client';
+import { Fragment } from 'react';
 import { T, useT } from '@/lib/i18n';
 import type { VolumeInput } from '@/lib/engine/types';
 import { angka } from '@/lib/format';
@@ -49,7 +50,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
               const isKont = r.moda.startsWith('cont');
               const mu = muatanBaris(r);
               const m = x.mobil;
-              return <tr key={i}>
+              return <Fragment key={i}><tr>
                 <td><select aria-label="Moda" value={r.moda} onChange={e => set(i, { moda: e.target.value as BarisProfil['moda'] })} style={{ minWidth: 170 }}>
                   <optgroup label="Kontainer">{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>
                   <optgroup label="Land transport (truk)">{MODA.filter(o => !o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup></select>
@@ -77,7 +78,47 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                   <div className="muted">pembatas: {m.pembatas === 'ton' ? 'berat' : m.pembatas}{mu === 'palet' && m.maksPaletCbm < m.kap.palet && ` · CBM hanya muat ${m.maksPaletCbm} palet`}</div>
                 </>}</td>
                 <td><button className="danger" onClick={() => onChange({ ...p, [arus]: rows.filter((_, j) => j !== i) })}>Hapus</button></td>
-              </tr>;
+              </tr>{m && (() => {
+                const trip = m.bulat || 1, cbm = m.cbmTrip * trip, kg = m.tonTrip * trip * 1000;
+                const cpp = r.casePerPalet || vp.cpp || 0, loose = mu !== 'palet';
+                const nP = loose ? 0 : (m.kap.palet > 0 ? x.paletHari / m.kap.palet : 0), nC = m.kap.cbm > 0 ? cbm / m.kap.cbm : 0, nT = m.kap.ton > 0 ? kg / (m.kap.ton * 1000) : 0;
+                const tbl = (l: string, v: string, b?: boolean) => <tr><td>{l}</td><td className="num">{b ? <b>{v}</b> : v}</td></tr>;
+                const beda = loose && cpp > 0 && Math.abs(cpp * p.param.cbmPerCase - p.param.cbmPerPalet) > 0.01;
+                return <tr className="rumus-baris"><td colSpan={9}>
+                  <details><summary className="small">Lihat rumus baris ini</summary>
+                    <div className="rumus-grid small">
+                      <div><b>1 · Volume per hari</b><table><tbody>
+                        {vol && vol.uom.trim().toLowerCase() !== 'palet' && cpp > 0 && tbl(`Palet/bln = ${angka(Number(vol[basis]) || 0)} ${vol.uom} ÷ ${angka(vp.cpp)}`, `${angka(vp.paletBulan, 1)} palet`)}
+                        {tbl(`Palet/hari = ${angka(vp.paletBulan, 1)} ÷ ${hariBulan} hari`, `${angka(paletHari, 1)} palet`)}
+                        {tbl(`Porsi moda = ${angka(paletHari, 1)} × ${pct(r.persen || 0)}`, `${angka(x.paletHari, 1)} palet`)}
+                        {loose && tbl(`Qty/hari = ${angka(x.paletHari, 2)} × ${angka(cpp)} case/palet`, `${angka(x.qtyHari)} ${x.satuan}`, true)}
+                      </tbody></table></div>
+                      <div><b>2 · CBM & berat per hari</b><table><tbody>
+                        {loose ? <>
+                          {tbl(`CBM = ${angka(x.paletHari * cpp)} case × ${p.param.cbmPerCase} CBM`, `${angka(cbm, 1)} CBM`)}
+                          {tbl(`Berat = ${angka(x.paletHari * cpp)} case × ${p.param.kgPerCase} kg`, `${angka(kg)} kg`)}
+                        </> : <>
+                          {tbl(`CBM = ${angka(x.paletHari, 1)} palet × ${p.param.cbmPerPalet} CBM`, `${angka(cbm, 1)} CBM`)}
+                          {tbl(`Berat = ${angka(x.paletHari, 1)} palet × ${angka(p.param.tonPerPalet * 1000)} kg`, `${angka(kg)} kg`)}
+                        </>}
+                      </tbody></table></div>
+                      <div><b>3 · {isKont ? 'Kontainer' : 'Mobil'} per hari</b> <span className="muted">({m.kendaraan}: {m.kap.palet} plt · {m.kap.cbm} m³ · {angka(m.kap.ton * 1000)} kg)</span><table><tbody>
+                        {tbl(`Palet: ${loose ? 'tidak dipakai (loose)' : `${angka(x.paletHari, 1)} ÷ ${m.kap.palet}`}`, loose ? '–' : angka(nP, 2), m.pembatas === 'palet')}
+                        {tbl(`CBM: ${angka(cbm, 1)} ÷ ${m.kap.cbm}`, angka(nC, 2), m.pembatas === 'cbm')}
+                        {tbl(`Berat: ${angka(kg)} ÷ ${angka(m.kap.ton * 1000)}`, angka(nT, 2), m.pembatas === 'ton')}
+                        {tbl(`Per hari = ROUNDUP(terbesar ${angka(m.perHari, 2)})`, `${m.bulat} ${isKont ? 'kontainer' : 'mobil'}`, true)}
+                        {tbl(`Per bulan = ${angka(m.perHari, 2)} × ${hariBulan} hari`, angka(m.perBulan))}
+                      </tbody></table></div>
+                      <div><b>4 · Muatan per {isKont ? 'kontainer' : 'mobil'}</b><table><tbody>
+                        {!loose && tbl(`Palet = ${angka(x.paletHari, 1)} ÷ ${trip}`, `${angka(m.paletTrip, 1)} / ${m.kap.palet}`)}
+                        {tbl(`CBM = ${angka(cbm, 1)} ÷ ${trip}`, `${angka(m.cbmTrip, 1)} / ${m.kap.cbm} m³`)}
+                        {tbl(`Berat = ${angka(kg)} ÷ ${trip}`, `${angka(m.tonTrip * 1000)} / ${angka(m.kap.ton * 1000)} kg`)}
+                        {tbl('Pembatas', m.pembatas === 'ton' ? 'berat' : m.pembatas.toUpperCase(), true)}
+                      </tbody></table></div>
+                    </div>
+                    {beda && <p className="small" style={{ color: 'var(--warn, #b45309)', marginTop: 6 }}>Cek parameter: {angka(cpp)} case × {p.param.cbmPerCase} CBM = {angka(cpp * p.param.cbmPerCase, 2)} CBM per palet, sedangkan Parameter muatan {p.param.cbmPerPalet} CBM per palet. Bila {p.param.cbmPerPalet} yang benar, CBM per case = {angka(p.param.cbmPerPalet / cpp, 3)}.</p>}
+                  </details></td></tr>;
+              })()}</Fragment>;
             })}
             {rows.length > 0 && <tr className="pd-sub"><td><b>Total</b></td>
               <td className="num"><b style={{ color: Math.abs(sisa) > 0.001 ? 'var(--bad, #b91c1c)' : undefined }}>{pct(h.totalPersen)}</b></td>

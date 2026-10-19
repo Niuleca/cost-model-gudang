@@ -290,3 +290,9 @@ tr.kat-link:hover td { background: var(--res); }
 .sel-persen { display: grid; gap: 4px; justify-items: end; width: 190px; }
 .sel-persen .nilai { font-weight: 700; padding: 4px 0; }
 .sel-persen select { width: 190px; min-width: 190px; font-size: 12px; }
+
+/* Rincian rumus profil order */
+.rumus-baris td { background: var(--surface-2, #f8f9fa); }
+.rumus-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 8px; }
+.rumus-grid table { width: 100%; margin-top: 4px; }
+.rumus-grid td { padding: 3px 6px; background: transparent; }
