@@ -156,6 +156,17 @@ export default function TableEditor(p: Props) {
     setDraft(d => { const n = { ...d }; delete n[id]; return n; });
     muat();
   }
+  async function simpanSemua() {
+    setErr(null);
+    const ids = Object.keys(draft);
+    for (const id of ids) {
+      const asal = rows.find(r => String(r[idKey]) === id) ?? {};
+      const { error } = await sb.from(p.table).update(bersihkan(draft[id], asal)).eq(idKey, id);
+      if (error) { setErr(`Baris ${id}: ${error.message}`); muat(); return; }
+      setDraft(d => { const n = { ...d }; delete n[id]; return n; });
+    }
+    muat();
+  }
   async function tambah() {
     if (!baru) return;
     setErr(null);
@@ -255,6 +266,9 @@ export default function TableEditor(p: Props) {
         <button className="ghost" onClick={unduh} disabled={!!sibuk}>Export Excel</button>
         {bolehEdit && <label className="btn ghost" style={{ cursor: 'pointer' }}>Import Excel
           <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={e => { bacaFile(e.target.files?.[0]); e.target.value = ''; }} /></label>}
+        {bolehEdit && Object.keys(draft).length > 0 && <>
+          <button onClick={simpanSemua}>Simpan perubahan ({Object.keys(draft).length} baris)</button>
+          <button className="ghost" onClick={() => setDraft({})}>Batalkan perubahan</button></>}
         {sibuk && <span className="small" role="status">{sibuk}</span>}
         {!bolehEdit && <span className="small muted">Hanya baca untuk role Anda.</span>}
       </div>
@@ -300,7 +314,7 @@ export default function TableEditor(p: Props) {
                 {judul && <tr className="grup"><td colSpan={p.kolom.length + (p.approval ? 1 : 0) + (bolehEdit ? 1 : 0) + (p.lampiran ? 1 : 0)}
                   style={{ background: 'var(--surface-2)', fontWeight: 600, position: 'sticky', left: 0 }}>
                   {g} <span className="small muted">· {tampil.filter(x => nilaiGrup(x) === g).length} item</span></td></tr>}
-                <tr>
+                <tr style={draft[id] ? { background: 'var(--res)' } : undefined} title={draft[id] ? 'Belum disimpan' : undefined}>
                   {p.kolom.map(k => <td key={k.key} className={k.type === 'number' || k.type === 'percent' ? 'num' : ''}>{sel(r, k, id)}</td>)}
                   {p.lampiran && <td>{selLampiran(r)}</td>}
                   {p.approval && (
@@ -323,6 +337,11 @@ export default function TableEditor(p: Props) {
           </tbody>
         </table>
       </div>
+      {bolehEdit && Object.keys(draft).length > 0 && (
+        <div className="aksi-bawah row" style={{ justifyContent: 'space-between' }} role="status">
+          <span className="small"><b>{Object.keys(draft).length} baris</b> diubah dan belum disimpan (ditandai warna).</span>
+          <div className="row"><button className="ghost" onClick={() => setDraft({})}>Batalkan</button><button onClick={simpanSemua}>Simpan perubahan</button></div>
+        </div>)}
       {lihat && (lihat.pdf && lihat.blob
         ? <PdfPreview blob={lihat.blob} judul={lihat.nama} onTutup={() => { URL.revokeObjectURL(lihat.url); setLihat(null); }}
             onUnduh={() => { const a = document.createElement('a'); a.href = lihat.url; a.download = lihat.nama; a.click(); }} />
