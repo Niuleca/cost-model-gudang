@@ -10,10 +10,17 @@ export const MODA: { v: ModaOrder; l: string; satuan: string }[] = [
   { v: 'cont20', l: 'Kontainer 20ft', satuan: 'kontainer' },
   { v: 'cont40', l: 'Kontainer 40ft', satuan: 'kontainer' },
   { v: 'cont40hc', l: 'Kontainer 40HC', satuan: 'kontainer' },
-  { v: 'palet', l: 'Palletize', satuan: 'palet' },
-  { v: 'case', l: 'Case / karton (loose)', satuan: 'case' },
-  { v: 'unit', l: 'Pcs / roll / liter / CBM', satuan: 'unit' },
+  { v: 'palet', l: 'Land transport · palletize', satuan: 'palet' },
+  { v: 'case', l: 'Land transport · case / karton (loose)', satuan: 'case' },
+  { v: 'unit', l: 'Land transport · pcs / roll / liter / CBM', satuan: 'unit' },
 ];
+/** Cara muat: palletize (dibatasi jumlah palet, CBM, berat) atau loose case/karton/pcs (dibatasi CBM & berat). */
+export type MuatanOrder = 'palet' | 'case' | 'unit';
+export const MUATAN: { v: MuatanOrder; l: string }[] = [
+  { v: 'palet', l: 'Palletize' }, { v: 'case', l: 'Loose case / karton' }, { v: 'unit', l: 'Loose pcs / unit' }];
+export const isKontainer = (m: ModaOrder) => m === 'cont20' || m === 'cont40' || m === 'cont40hc';
+/** Muatan efektif baris: land transport = modanya; kontainer = pilihan muatan (default loose case). */
+export const muatanBaris = (r: { moda: ModaOrder; muatan?: MuatanOrder }): MuatanOrder => isKontainer(r.moda) ? (r.muatan ?? 'case') : r.moda as MuatanOrder;
 export const SATUAN_UNIT = ['pcs', 'roll', 'liter', 'cbm', 'kg', 'botol', 'pack', 'bag', 'unit'];
 
 /** Muatan default per kontainer (ton) — asumsi umum, bisa diubah per baris. */
@@ -36,7 +43,8 @@ export interface BarisProfil {
   moda: ModaOrder;
   persen: number;              // porsi volume arus (0..1)
   satuanUnit?: string;         // untuk moda 'unit'
-  tonPerKontainer?: number;    // untuk kontainer
+  tonPerKontainer?: number;    // untuk kontainer (override kapasitas berat)
+  muatan?: MuatanOrder;        // untuk kontainer: palletize / loose case / loose pcs
   casePerPalet?: number;       // default dari konversi Volume
   unitPerCase?: number;        // default dari konversi Volume
   kendaraan?: string;          // palet / case / unit
@@ -83,40 +91,36 @@ export function hitungProfil(rows: BarisProfil[], paletHari: number, param: Para
     const palet = paletHari * pr;
     const cpp = r.casePerPalet || def.cpp || 0;
     const upc = r.unitPerCase || def.upc || 0;
-    let qty = palet, satuan = 'palet', ket = '';
+    const isKont = isKontainer(r.moda);
+    const muatan = muatanBaris(r);
+    // Volume per hari dalam satuan muat → CBM & berat
+    let qty = palet, satuan = 'palet', ket = `${f(palet)} palet`;
     let cbm = palet * param.cbmPerPalet, ton = palet * tp;
-    const isKont = r.moda === 'cont20' || r.moda === 'cont40' || r.moda === 'cont40hc';
-    if (isKont) {
-      const tk = r.tonPerKontainer ?? TON_KONTAINER[r.moda as keyof typeof TON_KONTAINER];
-      qty = tk > 0 ? ton / tk : 0; satuan = 'kontainer';
-      ket = `${f(palet)} plt × ${f(tp * 1000)} kg = ${f(ton * 1000)} kg ÷ ${f(tk * 1000)} kg/kont`;
-    } else if (r.moda === 'case') {
-      qty = palet * cpp; satuan = 'case';
-      cbm = qty * param.cbmPerCase; ton = qty * param.kgPerCase / 1000;
-      ket = cpp > 0 ? `${f(palet)} plt × ${f(cpp)} case/plt` : 'isi case per palet';
-    } else if (r.moda === 'unit') {
-      const cs = palet * cpp; qty = cs * upc; satuan = r.satuanUnit ?? 'pcs';
+    if (muatan === 'case' || muatan === 'unit') {
+      const cs = palet * cpp;
       cbm = cs * param.cbmPerCase; ton = cs * param.kgPerCase / 1000;
-      ket = cpp > 0 && upc > 0 ? `${f(palet)} plt × ${f(cpp)} case × ${f(upc)} ${satuan}/case` : 'isi case per palet & unit per case';
-    } else ket = `${f(palet)} palet`;
-
-    const h: HasilBaris = { paletHari: palet, qtyHari: qty, satuan, ket };
-    const k = isKont
-      ? kendaraan.find(x => r.moda === 'cont20' ? /20ft/i.test(x.nama) : r.moda === 'cont40hc' ? /40HC/i.test(x.nama) : /40ft/i.test(x.nama))
+      if (muatan === 'case') { qty = cs; satuan = 'case'; ket = cpp > 0 ? `${f(palet)} plt × ${f(cpp)} case/plt` : 'isi case per palet'; }
+      else { qty = cs * upc; satuan = r.satuanUnit ?? 'pcs'; ket = cpp > 0 && upc > 0 ? `${f(palet)} plt × ${f(cpp)} case × ${f(upc)} ${satuan}/case` : 'isi case per palet & unit per case'; }
+    }
+    const kDasar = isKont
+      ? kendaraan.find(x => r.moda === 'cont20' ? /20ft/i.test(x.nama) : r.moda === 'cont40hc' ? /40HC/i.test(x.nama) : /40ft/i.test(x.nama) && !/HC/i.test(x.nama))
       : kendaraan.find(x => x.nama === r.kendaraan) ?? kendaraan[0];
+    const k = kDasar && isKont && r.tonPerKontainer ? { ...kDasar, ton: r.tonPerKontainer } : kDasar;
+    const h: HasilBaris = { paletHari: palet, qtyHari: qty, satuan, ket };
     if (k && palet > 0) {
-      const loose = r.moda === 'case' || r.moda === 'unit';
-      const nPalet = isKont ? qty : loose ? 0 : (k.palet > 0 ? palet / k.palet : 0);
-      const nCbm = isKont ? 0 : k.cbm > 0 ? cbm / k.cbm : 0;
-      const nTon = isKont ? 0 : k.ton > 0 ? ton / k.ton : 0;
+      const loose = muatan !== 'palet';
+      const nPalet = loose ? 0 : (k.palet > 0 ? palet / k.palet : 0);
+      const nCbm = k.cbm > 0 ? cbm / k.cbm : 0;
+      const nTon = k.ton > 0 ? ton / k.ton : 0;
       const top = [{ p: 'palet' as const, n: nPalet }, { p: 'cbm' as const, n: nCbm }, { p: 'ton' as const, n: nTon }].sort((a, b) => b.n - a.n)[0];
       const perHari = top.n;
       const bulat = Math.ceil(perHari - 1e-9);
       const trip = bulat || 1;
-      h.mobil = { kendaraan: k.nama, perHari, bulat, perBulan: perHari * hariBulan, pembatas: isKont ? 'ton' : top.p,
+      h.mobil = { kendaraan: k.nama, perHari, bulat, perBulan: perHari * hariBulan, pembatas: top.p,
         paletTrip: loose ? 0 : palet / trip, cbmTrip: cbm / trip, tonTrip: ton / trip, kap: k,
         cbmCukup: cbm / trip <= k.cbm + 1e-9, tonCukup: ton / trip <= k.ton + 1e-9,
         maksPaletCbm: param.cbmPerPalet > 0 ? Math.floor(k.cbm / param.cbmPerPalet) : 0 };
+      if (isKont) h.ket = `${ket} → ${f(cbm)} CBM · ${f(ton * 1000)} kg (kap. ${k.cbm} CBM · ${f(k.ton * 1000)} kg${loose ? '' : ` · ${k.palet} plt`})`;
     }
     return h;
   });

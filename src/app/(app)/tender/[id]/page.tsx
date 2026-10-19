@@ -7,8 +7,9 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
+import { skemaVsmDefault, VSM_DEFAULT } from '@/lib/vsmDefault';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
-import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap } from '@/lib/engine/types';
+import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
@@ -102,6 +103,7 @@ export default function TenderPage() {
   const kotorAkhir = useRef(false);
   const setKotor = (v: boolean) => { kotorAkhir.current = v; setKotorS(v); };
   const [pembuat, setPembuat] = useState<string | null>(null);
+  const [konfirmVsm, setKonfirmVsm] = useState(false);
 
   const muat = useCallback(async () => {
     const [tr, p, it, tf, jb] = await Promise.all([
@@ -227,10 +229,10 @@ export default function TenderPage() {
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
   const spaceH = useMemo(() => {
     if (!t) return null;
-    const v = (ar: Arus) => t.asumsi.volumes.find(x => x.arus === ar)?.peakBulan ?? 0;
+    const v = (ar: Arus) => volumeEfektif(t.asumsi.volumes).find(x => x.arus === ar)?.peakBulan ?? 0;
     return hitungSpaceExcel(lengkapiSpaceExcel(t.asumsi.space.excel), v('storage'), v('inbound'), v('outbound'), t.jumlah_shift);
   }, [t]);
-  const pdFull = useMemo(() => t ? hitungProcessDesign(aktivitasDenganOrderAdmin(t.asumsi.aktivitas, t.asumsi.volumes, t.asumsi.profilVolume, t.asumsi.processDesign?.hariKerjaBulan ?? 25), t.asumsi.volumes, { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
+  const pdFull = useMemo(() => t ? hitungProcessDesign(aktivitasDenganOrderAdmin(t.asumsi.aktivitas, volumeEfektif(t.asumsi.volumes), t.asumsi.profilVolume, t.asumsi.processDesign?.hariKerjaBulan ?? 25), volumeEfektif(t.asumsi.volumes), { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
     t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift,
     { spanOfControl: t.asumsi.spanOfControl, roleSupervisor: t.asumsi.roleSupervisor, alatSupervisor: t.asumsi.alatSupervisor, peranTetap: t.asumsi.peranTetap }) : null, [t]);
   const pdMhe = pdFull?.mhe ?? [];
@@ -241,7 +243,8 @@ export default function TenderPage() {
   if (!t) return <p className="muted">{pesan ?? 'Memuat tender…'}</p>;
   const a = t.asumsi;
   const hariOps = a.processDesign?.hariKerjaBulan ?? 25;
-  const aktEf = aktivitasDenganOrderAdmin(a.aktivitas, a.volumes, a.profilVolume, hariOps);
+  const volEf = volumeEfektif(a.volumes);
+  const aktEf = aktivitasDenganOrderAdmin(a.aktivitas, volEf, a.profilVolume, hariOps);
   const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, batasUpahPensiun: masterMp?.payroll.batasUpahJp || PARAM_BIAYA_MP_DEFAULT.batasUpahPensiun, batasUpahKs: masterMp?.payroll.batasUpahKes || PARAM_BIAYA_MP_DEFAULT.batasUpahKs, ...(a.paramBiayaMp ?? {}) };
   const qtyRole = new Map<string, number>();
   for (const r of pdFull?.mp ?? []) if (r.resources > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.resources);
@@ -259,7 +262,7 @@ export default function TenderPage() {
     const nomorQuotation = (ql.find(q => q.status === 'approved' || q.status === 'terkirim') ?? ql.find(q => q.status !== 'batal') ?? ql[0])?.nomor ?? null;
     setNomorQ(nomorQuotation);
     return { t, hasil: h, master, catatanMaster: catatan, pd: pdFull, rincianMp, paramMp,
-      profil: a.profilVolume, orderAdmin: orderAdmin(a.profilVolume, a.volumes, hariOps), nomorQuotation };
+      profil: a.profilVolume, orderAdmin: orderAdmin(a.profilVolume, volEf, hariOps), nomorQuotation };
   }
 
   const aksi = (atas: boolean) => (
@@ -343,7 +346,7 @@ export default function TenderPage() {
           <h2><T>Volume</T></h2>
           <p className="small muted">Sizing memakai <b>peak</b>. Tarif dihitung dari <b>volume komitmen</b> (MGV). Storage diisi jumlah stok (posisi), arus lain per bulan.</p>
           {a.volumes.some(v => v.rataRataBulan > 0 && (!(v.peakBulan > 0) || !(v.komitmenBulan > 0))) && <p className="notice small" role="alert">
-            Peak/bln atau Komitmen/bln masih 0, sehingga sizing, ringkasan order, dan tarif ikut 0.{' '}
+            Peak/bln atau Komitmen/bln masih 0 — sementara dihitung memakai <b>rata-rata/bln</b> (sizing, volume aktivitas, ringkasan order, tarif). Isi peak & komitmen sebenarnya bila berbeda.{' '}
             <button className="ghost" onClick={() => setA({ volumes: a.volumes.map(v => v.rataRataBulan > 0 ? { ...v, peakBulan: v.peakBulan > 0 ? v.peakBulan : v.rataRataBulan, komitmenBulan: v.komitmenBulan > 0 ? v.komitmenBulan : v.rataRataBulan } : v) })}>Isi yang kosong = rata-rata/bln</button>
             {' '}lalu sesuaikan bila peak / komitmen berbeda.</p>}
           <div className="tablewrap"><table>
@@ -385,7 +388,7 @@ export default function TenderPage() {
           </div>
           <div className="tablewrap"><table>
             <thead><tr><th>Arus</th><th className="num">Per hari</th><th className="num">Per bulan</th><th className="num">Per tahun</th></tr></thead>
-            <tbody>{a.volumes.map((v, i) => {
+            <tbody>{volEf.map((v, i) => {
               const k = v.konversi; const p1 = k?.per1 || 0, p2 = k?.per2 || 0;
               const sel = (x: number) => <>{angka(x, x < 100 && x % 1 ? 1 : 0)} {v.uom}{p1 > 0 && <div className="small">{angka(x * p1)} {k!.uom1}</div>}{p1 > 0 && p2 > 0 && <div className="small muted">{angka(x * p1 * p2)} {k!.uom2}</div>}</>;
               const bln = Number(v[basisRingkas]) || 0;
@@ -424,12 +427,12 @@ export default function TenderPage() {
         </div>
       )}
 
-      {tab === 'Volume' && <ProfilVolumePanel profil={a.profilVolume} volumes={a.volumes} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
+      {tab === 'Volume' && <ProfilVolumePanel profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
         onChange={profilVolume => setA({ profilVolume })} />}
 
       {tab === 'Aktivitas & manpower' && (<>
         {<>
-          <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)}
               biaya={{
                 perOrang: role => { const r = rincianMp.find(x => x.role === role); return (r?.total ?? 0) * (r?.porsi ?? 1) * (1 + paramMp.feePersen); },
@@ -442,9 +445,9 @@ export default function TenderPage() {
             umk={masterMp?.upahMinimum ?? 0} lokasi={t.kab_kota} levelGaji={a.levelGaji ?? {}} levelRole={a.levelRole ?? {}}
             onLevelGaji={levelGaji => setA({ levelGaji })} onLevelRole={levelRole => setA({ levelRole })}
             onInput={rincianBiayaMp => setA({ rincianBiayaMp })} onParam={p => setA({ paramBiayaMp: { ...(a.paramBiayaMp ?? {}), ...p } })} />
-          <ProcessDesignPanel bagian="rincian" aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          <ProcessDesignPanel bagian="rincian" aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
-          <ProcessDesignPanel bagian="desain" aktivitas={aktEf} volumes={a.volumes} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          <ProcessDesignPanel bagian="desain" aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
         </>}
         <div className="card">
@@ -500,6 +503,19 @@ export default function TenderPage() {
         <div className="card">
           <h2><T>Aktivitas (VSM) & manpower</T></h2>
           <p className="small muted">Pilih aktivitas dari database produktivitas (Operations) atau tambah baris kosong. Semua kolom kuning bisa diubah: task, aktivitas, equipment, alat pendukung, role, produktivitas, UoM, arus, volume, %. Volume/bln kosong = volume peak arus × pengali. <b>Arus</b> = alur barang yang menjadi dasar volume aktivitas: Inbound (barang masuk), Outbound (barang keluar), Storage (stok/penyimpanan), VAS (value added service).</p>
+          <div className="notice small" style={{ display: 'grid', gap: 6 }}>
+            <div><b>Skema default VSM</b> ({VSM_DEFAULT.length} aktivitas, prosedur gudang standar): unloading curah oleh TKBM / palet dengan forklift CB → admin receiving → checker & tally → staging → admin input putaway → putaway reach truck → cycle count & input inventory → input & replenishment reach truck → admin input picking → picking case (picker) / palet (reach truck) → staging outbound → checker outbound → loading curah (TKBM) / paletan (forklift CB) → admin barang keluar & print handover list → checker serahkan HO ke driver.
+              Porsi awal: 50% curah / 50% palet di inbound, 50% case / 50% palet di picking & loading — sesuaikan kolom %, hapus, atau ganti baris sesuai kebutuhan.</div>
+            <div className="row">
+              {!konfirmVsm
+                ? <button className="ghost" onClick={() => a.aktivitas.length ? setKonfirmVsm(true) : setA({ aktivitas: skemaVsmDefault(prods) })}>{a.aktivitas.length ? 'Ganti dengan skema default' : 'Isi skema default'}</button>
+                : <><span>Ganti {a.aktivitas.length} aktivitas yang ada dengan skema default?</span>
+                  <button className="danger" onClick={() => { setA({ aktivitas: skemaVsmDefault(prods) }); setKonfirmVsm(false); }}>Ya, ganti</button>
+                  <button className="ghost" onClick={() => setKonfirmVsm(false)}>Batal</button></>}
+              {a.aktivitas.length > 0 && !konfirmVsm && <button className="ghost" onClick={() => setA({ aktivitas: [...a.aktivitas, ...skemaVsmDefault(prods)] })}>Tambahkan di bawah aktivitas yang ada</button>}
+              <span className="muted">Bisa di-Undo.</span>
+            </div>
+          </div>
           <TambahAktivitas prods={prods} industri={t.industri} onTambah={p => setA({ aktivitas: [...a.aktivitas, { ...dariProd(p), persenVolume: 1, pengaliUom: 1 }] })} />
           <div className="row">
             <button className="ghost" onClick={() => setA({ aktivitas: [...a.aktivitas, { aktivitas: 'Aktivitas baru', tahap: a.aktivitas.at(-1)?.tahap ?? 'Inbound', tool: 'Manual', roleName: jabatan[0] ?? '',
@@ -515,7 +531,7 @@ export default function TenderPage() {
               {a.aktivitas.length === 0 && <tr><td colSpan={12} className="muted">Belum ada aktivitas. Tambahkan dari daftar di atas atau baris kosong.</td></tr>}
               {a.aktivitas.map((x, i) => {
                 const ub = (patch: Partial<typeof x>) => setA({ aktivitas: ubahArray(a.aktivitas, i, patch) });
-                const vArus = a.volumes.find(v => v.arus === x.arus);
+                const vArus = volEf.find(v => v.arus === x.arus);
                 const pEf = pengaliEfektif(x, vArus);
                 const ef = aktEf[i];
                 const vAuto = ef?.volumeDariProfil ? Number(ef.volumeManual) : (vArus?.peakBulan ?? 0) * pEf;
@@ -557,9 +573,9 @@ export default function TenderPage() {
           setKol('warehouse_id', g?.id ?? null);
           setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
         }} />
-        <SpacePanel excel={a.space.excel} ppTotal={a.volumes.find(v => v.arus === 'storage')?.peakBulan ?? 0}
-          inboundBulan={a.volumes.find(v => v.arus === 'inbound')?.peakBulan ?? 0} outboundBulan={a.volumes.find(v => v.arus === 'outbound')?.peakBulan ?? 0}
-          uomIn={a.volumes.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={a.volumes.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
+        <SpacePanel excel={a.space.excel} ppTotal={volEf.find(v => v.arus === 'storage')?.peakBulan ?? 0}
+          inboundBulan={volEf.find(v => v.arus === 'inbound')?.peakBulan ?? 0} outboundBulan={volEf.find(v => v.arus === 'outbound')?.peakBulan ?? 0}
+          uomIn={volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
           jumlahShift={t.jumlah_shift} onChange={excel => setA({ space: { ...a.space, excel } })}
           komersial={<BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
             posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}

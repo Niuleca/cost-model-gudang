@@ -127,6 +127,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
                 {h.mp.length + ind.length === 0 && <tr><td colSpan={colTot} className="muted">–</td></tr>}
                 {h.mp.map(r => {
                   const status = r.tkbm ? (/helper|daily|harian/i.test(r.nama) ? 'Daily worker' : 'TKBM')
+                    : r.fte <= 1e-9 ? 'Tidak ada workload (volume / % aktivitas = 0)'
                     : r.resources === 0 ? `Dirangkap ${r.dirangkapOleh.join(', ')}` : r.merangkap.length ? 'Direct · multi-skill' : r.dirangkap ? `Direct · sisa dirangkap ${r.dirangkapOleh.join(', ')}` : 'Direct';
                   return <tr key={`d-${r.nama}`}><td>{r.nama}{r.merangkap.length > 0 && <div className="small muted">merangkap: {r.merangkap.join(', ')}</div>}</td>
                     <td className="small"><b>{status}</b>{r.catatan.map((c, k) => <div key={k} className="muted">{c}</div>)}</td>

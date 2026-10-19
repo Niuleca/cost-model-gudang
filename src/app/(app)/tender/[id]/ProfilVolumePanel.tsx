@@ -3,7 +3,7 @@ import { T, useT } from '@/lib/i18n';
 import type { VolumeInput } from '@/lib/engine/types';
 import { angka } from '@/lib/format';
 import {
-  hitungProfil, volumePalet, orderAdmin, KENDARAAN_DEFAULT, MODA, PARAM_DEFAULT, SATUAN_UNIT, TON_KONTAINER,
+  hitungProfil, volumePalet, orderAdmin, KENDARAAN_DEFAULT, MODA, MUATAN, muatanBaris, PARAM_DEFAULT, SATUAN_UNIT,
   type BarisProfil, type BasisVolume, type Kendaraan, type ProfilVolume,
 } from '@/lib/profilVolume';
 
@@ -35,43 +35,47 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
     return (
       <div style={{ minWidth: 0, display: 'grid', gap: 8 }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h3>{out ? 'Outbound (export / pengiriman)' : 'Inbound (import / penerimaan)'}</h3>
+          <h3>{out ? 'Outbound (pengiriman · kontainer / land transport)' : 'Inbound (penerimaan · kontainer / land transport)'}</h3>
           <span className="pill info">{angka(vp.paletBulan)} palet/bln ÷ {hariBulan} hari = <b>{angka(paletHari, 1)} palet/hari</b></span>
         </div>
         {!vp.ok && <p className="small" style={{ color: 'var(--warn, #b45309)' }}>{vp.ket}</p>}
         <div className="tablewrap"><table>
-          <thead><tr><th>Moda</th><th className="num">Porsi</th><th className="num">Palet/hari</th><th>Konversi</th><th className="num">Qty/hari</th>
+          <thead><tr><th>Moda & cara muat</th><th className="num">Porsi</th><th className="num">Palet/hari</th><th>Konversi</th><th className="num">Qty/hari</th>
             <th>Kendaraan</th><th className="num">Mobil/hari</th><th>Cek muatan per mobil</th><th></th></tr></thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={9} className="muted">Belum ada. Tambah moda di bawah lalu isi porsinya (%).</td></tr>}
             {rows.map((r, i) => {
               const x = h.hasil[i];
               const isKont = r.moda.startsWith('cont');
+              const mu = muatanBaris(r);
               const m = x.mobil;
               return <tr key={i}>
                 <td><select aria-label="Moda" value={r.moda} onChange={e => set(i, { moda: e.target.value as BarisProfil['moda'] })} style={{ minWidth: 170 }}>
-                  {MODA.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select>
-                  {r.moda === 'unit' && <select aria-label="Satuan" value={r.satuanUnit ?? 'pcs'} onChange={e => set(i, { satuanUnit: e.target.value })} style={{ minWidth: 80, marginTop: 4 }}>{SATUAN_UNIT.map(u => <option key={u}>{u}</option>)}</select>}</td>
+                  <optgroup label="Kontainer">{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>
+                  <optgroup label="Land transport (truk)">{MODA.filter(o => !o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup></select>
+                  {isKont && <select aria-label="Cara muat" value={mu} onChange={e => set(i, { muatan: e.target.value as BarisProfil['muatan'] })} style={{ minWidth: 170, marginTop: 4 }}>
+                    {MUATAN.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
+                  {mu === 'unit' && <select aria-label="Satuan" value={r.satuanUnit ?? 'pcs'} onChange={e => set(i, { satuanUnit: e.target.value })} style={{ minWidth: 80, marginTop: 4 }}>{SATUAN_UNIT.map(u => <option key={u}>{u}</option>)}</select>}</td>
                 <td className="num"><div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}>
                   {n(r.persen ? Math.round(r.persen * 1000) / 10 : 0, v => set(i, { persen: v / 100 }), 64)}<span className="small">%</span></div></td>
                 <td className="num"><b>{angka(x.paletHari, 1)}</b></td>
                 <td><div className="row small" style={{ flexWrap: 'nowrap', gap: 4 }}>
-                  {isKont && <>{n(r.tonPerKontainer, v => set(i, { tonPerKontainer: v }), 60, String(TON_KONTAINER[r.moda as keyof typeof TON_KONTAINER]))}<span className="muted">ton/kont</span></>}
-                  {r.moda === 'palet' && <span className="muted">—</span>}
-                  {(r.moda === 'case' || r.moda === 'unit') && <>{n(r.casePerPalet, v => set(i, { casePerPalet: v }), 60, vp.cpp ? String(vp.cpp) : 'case')}<span className="muted">case/plt</span></>}
-                  {r.moda === 'unit' && <>{n(r.unitPerCase, v => set(i, { unitPerCase: v }), 60, vp.upc ? String(vp.upc) : r.satuanUnit ?? 'pcs')}<span className="muted">/case</span></>}
+                  {mu === 'palet' && <span className="muted">—</span>}
+                  {(mu === 'case' || mu === 'unit') && <>{n(r.casePerPalet, v => set(i, { casePerPalet: v }), 60, vp.cpp ? String(vp.cpp) : 'case')}<span className="muted">case/plt</span></>}
+                  {mu === 'unit' && <>{n(r.unitPerCase, v => set(i, { unitPerCase: v }), 60, vp.upc ? String(vp.upc) : r.satuanUnit ?? 'pcs')}<span className="muted">/case</span></>}
                 </div><div className="small muted">{x.ket}</div></td>
                 <td className="num"><b>{angka(x.qtyHari, x.qtyHari < 10 ? 1 : 0)}</b><div className="small muted">{x.satuan}</div></td>
-                <td>{isKont ? <span className="small muted">{m?.kendaraan ?? 'kontainer'}</span>
+                <td>{isKont ? <><span className="small">{m?.kendaraan ?? 'kontainer'}</span>
+                    <div className="row small" style={{ flexWrap: 'nowrap', gap: 4, marginTop: 4 }}>{n(r.tonPerKontainer ? r.tonPerKontainer * 1000 : undefined, v => set(i, { tonPerKontainer: v ? v / 1000 : undefined }), 70, m ? String(Math.round(m.kap.ton * 1000)) : 'kg')}<span className="muted">kg maks/kont</span></div></>
                   : <select aria-label="Kendaraan" value={r.kendaraan ?? kendaraan[0].nama} onChange={e => set(i, { kendaraan: e.target.value })} style={{ minWidth: 150 }}>
                     {kendaraan.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('id-ID')} kg</option>)}</select>}</td>
-                <td className="num">{m ? <><b>{m.bulat}</b><div className="small muted">({angka(m.perHari, 2)}) · {angka(m.perBulan)}/bln</div></> : '–'}</td>
-                <td className="small">{m && !isKont && <>
-                  {r.moda === 'palet' && <div>{angka(m.paletTrip, 1)} / {m.kap.palet} palet</div>}
+                <td className="num">{m ? <><b>{m.bulat}</b>{isKont && <div className="small">kontainer</div>}<div className="small muted">({angka(m.perHari, 2)}) · {angka(m.perBulan)}/bln</div></> : '–'}</td>
+                <td className="small">{m && <>
+                  {mu === 'palet' && <div>{angka(m.paletTrip, 1)} / {m.kap.palet} palet</div>}
                   <div>CBM {angka(m.cbmTrip, 1)} / {m.kap.cbm} m³ <span className={`pill ${m.cbmCukup ? 'ok' : 'bad'}`}>{m.cbmCukup ? 'cukup' : 'tidak cukup'}</span></div>
                   <div>Berat {angka(m.tonTrip * 1000)} / {angka(m.kap.ton * 1000)} kg <span className={`pill ${m.tonCukup ? 'ok' : 'bad'}`}>{m.tonCukup ? 'cukup' : 'overload'}</span></div>
-                  <div className="muted">pembatas: {m.pembatas === 'ton' ? 'berat' : m.pembatas}{r.moda === 'palet' && m.maksPaletCbm < m.kap.palet && ` · CBM hanya muat ${m.maksPaletCbm} palet`}</div>
-                </>}{m && isKont && <span className="muted">{angka(x.qtyHari, 2)} kontainer/hari</span>}</td>
+                  <div className="muted">pembatas: {m.pembatas === 'ton' ? 'berat' : m.pembatas}{mu === 'palet' && m.maksPaletCbm < m.kap.palet && ` · CBM hanya muat ${m.maksPaletCbm} palet`}</div>
+                </>}</td>
                 <td><button className="danger" onClick={() => onChange({ ...p, [arus]: rows.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>;
             })}
@@ -92,7 +96,8 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
     <div className="card" style={{ gap: 12 }}>
       <h2><T>Profil order inbound & outbound (per hari)</T></h2>
       <p className="small muted">Mengikuti volume di tabel Volume: volume per bulan ÷ hari operasional = palet per hari, lalu dipecah per moda sesuai porsi (%).
-        Kontainer = ton ÷ ton per kontainer; case = palet × case/palet; pcs = × isi per case. Mobil per hari = kebutuhan terbesar antara palet, CBM, dan berat (kg) dibanding kapasitas kendaraan (dibulatkan ke atas per moda).</p>
+        Berlaku untuk kontainer 20ft / 40ft / 40HC maupun land transport (truk), inbound & outbound — tidak hanya import/export. Cara muat: <b>palletize</b> (dibatasi jumlah palet, CBM, berat) atau <b>loose case/karton/pcs</b> (case = palet × case/palet; CBM & berat dari parameter per case).
+        Kontainer/mobil per hari = kebutuhan terbesar antara palet, CBM, dan berat dibanding kapasitas kontainer/kendaraan (dibulatkan ke atas per moda). Kapasitas kontainer bisa diubah di "Kapasitas kendaraan".</p>
       <div className="row" style={{ alignItems: 'end' }}>
         <label className="f">Basis volume
           <select value={basis} onChange={e => onChange({ ...p, basis: e.target.value as BasisVolume })} style={{ minWidth: 170 }}>

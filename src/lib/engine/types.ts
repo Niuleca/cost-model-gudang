@@ -53,6 +53,14 @@ export interface AktivitasInput {
   volumeManual?: number | null; // override volume per bulan (sebelum %); kosong = peak arus × pengali
 }
 
+/** Volume efektif: Peak kosong → rata-rata (lalu komitmen); Komitmen kosong → rata-rata (lalu peak). Input asli tidak diubah. */
+export function volumeEfektif<V extends { rataRataBulan: number; peakBulan: number; komitmenBulan: number }>(vs: V[]): V[] {
+  return (vs ?? []).map(v => {
+    const avg = Number(v.rataRataBulan) || 0, pk = Number(v.peakBulan) || 0, km = Number(v.komitmenBulan) || 0;
+    return { ...v, peakBulan: pk > 0 ? pk : avg > 0 ? avg : km, komitmenBulan: km > 0 ? km : avg > 0 ? avg : pk };
+  });
+}
+
 /** Headcount peran tetap: qty total, atau qty per shift × shift aktif */
 export const headcountTetap = (p: { qty: number; perShift?: boolean }, shiftAktif: number) =>
   Math.max(0, Number(p.qty) || 0) * (p.perShift ? Math.max(1, shiftAktif) : 1);
