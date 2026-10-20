@@ -18,8 +18,9 @@ const STATUS: Record<string, { l: string; c: string }> = {
   rencana: { l: 'Rencana', c: 'info' }, dibuka: { l: 'Dibuka', c: 'ok' }, ditutup: { l: 'Ditutup', c: 'bad' }, dibatalkan: { l: 'Dibatalkan', c: 'bad' }, selesai: { l: 'Selesai', c: 'info' },
 };
 const kosong = (): Partial<Radar> => ({ perusahaan: '', judul: '', kategori: 'Warehousing', platform: 'Website perusahaan', status: 'dibuka' });
-const hariIni = () => new Date().toISOString().slice(0, 10);
-const sisaHari = (d: string | null) => d ? Math.ceil((new Date(d + 'T23:59:59').getTime() - Date.now()) / 86400000) : null;
+// Tanggal lokal (WIB di browser pengguna), bukan UTC
+const hariIni = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const sisaHari = (d: string | null) => d ? Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(hariIni() + 'T00:00:00Z')) / 86400000) : null;
 
 export default function Beranda() {
   const sb = supabaseBrowser();
@@ -111,7 +112,7 @@ export default function Beranda() {
         <tbody>
           {tampil.map(r => { const s = sisaHari(r.batas_penawaran); const st = STATUS[r.status] ?? { l: r.status, c: 'info' };
             return <tr key={r.id}>
-              <td className="small" style={{ whiteSpace: 'nowrap' }}>{r.batas_penawaran ? <><b>{tanggal(r.batas_penawaran)}</b><div className={s != null && s <= 7 && s >= 0 ? 'bad' : 'muted'}>{s == null ? '' : s < 0 ? 'lewat' : s === 0 ? 'hari ini' : `${s} hari lagi`}</div></> : <span className="muted">belum diumumkan</span>}
+              <td className="small" style={{ whiteSpace: 'nowrap' }}>{r.batas_penawaran ? <><b>{tanggal(r.batas_penawaran)}</b><div className={s != null && s <= 7 && s >= 0 ? 'bad' : 'muted'}>{s == null ? '' : s < 0 ? 'lewat' : s === 0 ? 'hari ini' : s === 1 ? 'besok' : `${s} hari lagi`}</div></> : <span className="muted">belum diumumkan</span>}
                 {r.batas_daftar && <div className="muted">daftar s.d. {tanggal(r.batas_daftar)}</div>}</td>
               <td><b>{r.perusahaan}</b>{r.industri && <div className="small muted">{r.industri}</div>}</td>
               <td>{r.link ? <a href={r.link} target="_blank" rel="noreferrer">{r.judul}</a> : r.judul}

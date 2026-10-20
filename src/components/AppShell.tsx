@@ -87,7 +87,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const on = isi.some(i => aktif(i.href));
     return (
       <div className={`dd${buka === id ? ' open' : ''}`} onMouseEnter={() => window.matchMedia('(hover: hover)').matches && setBuka(id)} onMouseLeave={() => window.matchMedia('(hover: hover)').matches && setBuka(null)}>
-        <button className={`ddbtn${on ? ' on' : ''}`} aria-haspopup="true" aria-expanded={buka === id} onClick={() => setBuka(buka === id ? null : id)}>
+        <button className={`ddbtn${on ? ' on' : ''}`} aria-haspopup="true" aria-expanded={buka === id} onClick={() => { if (id === 'dashboard') { setBuka(null); router.push('/beranda'); } else setBuka(buka === id ? null : id); }}>
           {t(label)} <span aria-hidden="true" className="caret">▾</span>
         </button>
         {buka === id && (
@@ -103,7 +103,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="shell">
       <header className="topbar">
-        <Link href="/" className="brand" aria-label="Leca — beranda"><LecaMark /><span className="brand-nama">Leca</span><span className="brand-oleh">by esapanghegar</span></Link>
+        <Link href="/beranda" className="brand" aria-label="Leca — beranda"><LecaMark /><span className="brand-nama">Leca</span><span className="brand-oleh">by esapanghegar</span></Link>
         <nav aria-label="Menu utama" ref={navRef} className="topnav">
           {(!profile || profile.status === undefined || profile.status === 'aktif') && MENU.map(m => <Dropdown key={m.id} {...m} />)}
           <div className="sela" />
