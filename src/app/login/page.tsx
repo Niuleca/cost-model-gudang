@@ -23,7 +23,7 @@ function LoginForm() {
       if (mode === 'masuk') {
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        router.replace(params.get('next') || '/');
+        router.replace(params.get('next') || '/beranda');
         router.refresh();
       } else if (mode === 'daftar') {
         const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: nama }, emailRedirectTo: redirect } });

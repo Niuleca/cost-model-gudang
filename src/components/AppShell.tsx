@@ -13,6 +13,7 @@ import { useBrandingSaya } from './BrandingProfil';
 type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: boolean };
 const MENU: { id: string; label: string; item: Item[] }[] = [
   { id: 'dashboard', label: 'Dashboard', item: [
+    { href: '/beranda', label: 'Beranda · Radar tender', roles: 'semua' },
     { href: '/', label: 'Ringkasan', roles: TIM_TENDER },
     { href: '/status', label: 'Status Project', roles: TIM_TENDER },
     { href: '/heatmap', label: 'Heatmap penyelesaian, backlog & waiting', roles: TIM_TENDER },
