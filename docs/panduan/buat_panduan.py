@@ -87,7 +87,7 @@ def sampul(c, doc):
     c.drawString(20 * mm, h - 150 * mm, 'Cost model, tender & quotation gudang — dari input sampai Excel ber-rumus')
     c.setFont('Sans', 9.5)
     for i, t in enumerate(['Untuk: Super Admin · Manager · Solution Design · Business Development · Procurement · IT · HR · Operational',
-                           'Alamat aplikasi: costmodel.esapanghegar.my.id', 'Versi Oktober 2026']):
+                           'Alamat aplikasi: costmodel.esapanghegar.my.id', 'Versi 20 Oktober 2026']):
         c.drawString(20 * mm, 45 * mm - i * 6 * mm, t)
     c.setFillColor(colors.white); c.setFont('Sans-B', 9.5); c.drawString(20 * mm, 22 * mm, 'by esapanghegar')
     c.restoreState()
@@ -116,11 +116,13 @@ def bangun(out):
           tabel([['Menu', 'Isi'],
                  ['Dashboard', 'Ringkasan pipeline, status project, heatmap backlog'],
                  ['Tender', 'New Tender · Draft Tender · Comparation Tender · Riwayat Tender · Approval quotation (Manager/Super Admin) · Implementation'],
-                 ['Price Inquiry', 'Database harga: MHE, racking, office, gudang, IT, utilities, gudang sewa, HR (UMK, jabatan, payroll)'],
+                 ['Price Inquiry', 'Database harga: MHE, racking, office, gudang, IT, utilities, gudang sewa, HR (UMK, jabatan, payroll) · Comparation Price (vendor)'],
                  ['Productivity', 'Database produktivitas per aktivitas & UoM'],
                  ['Menu akun (kanan atas)', 'Pengguna & role · Approval akun · Master data · Profil & password · Keluar'],
                  ['Pemilih bahasa (ikon bola dunia)', 'Indonesia · English · Korea · Jepang'],
-                 ['? Cara penggunaan', 'Membuka panduan ini']], [42 * mm, 128 * mm])]
+                 ['Baca saya sebelum mulai', 'Tombol di halaman New Tender untuk membuka panduan ini']], [42 * mm, 128 * mm]),
+          Spacer(1, 6), kotak('Di halaman tender, menu tab (Key assumption, Volume, Aktivitas &amp; manpower, …) tetap menempel di atas saat halaman di-scroll, '
+                              'dan bar <b>Undo · Redo · Simpan input · Hitung</b> menempel di bawah layar.', 'Navigasi tender')]
 
     # ---- 2
     s += [PageBreak(), P('BAB 2', 'eyebrow'), P('Akun: daftar, ACC, role & hak akses', 'h1'), P('Mendaftar', 'h2')]
@@ -168,32 +170,65 @@ def bangun(out):
                  ['Rencana go-live', 'Dasar kalender & mulai kontrak'], ['Jumlah shift · Payment term · Skenario aset', 'Rental / Own Asset / Built-to-Suit']],
                 [44 * mm, 126 * mm]),
           Spacer(1, 6), P('Tekan <b>Buat tender &amp; lanjut isi asumsi</b>. Tender tersimpan sebagai draft dan hanya bisa diedit pembuatnya, Manager, atau Super Admin.'),
-          kotak('Tombol <b>Simpan</b> dan <b>Hitung</b> ada di atas dan bawah setiap tab. <b>Undo/Redo</b> (Ctrl+Z / Ctrl+Y) membatalkan perubahan input. '
-                'Simpan sesering mungkin.', 'Kebiasaan baik')]
+          kotak('Tombol <b>Simpan input</b> dan <b>Hitung</b> ada di atas dan di bar bawah setiap tab. <b>Hitung</b> tidak memindahkan Anda ke tab Hasil — '
+                'Anda tetap di tab yang sedang dibuka. <b>Undo/Redo</b> (Ctrl+Z / Ctrl+Y) membatalkan perubahan input. Simpan sesering mungkin.', 'Kebiasaan baik'),
+          P('Isi otomatis pada tender baru', 'h2'),
+          *L(['Tab Aktivitas langsung berisi <b>skema default VSM</b> (22 aktivitas prosedur gudang standar) — tinggal disesuaikan.',
+              'Peran tetap kosong; supervisor dihitung otomatis dari span of control.',
+              'Angka di kolom angka boleh dikosongkan dulu saat mengetik. <b>Koma dibaca sebagai desimal</b> — tulis 20369, bukan 20,369.'])]
 
     # ---- 5
     s += [PageBreak(), P('BAB 5', 'eyebrow'), P('Mengisi tender langkah demi langkah', 'h1'),
           alur([('Asumsi', 'key assumption'), ('Volume', 'palet/order'), ('Aktivitas', '& manpower'), ('Gudang', 'space & MHE'), ('Interest', 'pinjaman'), ('IT', 'sistem'), ('Biaya lain', 'opex/capex'), ('Hasil', 'cek')]),
           P('1 · Key assumption', 'h2'),
-          *L(['Provinsi & area (UMK), hari kerja per minggu, jam efektif, cuti, faktor produktivitas & efisiensi.', 'Span of control supervisor dan peran tetap (SPV, security, dll.).']),
+          *L(['Customer, industri, provinsi &amp; area (UMK), skema, skenario aset, kontrak, go-live, shift, hari &amp; jam kerja, payment term, cuti, faktor produktivitas &amp; efisiensi.',
+              '<b>Workload palletize vs loose</b> per proses — isi % palletize, loose = sisanya. Aktivitas yang "Ikut porsi" otomatis memakai angka ini.',
+              '<b>Process Design</b>: working day (hari kerja, cuti, libur, jam efektif) untuk Man Power &amp; MHE, dan <b>workload per shift terpisah Inbound / Outbound / Storage-VAS</b> '
+              '(mis. inbound 70/30/0, outbound 0/40/60). Kolom Gabungan = rata-rata tertimbang man hour.']),
+          tabel([['Proses', 'Palletize', 'Loose', 'Catatan'],
+                 ['Unloading', 'forklift CB', 'TKBM curah + palletize', 'default 50 / 50'],
+                 ['Putaway', 'reach truck ke rak', 'loose case ke shelving', 'default 100 / 0'],
+                 ['Replenishment', 'reach truck turun palet', 'loose case manual', 'dari volume case picking saja'],
+                 ['Picking', 'full palet (RT)', 'case picking (picker)', 'default 50 / 50'],
+                 ['Loading', 'paletan (forklift CB)', 'curah / case (TKBM)', 'default 50 / 50']], [30 * mm, 38 * mm, 46 * mm, 56 * mm]),
           P('2 · Volume', 'h2'),
-          *L(['Isi volume per arus (storage, inbound, outbound) per bulan: <b>rata-rata, peak, komitmen (MGV)</b>.', 'Konversi palet → case → pcs dengan pilihan UoM.',
-              '<b>Parameter muatan</b>: kg & CBM per palet / per case — satu sumber untuk tarif storage alternatif (per kg/CBM) dan profil order.',
-              '<b>Profil order</b>: volume/bln ÷ hari operasional, dibagi per moda (kontainer, truk) → jumlah mobil/hari & order admin.']),
-          P('3 · Aktivitas & manpower', 'h2'),
-          *L(['Pilih aktivitas dari database Productivity; atur % volume dan tool (RT, RF, PC…).',
-              'Process Design menghitung: workload → RfR → man hour → <b>FTE</b> → headcount (dibulatkan & di-pooling multi-skill).',
-              '<b>Matriks rangkap</b>: atur siapa boleh merangkap siapa. TKBM & Helper tidak bisa rangkap; admin tidak boleh menggantikan operator RT/CB.',
-              '<b>Biaya manpower</b>: gaji = UMK × % level jabatan, BPJS TK/KS/JP, THR, kompensasi, management fee; <b>Dedicated/Sharing</b> (porsi 0,5 = dibagi 2 project).',
-              '<b>Kenaikan upah</b> setiap Januari (default 5%), biaya/bln = total kontrak ÷ bulan kontrak.']),
-          P('4 · Gudang, space & MHE', 'h2'),
-          *L(['Pilih gudang dari database (pakai per m² atau sewa utuh).', 'Space: rak selective/double deep, block stack, staging, fasilitas → total m².', 'MHE: sewa atau beli, umur, % spare.']),
+          *L(['Isi per arus (storage, inbound, outbound): <b>rata-rata, peak, komitmen (MGV)</b>. Peak &amp; komitmen otomatis mengikuti rata-rata selama masih kosong; '
+              'bila 0, hitungan memakai rata-rata dan muncul peringatan + tombol <i>Isi yang kosong = rata-rata/bln</i>.',
+              'UoM <b>palet</b>: 1 palet = N case, 1 case = N pcs. UoM <b>case/karton</b>: dibalik — <b>1 palet = N karton</b> (jumlah palet/bln tampil langsung) dan 1 karton = N pcs. '
+              'Ganti UoM palet ↔ case membawa isi per paletnya.',
+              '<b>Ringkasan order</b>: per hari / bulan / tahun dalam UoM, palet, dan pcs.',
+              '<b>Parameter muatan</b>: kg &amp; CBM per palet / per case. Pastikan isi case/palet × CBM per case ≈ CBM per palet.']),
+          P('Profil order (kontainer &amp; land transport)', 'h2'),
+          *L(['Moda: <b>Kontainer 20ft / 40ft / 40HC</b> atau <b>Land transport</b> (19 jenis kendaraan: blind van, pick up, CDE/CDD bak &amp; box, reefer, Fuso, Tronton, Trinton, trailer). '
+              'Inbound &amp; outbound, tidak hanya import/export. Kendaraan bisa diubah kapasitasnya atau ditambah sendiri.',
+              'Cara muat: <b>palletize</b> (dibatasi palet, CBM, berat) atau <b>loose case / pcs</b> (dibatasi CBM &amp; berat).',
+              '<b>Pemakaian ruang muat</b> default 90% (toleransi 10%): CBM efektif = CBM kendaraan × 90%; '
+              '<b>kapasitas = FLOOR(CBM efektif ÷ CBM per case)</b> case per mobil; mobil/bln = case/bln ÷ kapasitas (dibulatkan ke atas).',
+              'Klik <b>Lihat rumus baris ini</b> untuk rincian angka. Mobil/hari × input admin per mobil = volume order admin.']),
+          tabel([['Contoh', 'Rumus', 'Hasil'],
+                 ['CBM efektif Tronton wingbox', '55 m³ × 90%', '49,5 m³'],
+                 ['Kapasitas per mobil', 'FLOOR(49,5 ÷ 0,04)', '1.237 case'],
+                 ['Mobil per bulan', '1.222.150 case ÷ 1.237', '988 mobil']], [52 * mm, 70 * mm, 48 * mm]),
+          P('3 · Aktivitas &amp; manpower', 'h2'),
+          *L(['<b>Skema default VSM</b>: unloading → receiving admin → checker &amp; tally → staging → input putaway → putaway RT → cycle count → input inventory &amp; replenishment → '
+              'replenishment RT → input picking → picking case / palet → staging outbound → checker outbound → loading curah / paletan → goods issue &amp; print HO → checker serahkan HO. '
+              'Tombol <i>Ganti dengan skema default</i> / <i>Tambahkan di bawah</i>.',
+              'Urutan baris digeser dengan <b>▲ ▼</b> atau seret nomor baris.',
+              'Kolom <b>% volume</b>: <i>% manual</i> atau <i>Porsi … · palletize/loose</i> (mengikuti Key assumption). Pengali UoM "auto ÷60" = dibagi isi per palet.',
+              'Bila data di database Productivity diubah (mis. role Checker → Checker IB/OB), muncul tombol <b>Sinkronkan dengan database</b>.',
+              'Process Design: workload → RfR → man hour → <b>FTE</b> → headcount (multi-skill pooling per shift). <b>Man Power Summary</b> menampilkan jumlah orang <b>per shift</b>.',
+              '<b>Indirect &amp; peran tetap</b>: role supervisor hanya role SPV/Leader/Manager; span &lt; 5 diberi peringatan. Peran tetap berbasis <b>per shift</b> '
+              '(Security 1/shift × 3 = 3) atau <b>total</b> (1 SPV untuk gudang = non-shift).',
+              '<b>Matriks rangkap</b> (di tab Aktivitas): siapa boleh merangkap siapa. TKBM &amp; Helper tidak bisa rangkap.',
+              '<b>Biaya manpower</b>: gaji = UMK × level jabatan, BPJS, THR, kompensasi, management fee, Dedicated/Sharing; kenaikan upah tiap Januari (default 5%).']),
+          P('4 · Gudang, space &amp; MHE', 'h2'),
+          *L(['Pilih gudang dari database (per m² atau sewa utuh). Space dari volume palet ekuivalen (karton dikonversi ke palet).', 'MHE: sewa atau beli, umur, % spare.']),
           P('5 · Interest cost', 'h2'),
-          *L(['Bunga <b>tidak dihitung otomatis</b>. Pilih capex yang dibiayai pinjaman bank, atau tambah baris manual (mis. sewa gudang dibayar di muka).',
-              'Isi bunga %/thn, metode (flat / menurun), pokok & tenor. Interest cost/bln = total bunga ÷ bulan kontrak.']),
-          P('6 · IT  &  7 · Biaya lain', 'h2'),
-          *L(['IT dari katalog: bulanan, tahunan ÷ 12, OTC didepresiasi/diamortisasi, atau ditagih terpisah.',
-              'Biaya lain: office, HSE, consumable, asuransi, pest control, startup & implementation otomatis (% OPEX / % manpower).'])]
+          *L(['Bunga <b>tidak dihitung otomatis</b>. Pilih capex yang dibiayai pinjaman atau tambah baris manual; isi bunga %/thn, metode, pokok &amp; tenor.']),
+          P('6 · IT  &amp;  7 · Biaya lain', 'h2'),
+          *L(['IT: tombol <b>Isi default IT</b> menghitung qty dari luas gudang, transaksi, user kantor, RF/PC/laptop (CCTV 1/200 m² min. 8, NVR 1/32 kamera, printer 1/5.000 m², '
+              'HHT = unit RF, lisensi per user, WMS per transaksi). Dasar qty tercatat di kolom Catatan; semua bisa diubah atau dihapus.',
+              'Biaya lain: office, HSE, consumable, asuransi, pest control, startup &amp; implementation otomatis (% OPEX / % manpower).'])]
 
     # ---- 6
     s += [PageBreak(), P('BAB 6', 'eyebrow'), P('Membaca Hasil', 'h1'),
@@ -251,7 +286,12 @@ def bangun(out):
     s += [PageBreak(), P('BAB 9', 'eyebrow'), P('Price Inquiry & Productivity', 'h1'),
           *L(['<b>Price Inquiry</b>: tambah/ubah harga (MHE, racking, office, gudang, IT, utilities, gudang sewa, HR). Harga baru berstatus draft dan perlu di-approve '
               '(Solution Design / Manager / Super Admin). Harga kedaluwarsa muncul sebagai red flag di tender.',
-              '<b>Productivity</b>: produktivitas per aktivitas & UoM yang dipakai Process Design.',
+              'Kolom <b>Vendor</b> di sebelah Sumber; unggah <b>quotation vendor</b> per item (PDF/gambar) untuk pratinjau, ganti, atau hapus.',
+              '<b>Comparation Price (vendor)</b>: barang yang sama dari beberapa vendor diurutkan termurah → termahal, dengan selisih % dan pratinjau quotation.',
+              'Gudang sewa memiliki kolom Nama PIC &amp; No. telepon.',
+              'Tabel master: setelah mengubah isi, baris ditandai warna dan muncul bar <b>Simpan perubahan</b> di bawah layar (simpan semua sekaligus) atau Batalkan.',
+              '<b>Productivity</b>: produktivitas per aktivitas &amp; UoM. Perubahan di sini tidak otomatis mengubah tender lama — pakai tombol Sinkronkan di tab Aktivitas.',
+              'Role baru di Productivity sebaiknya juga ditambahkan di master <b>Jabatan</b> agar faktor UMK &amp; tunjangan benar.',
               'Siapa yang mengubah: lihat tabel hak akses di Bab 2.']),
           P('BAB 10', 'eyebrow'), P('Menu Super Admin & Manager', 'h1'),
           tabel([['Menu', 'Fungsi'],
@@ -270,6 +310,12 @@ def bangun(out):
                  ['Lupa password', 'Lupa password di halaman login, atau minta Super Admin Atur password'],
                  ['Perubahan tidak muncul setelah update aplikasi', 'Muat ulang (refresh) halaman'],
                  ['Excel menampilkan angka beda setelah saya ubah', 'Wajar bila Anda mengubah sel input — itu simulasi. Sel abu-abu jangan ditimpa'],
+                 ['Angka saya jadi kecil sekali (mis. 20,369)', 'Koma = desimal. Tulis 20369 tanpa titik/koma'],
+                 ['Hasil manpower / ringkasan 0', 'Peak/komitmen masih 0 atau % aktivitas 0 — cek tab Volume &amp; kolom % volume'],
+                 ['Security / supervisor terhitung terlalu banyak', 'Role supervisor harus role SPV/Leader; Security masukkan di peran tetap (per shift)'],
+                 ['Role di tender tidak ikut perubahan Productivity', 'Tab Aktivitas → Sinkronkan dengan database'],
+                 ['Jumlah mobil terlalu banyak / sedikit', 'Cek CBM per case, isi per palet, pemakaian ruang muat (90%), dan kapasitas kendaraan; lihat "Lihat rumus baris ini"'],
+                 ['Tombol simpan di tabel master tidak terlihat', 'Gunakan bar Simpan perubahan di bawah layar'],
                  ['Bahasa', 'Pilih di pemilih bahasa (ikon bola dunia) di menu atas: ID / EN / KO / JA']], [64 * mm, 106 * mm]),
           Spacer(1, 10), kotak('CP 088291919234 · Email Niuleca@gmail.com', 'Butuh bantuan?', KUNING, KUNING_GARIS)]
     doc.build(s)
