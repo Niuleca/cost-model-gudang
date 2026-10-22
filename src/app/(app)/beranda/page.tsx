@@ -13,7 +13,7 @@ interface Radar {
   sumber: 'manual' | 'claude'; sumber_url: string | null; terverifikasi: boolean; dibuat_oleh: string | null; diubah_oleh: string | null; updated_at: string;
 }
 const KATEGORI = ['Warehousing', '3PL / Contract Logistics', 'Transport / Distribusi', 'Freight Forwarding', 'Cold Chain', 'Lainnya'];
-const PLATFORM = ['Coupa', 'SAP Ariba', 'SPSE / LPSE (pemerintah)', 'e-Proc BUMN', 'Website perusahaan', 'Undangan langsung / email', 'Lainnya'];
+const PLATFORM = ['Coupa', 'SAP Ariba', 'SPSE / LPSE (pemerintah)', 'e-Proc BUMN', 'e-Proc swasta', 'Website perusahaan', 'LinkedIn', 'Berita / media', 'Undangan langsung / email', 'Lainnya'];
 const STATUS: Record<string, { l: string; c: string }> = {
   rencana: { l: 'Rencana', c: 'info' }, dibuka: { l: 'Dibuka', c: 'ok' }, ditutup: { l: 'Ditutup', c: 'bad' }, dibatalkan: { l: 'Dibatalkan', c: 'bad' }, selesai: { l: 'Selesai', c: 'info' },
 };
