@@ -3,9 +3,9 @@ import { useState } from 'react';
 import { T } from '@/lib/i18n';
 import type { DataExport } from '@/lib/exportTender';
 
-type Pratinjau = { nama: string; baris: number; kolom: number; rows: (string | number | null)[][]; gaya?: ({ bg?: string; b?: boolean; pct?: boolean } | null)[][] };
+type Pratinjau = { nama: string; baris: number; kolom: number; rows: (string | number | null)[][]; gaya?: ({ bg?: string; b?: boolean; pct?: boolean; c?: string; al?: 'left' | 'center' | 'right' } | null)[][] };
 const KET: Record<string, string> = {
-  '0 Ringkasan': 'KPI, rate card, porsi biaya, opex vs capex — semua merujuk sheet perhitungan',
+  '0 Ringkasan': 'PNL (Selling − Cost − Indirect = Gross Profit) per bulan & per kontrak · Cost Details: manpower per jabatan & biaya lain per baris',
   '1 Key Assumption': 'Kontrak, shift, kalender, jam tersedia MP/MHE, produktivitas, keuangan, margin, UMK',
   '2 Volume': 'Rata-rata, peak, komitmen → faktor peak, volume desain per hari/shift',
   '3 Process Design': 'Workload → RfR → man hour → FTE per task · Man Power & MHE Summary · indirect',
@@ -85,7 +85,7 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
             <tbody>{sh.rows.map((r, i) => <tr key={i}>
               <td className="num muted small">{i + 1}</td>
               {Array.from({ length: Math.min(sh.kolom, 40) }, (_, c) => { const v = r[c] ?? null; const g = sh.gaya?.[i]?.[c];
-                return <td key={c} className={typeof v === 'number' ? 'num' : undefined} style={g ? { background: g.bg, fontWeight: g.b ? 700 : undefined } : undefined}>
+                return <td key={c} className={typeof v === 'number' ? 'num' : undefined} style={g ? { background: g.bg, fontWeight: g.b ? 700 : undefined, color: g.c && g.c.toUpperCase() !== '#1F1F1F' ? g.c : undefined, textAlign: g.al } : undefined}>
                   {g?.pct && typeof v === 'number' ? `${(v * 100).toLocaleString('id-ID', { maximumFractionDigits: 2 })}%` : fmt(v)}</td>; })}
             </tr>)}</tbody>
           </table></div>

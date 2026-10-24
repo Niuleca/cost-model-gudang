@@ -47,8 +47,8 @@ export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
 export const SHEET_EXPORT = ['0 Ringkasan', '1 Key Assumption', '2 Volume', '3 Process Design', '4 Biaya Manpower', '5 Space & MHE', '6 Interest cost', '7 IT & Biaya lain', '8 Rincian Biaya', '9 Rate Card', 'Master Data', 'Data Mentah'] as const;
 
 /** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya). */
-export type GayaSel = { bg?: string; b?: boolean; pct?: boolean } | null;
-/** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya) + warna/huruf tebal sel. */
+export type GayaSel = { bg?: string; b?: boolean; pct?: boolean; c?: string; al?: 'left' | 'center' | 'right'; span?: number } | null;
+/** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya) + warna/huruf tebal/perataan sel. */
 export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
   const wb = await susunWorkbook(p);
   return wb.worksheets.map(ws => {
@@ -57,19 +57,28 @@ export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
     let lebar = 0;
     ws.eachRow({ includeEmpty: true }, (row, i) => {
       if (i > maksBaris) return;
-      const v = (row.values as unknown[]).slice(1).map(c => {
-        if (c == null) return null;
-        if (typeof c === 'object') { const o = c as { result?: unknown; formula?: string; text?: string }; return (o.result ?? o.text ?? (o.formula ? 0 : null)) as string | number | null; }   // exceljs tidak menyimpan hasil 0
-        return c as string | number;
-      });
-      const n = Math.max(v.length, row.cellCount);
+      const n = row.cellCount;
+      const v: (string | number | null)[] = [];
       const g: GayaSel[] = [];
       for (let c = 1; c <= n; c++) {
         const cell = row.getCell(c);
+        const slave = cell.isMerged && cell.master !== cell;   // sel gabungan: nilai hanya di sel utama
+        const raw = slave ? null : (cell.value as unknown);
+        let val: string | number | null = null;
+        if (raw != null) {
+          if (typeof raw === 'object' && !(raw instanceof Date)) { const o = raw as { result?: unknown; formula?: string; text?: string; richText?: { text: string }[] };
+            val = (o.result ?? o.text ?? (o.richText ? o.richText.map(x => x.text).join('') : null) ?? (o.formula ? 0 : null)) as string | number | null; }   // exceljs tidak menyimpan hasil 0
+          else val = raw instanceof Date ? raw.toLocaleDateString('id-ID') : raw as string | number;
+        }
+        v.push(val);
         const argb = (cell.fill as { fgColor?: { argb?: string } } | undefined)?.fgColor?.argb;
-        const b = !!(cell.font as { bold?: boolean } | undefined)?.bold || !!(row.font as { bold?: boolean } | undefined)?.bold;
+        const font = cell.font as { bold?: boolean; color?: { argb?: string } } | undefined;
+        const b = !!font?.bold || !!(row.font as { bold?: boolean } | undefined)?.bold;
         const pct = typeof cell.numFmt === 'string' && cell.numFmt.includes('%');
-        g.push(argb || b || pct ? { bg: argb ? `#${argb.slice(-6)}` : undefined, b, pct } : null);
+        const warna = font?.color?.argb;
+        const al = (cell.alignment as { horizontal?: string } | undefined)?.horizontal;
+        g.push(argb || b || pct || warna || al ? { bg: argb ? `#${argb.slice(-6)}` : undefined, b, pct, c: warna ? `#${warna.slice(-6)}` : undefined,
+          al: al === 'center' || al === 'right' || al === 'left' ? al : undefined } : null);
       }
       lebar = Math.max(lebar, n); rows.push(v); gaya.push(g);
     });
