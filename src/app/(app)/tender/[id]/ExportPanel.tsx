@@ -5,7 +5,7 @@ import type { DataExport } from '@/lib/exportTender';
 
 type Pratinjau = { nama: string; baris: number; kolom: number; rows: (string | number | null)[][]; gaya?: ({ bg?: string; b?: boolean; pct?: boolean; c?: string; al?: 'left' | 'center' | 'right' } | null)[][] };
 const KET: Record<string, string> = {
-  '0 Ringkasan': 'PNL (Selling − Cost − Indirect = Gross Profit) per bulan & per kontrak · Cost Details: manpower per jabatan & biaya lain per baris',
+  '0 Ringkasan': 'KPI, rate card, porsi biaya, opex vs capex — semua merujuk sheet perhitungan',
   '1 Key Assumption': 'Kontrak, shift, kalender, jam tersedia MP/MHE, produktivitas, keuangan, margin, UMK',
   '2 Volume': 'Rata-rata, peak, komitmen → faktor peak, volume desain per hari/shift',
   '3 Process Design': 'Workload → RfR → man hour → FTE per task · Man Power & MHE Summary · indirect',

@@ -129,8 +129,6 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
   const sumber = new Map<string, string>();
   /** deskripsi baris capex (… — depresiasi / — amortisasi) → alamat nilai investasi. */
   const nilaiCapex = new Map<string, string>();
-  /** deskripsi baris biaya → rujukan qty, harga satuan & pembagi depresiasi (untuk Cost Details di Ringkasan). */
-  const detail = new Map<string, { qty?: NilaiSel; harga?: NilaiSel; bagi?: string }>();
 
   // ================= 0. Ringkasan (diisi paling akhir, tapi dibuat pertama supaya jadi sheet pertama) =================
   const S0 = new Lembar(wb, '0 Ringkasan', 'RINGKASAN', `${t.customer} — ${t.kode ?? ''}`,
@@ -351,11 +349,10 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
   if (sw) {
     if (inp.space.sewaTetapBulan && inp.skenarioAset === 'Rental') {
       const a = S5.param('Sewa gudang utuh / bln', inp.space.sewaTetapBulan, 'rp', 'input', 'Rp/bln', `${inp.space.luasTersediaM2 ?? '?'} m² disewa utuh`);
-      sumber.set(sw.deskripsi, a); detail.set(sw.deskripsi, { qty: 1, harga: { f: a, v: inp.space.sewaTetapBulan }, bagi: '1' });
+      sumber.set(sw.deskripsi, a);
     } else {
       const aT = S5.param('Tarif sewa / m² / bln', inp.space.tarifSewaM2Bulan, 'rp', 'input', 'Rp/m²');
       sumber.set(sw.deskripsi, S5.param(sw.deskripsi, { f: `LuasM2*${aT}`, v: sw.biayaBulan }, 'rp', 'hasil', 'Rp/bln', '→ total space × tarif'));
-      detail.set(sw.deskripsi, { qty: { f: 'LuasM2', v: h.space.totalM2 }, harga: { f: aT, v: inp.space.tarifSewaM2Bulan }, bagi: '1' });
     }
   }
   const rk = h.biaya.filter(b => b.kelompok === 'Racking' && b.deskripsi.endsWith('— depresiasi'));
@@ -370,7 +367,6 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
       const r = S5.r;
       S5.baris(kr, [b.deskripsi.replace(' — depresiasi', ''), Number(nm?.[2] ?? 0), hr.harga, hr.umurBulan || n, { f: `B${r}*C${r}`, v: Number(nm?.[2] ?? 0) * hr.harga }, { f: `E${r}/MIN(D${r},Kontrak)`, v: b.biayaBulan }]);
       sumber.set(b.deskripsi, ref(S5.nama, 6, r)); nilaiCapex.set(b.deskripsi, ref(S5.nama, 5, r));
-      detail.set(b.deskripsi, { qty: { f: ref(S5.nama, 2, r), v: Number(nm?.[2] ?? 0) }, harga: { f: ref(S5.nama, 3, r), v: hr.harga }, bagi: `MIN(${ref(S5.nama, 4, r)},Kontrak)` });
     }
   }
   S5.bagian('MHE', 'Unit diambil dari MHE Summary (sheet 3)');
@@ -385,21 +381,16 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
       { f: x.mode === 'sewa' ? `D${r}*E${r}` : `D${r}*E${r}/MIN(F${r},Kontrak)`, v: h.biaya.find(b => b.deskripsi === desk)?.biayaSistem ?? h.biaya.find(b => b.deskripsi === desk)?.biayaBulan }, x.mode === 'sewa' ? '' : { f: `D${r}*E${r}`, v: x.unit * x.harga }]);
     sumber.set(desk, ref(S5.nama, 7, r));
     if (x.mode !== 'sewa') nilaiCapex.set(desk, ref(S5.nama, 8, r));
-    detail.set(desk, { qty: { f: ref(S5.nama, 4, r), v: x.unit }, harga: { f: ref(S5.nama, 5, r), v: x.harga }, bagi: x.mode === 'sewa' ? '1' : `MIN(${ref(S5.nama, 6, r)},Kontrak)` });
   }
   const ls = h.biaya.find(b => b.kelompok === 'Utilitas');
   if (ls) {
     S5.bagian('Listrik');
-    if (inp.listrikSimulasi && inp.listrikSimulasi.totalBulan > 0) {
-      const a = S5.param(ls.deskripsi, inp.listrikSimulasi.totalBulan, 'rp', 'input', 'Rp/bln', `simulasi Utilities ${Math.round(inp.listrikSimulasi.kwhBulan).toLocaleString('id-ID')} kWh/bln`);
-      sumber.set(ls.deskripsi, a); detail.set(ls.deskripsi, { qty: 1, harga: { f: a, v: inp.listrikSimulasi.totalBulan }, bagi: '1' });
-    }
+    if (inp.listrikSimulasi && inp.listrikSimulasi.totalBulan > 0) sumber.set(ls.deskripsi, S5.param(ls.deskripsi, inp.listrikSimulasi.totalBulan, 'rp', 'input', 'Rp/bln', `simulasi Utilities ${Math.round(inp.listrikSimulasi.kwhBulan).toLocaleString('id-ID')} kWh/bln`));
     else {
       const kwh = inp.listrik.reduce((s, l) => s + l.watt * l.qty * l.jamPerHari, 0) * h.kalender.hariOperasionalBulan / 1000;
       const aK = S5.param('Pemakaian listrik', kwh, 'n0', 'input', 'kWh/bln', 'Σ watt × qty × jam/hari × hari ops/bln ÷ 1000');
       const aTr = S5.param('Tarif listrik', inp.tarifListrikKwh, 'n2', 'input', 'Rp/kWh');
       sumber.set(ls.deskripsi, S5.param('Biaya listrik / bln', { f: `${aK}*${aTr}`, v: ls.biayaBulan }, 'rp', 'hasil', 'Rp/bln'));
-      detail.set(ls.deskripsi, { qty: { f: aK, v: kwh }, harga: { f: aTr, v: inp.tarifListrikKwh }, bagi: '1' });
     }
   }
 
@@ -421,7 +412,6 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
       { f: c.mode === 'beli' ? `G${r}/MIN(F${r},Kontrak)` : c.mode === 'sekali' ? `G${r}/Kontrak` : `D${r}*E${r}`, v: bb?.biayaBulan }]);
     if (bb) sumber.set(desk, ref(S7.nama, 8, r));
     if (c.mode === 'beli' || c.mode === 'sekali') nilaiCapex.set(desk, ref(S7.nama, 7, r));
-    detail.set(desk, { qty: { f: ref(S7.nama, 4, r), v: c.qty }, harga: { f: ref(S7.nama, 5, r), v: c.hargaSatuan }, bagi: c.mode === 'beli' ? `MIN(${ref(S7.nama, 6, r)},Kontrak)` : c.mode === 'sekali' ? 'Kontrak' : '1' });
   }
   const RB = '8 Rincian Biaya';
   let patchOpex: any = null;
@@ -434,11 +424,11 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
     patchOpex = S7.sel(2, S7.r - 1);
     const aNs = S7.param('Nilai startup cost', { f: `${aPo}*${aOpex}` }, 'rp', 'hasil', 'Rp');
     const st = h.biaya.find(b => b.deskripsi === 'Startup cost (otomatis) — amortisasi');
-    if (st) { sumber.set(st.deskripsi, S7.param('Startup cost — amortisasi / bln', { f: `${aNs}/Kontrak`, v: st.biayaBulan }, 'rp', 'hasil', 'Rp/bln')); nilaiCapex.set(st.deskripsi, aNs); detail.set(st.deskripsi, { qty: 1, harga: { f: aNs }, bagi: 'Kontrak' }); }
+    if (st) { sumber.set(st.deskripsi, S7.param('Startup cost — amortisasi / bln', { f: `${aNs}/Kontrak`, v: st.biayaBulan }, 'rp', 'hasil', 'Rp/bln')); nilaiCapex.set(st.deskripsi, aNs); }
     const aPm = S7.param('% implementation dari biaya manpower/bln', sa.persenManpower, 'pct', 'input');
     const aNi = S7.param('Nilai implementation cost', { f: `${aPm}*${aMpDasar}` }, 'rp', 'hasil', 'Rp', '→ % × biaya manpower/bln dasar (sheet 4)');
     const im = h.biaya.find(b => b.deskripsi === 'Implementation cost (otomatis) — amortisasi');
-    if (im) { sumber.set(im.deskripsi, S7.param('Implementation cost — amortisasi / bln', { f: `${aNi}/Kontrak`, v: im.biayaBulan }, 'rp', 'hasil', 'Rp/bln')); nilaiCapex.set(im.deskripsi, aNi); detail.set(im.deskripsi, { qty: 1, harga: { f: aNi }, bagi: 'Kontrak' }); }
+    if (im) { sumber.set(im.deskripsi, S7.param('Implementation cost — amortisasi / bln', { f: `${aNi}/Kontrak`, v: im.biayaBulan }, 'rp', 'hasil', 'Rp/bln')); nilaiCapex.set(im.deskripsi, aNi); }
   }
 
   // ================= 6. Interest =================
@@ -585,179 +575,90 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
     }
   }
 
-  // ================= 0. Ringkasan (isi) — format PNL + Cost Details =================
-  // 1-1 PNL: Selling (rate card × volume) − Cost (per kategori) − Indirect (overhead) = Gross Profit
-  // 2-1 Manpower per jabatan · 2-2 biaya lain per baris. Semua angka rumus yang merujuk sheet 4/5/7/8/9.
-  S0.setLebar(22, 44, 12, 14, 17, 18, 20, 34);
+  // ================= 0. Ringkasan (isi) =================
+  // Isi sama dengan versi web (KPI, rate card, porsi biaya, opex vs capex, alur, legenda); tampilan tabel bergaris ala PNL.
+  S0.setLebar(24, 34, 20, 20, 16, 4, 4, 4);
   const ws0 = S0.ws;
-  for (let rr = 1; rr <= 3; rr++) for (let c = 9; c <= 16; c++) ws0.getCell(rr, c).fill = { type: 'pattern', pattern: 'none' };   // banner selebar tabel (A–H)
+  for (let rr = 1; rr <= 3; rr++) for (let c = 6; c <= 16; c++) ws0.getCell(rr, c).fill = { type: 'pattern', pattern: 'none' };   // banner selebar tabel
   const GR = { style: 'thin', color: { argb: 'FF8C8C8C' } };
   const KOTAK = { top: GR, bottom: GR, left: GR, right: GR };
-  const isiBg = (argb: string) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
-  const nK = 8;
+  let nK = 5;   // lebar tabel aktif (kolom)
+  let gabAB = false;   // kolom A:B digabung (tabel kategori)
   type Opsi = { fmt?: Fmt; b?: boolean; bg?: string; al?: 'left' | 'center' | 'right' };
   const tulis = (r: number, c: number, v: NilaiSel, o: Opsi = {}) => {
     const cell = ws0.getCell(r, c);
     S0.isi(cell, v, o.fmt);
     cell.border = KOTAK;
     cell.font = { size: 10, bold: !!o.b, color: { argb: C.INK } };
-    if (o.bg) cell.fill = isiBg(o.bg);
-    const angka = !!o.fmt && o.fmt !== 'teks';
-    const al = o.al ?? (angka ? 'right' : 'center');
+    if (o.bg) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: o.bg } };
+    const al = o.al ?? (o.fmt && o.fmt !== 'teks' ? 'right' : 'center');
     cell.alignment = { vertical: 'middle', horizontal: al, wrapText: true, indent: al === 'center' ? 0 : 1 };
-    return cell;
   };
-  const kosongBaris = (r: number, o: Opsi = {}) => { for (let c = 1; c <= nK; c++) if (ws0.getCell(r, c).value == null) tulis(r, c, null, o); };
-  const judulTabel = (teks: string, kanan?: string) => {
+  const judulTabel = (teks: string, kanan = '[Currency : IDR]', lebarTabel = 5, ab = false) => {
+    nK = lebarTabel; gabAB = ab;
     const c = S0.sel(1); c.value = teks; c.font = { bold: true, size: 11, color: { argb: C.INK } };
     if (kanan) { const k = S0.sel(nK); k.value = kanan; k.font = { size: 9, color: { argb: C.MUTED } }; k.alignment = { horizontal: 'right' }; }
     S0.r++;
   };
-  const header = (hs: string[]) => { hs.forEach((x, i) => tulis(S0.r, i + 1, x, { b: true, bg: C.HDR_RUMUS })); ws0.getRow(S0.r).height = 22; return ++S0.r; };
-  const bulanLabel = `${n} Bulan`;
+  const header = (hs: string[]) => { for (let c = 1; c <= nK; c++) tulis(S0.r, c, hs[c - 1] ?? null, { b: true, bg: C.HDR_RUMUS }); if (gabAB) ws0.mergeCells(S0.r, 1, S0.r, 2); ws0.getRow(S0.r).height = 22; S0.r++; };
+  /** Baris tabel: sel kosong tetap diberi garis supaya tabel rapi. */
+  const baris = (vals: NilaiSel[], fmts: (Fmt | undefined)[], o: Opsi = {}) => {
+    for (let c = 1; c <= nK; c++) tulis(S0.r, c, vals[c - 1] ?? null, { ...o, fmt: fmts[c - 1] });
+    if (gabAB) ws0.mergeCells(S0.r, 1, S0.r, 2);
+    return S0.r++;
+  };
   const gabung = (r0: number, r1: number) => { if (r1 > r0) ws0.mergeCells(r0, 1, r1, 1); const c = ws0.getCell(r0, 1); c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }; c.font = { size: 10, bold: true }; };
-  const F = (c: number, r: number) => `${huruf(c)}${r}`;
 
-  // ---- 1-1. PNL ----
   S0.r = 6;
-  judulTabel('1-1. PNL', `Durasi kontrak: ${n} bulan   ·   [Currency : IDR]`);
-  header(['Category', 'Item', 'UOM', 'Qty', 'Price', 'Month', bulanLabel, 'Remarks']);
-  // Selling
-  const sj0 = S0.r;
-  for (const rc of h.rateCard) {
-    const rr = rowT.get(rc.bucket)!; const r = S0.r;
-    tulis(r, 2, LAYANAN[rc.bucket]);
-    tulis(r, 3, { f: `'9 Rate Card'!H${rr}`, v: rc.uom });
-    tulis(r, 4, { f: `'9 Rate Card'!K${rr}`, v: rc.volumeTarif }, { fmt: 'n0' });
-    tulis(r, 5, { f: `'9 Rate Card'!L${rr}`, v: rc.tarifPerUnit }, { fmt: 'rp' });
-    tulis(r, 6, { f: `${F(4, r)}*${F(5, r)}`, v: rc.volumeTarif * rc.tarifPerUnit }, { fmt: 'rp' });
-    tulis(r, 7, { f: `${F(6, r)}*Kontrak`, v: rc.volumeTarif * rc.tarifPerUnit * n }, { fmt: 'rp' });
-    tulis(r, 8, { f: `"GP "&TEXT('9 Rate Card'!G${rr},"0.0%")&" · incl. PPN "&TEXT('9 Rate Card'!N${rr},"#,##0")`, v: `GP ${(rc.gpPersen * 100).toFixed(1)}%` }, { al: 'left' });
-    S0.r++;
-  }
-  const brutoSell = h.rateCard.reduce((x, rc) => x + rc.volumeTarif * rc.tarifPerUnit, 0);
-  const rPph = S0.r;
-  tulis(rPph, 2, 'PPh 23 (dipotong customer)'); tulis(rPph, 3, '%');
-  tulis(rPph, 4, { f: 'PPh', v: m.finance.pphGrossUp }, { fmt: 'pct' });
-  tulis(rPph, 6, { f: `-SUM(${F(6, sj0)}:${F(6, rPph - 1)})*${F(4, rPph)}`, v: -brutoSell * m.finance.pphGrossUp }, { fmt: 'rp' });
-  tulis(rPph, 7, { f: `${F(6, rPph)}*Kontrak` }, { fmt: 'rp' });
-  tulis(rPph, 8, 'Selling bersih PPh (sama dengan simulasi sheet 9)', { al: 'left' });
-  S0.r++;
-  const rSell = S0.r;
-  tulis(rSell, 2, 'Sum', { b: true, bg: C.HASIL });
-  tulis(rSell, 6, { f: `SUM(${F(6, sj0)}:${F(6, rSell - 1)})`, v: s0Pendapatan() }, { fmt: 'rp', b: true, bg: C.HASIL });
-  tulis(rSell, 7, { f: `SUM(${F(7, sj0)}:${F(7, rSell - 1)})` }, { fmt: 'rp', b: true, bg: C.HASIL });
-  kosongBaris(rSell, { bg: C.HASIL });
-  for (let r = sj0; r < rSell; r++) kosongBaris(r);
-  S0.r++;
-  tulis(sj0, 1, 'Selling'); gabung(sj0, rSell);
-  function s0Pendapatan() { return h.simulasi[0]?.pendapatanBulan; }
-
-  // Cost per kategori (urutan tetap), overhead → Indirect Cost
-  const URUT = ['Manpower', 'Fasilitas', 'Utilitas', 'MHE', 'Racking', 'IT', 'Office', 'Consumable', 'HSE', 'Asuransi', 'Startup', 'Finance', 'Interest cost', 'Lainnya'];
-  const rowKat = new Map<string, number>(kat.map(([k], i) => [k, katRange.r0 + i]));
-  const katCost = [...rowKat.keys()].filter(k => k !== 'Overhead').sort((a, b) => (URUT.indexOf(a) + 99) % 99 - (URUT.indexOf(b) + 99) % 99);
-  const cj0 = S0.r;
-  const LABEL_KAT: Record<string, string> = { Fasilitas: 'Warehouse / fasilitas', Utilitas: 'Utilities (listrik)', Startup: 'Implementation / startup' };
-  for (const k of katCost) {
-    const rr = rowKat.get(k)!; const r = S0.r; const v = h.perKelompok[k] ?? 0;
-    tulis(r, 2, LABEL_KAT[k] ?? k);
-    if (k === 'Manpower') {
-      tulis(r, 3, 'Orang'); tulis(r, 4, { f: `'4 Biaya Manpower'!R${b1 + 1}`, v: h.totalHeadcount }, { fmt: 'n0' });
-      tulis(r, 5, { f: `IF(${F(4, r)}>0,${F(6, r)}/${F(4, r)},0)`, v: h.totalHeadcount ? v / h.totalHeadcount : 0 }, { fmt: 'rp' });
-    } else if (k === 'Fasilitas') {
-      tulis(r, 3, 'm²'); tulis(r, 4, { f: 'LuasM2', v: h.space.totalM2 }, { fmt: 'n0' });
-      tulis(r, 5, { f: `IF(${F(4, r)}>0,${F(6, r)}/${F(4, r)},0)`, v: h.space.totalM2 ? v / h.space.totalM2 : 0 }, { fmt: 'rp' });
-    } else tulis(r, 3, 'Set');
-    tulis(r, 6, { f: `'${RB}'!H${rr}`, v }, { fmt: 'rp' });
-    tulis(r, 7, { f: `${F(6, r)}*Kontrak`, v: v * n }, { fmt: 'rp' });
-    tulis(r, 8, { f: `TEXT('${RB}'!I${rr},"0.0%")&" dari total biaya"`, v: `${((h.totalBiayaBulan ? v / h.totalBiayaBulan : 0) * 100).toFixed(1)}% dari total biaya` }, { al: 'left' });
-    kosongBaris(r);
-    S0.r++;
-  }
-  const rCost = S0.r;
-  const vCost = katCost.reduce((x, k) => x + (h.perKelompok[k] ?? 0), 0);
-  tulis(rCost, 2, 'Sum', { b: true, bg: C.HASIL });
-  tulis(rCost, 6, { f: `SUM(${F(6, cj0)}:${F(6, rCost - 1)})`, v: vCost }, { fmt: 'rp', b: true, bg: C.HASIL });
-  tulis(rCost, 7, { f: `SUM(${F(7, cj0)}:${F(7, rCost - 1)})`, v: vCost * n }, { fmt: 'rp', b: true, bg: C.HASIL });
-  kosongBaris(rCost, { bg: C.HASIL });
-  tulis(cj0, 1, 'Cost'); gabung(cj0, rCost);
-  S0.r++;
-  const rInd = S0.r; const vOh = h.perKelompok['Overhead'] ?? 0; const rOh = rowKat.get('Overhead');
-  tulis(rInd, 1, 'Indirect Cost', { b: true }); tulis(rInd, 2, 'Overhead'); tulis(rInd, 3, '%');
-  tulis(rInd, 4, { f: 'Overhead', v: m.finance.overheadPersen }, { fmt: 'pct' });
-  tulis(rInd, 6, rOh ? { f: `'${RB}'!H${rOh}`, v: vOh } : 0, { fmt: 'rp' });
-  tulis(rInd, 7, { f: `${F(6, rInd)}*Kontrak`, v: vOh * n }, { fmt: 'rp' });
-  tulis(rInd, 8, 'Overhead × subtotal biaya', { al: 'left' }); kosongBaris(rInd);
-  S0.r++;
-  const rGp = S0.r; const s0 = h.simulasi[0];
-  tulis(rGp, 1, 'Gross Profit', { b: true, bg: C.HASIL });
-  tulis(rGp, 6, { f: `${F(6, rSell)}-${F(6, rCost)}-${F(6, rInd)}`, v: s0?.gp }, { fmt: 'rp', b: true, bg: C.HASIL });
-  tulis(rGp, 7, { f: `${F(7, rSell)}-${F(7, rCost)}-${F(7, rInd)}`, v: (s0?.gp ?? 0) * n }, { fmt: 'rp', b: true, bg: C.HASIL });
-  kosongBaris(rGp, { bg: C.HASIL });
-  S0.r++;
-  const rPct = S0.r;
-  tulis(rPct, 1, '(%)', { b: true, bg: C.HASIL });
-  tulis(rPct, 6, { f: `IF(${F(6, rSell)}<>0,${F(6, rGp)}/${F(6, rSell)},0)`, v: s0?.gpPersen }, { fmt: 'pct', b: true, bg: C.HASIL, al: 'center' });
-  tulis(rPct, 7, { f: `IF(${F(7, rSell)}<>0,${F(7, rGp)}/${F(7, rSell)},0)`, v: s0?.gpPersen }, { fmt: 'pct', b: true, bg: C.HASIL, al: 'center' });
-  kosongBaris(rPct, { bg: C.HASIL });
-  S0.r += 3;
-
-  // ---- 2. Cost Details ----
-  { const c = S0.sel(1); c.value = '2. Cost Details'; c.font = { bold: true, size: 12, color: { argb: C.INK } }; S0.r += 2; }
-  judulTabel('2-1. Manpower', '[Currency : IDR]');
-  header(['Category', 'Position', 'Rate / org', 'PAX / Shift', 'Shift', 'Total Manpower', 'Cost / bln', bulanLabel]);
-  const roleIndirect = new Set(pd.indirect.rows.map(x => x.nama).filter(x => !pd.mp.some(y => y.nama === x)));
-  const mj0 = S0.r;
-  h.manpower.forEach((p, i) => {
-    const r = S0.r; const r4 = b0 + i;
-    tulis(r, 1, roleIndirect.has(p.roleName) ? 'Indirect' : 'Direct');
-    tulis(r, 2, p.roleName);
-    tulis(r, 6, { f: `'4 Biaya Manpower'!R${r4}`, v: p.headcount }, { fmt: 'n0' });
-    tulis(r, 7, { f: `'4 Biaya Manpower'!U${r4}`, v: p.biayaBulan }, { fmt: 'rp' });
-    tulis(r, 3, { f: `IF(${F(6, r)}>0,${F(7, r)}/${F(6, r)},0)`, v: p.headcount ? p.biayaBulan / p.headcount : 0 }, { fmt: 'rp' });
-    tulis(r, 5, { f: 'ShiftAktif' }, { fmt: 'n0', al: 'center' });
-    tulis(r, 4, { f: `IF(${F(5, r)}>0,${F(6, r)}/${F(5, r)},0)` }, { fmt: 'n2', al: 'center' });
-    tulis(r, 8, { f: `${F(7, r)}*Kontrak`, v: p.biayaBulan * n }, { fmt: 'rp' });
-    S0.r++;
-  });
-  const rMt = S0.r;
-  tulis(rMt, 1, 'Total', { b: true, bg: C.HASIL });
-  tulis(rMt, 6, { f: `SUM(${F(6, mj0)}:${F(6, rMt - 1)})`, v: h.totalHeadcount }, { fmt: 'n0', b: true, bg: C.HASIL });
-  tulis(rMt, 7, { f: `SUM(${F(7, mj0)}:${F(7, rMt - 1)})`, v: h.manpower.reduce((x, y) => x + y.biayaBulan, 0) }, { fmt: 'rp', b: true, bg: C.HASIL });
-  tulis(rMt, 8, { f: `SUM(${F(8, mj0)}:${F(8, rMt - 1)})` }, { fmt: 'rp', b: true, bg: C.HASIL });
-  kosongBaris(rMt, { bg: C.HASIL });
-  S0.r += 3;
-
-  judulTabel('2-2. Other Cost Details', '[Currency : IDR]');
-  header(['Category', 'Item', 'Price', 'Qty', 'Depreciation (bln)', 'Month', bulanLabel, 'Remarks']);
-  const oj0 = S0.r;
-  h.biaya.forEach((b, i) => {
-    if (b.kelompok === 'Manpower') return;
-    const r = S0.r; const r8 = r0 + i; const dt = detail.get(b.deskripsi);
-    tulis(r, 1, { f: `'${RB}'!B${r8}`, v: b.kelompok });
-    tulis(r, 2, { f: `'${RB}'!C${r8}`, v: b.deskripsi }, { al: 'left' });
-    tulis(r, 3, dt?.harga ?? null, { fmt: 'rp' });
-    tulis(r, 4, dt?.qty ?? null, { fmt: 'n2' });
-    tulis(r, 5, dt?.bagi ? (dt.bagi === '1' ? 1 : { f: dt.bagi }) : null, { fmt: 'n0', al: 'center' });
-    tulis(r, 6, { f: `'${RB}'!H${r8}`, v: b.biayaBulan }, { fmt: 'rp' });
-    tulis(r, 7, { f: `${F(6, r)}*Kontrak`, v: b.biayaBulan * n }, { fmt: 'rp' });
-    tulis(r, 8, { f: `'${RB}'!F${r8}&IF('${RB}'!G${r8}<>'${RB}'!H${r8}," · direvisi manual","")`, v: b.jenis === 'capex' ? 'Capex' : b.jenis === 'interest' ? 'Interest' : 'Opex' }, { al: 'left' });
-    const qv = ws0.getCell(r, 4); const qn = typeof dt?.qty === 'object' ? dt.qty?.v : dt?.qty;
-    if (typeof qn === 'number' && Number.isInteger(qn)) qv.numFmt = NUMFMT.n0;
-    S0.r++;
-  });
-  const rOt = S0.r;
-  const vOt = h.biaya.filter(b => b.kelompok !== 'Manpower').reduce((x, b) => x + b.biayaBulan, 0);
-  tulis(rOt, 1, 'Total', { b: true, bg: C.HASIL });
-  tulis(rOt, 6, { f: `SUM(${F(6, oj0)}:${F(6, rOt - 1)})`, v: vOt }, { fmt: 'rp', b: true, bg: C.HASIL });
-  tulis(rOt, 7, { f: `SUM(${F(7, oj0)}:${F(7, rOt - 1)})`, v: vOt * n }, { fmt: 'rp', b: true, bg: C.HASIL });
-  kosongBaris(rOt, { bg: C.HASIL });
+  judulTabel('1. Hasil utama', '[Currency : IDR]', 4);
+  header(['Category', 'Item', 'Per bulan', 'Per tahun']);
+  const s0 = h.simulasi[0];
+  const ht0 = S0.r;
+  baris(['Selling', 'Selling (bersih PPh)', { f: `'9 Rate Card'!B${simRow[0]}`, v: s0?.pendapatanBulan }, { f: `'9 Rate Card'!B${simRow[0]}*12`, v: (s0?.pendapatanBulan ?? 0) * 12 }], [undefined, undefined, 'rp', 'rp']);
+  baris(['Cost', 'Cost', { f: 'TotalBiaya', v: h.totalBiayaBulan }, { f: 'TotalBiaya*12', v: h.totalBiayaBulan * 12 }], [undefined, undefined, 'rp', 'rp']);
+  const hp0 = baris(['Profit', 'Profit', { f: `'9 Rate Card'!E${simRow[0]}`, v: s0?.gp }], [undefined, undefined, 'rp'], { b: true, bg: C.HASIL });
+  const hp1 = baris(['', 'Margin (GP %)', { f: `'9 Rate Card'!F${simRow[0]}`, v: s0?.gpPersen }], [undefined, undefined, 'pct'], { b: true, bg: C.HASIL });
+  gabung(hp0, hp1);
+  const ho0 = baris(['Operasional', 'Jumlah manpower', { f: `'4 Biaya Manpower'!R${b1 + 1}`, v: h.totalHeadcount }], [undefined, undefined, 'n0']);
+  const ho1 = baris(['', 'Luas gudang (m²)', { f: 'LuasM2', v: h.space.totalM2 }], [undefined, undefined, 'n0']);
+  gabung(ho0, ho1);
+  for (let r = ht0; r < hp0; r++) ws0.getCell(r, 1).font = { size: 10, bold: true };
+  S0.catatan('Semua angka merujuk sheet perhitungan — ubah input (sel putih tulang) di sheet 1–9, ringkasan ikut berubah');
   S0.r += 2;
-  S0.catatan('Cost/bln Manpower (2-1) + Total Other Cost (2-2) = total biaya PNL (Cost + Indirect). Selling = tarif excl. PPN × volume komitmen tarif (sheet 9).');
-  S0.catatan('Sel abu-abu = total / hasil · semua angka rumus yang merujuk sheet 4, 5, 7, 8 dan 9 — ubah input di sheet tersebut, ringkasan ikut berubah.');
-  ws0.views = [{ showGridLines: false, state: 'frozen', ySplit: 4 }];
-  ws0.pageSetup.printArea = `A1:H${S0.r}`;
-  void aTotRc; void kal; void kv; void jenRange;
+
+  judulTabel('2. Rate card', '[Currency : IDR]', 5);
+  header(['Layanan', 'UoM tarif', 'Tarif excl. PPN', 'Tarif incl. PPN', 'GP %']);
+  for (const rc of h.rateCard) { const rr = rowT.get(rc.bucket)!;
+    baris([LAYANAN[rc.bucket], { f: `'9 Rate Card'!H${rr}`, v: rc.uom }, { f: `'9 Rate Card'!L${rr}`, v: rc.tarifPerUnit }, { f: `'9 Rate Card'!N${rr}`, v: rc.tarifInclPpn }, { f: `'9 Rate Card'!G${rr}`, v: rc.gpPersen }],
+      [undefined, undefined, 'rp', 'rp', 'pct']); }
+  S0.r += 2;
+
+  judulTabel('3. Porsi biaya per kategori', '[Currency : IDR]', 4, true);
+  header(['Kategori', '', 'Biaya / bln', '%']);
+  kat.forEach(([k, v], i) => { const rr = katRange.r0 + i;
+    baris([{ f: `'${RB}'!B${rr}`, v: k }, '', { f: `'${RB}'!H${rr}`, v }, { f: `'${RB}'!I${rr}`, v: h.totalBiayaBulan ? v / h.totalBiayaBulan : 0 }], [undefined, undefined, 'rp', 'pct']); });
+  S0.r += 2;
+
+  judulTabel('4. Opex vs capex', '[Currency : IDR]', 4, true);
+  header(['Kategori', '', 'Biaya / bln', '%']);
+  (['opex', 'capex', 'interest'] as const).forEach((j, i) => { const rr = jenRange.r0 + i; const v = h.perJenis[j];
+    baris([{ f: `'${RB}'!B${rr}`, v: ['Opex', 'Capex', 'Interest cost'][i] }, '', { f: `'${RB}'!H${rr}`, v }, { f: `'${RB}'!I${rr}`, v: h.totalBiayaBulan ? v / h.totalBiayaBulan : 0 }], [undefined, undefined, 'rp', 'pct']); });
+  S0.r += 2;
+
+  judulTabel('5. Alur perhitungan (sama dengan langkah di web)', '', 5);
+  header(['Sheet', 'Isi']); ws0.mergeCells(S0.r - 1, 2, S0.r - 1, nK);
+  const alur = ['1 Key Assumption — kontrak, shift, kalender, produktivitas, keuangan, margin, UMK', '2 Volume — rata-rata, peak, komitmen → volume desain per hari/shift',
+    '3 Process Design — workload → RfR → man hour → FTE → headcount & unit MHE', '4 Biaya Manpower — gaji, BPJS, THR, kompensasi, fee, eskalasi',
+    '5 Space & MHE — luas, sewa gudang, racking, MHE, listrik', '6 Interest cost — bunga pinjaman yang dipilih', '7 IT & Biaya lain — bulanan, depresiasi, amortisasi, startup',
+    '8 Rincian Biaya — semua baris + alokasi ke layanan', '9 Rate Card — margin, PPh, tarif, simulasi pendapatan'];
+  for (const a of alur) { const [sh, isi] = a.split(' — '); const r = baris([sh, isi], []); ws0.mergeCells(r, 2, r, nK); ws0.getCell(r, 2).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 }; }
+  S0.r += 2;
+
+  judulTabel('Legenda warna', '', 2);
+  ([['Header rumus / hasil', C.HDR_RUMUS], ['Header input', C.HDR_INPUT], ['Sel input (boleh diubah)', C.INPUT], ['Sel hasil rumus', C.HASIL]] as const).forEach(([l, w]) => {
+    tulis(S0.r, 1, null, { bg: w }); tulis(S0.r, 2, l, { al: 'left' }); S0.r++;
+  });
+  ws0.pageSetup.printArea = `A1:E${S0.r}`;
+  void aTotRc; void kal; void kv;
   return wb;
 }
