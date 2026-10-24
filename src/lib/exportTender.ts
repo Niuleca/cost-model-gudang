@@ -47,7 +47,7 @@ export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
 export const SHEET_EXPORT = ['0 Ringkasan', '1 Key Assumption', '2 Volume', '3 Process Design', '4 Biaya Manpower', '5 Space & MHE', '6 Interest cost', '7 IT & Biaya lain', '8 Rincian Biaya', '9 Rate Card', 'Master Data', 'Data Mentah'] as const;
 
 /** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya). */
-export type GayaSel = { bg?: string; b?: boolean; pct?: boolean } | null;
+export type GayaSel = { bg?: string; b?: boolean; pct?: boolean; c?: string; i?: boolean } | null;
 /** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya) + warna/huruf tebal sel. */
 export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
   const wb = await susunWorkbook(p);
@@ -69,7 +69,9 @@ export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
         const argb = (cell.fill as { fgColor?: { argb?: string } } | undefined)?.fgColor?.argb;
         const b = !!(cell.font as { bold?: boolean } | undefined)?.bold || !!(row.font as { bold?: boolean } | undefined)?.bold;
         const pct = typeof cell.numFmt === 'string' && cell.numFmt.includes('%');
-        g.push(argb || b || pct ? { bg: argb ? `#${argb.slice(-6)}` : undefined, b, pct } : null);
+        const fc = (cell.font as { color?: { argb?: string } } | undefined)?.color?.argb;
+        const it = !!(cell.font as { italic?: boolean } | undefined)?.italic;
+        g.push(argb || b || pct || fc || it ? { bg: argb ? `#${argb.slice(-6)}` : undefined, b, pct, c: fc ? `#${fc.slice(-6)}` : undefined, i: it } : null);
       }
       lebar = Math.max(lebar, n); rows.push(v); gaya.push(g);
     });
