@@ -6,7 +6,8 @@ import type { MasterData } from '@/lib/engine/types';
 import type { TenderRow } from '@/lib/tender';
 import type { ParamBiayaMp, RincianBiayaRole } from '@/lib/engine/biayaMp';
 import { keInput } from '@/lib/tender';
-import { tulisModelRumus } from '@/lib/exportRumus';
+import { tulisModelWeb } from '@/lib/exportWeb';
+import type { DaftarWeb } from '@/lib/exportWebUtil';
 
 type Baris = Record<string, unknown>;
 // Skema warna Excel: header rumus/hasil = silver, header input = abu-abu muda, sel input = broken white, sel hasil = abu-abu
@@ -27,7 +28,7 @@ function ratakan(o: unknown, pre = '', out: Baris = {}): Baris {
 
 export interface DataExport {
   t: TenderRow; hasil: HasilTender; master: MasterData; catatanMaster: string[];
-  pd: unknown; rincianMp: RincianBiayaRole[]; paramMp: ParamBiayaMp; profil?: unknown; orderAdmin?: unknown; nomorQuotation?: string | null;
+  pd: unknown; rincianMp: RincianBiayaRole[]; paramMp: ParamBiayaMp; profil?: unknown; orderAdmin?: unknown; nomorQuotation?: string | null; daftar?: DaftarWeb;
 }
 
 /** Nama file: Leca_Costmodel_nomor-quotation — "/" diganti "-" karena tidak boleh di nama file. Tanpa quotation → kode tender. */
@@ -44,7 +45,7 @@ export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-export const SHEET_EXPORT = ['0 Ringkasan', '1 Key Assumption', '2 Volume', '3 Process Design', '4 Biaya Manpower', '5 Space & MHE', '6 Interest cost', '7 IT & Biaya lain', '8 Rincian Biaya', '9 Rate Card', 'Master Data', 'Data Mentah'] as const;
+export const SHEET_EXPORT = ['0 Ringkasan', 'Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Daftar', 'Master Data', 'Data Mentah'] as const;
 
 /** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya). */
 export type GayaSel = { bg?: string; b?: boolean; pct?: boolean; c?: string; al?: 'left' | 'center' | 'right'; span?: number } | null;
@@ -67,7 +68,7 @@ export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
         let val: string | number | null = null;
         if (raw != null) {
           if (typeof raw === 'object' && !(raw instanceof Date)) { const o = raw as { result?: unknown; formula?: string; text?: string; richText?: { text: string }[] };
-            val = (o.result ?? o.text ?? (o.richText ? o.richText.map(x => x.text).join('') : null) ?? (o.formula ? 0 : null)) as string | number | null; }   // exceljs tidak menyimpan hasil 0
+            val = (o.result ?? o.text ?? (o.richText ? o.richText.map(x => x.text).join('') : null) ?? (o.formula ? `=${o.formula.length > 40 ? o.formula.slice(0, 40) + '…' : o.formula}` : null)) as string | number | null; }   // belum ada hasil cache → tampilkan rumusnya
           else val = raw instanceof Date ? raw.toLocaleDateString('id-ID') : raw as string | number;
         }
         v.push(val);
@@ -171,8 +172,8 @@ async function susunWorkbook(p: DataExport) {
   const lebar = (ws: WS, w = 18) => { ws.columns.forEach((c, i) => { c.width = i === 0 ? Math.max(w + 10, 28) : w; }); };
   const hasilCell = (c: { fill: unknown; font: unknown }) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HASIL } }; c.font = { bold: true, color: { argb: HASIL_INK } }; };
 
-  // 0–9. Model ber-rumus (alur sama dengan langkah di web)
-  tulisModelRumus(wb, { t, h, m, inp: keInput(t), rincianMp: p.rincianMp, paramMp: p.paramMp });
+  // Sheet sama dengan tab web (rumus hidup + droplist) — 0 Ringkasan format PNL
+  tulisModelWeb(wb, { t, h, m, inp: keInput(t), daftar: p.daftar, nomorQuotation: p.nomorQuotation, catatanMaster: p.catatanMaster });
   void rateCardRapi; void kv; void tabel; void lebar; void hasilCell; void gayaHeader; void judul;
 
   // 7. Master data yang dipakai

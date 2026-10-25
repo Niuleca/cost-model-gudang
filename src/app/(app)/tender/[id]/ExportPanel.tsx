@@ -5,19 +5,22 @@ import type { DataExport } from '@/lib/exportTender';
 
 type Pratinjau = { nama: string; baris: number; kolom: number; rows: (string | number | null)[][]; gaya?: ({ bg?: string; b?: boolean; pct?: boolean; c?: string; al?: 'left' | 'center' | 'right' } | null)[][] };
 const KET: Record<string, string> = {
-  '0 Ringkasan': 'Hasil utama · 1-1 PNL (selling, cost, indirect, gross profit) · 2-1 manpower · 2-2 other cost · porsi kategori · opex vs capex · rate card — semua rumus ke sheet 1–9',
-  '1 Key Assumption': 'Kontrak, shift, kalender, jam tersedia MP/MHE, produktivitas, keuangan, margin, UMK',
-  '2 Volume': 'Rata-rata, peak, komitmen → faktor peak, volume desain per hari/shift',
-  '3 Process Design': 'Workload → RfR → man hour → FTE per task · Man Power & MHE Summary · indirect',
-  '4 Biaya Manpower': 'Gaji (UMK × % level), BPJS, THR, kompensasi, fee, eskalasi per tahun',
-  '5 Space & MHE': 'Luas, sewa gudang, racking, MHE sewa/beli, listrik',
-  '6 Interest cost': 'Pinjaman bank: pokok × bunga × tenor ÷ kontrak',
-  '7 IT & Biaya lain': 'Bulanan, depresiasi, amortisasi, startup & implementation otomatis',
-  '8 Rincian Biaya': 'Semua baris biaya (rujukan ke sheet sumber) + alokasi ke layanan, porsi kategori, opex/capex',
-  '9 Rate Card': 'Biaya per risiko, margin, PPh gross-up, tarif (pembulatan), simulasi pendapatan',
+  '0 Ringkasan': 'Hasil utama · 1-1 PNL (selling, cost, indirect, gross profit) · 2-1 manpower · 2-2 other cost · porsi kategori · opex vs capex · rate card',
+  'Key assumption': 'Data tender, provinsi → kab/kota → UMK, shift, faktor, porsi palletize/loose, working day, workload per shift',
+  'Volume': 'Volume & konversi, ringkasan order, parameter muatan, profil order inbound/outbound, kapasitas kendaraan',
+  'Aktivitas & manpower': 'Man Power & MHE Summary, skema kontrak, rincian biaya manpower, rincian per task, matriks multi-skill, indirect, VSM',
+  'Gudang, space & MHE': 'Gudang terpilih, space A–E, racking level, komposisi luas, biaya space & racking, kebutuhan MHE',
+  'Interest cost': 'Pilih capex yang dibiayai pinjaman, baris manual, working capital',
+  'IT': 'Kebutuhan IT format BAP (budget vs aktual), ringkasan biaya IT per bulan',
+  'Biaya lain': 'Per klasifikasi Price Inquiry, startup & implementation otomatis, listrik',
+  'Hasil': 'KPI, red flag, rate card & margin, simulasi, kurs, porsi kategori, opex/capex, kalender, rincian biaya per bulan',
+  'Quotation': 'Rate card penawaran & tagihan sekali',
+  'Daftar': 'Sumber semua droplist (Data Validation) & data master yang dipakai rumus',
   'Master Data': 'UMK, payroll, finance, margin, jabatan, hari libur yang dipakai',
   'Data Mentah': 'Seluruh isi asumsi & hasil (path → nilai) untuk audit',
 };
+/** Sheet yang saling dirujuk rumus — selalu ikut diunduh. */
+const WAJIB = ['0 Ringkasan', 'Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Daftar'];
 const kolom = (c: number) => { let s = ''; c++; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
 const fmt = (v: string | number | null) => v == null ? '' : typeof v === 'number' ? (Math.abs(v) >= 10000 ? Math.round(v).toLocaleString('id-ID') : Number.isInteger(v) ? String(v) : v.toLocaleString('id-ID', { maximumFractionDigits: 4 })) : String(v);
 
@@ -43,7 +46,7 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
   async function unduh() {
     if (!data) return;
     setSibuk(true); setPesan('Membuat file…');
-    try { const { exportTenderLengkap } = await import('@/lib/exportTender'); await exportTenderLengkap(data, pilih); setPesan('File diunduh.'); }
+    try { const { exportTenderLengkap } = await import('@/lib/exportTender'); await exportTenderLengkap(data, Array.from(new Set([...pilih, ...WAJIB]))); setPesan('File diunduh.'); }
     catch (e) { setPesan(`Gagal export: ${(e as Error).message}`); }
     setSibuk(false);
   }
@@ -56,20 +59,20 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
         <div className="row">
           {pesan && <span className="small" role="status">{pesan}</span>}
           <button className="ghost" onClick={muatReview} disabled={sibuk}>{pv ? '↻ Muat ulang review' : 'Siapkan review'}</button>
-          <button onClick={unduh} disabled={!data || sibuk || !pilih.length}>⬇ Unduh {pilih.length ? `${pilih.length} sheet` : ''} (.xlsx)</button>
+          <button onClick={unduh} disabled={!data || sibuk || !pilih.length}>⬇ Unduh {pv ? `${new Set([...pilih, ...WAJIB.filter(w => pv.some(x => x.nama === w))]).size} sheet` : ''} (.xlsx)</button>
         </div>
       </div>
       <p className="small muted">Tender dihitung ulang dengan data master terbaru, lalu disusun menjadi workbook <b>{namaFile}</b>. Review isi tiap sheet di bawah, hapus centang sheet yang tidak perlu, lalu unduh.
-        Semua angka hasil adalah <b>rumus Excel</b> yang saling terhubung mengikuti langkah di web (1 → 9). Ubah sel putih tulang (input) di Excel untuk simulasi; ringkasan ikut berubah.</p>
+        Sheet sama dengan tab web (urutan, kartu, kolom & <b>droplist</b>), semua angka berupa <b>rumus Excel</b> yang saling terhubung — ubah sel putih tulang (input) di Excel, hasil, rate card, quotation & ringkasan ikut berubah. Menu tab di baris atas tiap sheet bisa diklik. Headcount hasil multi-skill pooling (Shift 1–3) ditulis sebagai input.</p>
 
       {!pv && <div className="umk-box"><span className="small">Tekan <b>Siapkan review</b> untuk melihat isi file sebelum diunduh.</span></div>}
 
       {pv && <>
         <div className="tablewrap"><table>
-          <thead><tr><th style={{ width: 36 }}><input type="checkbox" aria-label="Pilih semua sheet" checked={pilih.length === pv.length} onChange={e => setPilih(e.target.checked ? pv.map(x => x.nama) : [])} /></th>
+          <thead><tr><th style={{ width: 36 }}><input type="checkbox" aria-label="Pilih semua sheet" checked={pilih.length === pv.length} onChange={e => setPilih(e.target.checked ? pv.map(x => x.nama) : pv.map(x => x.nama).filter(n => WAJIB.includes(n)))} /></th>
             <th>Sheet</th><th>Isi</th><th className="num">Baris</th><th /></tr></thead>
           <tbody>{pv.map((x, i) => <tr key={x.nama} style={i === aktif ? { background: 'var(--res)' } : undefined}>
-            <td><input type="checkbox" aria-label={`Sertakan ${x.nama}`} checked={pilih.includes(x.nama)} onChange={e => setPilih(e.target.checked ? [...pilih, x.nama] : pilih.filter(n => n !== x.nama))} /></td>
+            <td><input type="checkbox" aria-label={`Sertakan ${x.nama}`} checked={pilih.includes(x.nama) || WAJIB.includes(x.nama)} disabled={WAJIB.includes(x.nama)} title={WAJIB.includes(x.nama) ? 'Wajib — dirujuk rumus sheet lain' : undefined} onChange={e => setPilih(e.target.checked ? [...pilih, x.nama] : pilih.filter(n => n !== x.nama))} /></td>
             <td><b>{x.nama}</b></td><td className="small muted">{KET[x.nama] ?? ''}</td><td className="num">{x.baris.toLocaleString('id-ID')}</td>
             <td><button className="ghost" onClick={() => setAktif(i)} disabled={i === aktif}>{i === aktif ? 'Sedang direview' : 'Review'}</button></td>
           </tr>)}</tbody>

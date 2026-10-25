@@ -15,6 +15,7 @@ import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
 import { namaFileExport } from '@/lib/exportTender';
+import type { DaftarWeb } from '@/lib/exportWebUtil';
 import InterestPanel from './InterestPanel';
 import { rincianBiayaRole, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { aktivitasDenganOrderAdmin, isAktivitasAdmin, orderAdmin, stokDariPalet } from '@/lib/profilVolume';
@@ -271,8 +272,14 @@ export default function TenderPage() {
     const ql = (qs ?? []) as { nomor: string; status: string }[];
     const nomorQuotation = (ql.find(q => q.status === 'approved' || q.status === 'terkirim') ?? ql.find(q => q.status !== 'batal') ?? ql[0])?.nomor ?? null;
     setNomorQ(nomorQuotation);
+    // Daftar master untuk droplist & lookup di Excel (sheet Daftar)
+    const [wh, itk] = await Promise.all([
+      sb.from('warehouses').select('id, nama, kab_kota, provinsi, luas_m2, harga_sewa_m2_bulan, harga_per_bulan').order('provinsi').order('kab_kota'),
+      sb.from('it_catalog').select('id, kelompok, item, cost_type, harga').order('urutan').order('item'),
+    ]);
+    const daftar = { prods, items, jabatan, upah: upahList, tarif, gudang: (wh.data ?? []) as DaftarWeb['gudang'], itKatalog: (itk.data ?? []) as DaftarWeb['itKatalog'] };
     return { t, hasil: h, master, catatanMaster: catatan, pd: pdFull, rincianMp, paramMp,
-      profil: a.profilVolume, orderAdmin: orderAdmin(a.profilVolume, volEf, hariOps), nomorQuotation };
+      profil: a.profilVolume, orderAdmin: orderAdmin(a.profilVolume, volEf, hariOps), nomorQuotation, daftar };
   }
 
   const aksi = (atas: boolean) => (
