@@ -90,7 +90,26 @@ export async function pratinjauWorkbook(p: DataExport, maksBaris = 400) {
 export async function buatWorkbookTender(p: DataExport, sheets?: string[]) {
   const wb = await susunWorkbook(p);
   if (sheets?.length) for (const ws of [...wb.worksheets]) if (!sheets.includes(ws.name)) wb.removeWorksheet(ws.id);
-  return wb.xlsx.writeBuffer();
+  return rapikanXlsx(await wb.xlsx.writeBuffer());
+}
+
+/** Perbaiki urutan elemen XML yang ditulis exceljs supaya Excel tidak "memperbaiki" (menghapus isi) sheet:
+ *  extLst wajib elemen terakhir di <worksheet> (exceljs menaruhnya sebelum legacyDrawing bila sheet punya data bar + catatan). */
+export async function rapikanXlsx(buf: ArrayBuffer | Buffer | Uint8Array): Promise<ArrayBuffer> {
+  const JSZip = (await import('jszip')).default;   // jszip = dependensi bawaan exceljs
+  const zip = await JSZip.loadAsync(buf);
+  for (const nama of Object.keys(zip.files).filter(n => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))) {
+    const x0 = await zip.file(nama)!.async('string');
+    const x = rapikanValidasi(x0);
+    // extLst tingkat worksheet = <extLst> terakhir (extLst di dalam <cfRule> selalu lebih awal)
+    const i = x.lastIndexOf('<extLst>'), j = x.lastIndexOf('</extLst>');
+    const akhir = x.lastIndexOf('</worksheet>');
+    if (i < 0 || j < i) { if (x !== x0) zip.file(nama, x); continue; }
+    const sesudah = x.slice(j + 9, akhir);
+    if (!sesudah.trim()) { if (x !== x0) zip.file(nama, x); continue; }
+    zip.file(nama, x.slice(0, i) + sesudah + x.slice(i, j + 9) + x.slice(akhir));
+  }
+  return zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
 }
 
 async function susunWorkbook(p: DataExport) {
@@ -205,4 +224,42 @@ async function susunWorkbook(p: DataExport) {
   }
 
   return wb;
+}
+
+/** Excel menolak dataValidation yang sqref-nya tumpang tindih (exceljs kadang menulis ganda) → sel yang sudah tercakup dibuang. */
+function rapikanValidasi(x: string) {
+  const kol = (h: string) => [...h].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0);
+  const huruf = (n: number) => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+  const sudah = new Set<string>();
+  let ubah = false;
+  const y = x.replace(/<dataValidation ([^>]*?)sqref="([^"]+)"([^>]*)>([\s\S]*?)<\/dataValidation>/g, (all, pre: string, sq: string, post: string, isi: string) => {
+    const sisa = new Map<number, number[]>();
+    let buang = false;
+    for (const part of sq.split(/\s+/)) {
+      const [a, b = a] = part.split(':');
+      const m1 = /([A-Z]+)(\d+)/.exec(a), m2 = /([A-Z]+)(\d+)/.exec(b);
+      if (!m1 || !m2) return all;
+      for (let c = kol(m1[1]); c <= kol(m2[1]); c++) for (let r = +m1[2]; r <= +m2[2]; r++) {
+        const k = `${c},${r}`;
+        if (sudah.has(k)) { buang = true; continue; }
+        sudah.add(k); (sisa.get(c) ?? sisa.set(c, []).get(c)!).push(r);
+      }
+    }
+    if (!buang) return all;
+    ubah = true;
+    const bagian: string[] = [];
+    for (const [c, rs] of sisa) {
+      rs.sort((p, q) => p - q);
+      let s0 = rs[0], p0 = rs[0];
+      for (const r of [...rs.slice(1), Infinity]) {
+        if (r === p0 + 1) { p0 = r; continue; }
+        bagian.push(s0 === p0 ? `${huruf(c)}${s0}` : `${huruf(c)}${s0}:${huruf(c)}${p0}`);
+        s0 = p0 = r;
+      }
+    }
+    return bagian.length ? `<dataValidation ${pre}sqref="${bagian.join(' ')}"${post}>${isi}</dataValidation>` : '';
+  });
+  if (!ubah) return x;
+  const n = (y.match(/<dataValidation /g) ?? []).length;
+  return y.replace(/<dataValidations count="\d+"/, `<dataValidations count="${n}"`).replace(/<dataValidations count="0">\s*<\/dataValidations>/, '');
 }

@@ -22,7 +22,7 @@ export function tulisGudang(x: Ctx) {
   GD.field('Luas tersedia', { f: `N(${lkG('Luas')})` }, 'n0', 'out', 'm²', '', 'GdLuas');
   GD.field('Tarif database', { f: `IF(GdPilih="—",0,ROUND(IF(N(${lkG('TarifM2')})>0,${lkG('TarifM2')},N(${lkG('HargaBln')})/MAX(1,GdLuas)),0))` }, 'rp', 'out', 'Rp/m²/bln', '', 'GdTarifDb');
   GD.field('Harga sewa utuh database', { f: `IF(GdPilih="—",0,IF(N(${lkG('HargaBln')})>0,${lkG('HargaBln')},N(${lkG('TarifM2')})*GdLuas))` }, 'rp', 'out', 'Rp/bln', '', 'GdHargaBln');
-  GD.field('Kebutuhan vs luas tersedia', { f: `IF(GdLuas=0,"",IF(LuasM2>GdLuas,"KURANG: kebutuhan "&TEXT(LuasM2,"#,##0")&" m²","OK: kebutuhan "&TEXT(LuasM2,"#,##0")&" m²"))` }, 'teks', 'out');
+  GD.field('Kebutuhan vs luas tersedia', { f: `IF(GdLuas=0,"",IF(LuasM2>GdLuas,"KURANG: kebutuhan "&FIXED(LuasM2,0)&" m²","OK: kebutuhan "&FIXED(LuasM2,0)&" m²"))` }, 'teks', 'out');
 
   // ===================== Space
   const sx = lengkapiSpaceExcel(a.space.excel);

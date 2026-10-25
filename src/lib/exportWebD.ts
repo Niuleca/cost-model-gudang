@@ -24,12 +24,12 @@ export function tulisHasil(x: Ctx) {
   // ===================== KPI
   HS.h2('Hasil', 'Semua angka di sheet ini rumus dari sheet input. Ubah input (sel putih tulang) → hasil, rate card, quotation & ringkasan ikut berubah.');
   HS.hdr(['Indikator', 'Nilai', 'Keterangan']);
-  HS.put(1, 'Cost per bulan', { j: 'txt', b: true }); HS.put(2, { f: 'TotalBiaya', v: h.totalBiayaBulan }, { j: 'out', fmt: 'rp', b: true }); HS.put(3, { f: '"per tahun "&TEXT(TotalBiaya*12,"#,##0")' }, { j: 'txt' }); HS.r++;
-  HS.put(1, 'Selling per bulan', { j: 'txt', b: true }); HS.put(2, { f: 'Sim_Pend', v: s0?.pendapatanBulan }, { j: 'out', fmt: 'rp', b: true }); HS.put(3, { f: '"per tahun "&TEXT(Sim_Pend*12,"#,##0")&" · bersih setelah PPh"' }, { j: 'txt' }); HS.r++;
-  HS.put(1, 'Profit per bulan', { j: 'txt', b: true }); HS.put(2, { f: 'Sim_Gp', v: s0?.gp }, { j: 'out', fmt: 'rp', b: true }); HS.put(3, { f: '"per tahun "&TEXT(Sim_Gp*12,"#,##0")' }, { j: 'txt' }); HS.r++;
+  HS.put(1, 'Cost per bulan', { j: 'txt', b: true }); HS.put(2, { f: 'TotalBiaya', v: h.totalBiayaBulan }, { j: 'out', fmt: 'rp', b: true }); HS.put(3, { f: '"per tahun "&FIXED(TotalBiaya*12,0)' }, { j: 'txt' }); HS.r++;
+  HS.put(1, 'Selling per bulan', { j: 'txt', b: true }); HS.put(2, { f: 'Sim_Pend', v: s0?.pendapatanBulan }, { j: 'out', fmt: 'rp', b: true }); HS.put(3, { f: '"per tahun "&FIXED(Sim_Pend*12,0)&" · bersih setelah PPh"' }, { j: 'txt' }); HS.r++;
+  HS.put(1, 'Profit per bulan', { j: 'txt', b: true }); HS.put(2, { f: 'Sim_Gp', v: s0?.gp }, { j: 'out', fmt: 'rp', b: true }); HS.put(3, { f: '"per tahun "&FIXED(Sim_Gp*12,0)' }, { j: 'txt' }); HS.r++;
   HS.put(1, 'Margin (GP%)', { j: 'txt', b: true }); HS.put(2, { f: 'Sim_GpPct', v: s0?.gpPersen }, { j: 'out', fmt: 'pct', b: true }); HS.put(3, 'atas volume komitmen', { j: 'txt' }); HS.r++;
   HS.put(1, 'Jumlah manpower', { j: 'txt', b: true }); HS.put(2, { f: 'TotalHeadcount', v: h.totalHeadcount }, { j: 'out', fmt: 'n0', b: true }); HS.put(3, 'orang · headcount setelah rangkap', { j: 'txt' }); HS.r++;
-  HS.put(1, 'Luas gudang', { j: 'txt', b: true }); HS.put(2, { f: 'LuasM2', v: h.space.totalM2 }, { j: 'out', fmt: 'n0', b: true }); HS.put(3, { f: 'IF(GdPilih="—","m² · gudang belum dipilih","m² · "&SUBSTITUTE(GdPilih,"(terpilih) ","")&" · dari "&TEXT(GdLuas,"#,##0")&" m²")' }, { j: 'txt' }); HS.r++;
+  HS.put(1, 'Luas gudang', { j: 'txt', b: true }); HS.put(2, { f: 'LuasM2', v: h.space.totalM2 }, { j: 'out', fmt: 'n0', b: true }); HS.put(3, { f: 'IF(GdPilih="—","m² · gudang belum dipilih","m² · "&SUBSTITUTE(GdPilih,"(terpilih) ","")&" · dari "&FIXED(GdLuas,0)&" m²")' }, { j: 'txt' }); HS.r++;
 
   // ===================== Red flag
   HS.r++;
@@ -53,7 +53,7 @@ export function tulisHasil(x: Ctx) {
   HS.field('Margin default — risiko Tinggi', m.margin.Tinggi, 'pct', 'in', 'markup', '', 'MTinggi');
   HS.field('Overhead', m.finance.overheadPersen, 'pct', 'in', '', '× subtotal biaya (master Finance)', 'Overhead');
   HS.field('GP minimum (red flag)', m.finance.gpMinimum, 'pct', 'in', '', '', 'GpMin');
-  HS.field('Contoh harga Rp100.000', { f: '"tarif "&IF(GrossUp>0,"di-gross-up jadi "&TEXT(100000/(1-GrossUp),"#,##0"),"tetap 100.000")&" → PPh 23 dipotong "&TEXT(100000/(1-GrossUp)*PPh,"#,##0")&" → diterima "&TEXT(100000/(1-GrossUp)*(1-PPh),"#,##0")' }, 'teks', 'out');
+  HS.field('Contoh harga Rp100.000', { f: '"tarif "&IF(GrossUp>0,"di-gross-up jadi "&FIXED(100000/(1-GrossUp),0),"tetap 100.000")&" → PPh 23 dipotong "&FIXED(100000/(1-GrossUp)*PPh,0)&" → diterima "&FIXED(100000/(1-GrossUp)*(1-PPh),0)' }, 'teks', 'out');
 
   // ===================== Rincian biaya per bulan — susun posisi baris lebih dulu (dirujuk rate card)
   const lines = x.lines;
@@ -189,7 +189,7 @@ export function tulisHasil(x: Ctx) {
     if (i === 0) { HS.nm('Sim_Pend', 2); HS.nm('Sim_Gp', 4); HS.nm('Sim_GpPct', 5); }
     HS.r++;
   }
-  HS.field('Cek GP komitmen vs GP minimum', { f: 'IF(Sim_GpPct<GpMin,"KRITIS: GP di bawah batas "&TEXT(GpMin,"0.0%"),"OK")' }, 'teks', 'out');
+  HS.field('Cek GP komitmen vs GP minimum', { f: 'IF(Sim_GpPct<GpMin,"KRITIS: GP di bawah batas "&FIXED((GpMin)*100,1)&"%","OK")' }, 'teks', 'out');
   HS.note('Pendapatan = tarif sebelum PPN × volume, dikurangi PPh 23 (dipotong customer). Per tahun = per bulan × 12.');
 
   // ===================== Konversi mata uang
@@ -227,7 +227,7 @@ export function tulisHasil(x: Ctx) {
     const r = HS.r;
     HS.put(1, l, { j: 'txt', b: true }); HS.put(2, { f: `SUMIFS(Rinci_Biaya,Rinci_Jenis,${q(k)})`, v: h.perJenis[k === 'Opex' ? 'opex' : k === 'Capex' ? 'capex' : 'interest'] }, { j: 'out', fmt: 'rp' });
     HS.put(3, { f: `B${r}*12` }, { j: 'out', fmt: 'rp' }); HS.put(4, { f: `IF(TotalBiaya>0,B${r}/TotalBiaya,0)` }, { j: 'out', fmt: 'pct', b: true });
-    HS.put(5, ket ?? { f: '"depresiasi/amortisasi investasi (total investasi Rp"&TEXT(TotalInvestasi,"#,##0")&")"' }, { j: 'txt', size: 9 });
+    HS.put(5, ket ?? { f: '"depresiasi/amortisasi investasi (total investasi Rp"&FIXED(TotalInvestasi,0)&")"' }, { j: 'txt', size: 9 });
     HS.r++;
   }
   HS.put(1, 'Total', { j: 'sub' }); HS.put(2, { f: `SUM(B${oj0}:B${HS.r - 1})` }, { j: 'sub', fmt: 'rp' }); HS.put(3, { f: `SUM(C${oj0}:C${HS.r - 1})` }, { j: 'sub', fmt: 'rp' }); HS.put(4, { f: `SUM(D${oj0}:D${HS.r - 1})` }, { j: 'sub', fmt: 'pct' }); HS.r++;
@@ -259,7 +259,7 @@ export function tulisHasil(x: Ctx) {
   HS.field('Posisi palet desain (peak)', { f: 'PP', v: h.space.ppDesain }, 'n0', 'out', 'PP');
   HS.field('m² per posisi', { f: 'IF(PP>0,(SprFp+DdrFp+BlkFp+FlrFp)/PP,0)', v: h.space.m2PerPP }, 'n3', 'out', 'm²');
   HS.field('Area simpan', { f: 'SprFp+DdrFp+BlkFp+FlrFp', v: h.space.storageM2 }, 'n1', 'out', 'm²');
-  HS.field('Staging inbound / outbound', { f: 'TEXT(StIFp,"#,##0.0")&" / "&TEXT(StOFp,"#,##0.0")' }, 'teks', 'out', 'm²');
+  HS.field('Staging inbound / outbound', { f: 'FIXED(StIFp,1)&" / "&FIXED(StOFp,1)' }, 'teks', 'out', 'm²');
   HS.field('Fasilitas', { f: 'SUM(FasilitasM2)', v: h.space.fasilitasM2 }, 'n1', 'out', 'm²');
   HS.field('Allowance (pembulatan)', { f: 'LuasM2-SpaceSubtotal', v: h.space.allowanceM2 }, 'n1', 'out', 'm²');
   HS.field('Total', { f: 'LuasM2', v: h.space.totalM2 }, 'n0', 'out', 'm²');
@@ -302,7 +302,7 @@ export function tulisHasil(x: Ctx) {
   const rr1 = rr - 1;
   for (const g0 of grup) {
     const r = HS.r;
-    HS.put(1, { f: `"${g0.k} · "&COUNTIFS($G$${rr0}:$G$${rr1},${q(g0.k)},$A$${rr0}:$A$${rr1},"?*")&" baris · "&TEXT(IF(TotalBiaya>0,F${r}/TotalBiaya,0),"0.0%")` }, { j: 'sub' });
+    HS.put(1, { f: `"${g0.k} · "&COUNTIFS($G$${rr0}:$G$${rr1},${q(g0.k)},$A$${rr0}:$A$${rr1},"?*")&" baris · "&FIXED((IF(TotalBiaya>0,F${r}/TotalBiaya,0))*100,1)&"%"` }, { j: 'sub' });
     for (const c of [2, 3, 4, 5]) HS.put(c, '', { j: 'sub' });
     HS.put(6, { f: `SUMIFS($F$${rr0}:$F$${rr1},$G$${rr0}:$G$${rr1},${q(g0.k)})` }, { j: 'sub', fmt: 'rp' });
     HS.r++;
@@ -348,7 +348,7 @@ export function tulisQuotation(x: Ctx) {
   for (const rc of (x.rcList as HasilRc[])) {
     const z = rcRef[rc.bucket];
     QU.put(1, LAYANAN[rc.bucket], { j: 'txt', b: true }); QU.put(2, { f: sat[rc.bucket].replace('{u}', z.uom) }, { j: 'out' });
-    QU.put(3, { f: z.quote, v: rc.tarifQuote }, { j: 'out', fmt: 'rp', b: true }); QU.put(4, { f: `"volume minimum "&TEXT(${z.vol},"#,##0")&" "&${z.uom}&" / bln"` }, { j: 'txt', size: 9 });
+    QU.put(3, { f: z.quote, v: rc.tarifQuote }, { j: 'out', fmt: 'rp', b: true }); QU.put(4, { f: `"volume minimum "&FIXED(${z.vol},0)&" "&${z.uom}&" / bln"` }, { j: 'txt', size: 9 });
     QU.r++;
   }
   QU.r++;
@@ -425,7 +425,7 @@ export function tulisRingkasan(x: Ctx) {
     const z = rcRef[rc.bucket]; const r = S0.r;
     const vM = (rc.tarifPerUnit ?? 0) * (rc.volumeTarif ?? 0); jualKotor += vM;
     baris(['', LAYANAN[rc.bucket], { f: z.uom, v: rc.uom }, { f: z.vol, v: rc.volumeTarif }, { f: z.tarif, v: rc.tarifPerUnit }, { f: `D${r}*E${r}`, v: vM }, { f: `F${r}*Kontrak`, v: vM * n },
-      { f: `"Komitmen / MOQ per bulan · GP "&TEXT(${z.gp},"0.0%")` }], [undefined, undefined, undefined, 'n0', 'rp', 'rp', 'rp']);
+      { f: `"Komitmen / MOQ per bulan · GP "&FIXED((${z.gp})*100,1)&"%"` }], [undefined, undefined, undefined, 'n0', 'rp', 'rp', 'rp']);
   }
   const rSum = sub('Sum (gross)', (x.rcList as HasilRc[]).length ? `SUM(F${sel0}:F${S0.r - 1})` : '0', jualKotor);
   const rPph = S0.r;
@@ -511,7 +511,7 @@ export function tulisRingkasan(x: Ctx) {
   const oj0 = S0.r;
   for (const [l, k, ket] of [['Opex', 'Opex', 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, overhead, dll.'], ['Capex', 'Capex', null], ['Interest cost', 'Interest', 'bunga pinjaman yang dipilih di sheet Interest cost']] as const) {
     const r = S0.r;
-    baris([l, ket ?? { f: '"depresiasi/amortisasi investasi (total investasi Rp"&TEXT(TotalInvestasi,"#,##0")&")"' }, { f: `SUMIFS(Rinci_Biaya,Rinci_Jenis,${q(k)})` }, { f: `C${r}*12` }, { f: `C${r}*Kontrak` }, { f: `IF(TotalBiaya>0,C${r}/TotalBiaya,0)` }], FK);
+    baris([l, ket ?? { f: '"depresiasi/amortisasi investasi (total investasi Rp"&FIXED(TotalInvestasi,0)&")"' }, { f: `SUMIFS(Rinci_Biaya,Rinci_Jenis,${q(k)})` }, { f: `C${r}*12` }, { f: `C${r}*Kontrak` }, { f: `IF(TotalBiaya>0,C${r}/TotalBiaya,0)` }], FK);
     ws0.getCell(r, 1).font = { size: 10, bold: true };
   }
   const oj1 = S0.r - 1;

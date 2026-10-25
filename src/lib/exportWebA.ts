@@ -42,7 +42,7 @@ export function tulisKeyAssumption(x: Ctx) {
   for (const p of PROSES_MUAT) {
     const r = KA.r;
     KA.put(1, p.l, { j: 'txt', b: true }); KA.put(2, pm[p.v], { j: 'in', fmt: 'pct' }); KA.put(3, { f: `1-B${r}`, v: 1 - pm[p.v] }, { j: 'out', fmt: 'pct' });
-    KA.put(4, p.v === 'replenishment' ? { f: `"${p.ket} · basis "&TEXT(1-Porsi_picking,"0.0%")&" outbound"` } : p.ket, { j: 'txt', wrap: false });
+    KA.put(4, p.v === 'replenishment' ? { f: `"${p.ket} · basis "&FIXED((1-Porsi_picking)*100,1)&"%"&" outbound"` } : p.ket, { j: 'txt', wrap: false });
     KA.put(7, p.v, { j: 'none', color: 'FF9CA3AF' });
     KA.nm(`Porsi_${p.v}`, 2);
     KA.r++;
