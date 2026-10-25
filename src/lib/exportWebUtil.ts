@@ -111,8 +111,13 @@ export class S {
   }
   h3(t: string) { const c = this.cell(1); c.value = t; c.font = { bold: true, size: 11, color: { argb: C.INK } }; this.r++; }
   note(t: string) { const c = this.cell(1); c.value = t; c.font = { size: 9, italic: true, color: { argb: C.MUTED } }; this.r++; }
-  hdr(cols: (string | [string, boolean])[], c0 = 1) {
-    cols.forEach((h, i) => { const [t, inp] = Array.isArray(h) ? h : [h, false]; this.put(c0 + i, t, { j: inp ? 'hdrIn' : 'hdr', al: 'center' }); });
+  /** Header tabel: teks, atau [teks, input?, catatan rumus] — catatan tampil saat sel header disorot. */
+  hdr(cols: (string | [string, boolean] | [string, boolean, string])[], c0 = 1) {
+    cols.forEach((h, i) => {
+      const [t, inp, ket] = Array.isArray(h) ? [h[0], h[1], (h as [string, boolean, string])[2]] : [h, false, undefined];
+      const c = this.put(c0 + i, t, { j: inp ? 'hdrIn' : 'hdr', al: 'center' });
+      if (ket) c.note = { texts: [{ text: ket }], margins: { insetmode: 'auto' } };
+    });
     this.ws.getRow(this.r).height = 30; return ++this.r;
   }
   /** Baris label | nilai | satuan | keterangan. */

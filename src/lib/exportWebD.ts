@@ -1,3 +1,4 @@
+import type { MpBarisXl } from '@/lib/exportWebB';
 // Sheet "Hasil" (KPI, red flag, rate card & margin, simulasi, kurs, porsi kategori, opex/capex, kalender, space,
 // kebutuhan manpower & MHE, rincian biaya per bulan), "Quotation" dan "0 Ringkasan" (format PNL).
 import { R, q, BUCKETS, LAYANAN, NF, C, type Ctx, type Line, type Fmt, type NilaiSel } from '@/lib/exportWebUtil';
@@ -266,17 +267,19 @@ export function tulisHasil(x: Ctx) {
   // ===================== Kebutuhan manpower & MHE
   HS.r++;
   HS.h2('Kebutuhan manpower & MHE', 'Hanya jumlah (orang / unit). Biayanya ada di Rincian biaya per bulan (kategori Manpower & MHE).');
-  HS.hdr(['Role', 'Jenis', 'Jam kerja/shift', 'MP/shift', 'Headcount', 'Utilisasi', 'Skema']);
+  HS.hdr(['Role', 'Jenis', ['FTE', false, 'Dari Man Power Summary'], ['Orang per shift', false, 'Hasil pooling (Man Power Summary)'], ['Headcount', false, 'Manpower di Rincian biaya manpower'], ['Utilisasi', false, 'FTE ÷ headcount'], 'Skema']);
   const AKN = `'Aktivitas & manpower'!`;
-  const bmpRow = x.bmpRow as number[]; const mpRow = x.mpRow as Map<string, number>;
-  h.manpower.forEach((p, i) => {
-    const r = HS.r, br = bmpRow[i], mr = mpRow.get(p.roleName);
-    HS.put(1, p.roleName, { j: 'txt' }); HS.put(2, p.jenis, { j: 'txt' }); HS.put(3, p.jenis === 'Direct' ? p.jamPerShift : '—', { j: 'out', fmt: 'n2' });
-    HS.put(4, p.mpPerShift || '—', { j: 'out', fmt: 'n0' }); HS.put(5, { f: `${AKN}W${br}`, v: p.headcount }, { j: 'out', fmt: 'n0', b: true });
-    HS.put(6, p.jenis === 'Direct' && mr ? { f: `IF(E${r}>0,${AKN}C${mr}/E${r},0)` } : '—', { j: 'out', fmt: 'pct' });
-    HS.put(7, { f: `IF(${AKN}X${br}="Sharing","sharing "&IF(${AKN}Y${br}="",0.5,${AKN}Y${br}),"dedicated")` }, { j: 'txt', size: 9 });
+  const mpRows = x.mpRows as MpBarisXl[];
+  for (const z of mpRows) {
+    const r = HS.r, br = z.row, sr = z.sumRow;
+    HS.put(1, { f: `${AKN}B${br}` }, { j: 'txt' }); HS.put(2, z.jenis === 'Tetap' ? 'Indirect' : z.jenis, { j: 'txt' });
+    HS.put(3, z.jenis === 'Direct' ? { f: `${AKN}C${sr}` } : '—', { j: 'out', fmt: 'n2' });
+    HS.put(4, { f: `IF(A${r}="","",TRIM(IF(${AKN}E${sr}>0,"S1: "&ROUND(${AKN}E${sr},1)&"  ","")&IF(${AKN}F${sr}>0,"S2: "&ROUND(${AKN}F${sr},1)&"  ","")&IF(${AKN}G${sr}>0,"S3: "&ROUND(${AKN}G${sr},1),"")))` }, { j: 'out', size: 9 });
+    HS.put(5, { f: `${AKN}W${br}` }, { j: 'out', fmt: 'n0', b: true });
+    HS.put(6, z.jenis === 'Direct' ? { f: `IF(E${r}>0,${AKN}C${sr}/E${r},0)` } : '—', { j: 'out', fmt: 'pct' });
+    HS.put(7, { f: `IF(A${r}="","",IF(${AKN}X${br}="Sharing","sharing "&${AKN}Y${br},"dedicated"))` }, { j: 'txt', size: 9 });
     HS.r++;
-  });
+  }
   HS.put(1, 'Total', { j: 'sub' }); HS.put(5, { f: 'TotalHeadcount' }, { j: 'sub', fmt: 'n0' }); HS.r++;
   HS.r++;
   HS.h3('MHE');
@@ -362,7 +365,6 @@ export function tulisRingkasan(x: Ctx) {
   const { h, m } = d;
   const n = x.n;
   const rcRef = x.rcRef as Record<string, Record<string, string>>;
-  const bmpRow = x.bmpRow as number[];
   const AKN = `'Aktivitas & manpower'!`, HSN = `'Hasil'!`;
   S0.lebar(22, 46, 16, 16, 18, 18, 20, 50);
   const ws0 = S0.ws;
@@ -463,18 +465,13 @@ export function tulisRingkasan(x: Ctx) {
   const c2 = S0.cell(1); c2.value = '2. Cost Details'; c2.font = { bold: true, size: 12, color: { argb: C.INK } }; S0.r += 2;
   judulTabel('2-1. Manpower', 8);
   header(['Category', 'Position', 'Rate / org / bln', 'Pax / shift', 'Shift', 'Total manpower', 'Cost / bln', `${n} Month (kontrak)`]);
-  const shiftOf = new Map<string, number[]>();
-  const tambahShift = (nama: string, ps: number[] | null | undefined) => { if (!ps) return; const a2 = shiftOf.get(nama) ?? ps.map(() => 0); ps.forEach((v, i) => { a2[i] = (a2[i] ?? 0) + v; }); shiftOf.set(nama, a2); };
-  for (const z of x.pd.mp) tambahShift(z.nama, z.perShift);
-  for (const z of x.pd.indirect.rows) tambahShift(z.nama, z.perShift);
   const mp0 = S0.r;
-  const urut = h.manpower.map((p, i) => ({ p, i })).sort((p1, p2) => Number(p2.p.jenis === 'Direct') - Number(p1.p.jenis === 'Direct'));
-  for (const { p, i } of urut) {
-    const br = bmpRow[i]; const r = S0.r;
-    const ps = shiftOf.get(p.roleName);
-    const aktif = ps ? ps.filter(v => v > 0).length : 0;
-    const teks = ps && aktif ? ps.map((v, k) => v > 0 ? `S${k + 1}: ${Math.round(v * 10) / 10}` : null).filter(Boolean).join(' · ') : '—';
-    baris([p.jenis === 'Direct' ? 'Direct' : 'Indirect', p.roleName, { f: `IF(F${r}>0,G${r}/F${r},0)` }, teks, aktif || { f: 'ShiftAktif' }, { f: `${AKN}W${br}`, v: p.headcount }, { f: `${AKN}AB${br}`, v: p.biayaBulan }, { f: `G${r}*Kontrak` }],
+  for (const z of x.mpRows as MpBarisXl[]) {
+    const br = z.row, sr = z.sumRow; const r = S0.r;
+    const ada = `${AKN}B${br}=""`;
+    baris([{ f: `IF(${ada},"","${z.jenis === 'Direct' ? 'Direct' : 'Indirect'}")` }, { f: `${AKN}B${br}` }, { f: `IF(F${r}>0,G${r}/F${r},0)` },
+      { f: `IF(${ada},"",IF(COUNTIF(${AKN}E${sr}:G${sr},">0")=0,"—",TRIM(IF(${AKN}E${sr}>0,"S1: "&ROUND(${AKN}E${sr},1)&" · ","")&IF(${AKN}F${sr}>0,"S2: "&ROUND(${AKN}F${sr},1)&" · ","")&IF(${AKN}G${sr}>0,"S3: "&ROUND(${AKN}G${sr},1),""))))` },
+      { f: `IF(${ada},"",IF(COUNTIF(${AKN}E${sr}:G${sr},">0")=0,ShiftAktif,COUNTIF(${AKN}E${sr}:G${sr},">0")))` }, { f: `${AKN}W${br}` }, { f: `${AKN}AB${br}` }, { f: `G${r}*Kontrak` }],
       [undefined, undefined, 'rp', undefined, 'n0', 'n0', 'rp', 'rp']);
     ws0.getCell(r, 4).alignment = { vertical: 'middle', horizontal: 'center' };
   }

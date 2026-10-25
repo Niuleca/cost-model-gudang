@@ -3,13 +3,13 @@
 // semua angka berupa rumus hidup yang saling terhubung. Pengecualian (bersifat algoritma di web):
 // headcount hasil multi-skill pooling & per shift → ditulis sebagai sel input (bisa diubah), alokasi biaya
 // manpower/MHE per layanan → nilai dari web. Rumus memakai fungsi yang kompatibel Excel 2016+ / 365.
-import { MENU, SHEET_WEB, S, BUCKETS, RISIKO_DEFAULT, ALOKASI, TOOLS, UOM, UOM_ISI, INDUSTRI, MATA_UANG, KELAS_UOM, R, C, type Ctx, type DataWeb, type Fmt } from '@/lib/exportWebUtil';
+import { MENU, SHEET_WEB, S, BUCKETS, RISIKO_DEFAULT, ALOKASI, TOOLS, UOM, UOM_ISI, INDUSTRI, MATA_UANG, KELAS_UOM, R, A, C, type Ctx, type DataWeb, type Fmt } from '@/lib/exportWebUtil';
 import { LEVEL_JABATAN } from '@/lib/engine/biayaMp';
 import { MODA, MUATAN, SATUAN_UNIT } from '@/lib/profilVolume';
 import { OPSI_TAG, labelTag } from '@/lib/porsiMuat';
 import { COST_TYPES, KELOMPOK_IT } from '@/lib/it';
 import { SEKSI_BIAYA } from '@/lib/biayaLain';
-import { PD_DEFAULT } from '@/lib/engine/processDesign';
+import { PD_DEFAULT, RANGKAP_DEFAULT } from '@/lib/engine/processDesign';
 import { tulisKeyAssumption, tulisVolume } from '@/lib/exportWebA';
 import { tulisAktivitas } from '@/lib/exportWebB';
 import { tulisGudang, tulisIt, tulisBiayaLain, tulisInterest } from '@/lib/exportWebC';
@@ -116,6 +116,23 @@ export function tulisModelWeb(wb: WB, d: DataWeb) {
   daftarTabel('D_Moda', 'Moda', ['Label', 'Kode'], MODA.map(x => [x.l, x.v]));
   daftarTabel('D_Mu', 'Cara muat', ['Label', 'Kode'], MUATAN.map(x => [x.l, x.v]));
   daftarTabel('D_Lv', 'Level jabatan', ['Label', 'Kode'], LEVEL_JABATAN.map(x => [x.l.split(' (')[0], x.v]));
+  daftarList('L_Rangkap', 'Matriks multi-skill', ['Default', 'Ya', 'Tidak'], 0);
+  {
+    // Aturan rangkap default: baris = kategori yang merangkap, kolom = kategori yang dirangkap (1 = boleh)
+    const KAT = ['checker', 'picker', 'admin', 'operator', 'lain', 'nonkaryawan'] as const;
+    const c0 = kolDf; kolDf += KAT.length + 2;
+    DF.put(c0, 'Aturan rangkap default (1 = boleh)', { b: true, size: 11, j: 'none' }, 5);
+    DF.put(c0, 'Merangkap ↓ / dirangkap →', { j: 'hdr', al: 'center' }, 6);
+    KAT.forEach((k, j) => DF.put(c0 + 1 + j, k, { j: 'hdr', al: 'center' }, 6));
+    KAT.forEach((ka, i) => {
+      DF.put(c0, ka, { j: 'txt', b: true }, 7 + i);
+      KAT.forEach((kb, j) => DF.put(c0 + 1 + j, ka !== 'nonkaryawan' && kb !== 'nonkaryawan' && RANGKAP_DEFAULT[ka].includes(kb) ? 1 : 0, { j: 'in', fmt: 'n0', al: 'center' }, 7 + i));
+    });
+    DF.ws.getColumn(c0).width = 24;
+    DF.nmR('D_RkKat', c0, 7, 7 + KAT.length - 1);
+    wb.definedNames.add(`'Daftar'!${A(c0 + 1, 6)}:${A(c0 + KAT.length, 6)}`, 'D_RkKol');
+    wb.definedNames.add(`'Daftar'!${A(c0 + 1, 7)}:${A(c0 + KAT.length, 7 + KAT.length - 1)}`, 'D_RkGrid');
+  }
   daftarTabel('D_Risk', 'Risiko default', ['Kelompok', 'Risiko'], Object.entries(RISIKO_DEFAULT));
   const upahUrut = [...L0.upah].sort((x, y) => x.provinsi.localeCompare(y.provinsi) || x.kab_kota.localeCompare(y.kab_kota));
   if (!upahUrut.some(u => u.provinsi === t.provinsi && u.kab_kota === t.kab_kota)) upahUrut.push({ provinsi: t.provinsi, kab_kota: t.kab_kota, upah_berlaku: m.upahMinimum, status_verifikasi: m.statusUpah, tahun: inp.tahun });

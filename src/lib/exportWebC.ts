@@ -169,34 +169,47 @@ export function tulisGudang(x: Ctx) {
 
   // ===================== Kebutuhan MHE
   GD.r++;
-  GD.h2('Kebutuhan MHE', 'Daftar alat dari Aktivitas & manpower (Equipment & Alat pendukung). Unit = MHE Summary + spare. Pilih item harga supaya biayanya masuk cost model; alat tanpa harga = tanpa biaya. Sewa = unit × harga · Beli = unit × harga ÷ MIN(umur, kontrak).');
-  GD.hdr(['Equipment (dari aktivitas)', 'FTE', 'Unit kebutuhan', ['Item harga', true], ['Mode', true], ['Harga', true], ['Umur (bln)', true], ['Spare %', true], 'Spare', 'Total unit', 'Biaya/bln', 'Nilai investasi', 'Harga DB (sesuai mode)']);
-  const tools = Array.from(new Set([...x.pd.mhe.map(e => e.nama), ...a.mhe.map(m => m.tool)]));
+  GD.h2('Kebutuhan MHE', 'Satu baris per alat ber-harga (sama dengan daftar harga MHE di web). Unit = MHE Summary (sheet Aktivitas & manpower) + spare. Sewa = unit × harga · Beli = unit × harga ÷ MIN(umur, kontrak). Alokasi biaya per layanan otomatis dari bobot alat di VSM (peak × % × pengali ÷ prod); alat tanpa aktivitas utama → man hour alat; tidak ada → 40/30/30.');
+  GD.hdr([['Equipment', true, 'Nama alat persis seperti di Aktivitas (huruf besar/kecil berpengaruh)'], ['FTE', false, 'Dari MHE Summary'], ['Unit kebutuhan', false, 'Resources di MHE Summary'], ['Item harga', true], ['Mode', true], ['Harga', true], ['Umur (bln)', true], ['Spare %', true],
+    ['Spare', false, 'ROUNDUP(unit × spare %)'], ['Total unit', false, 'Unit + spare'], ['Biaya/bln', false, 'Sewa: unit × harga · Beli: unit × harga ÷ MIN(umur, kontrak)'], 'Nilai investasi', 'Harga DB (sesuai mode)',
+    ['Bobot VSM', false, 'Σ bobot alat di kolom "Bobot alat" VSM'], ['Sto', false, 'Alokasi ke Storage = bobot arus storage ÷ bobot total'], 'HIn', 'HOut', 'VAS', 'Man']);
+  const tools = Array.from(new Set([...a.mhe.map(m => m.tool), ...x.pd.mhe.map(e => e.nama)]));
   const m0 = GD.r;
-  for (const tl of tools) {
+  const ARUS = ['storage', 'inbound', 'outbound', 'vas'];
+  for (const tl of [...tools, ...Array.from({ length: 4 }, () => null)]) {
     const r = GD.r;
-    const mi = a.mhe.find(m => m.tool === tl);
-    GD.put(1, tl, { j: 'txt', b: true });
-    GD.put(2, { f: `IFERROR(INDEX(MheSum_Fte,MATCH(TRUE,INDEX(EXACT(MheSum_Nama,A${r}),0),0)),0)` }, { j: 'out', fmt: 'n2' });
-    GD.put(3, { f: `IFERROR(INDEX(MheSum_Res,MATCH(TRUE,INDEX(EXACT(MheSum_Nama,A${r}),0),0)),0)` }, { j: 'out', fmt: 'n0' });
+    const mi = tl ? a.mhe.find(m => m.tool === tl) : undefined;
+    GD.put(1, tl, { j: 'in', b: true }); GD.dd(1, 'L_Tool', false);
+    GD.put(2, { f: `IF(A${r}="",0,IFERROR(INDEX(MheSum_Fte,MATCH(TRUE,INDEX(EXACT(MheSum_Nama,A${r}),0),0)),0))` }, { j: 'out', fmt: 'n2' });
+    GD.put(3, { f: `IF(A${r}="",0,IFERROR(INDEX(MheSum_Res,MATCH(TRUE,INDEX(EXACT(MheSum_Nama,A${r}),0),0)),0))` }, { j: 'out', fmt: 'n0' });
     GD.put(4, mi?.nama || '—', { j: 'in' }); GD.dd(4, 'L_ItemMhe', false);
     GD.put(5, mi?.mode ?? 'sewa', { j: 'in' }); GD.dd(5, 'L_ModeMhe');
     GD.put(6, mi?.harga ?? null, { j: 'in', fmt: 'rp' }); GD.put(7, mi?.umurBulan ?? null, { j: 'in', fmt: 'n0' }); GD.put(8, mi?.sparePersen ?? 0, { j: 'in', fmt: 'pct' });
     GD.put(9, { f: `IF(C${r}>0,MAX(0,ROUNDUP(C${r}*N(H${r})-1E-9,0)),0)` }, { j: 'out', fmt: 'n0' });
-    GD.put(10, { f: `C${r}+I${r}`, v: h.mhe.find(m => m.tool === tl)?.unit }, { j: 'out', fmt: 'n0', b: true });
-    GD.put(11, { f: `IF(N(F${r})<=0,0,IF(E${r}="sewa",J${r}*F${r},J${r}*F${r}/MIN(IF(N(G${r})>0,G${r},Kontrak),Kontrak)))` }, { j: 'out', fmt: 'rp', b: true });
-    GD.put(12, { f: `IF(E${r}="beli",J${r}*N(F${r}),0)` }, { j: 'out', fmt: 'rp' });
+    GD.put(10, { f: `C${r}+I${r}`, v: tl ? h.mhe.find(m => m.tool === tl)?.unit : undefined }, { j: 'out', fmt: 'n0', b: true });
+    GD.put(11, { f: `IF(OR(A${r}="",N(F${r})<=0),0,IF(E${r}="sewa",J${r}*F${r},J${r}*F${r}/MIN(IF(N(G${r})>0,G${r},Kontrak),Kontrak)))` }, { j: 'out', fmt: 'rp', b: true });
+    GD.put(12, { f: `IF(AND(A${r}<>"",E${r}="beli"),J${r}*N(F${r}),0)` }, { j: 'out', fmt: 'rp' });
     GD.put(13, { f: `IFERROR(INDEX(IF(E${r}="sewa",D_ItSewa,D_ItBeli),MATCH(D${r},D_ItItem,0)),"")` }, { j: 'out', fmt: 'rp' });
-    const hm = h.mhe.find(m => m.tool === tl);
-    const eng = h.biaya.find(b => b.kelompok === 'MHE' && mi && (b.deskripsi.startsWith(`${mi.nama} — sewa`) || b.deskripsi.startsWith(`${mi.nama} (`)));
+    GD.put(14, { f: `IF(A${r}="",0,SUMPRODUCT(EXACT(VSM_Tool,A${r})*VSM_Bobot))` }, { j: 'out', fmt: 'n2' });
+    const mhTot = `SUMIFS(PD_MH,PD_Res,A${r},PD_Jenis,"Equipment")`;
+    ARUS.forEach((ar, k) => {
+      const vs = `SUMPRODUCT(EXACT(VSM_Tool,A${r})*(VSM_Arus="${ar}")*VSM_Bobot)`;
+      const mh = `SUMIFS(PD_MH,PD_Res,A${r},PD_Jenis,"Equipment",PD_Arus,"${ar}")`;
+      GD.put(15 + k, { f: `IF(N${r}>0,${vs}/N${r},IF(${mhTot}>0,${mh}/${mhTot},${MERATA[k]}))` }, { j: 'out', fmt: 'pct', size: 8 });
+    });
+    GD.put(19, 0, { j: 'out', fmt: 'pct', size: 8 });
+    const hmU = tl ? h.mhe.find(m => m.tool === tl)?.unit ?? 0 : 0;
+    const eng = mi ? h.biaya.find(b => b.kelompok === 'MHE' && (b.deskripsi === `${mi.nama} — sewa (${hmU} unit)` || b.deskripsi.startsWith(`${mi.nama} (${hmU} unit)`))) : undefined;
     const nm = `IF(${SN}D${r}="—","",${SN}D${r})`;
-    x.lines.push({ kel: 'MHE', tahap: 1, desk: { f: `IF(${SN}E${r}="sewa",${nm}&" — sewa ("&${SN}J${r}&" unit)",${nm}&" ("&${SN}J${r}&" unit) — depresiasi")`, v: eng?.deskripsi }, deskKey: eng?.deskripsi ?? `${mi?.nama ?? tl}`,
-      jenis: { f: `IF(${SN}E${r}="beli","Capex","Opex")` }, risk: 'Sedang', sistem: `${SN}$K$${r}`, alok: hm ? alokAngka(hm.alokasi) : MERATA, dasar: eng?.dasar ?? '', v: eng?.biayaBulan,
+    x.lines.push({ kel: 'MHE', tahap: 1, desk: { f: `IF(OR(${SN}A${r}="",${nm}=""),"",IF(${SN}E${r}="sewa",${nm}&" — sewa ("&${SN}J${r}&" unit)",${nm}&" ("&${SN}J${r}&" unit) — depresiasi"))`, v: eng?.deskripsi ?? '' }, deskKey: eng?.deskripsi ?? `${mi?.nama ?? tl ?? ''}`,
+      jenis: { f: `IF(${SN}E${r}="beli","Capex","Opex")` }, risk: 'Sedang', sistem: `${SN}$K$${r}`, alok: BUCKETS.map((_, k) => ({ f: `${SN}${R(15 + k, r)}` })), dasar: eng?.dasar ?? '', v: eng?.biayaBulan,
       nilai: `${SN}$L$${r}`, qty: { f: `${SN}J${r}` }, harga: { f: `${SN}F${r}` }, umur: { f: `IF(${SN}E${r}="beli",MIN(IF(N(${SN}G${r})>0,${SN}G${r},Kontrak),Kontrak),"")` }, uom: 'unit', capex: mi?.mode === 'beli' });
     GD.r++;
   }
-  GD.put(1, 'Total estimasi biaya MHE / bulan', { j: 'tot' }); GD.put(11, { f: `SUM(K${m0}:K${Math.max(m0, GD.r - 1)})` }, { j: 'tot', fmt: 'rp' }); GD.r++;
-  GD.note('Alat baru di aktivitas: tambahkan di web lalu export ulang (daftar alat mengikuti MHE Summary saat export).');
+  GD.nmR('MheHarga_Tool', 1, m0, GD.r - 1); GD.nmR('MheHarga_Biaya', 11, m0, GD.r - 1);
+  GD.put(1, 'Total estimasi biaya MHE / bulan', { j: 'tot' }); GD.put(11, { f: `SUM(K${m0}:K${GD.r - 1})` }, { j: 'tot', fmt: 'rp' }); GD.r++;
+  GD.note('Alat baru di Aktivitas otomatis muncul di MHE Summary; agar dibiayai, isi nama alatnya di baris kosong tabel ini lalu pilih item harga / isi harga.');
+  void alokAngka;
   void R; void q; void normAlok; void namaAlok;
 }
 
