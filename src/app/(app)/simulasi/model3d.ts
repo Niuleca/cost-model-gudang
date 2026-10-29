@@ -130,7 +130,7 @@ export function pinBersih(warna = WARNA_BERSIH.biru) {
 // ---------- model detail dari Meshy AI (public/sim3d/model/*.glb, tekstur webp 1024)
 // Model Meshy dinormalisasi: panjang di sumbu X (ternormal ±0,95), atas = +Y. Depan model Meshy = −X → diputar π
 // supaya depan = +X seperti model kode. Skala tidak seragam supaya panjang/lebar/tinggi sesuai ukuran nyata.
-export type JenisModel = 'forklift' | 'reach' | 'hpt' | 'truk' | 'container' | 'cde' | 'fuso' | 'tronton';
+export type JenisModel = 'forklift' | 'reach' | 'hpt' | 'truk' | 'container' | 'container20' | 'cde' | 'cdd' | 'fuso' | 'tronton';
 /** sumbu = sumbu panjang model asli ('x' bawaan Meshy text-to-3d, 'z' untuk sebagian model unggahan). */
 interface Spek { panjang: number; lebar: number; tinggi: number; putar: number; pusatX: number; berkas: string; cadangan?: string; sumbu?: 'x' | 'z' }
 const truk = (panjang: number, lebar: number, tinggi: number, berkas: string, cadangan?: string): Spek => ({ panjang, lebar, tinggi, putar: 0, pusatX: -0.5 - panjang / 2, berkas, cadangan });   // ujung belakang di x = −0,5 (menempel dock)
@@ -140,10 +140,12 @@ const SPEK: Record<JenisModel, Spek> = {
   hpt: { panjang: 1.6, lebar: 0.56, tinggi: 1.25, putar: Math.PI, pusatX: 0.1, berkas: 'hpt' },
   truk: truk(9.2, 2.5, 3.6, 'truk'),
   // armada: file model sendiri bila ada (cde.glb / fuso.glb / tronton.glb), kalau belum → truk boks diskalakan ke ukuran jenisnya
-  cde: truk(5.6, 2.0, 2.9, 'cde', 'truk'),
+  cde: truk(5.0, 1.9, 2.8, 'cde', 'truk'),
+  cdd: truk(6.6, 2.2, 3.1, 'cdd', 'truk'),
   fuso: truk(7.6, 2.3, 3.3, 'fuso', 'truk'),
   tronton: truk(10.5, 2.5, 3.7, 'tronton', 'truk'),
   container: truk(16.5, 2.5, 4.0, 'container'),   // kepala truk + trailer + container 40 HC
+  container20: truk(10.5, 2.5, 3.9, 'container20', 'container'),   // kepala truk + trailer + container 20 ft
 };
 const pemuat = new GLTFLoader();
 const cacheBerkas = new Map<string, Promise<THREE.Object3D | null>>();

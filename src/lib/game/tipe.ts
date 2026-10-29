@@ -42,12 +42,13 @@ export interface Txn { t: number; tipe: TipeTxn; sku: string; lot: string; karto
 
 export interface BarisAsn { sku: string; lot: string; expiry: number | null; karton: number }
 /** Jenis armada umum di Indonesia + kapasitas palet. */
-export type JenisTruk = 'cde' | 'fuso' | 'tronton' | 'container';
+export type JenisTruk = 'cde' | 'cdd' | 'fuso' | 'tronton' | 'container20' | 'container';
 export const ARMADA: Record<JenisTruk, { nama: string; kapasitas: number }> = {
-  cde: { nama: 'CDE', kapasitas: 8 }, fuso: { nama: 'Fuso', kapasitas: 14 }, tronton: { nama: 'Tronton', kapasitas: 20 }, container: { nama: 'Container 40HC', kapasitas: 24 },
+  cde: { nama: 'CDE', kapasitas: 8 }, cdd: { nama: 'CDD', kapasitas: 11 }, fuso: { nama: 'Fuso', kapasitas: 14 }, tronton: { nama: 'Tronton', kapasitas: 20 },
+  container20: { nama: 'Container 20ft', kapasitas: 11 }, container: { nama: 'Container 40HC', kapasitas: 24 },
 };
-/** Jenis truk dari jumlah palet: CDE ≤8, Fuso ≤14, Tronton ≤20, container 40HC >20. */
-export const jenisTrukDari = (palet: number): JenisTruk => (palet <= 8 ? 'cde' : palet <= 14 ? 'fuso' : palet <= 20 ? 'tronton' : 'container');
+/** Jenis truk dari jumlah palet: CDE ≤8, CDD ≤11, Fuso ≤14, Tronton ≤20, container 40HC >20. */
+export const jenisTrukDari = (palet: number): JenisTruk => (palet <= 8 ? 'cde' : palet <= 11 ? 'cdd' : palet <= 14 ? 'fuso' : palet <= 20 ? 'tronton' : 'container');
 export interface Truk {
   id: string; arus: 'inbound' | 'outbound'; jenis?: JenisTruk;
   rencanaTiba: number; tiba: number;

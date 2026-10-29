@@ -110,12 +110,22 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const kap = lokSimpan.length + 1200;
     const alas = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.14, 1.0), bersih ? mat(WARNA_BERSIH.kayu, { roughness: 0.8 }) : mat('#ffffff', { roughness: 0.9, map: teks('palet') }), kap);
     const tinggiMuat = Math.max(0.3, tinggiPalet - 0.22);
-    const muat = new THREE.InstancedMesh(new THREE.BoxGeometry(1.05, tinggiMuat, 0.96), bersih ? mat('#ffffff', { roughness: 0.6 }) : mat('#ffffff', { roughness: 0.4, map: teks('muatan') }), kap);
+    // gaya bersih: palet = kotak bertekstur hasil "foto" 5 sisi model Meshy (palet + karton ber-stretch film) → 12 segitiga per palet
+    const tinggiImpostor = Math.max(0.6, tinggiPalet - 0.05);
+    const muatImpostor = () => {
+      const tl = new THREE.TextureLoader();
+      const sisi = (k: string) => { const t = tl.load(`/sim3d/tekstur/palet3d_${k}.webp`); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return new THREE.MeshStandardMaterial({ map: t, roughness: 0.75, alphaTest: 0.5, transparent: false }); };
+      const bawah = new THREE.MeshStandardMaterial({ color: WARNA_BERSIH.kayu, roughness: 0.9 });
+      return [sisi('px'), sisi('nx'), sisi('py'), bawah, sisi('pz'), sisi('nz')];   // urutan sisi BoxGeometry: +X −X +Y −Y +Z −Z
+    };
+    const muat = bersih
+      ? new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, tinggiImpostor, 1.0), muatImpostor(), kap)
+      : new THREE.InstancedMesh(new THREE.BoxGeometry(1.05, tinggiMuat, 0.96), mat('#ffffff', { roughness: 0.4, map: teks('muatan') }), kap);
     alas.castShadow = muat.castShadow = lokSimpan.length <= 4000; alas.receiveShadow = muat.receiveShadow = true;
     alas.frustumCulled = muat.frustumCulled = false;
     gPalet.add(alas, muat);
     const warnaSku = new Map<string, THREE.Color>();
-    const palet = bersih ? ['#d8b07a', '#e2bf8c', '#cfa36c', '#e9cda0', '#d4a874', '#ddb784', '#c99c62', '#e5c596', '#d1aa78', '#dcb27c']
+    const palet = bersih ? ['#ffffff', '#f7f1e8', '#f0e6d6', '#fbf7f0', '#f2ede4', '#f6efe2', '#eee4d2', '#faf4ea', '#f3eadb', '#f8f2e6']
       : ['#ffffff', '#f4efe6', '#ebe3d4', '#fbf7f0', '#e6edf3', '#f1e9dc', '#fde9d9', '#e3f1e6', '#e8e4f5', '#f5f0d8'];
     [...d.sku.keys()].forEach((s, i) => warnaSku.set(s, new THREE.Color(palet[i % palet.length])));
     const tmp = new THREE.Object3D();
@@ -124,9 +134,11 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const taruhPalet = (x: number, y: number, z: number, rot: number, sku: string, isi = 1, lpn: string | null = null) => {
       if (n >= kap) return;
       idxLpn[n] = lpn; if (lpn) posPalet.set(lpn, v(x, z, y + tinggiPalet));
-      tmp.position.set(x, y + 0.07, z); tmp.rotation.set(0, rot, 0); tmp.scale.set(1, 1, 1); tmp.updateMatrix(); alas.setMatrixAt(n, tmp.matrix);
+      tmp.position.set(x, y + 0.07, z); tmp.rotation.set(0, rot, 0); tmp.scale.set(1, 1, 1); tmp.updateMatrix(); if (!bersih) alas.setMatrixAt(n, tmp.matrix);
       const sk = Math.max(0.15, Math.min(1, isi));
-      tmp.position.set(x, y + 0.14 + (tinggiMuat * sk) / 2, z); tmp.scale.set(1, sk, 1); tmp.updateMatrix(); muat.setMatrixAt(n, tmp.matrix);
+      if (bersih) { const h = tinggiImpostor * (0.3 + 0.7 * sk); tmp.position.set(x, y + h / 2, z); tmp.scale.set(1, h / tinggiImpostor, 1); }
+      else { tmp.position.set(x, y + 0.14 + (tinggiMuat * sk) / 2, z); tmp.scale.set(1, sk, 1); }
+      tmp.updateMatrix(); muat.setMatrixAt(n, tmp.matrix);
       muat.setColorAt(n, warnaSku.get(sku) ?? new THREE.Color('#ffffff'));
       n++;
     };
@@ -147,7 +159,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         taruhPalet(p.x, p.y, p.z, 0, l.sku, l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton), id);
       });
       for (const b of dibawa) taruhPalet(b.pos.x, b.pos.y, b.pos.z, b.rot, b.sku, 1, b.lpn);
-      alas.count = muat.count = n;
+      muat.count = n; alas.count = bersih ? 0 : n;
       alas.instanceMatrix.needsUpdate = muat.instanceMatrix.needsUpdate = true;
       alas.boundingSphere = muat.boundingSphere = null;   // supaya klik (raycast) memakai posisi palet terbaru
       if (muat.instanceColor) muat.instanceColor.needsUpdate = true;
@@ -156,7 +168,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     // ---------- truk: satu per dock + antrean di halaman
     interface ObjTruk { g: THREE.Group; lbl: CSS2DObject; truk: string | null; mulai: number; arus: 'inbound' | 'outbound'; jenis: JenisTruk | null; badan: THREE.Group | null }
     const trukDock = new Map<string, ObjTruk>();
-    const PANJANG_TRUK: Record<JenisTruk, number> = { cde: 5.6, fuso: 7.6, tronton: 10.5, container: 16.5 };
+    const PANJANG_TRUK: Record<JenisTruk, number> = { cde: 5.0, cdd: 6.6, fuso: 7.6, tronton: 10.5, container20: 10.5, container: 16.5 };
     const buatObjTruk = (arus: 'inbound' | 'outbound') => {
       const g = new THREE.Group(); g.visible = false; gTruk.add(g);
       const lbl = label('', 'kecil'); lbl.position.set(-7, 4.4, 0); g.add(lbl);

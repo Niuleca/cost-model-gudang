@@ -266,7 +266,7 @@ function awalHari(d: Dunia) {
     // truk inbound tersebar di jam operasi (sisakan 2 jam terakhir)
     // armada campuran: CDE / Fuso / Tronton / container 40HC; total palet harian = volume tender
     let sisaPalet = bulatAcak(d.rng, sk.permintaan.paletInHari);
-    const pilihan: JenisTruk[] = ['cde', 'fuso', 'tronton', 'container'], bobotArmada = [0.15, 0.25, 0.35, 0.25];
+    const pilihan: JenisTruk[] = ['cde', 'cdd', 'fuso', 'tronton', 'container20', 'container'], bobotArmada = [0.1, 0.15, 0.2, 0.25, 0.1, 0.2];
     while (sisaPalet > 0) {
       const jenisTruk = pilihan[pilihBerbobot(d.rng, bobotArmada)];
       const jml = Math.min(sisaPalet, ARMADA[jenisTruk].kapasitas);
@@ -278,7 +278,7 @@ function awalHari(d: Dunia) {
         const { lot, expiry } = lotBaru(d, s.id, 3 + Math.floor(d.rng() * 20));
         return { sku: s.id, lot, expiry, karton: s.kartonPerPalet };
       });
-      const tr: Truk = { id: id(d, 'TI'), arus: 'inbound', jenis: jenisTrukDari(jml), rencanaTiba: rencana, tiba: rencana + telat, dock: null, status: 'dijadwalkan', palet, order: [], sisaTugas: 0 };
+      const tr: Truk = { id: id(d, 'TI'), arus: 'inbound', jenis: jenisTruk, rencanaTiba: rencana, tiba: rencana + telat, dock: null, status: 'dijadwalkan', palet, order: [], sisaTugas: 0 };
       d.truk.set(tr.id, tr); jadwal(d, tr.tiba, 'truk_tiba', tr.id);
       if (telat) d.hariIni.kejadian.push(`Truk inbound ${tr.id} terlambat ${Math.round(telat / JAM)} jam.`);
     }
