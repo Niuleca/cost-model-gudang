@@ -15,7 +15,7 @@ export interface Kecepatan { faktor: number; siklus: Record<string, number> }
 export interface OpsiViewer { atap: boolean; dinding: boolean; label: boolean; animasi: boolean; truk: boolean; orang: boolean }
 
 const WARNA_ZONA: Record<string, string> = {
-  stagingIn: '#3b82f6', stagingOut: '#10b981', spr: '#64748b', ddr: '#475569', block: '#a16207', floor: '#b45309', fasilitas: '#8b5cf6', jalur: '#f59e0b',
+  stagingIn: '#3b82f6', stagingOut: '#10b981', spr: '#64748b', ddr: '#475569', block: '#a16207', floor: '#b45309', fasilitas: '#8b5cf6', jalur: '#f59e0b', custom: '#0ea5e9',
 };
 const NAMA_MHE: Record<JenisMhe, string> = { reach: 'RT', forklift: 'FL', stacker: 'ST', hpt: 'HPT', perangkat: '' };
 
@@ -80,6 +80,12 @@ function modelOrang(c: string) {
   return g;
 }
 
+/** Titik di sepanjang lorong (t = 0 mulut … 1 ujung), digeser tegak lurus sejauh geser meter. */
+function titikLorong(lo: { x0: number; z0: number; x1: number; z1: number }, t: number, geser: number) {
+  const dx = lo.x1 - lo.x0, dz = lo.z1 - lo.z0, n = Math.hypot(dx, dz) || 1;
+  return new THREE.Vector3(lo.x0 + dx * t - (dz / n) * geser, 0, lo.z0 + dz * t + (dx / n) * geser);
+}
+
 interface Gerak { obj: THREE.Object3D; a: THREE.Vector3; b: THREE.Vector3; kunci: string; siklusAwal: number; fase: number; garpu?: THREE.Object3D; angkat?: number }
 
 const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; opsi: OpsiViewer; kecepatan: Kecepatan }>(function Viewer3D({ layout, shift, opsi, kecepatan }, ref) {
@@ -110,7 +116,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     if (k === 'dock') { s.cam.position.set(-32, 14, W / 2 + W * 0.35); target.set(4, 2, W / 2); }
     if (k === 'lorong') {
       const lor = layout.lorong[0];
-      if (lor) { s.cam.position.set(lor.x0 - 1, 1.7, lor.z); target.set(lor.x1, 1.5, lor.z); } else { s.cam.position.set(1, 1.7, W / 2); target.set(L, 1.5, W / 2); }
+      if (lor) { const dx = lor.x1 - lor.x0, dz = lor.z1 - lor.z0, n = Math.hypot(dx, dz) || 1; s.cam.position.set(lor.x0 - dx / n, 1.7, lor.z0 - dz / n); target.set(lor.x1, 1.5, lor.z1); } else { s.cam.position.set(1, 1.7, W / 2); target.set(L, 1.5, W / 2); }
     }
     void H;
     s.ctl.target.copy(target); s.cam.updateProjectionMatrix(); s.ctl.update();
@@ -188,7 +194,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     // zona: warna lantai tipis + garis kuning
     const garis = mat('#facc15', { roughness: 0.6 });
     for (const z of layout.zona) {
-      const p = new THREE.Mesh(new THREE.PlaneGeometry(z.x1 - z.x0, z.z1 - z.z0), new THREE.MeshStandardMaterial({ color: WARNA_ZONA[z.jenis], transparent: true, opacity: z.jenis === 'jalur' ? 0.08 : 0.13, roughness: 0.8 }));
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(z.x1 - z.x0, z.z1 - z.z0), new THREE.MeshStandardMaterial({ color: z.warna ?? WARNA_ZONA[z.jenis] ?? '#94a3b8', transparent: true, opacity: z.jenis === 'jalur' ? 0.08 : 0.13, roughness: 0.8 }));
       p.rotation.x = -Math.PI / 2; p.position.set((z.x0 + z.x1) / 2, 0.012, (z.z0 + z.z1) / 2); p.receiveShadow = true; gBangunan.add(p);
       if (z.jenis === 'stagingIn' || z.jenis === 'stagingOut') {
         const b = (sx: number, sz: number, x: number, zz: number) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.015, sz), garis); m.position.set(x, 0.015, zz); gBangunan.add(m); };
@@ -198,7 +204,12 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
       (lb.element as HTMLDivElement).title = z.ket; lb.element.innerHTML = `<b>${z.label}</b><span>${z.ket}</span>`; gLabel.add(lb);
     }
     // garis lorong rak
-    for (const lo of layout.lorong) { const m = new THREE.Mesh(new THREE.BoxGeometry(lo.x1 - lo.x0, 0.012, 0.1), garis); m.position.set((lo.x0 + lo.x1) / 2, 0.016, lo.z); gBangunan.add(m); }
+    for (const lo of layout.lorong) {
+      const pj = Math.hypot(lo.x1 - lo.x0, lo.z1 - lo.z0); const m = new THREE.Mesh(new THREE.BoxGeometry(pj, 0.012, 0.1), garis);
+      m.position.set((lo.x0 + lo.x1) / 2, 0.016, (lo.z0 + lo.z1) / 2); m.rotation.y = -Math.atan2(lo.z1 - lo.z0, lo.x1 - lo.x0); gBangunan.add(m);
+    }
+    // kolom struktur (layout editor)
+    for (const k of layout.kolom ?? []) { const m = new THREE.Mesh(new THREE.BoxGeometry(k.w, k.tinggi, k.d), mat('#475569', { metalness: 0.5, roughness: 0.4 })); m.position.set(k.x + k.w / 2, k.tinggi / 2, k.z + k.d / 2); m.castShadow = true; gBangunan.add(m); }
 
     // dinding (panel cladding transparan) + kolom baja
     const panel = (sx: number, sy: number, sz: number, x: number, y: number, z: number) => {
@@ -239,7 +250,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
 
     // fasilitas (ruangan kaca)
     for (const f of layout.fasilitas) {
-      const tinggi = 3, sx = f.x1 - f.x0, sz = f.z1 - f.z0;
+      const tinggi = f.tinggi && f.tinggi > 0 ? f.tinggi : 3, sx = f.x1 - f.x0, sz = f.z1 - f.z0;
       const m = new THREE.Mesh(new THREE.BoxGeometry(sx - 0.2, tinggi, sz - 0.2), new THREE.MeshStandardMaterial({ color: '#ede9fe', transparent: true, opacity: 0.55, roughness: 0.3 }));
       m.position.set((f.x0 + f.x1) / 2, tinggi / 2, (f.z0 + f.z1) / 2); m.castShadow = true; gBangunan.add(m);
       const tepi = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: '#6d28d9' })); tepi.position.copy(m.position); gBangunan.add(tepi);
@@ -252,13 +263,15 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     const tiang = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, layout.tinggiRak, 0.09), mat('#1e56a0', { metalness: 0.5, roughness: 0.45 }), Math.max(1, nTiang));
     const beam = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.12, 1), mat('#f97316', { metalness: 0.4, roughness: 0.4 }), Math.max(1, nBeam));
     const tmp = new THREE.Object3D(); let it = 0, ib = 0;
-    // baris rak memanjang di X: tiang di tiap batas bay (muka lorong & muka belakang), beam sejajar X
+    // baris rak: tiang di tiap batas bay (muka lorong & muka belakang), beam sejajar arah baris; arah 'z' = baris memanjang di Z
     for (const rr of layout.rak) {
+      const ly = rr.levelY ?? layout.levelY; const tg = rr.tinggi ?? layout.tinggiRak; const zArah = rr.arah === 'z';
+      const titik = (sepanjang: number, melintang: number, y: number) => zArah ? tmp.position.set(rr.x0 + melintang, y, rr.z0 + sepanjang) : tmp.position.set(rr.x0 + sepanjang, y, rr.z0 + melintang);
       for (let b = 0; b <= rr.nBay; b++) for (const dz of [0.05, rr.depth - 0.05]) {
-        tmp.position.set(rr.x0 + b * rr.bayW, layout.tinggiRak / 2, rr.z0 + dz); tmp.scale.set(1, 1, 1); tmp.rotation.set(0, 0, 0); tmp.updateMatrix(); tiang.setMatrixAt(it++, tmp.matrix);
+        titik(b * rr.bayW, dz, tg / 2); tmp.scale.set(1, tg / layout.tinggiRak, 1); tmp.rotation.set(0, 0, 0); tmp.updateMatrix(); tiang.setMatrixAt(it++, tmp.matrix);
       }
       for (let b = 0; b < rr.nBay; b++) for (let l = 1; l < rr.level; l++) for (const dz of [0.05, rr.depth - 0.05]) {
-        tmp.position.set(rr.x0 + (b + 0.5) * rr.bayW, layout.levelY[l] - 0.06, rr.z0 + dz); tmp.scale.set(1, 1, rr.bayW - 0.09); tmp.rotation.set(0, Math.PI / 2, 0); tmp.updateMatrix(); beam.setMatrixAt(ib++, tmp.matrix);
+        titik((b + 0.5) * rr.bayW, dz, (ly[l] ?? 0) - 0.06); tmp.scale.set(1, 1, rr.bayW - 0.09); tmp.rotation.set(0, zArah ? 0 : Math.PI / 2, 0); tmp.updateMatrix(); beam.setMatrixAt(ib++, tmp.matrix);
       }
     }
     tiang.count = it; beam.count = ib; tiang.castShadow = beam.castShadow = true; tiang.receiveShadow = beam.receiveShadow = true;
@@ -292,8 +305,8 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
         let a: THREE.Vector3, b: THREE.Vector3;
         if ((u.jenis === 'reach' || u.jenis === 'stacker') && lorRak.length) {
           // reach truck: mulut lorong (jalur utama) ↔ bay tujuan di dalam lorong
-          const lo = lorRak[iLor++ % lorRak.length]; const panjang = Math.max(2, lo.x1 - lo.x0 - 3);
-          a = new THREE.Vector3(lo.x0, 0, lo.z); b = new THREE.Vector3(lo.x0 + 2 + ((k * 0.37 + iLor * 0.23 + 0.2) % 1) * panjang, 0, lo.z);
+          const lo = lorRak[iLor++ % lorRak.length];
+          a = new THREE.Vector3(lo.x0, 0, lo.z0); b = titikLorong(lo, 0.15 + ((k * 0.37 + iLor * 0.23 + 0.2) % 1) * 0.8, 0);
         } else if (u.jenis === 'hpt') {
           const r2 = iHp++ % 2 === 0 ? layout.stagingIn : layout.stagingOut; const x = r2.x0 + 2.5 + (iHp % 3) * 1.6; a = new THREE.Vector3(x, 0, r2.z0 + 1); b = new THREE.Vector3(x, 0, r2.z1 - 1);
         } else {
@@ -346,13 +359,13 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
           case 'security': p = new THREE.Vector3(-3 - i, 0, W + 2.5); break;
           case 'inventory': {
             const lo = lorRak[(i * 3 + 1) % Math.max(1, lorRak.length)];
-            if (lo) { p = new THREE.Vector3(lo.x1 - 0.5, 0, lo.z + 0.5); jalanLorong.push({ obj: new THREE.Object3D(), a: p, b: new THREE.Vector3(lo.x0 + 1, 0, lo.z + 0.5), kunci: `role:${o.nama}`, siklusAwal: 300, fase: (i * 0.27) % 1 }); }
+            if (lo) { p = titikLorong(lo, 0.97, 0.5); jalanLorong.push({ obj: new THREE.Object3D(), a: p, b: titikLorong(lo, 0.08, 0.5), kunci: `role:${o.nama}`, siklusAwal: 300, fase: (i * 0.27) % 1 }); }
             else p = new THREE.Vector3(L.stagingIn.x1 + 2, 0, 2 + i);
             break;
           }
           case 'picker': {
             const lo = lorRak[iPick++ % Math.max(1, lorRak.length)];
-            if (lo) { const a = new THREE.Vector3(lo.x0 + 0.5, 0, lo.z + 0.6); const b = new THREE.Vector3(lo.x0 + 2 + ((i * 0.53 + 0.3) % 1) * Math.max(2, lo.x1 - lo.x0 - 3), 0, lo.z + 0.6); p = a; jalanLorong.push({ obj: new THREE.Object3D(), a, b, kunci: `role:${o.nama}`, siklusAwal: 30, fase: (i * 0.29) % 1 }); }
+            if (lo) { const a = titikLorong(lo, 0.03, 0.6); const b = titikLorong(lo, 0.15 + ((i * 0.53 + 0.3) % 1) * 0.8, 0.6); p = a; jalanLorong.push({ obj: new THREE.Object3D(), a, b, kunci: `role:${o.nama}`, siklusAwal: 30, fase: (i * 0.29) % 1 }); }
             else p = acakTitik(L.stagingOut.x0 + 4.5, L.stagingOut.x1 - 1, L.stagingOut.z0 + 1, L.stagingOut.z1 - 1, i + 5);
             break;
           }

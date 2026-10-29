@@ -5,15 +5,17 @@ import type { HasilTender } from '@/lib/engine/index.ts';
 import type { TenderRow } from '@/lib/tender';
 import { hitungLevelRak, lengkapiSpaceExcel } from '@/lib/engine/space';
 
-export type JenisZona = 'stagingIn' | 'stagingOut' | 'spr' | 'ddr' | 'block' | 'floor' | 'fasilitas' | 'jalur';
-export interface Zona { id: string; jenis: JenisZona; label: string; x0: number; x1: number; z0: number; z1: number; ket: string }
+export type JenisZona = 'stagingIn' | 'stagingOut' | 'spr' | 'ddr' | 'block' | 'floor' | 'fasilitas' | 'jalur' | 'custom';
+export interface Zona { id: string; jenis: JenisZona; label: string; x0: number; x1: number; z0: number; z1: number; ket: string; warna?: string }
 /** Satu baris rak: memanjang di sumbu X (bay berjejer ke belakang), kedalaman di sumbu Z. hadap = sisi lorong (+1 = ke arah Z besar). */
-export interface BarisRak { jenis: 'spr' | 'ddr'; x0: number; z0: number; depth: number; hadap: 1 | -1; nBay: number; bayW: number; level: number; deep: number; ppl: number }
+export interface BarisRak { jenis: 'spr' | 'ddr'; x0: number; z0: number; depth: number; hadap: 1 | -1; nBay: number; bayW: number; level: number; deep: number; ppl: number;
+  /** 'z' = baris memanjang di sumbu Z (layout editor); default 'x'. levelY & tinggi per baris (editor) — default ikut layout. */
+  arah?: 'x' | 'z'; levelY?: number[]; tinggi?: number }
 export interface Palet { x: number; y: number; z: number; jenis: 'spr' | 'ddr' | 'block' | 'floor' | 'stagingIn' | 'stagingOut'; rot?: boolean }
-/** Lorong rak memanjang di sumbu X pada posisi z; x0 = mulut lorong (di jalur utama). */
-export interface Lorong { z: number; x0: number; x1: number; zona: 'spr' | 'ddr' }
+/** Lorong rak: segmen garis dari mulut lorong (x0, z0) ke ujung (x1, z1). */
+export interface Lorong { x0: number; z0: number; x1: number; z1: number; zona: 'spr' | 'ddr' }
 export interface Dock { z: number; arus: 'inbound' | 'outbound' }
-export interface Fasilitas { nama: string; x0: number; x1: number; z0: number; z1: number }
+export interface Fasilitas { nama: string; x0: number; x1: number; z0: number; z1: number; tinggi?: number }
 export type JenisMhe = 'reach' | 'forklift' | 'stacker' | 'hpt' | 'perangkat';
 export interface UnitMhe { nama: string; jenis: JenisMhe; unit: number }
 export type KategoriOrang = 'admin' | 'checker' | 'picker' | 'operator' | 'tkbm' | 'supervisor' | 'security' | 'inventory' | 'lain';
@@ -39,6 +41,7 @@ export interface LayoutGudang {
   tinggiPalet: number; tinggiRak: number; levelY: number[]; level: number;
   stagingIn: { x0: number; x1: number; z0: number; z1: number }; stagingOut: { x0: number; x1: number; z0: number; z1: number };
   mhe: UnitMhe[]; orang: GrupOrang[]; shiftAktif: number[]; aktivitas: AktSim[];
+  kolom?: { x: number; z: number; w: number; d: number; tinggi: number }[];
   ringkas: { label: string; nilai: string }[];
   asumsi: string[];
 }
@@ -177,7 +180,7 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
       if (nBay > 0) rows.push({ jenis, x0, z0: b.z0, depth, hadap: b.hadap, nBay, bayW, level, deep, ppl });
     }
     const panjang = perBaris * bayW;
-    for (const zc of pola.lorong) lorong.push({ z: zc, x0: x0 - 1.75, x1: x0 + panjang, zona: jenis });
+    for (const zc of pola.lorong) lorong.push({ x0: x0 - 1.75, z0: zc, x1: x0 + panjang, z1: zc, zona: jenis });
     x += panjang;
     // isi palet (acak deterministik)
     const slot: Palet[] = [];
