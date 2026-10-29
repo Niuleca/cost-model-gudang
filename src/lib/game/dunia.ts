@@ -120,7 +120,14 @@ function stokAwal(d: Dunia) {
 // ---------- tugas & penjadwalan
 function tugasBaru(d: Dunia, jenis: JenisTugas, qty: number, prioritas: number, x: Partial<Tugas> = {}) {
   const t: Tugas = { id: id(d, 'T'), jenis, qty, satuan: d.sk.prod[jenis].satuan, prioritas, status: 'menunggu', dibuat: d.t, ...x };
-  const antre = antreTugas(d); d.tugas.set(t.id, t); d.menunggu.add(t.id); antre.get(jenis)!.push(t);
+  const antre = antreTugas(d); d.tugas.set(t.id, t);
+  if (d.sk.prod[jenis].luar) {
+    // di luar lingkup tender: langsung jalan tanpa pekerja/MHE gudang
+    let siap = true;
+    if (jenis === 'putaway') { const lok = cariLokasiKosong(d); if (lok) { lok.dipesan++; t.ke = lok.id; } else siap = false; }
+    if (siap) { t.status = 'jalan'; t.mulai = d.t; t.durasi = durasi(d, t); t.selesai = d.t + t.durasi; jadwal(d, t.selesai, 'tugas_selesai', t.id); return t; }
+  }
+  d.menunggu.add(t.id); antre.get(jenis)!.push(t);
   return t;
 }
 function durasi(d: Dunia, t: Tugas) {
@@ -290,12 +297,14 @@ function orderBaru(d: Dunia, shift: number) {
   for (let i = 0; i < n; i++) {
     const target = paletPerOrder * (0.5 + d.rng());
     const nb = 1 + Math.floor(d.rng() * 3);
+    // pembulatan probabilistik supaya rata-rata palet keluar = volume tender (tidak bias ke atas)
     const baris = Array.from({ length: nb }, () => {
       const s = sk.sku[pilihBerbobot(d.rng, sk.sku.map(x => x.bobot))];
       const plt = target / nb;
-      const karton = d.rng() < P.porsiKartonLepas ? Math.max(1, Math.round(plt * s.kartonPerPalet)) : Math.max(1, Math.round(plt)) * s.kartonPerPalet;
+      const karton = d.rng() < P.porsiKartonLepas ? Math.max(1, bulatAcak(d.rng, plt * s.kartonPerPalet)) : bulatAcak(d.rng, plt) * s.kartonPerPalet;
       return { sku: s.id, karton, teralokasi: 0, terpick: 0 };
-    });
+    }).filter(b => b.karton > 0);
+    if (!baris.length) { const s = sk.sku[pilihBerbobot(d.rng, sk.sku.map(x => x.bobot))]; baris.push({ sku: s.id, karton: s.kartonPerPalet, teralokasi: 0, terpick: 0 }); }
     const o: Order = { id: id(d, 'SO'), dibuat: d.t, batas, baris, status: 'baru', truk: null, sisaPick: 0, kartonLepas: 0, paletEq: 0, kurang: 0 };
     d.order.set(o.id, o); alokasi(d, o);
     if (o.status !== 'batal') { baru.push(o); tugasBaru(d, 'admin_out', 1, batas, { order: o.id }); }
@@ -473,3 +482,20 @@ export function ringkasDunia(d: Dunia) {
 
 /** Akses fungsi internal untuk uji otomatis (jangan dipakai UI). */
 export const _uji = { alokasi, lpnBaru, cariLokasiKosong, txn, urutLokasi };
+
+/** Waktu mulai shift berikutnya setelah d.t (untuk tombol "lewati ke shift berikutnya"). */
+export function shiftBerikut(d: Dunia): number {
+  const h0 = hariKe(d.t);
+  for (let h = h0; h <= h0 + 8; h++) {
+    if (!hariOperasi(d, h)) continue;
+    for (let s = 0; s < d.sk.shift.jumlah; s++) { const m = mulaiShift(d, h, s); if (m > d.t + 1) return m; }
+  }
+  return (h0 + 1) * HARI;
+}
+/** Jam & tanggal game untuk tampilan. */
+export function waktuGame(d: Dunia) {
+  const h = hariKe(d.t), det = d.t - h * HARI;
+  const jam = Math.floor(det / JAM), menit = Math.floor((det % JAM) / 60);
+  const shiftAktif = Array.from({ length: d.sk.shift.jumlah }, (_, s) => s).filter(s => bertugas(d, s, d.t));
+  return { hari: h, tanggal: tanggal(d, d.t), jam, menit, teks: `${String(jam).padStart(2, '0')}:${String(menit).padStart(2, '0')}`, operasi: hariOperasi(d, h), shiftAktif };
+}

@@ -1,6 +1,7 @@
 'use client';
-// Leca Game · halaman uji mesin simulasi (M1, tanpa 3D): pilih project tender → skenario data sungguhan →
-// jalankan N hari → laporan harian, keuangan vs cost model, status invariant.
+// Leca Game: pilih project tender → skenario data sungguhan → main di gudang 3D (M2) atau jalankan cepat N hari (M1)
+// → laporan harian, keuangan vs cost model, status invariant.
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -9,6 +10,9 @@ import { IT_SHEET_DEFAULT } from '@/lib/it';
 import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import { labelStatus } from '@/lib/status';
 import { buatDunia, jalankanHari, ringkasDunia, skenarioDariTender, type Dunia, type JenisTugas, type Skenario } from '@/lib/game';
+import { susunLayout, type LayoutGudang } from '@/lib/simulasi3d/layout';
+
+const Main3D = dynamic(() => import('./Main3D'), { ssr: false, loading: () => <div className="card sim3d-wadah sim3d-muat">Menyiapkan gudang 3D…</div> });
 
 interface T { id: string; kode: string | null; customer: string; status: string; updated_at: string }
 const rp = (v: number) => `Rp ${Math.round(v).toLocaleString('id-ID')}`;
@@ -34,6 +38,7 @@ export default function LecaGame() {
   const [dunia, setDunia] = useState<Dunia | null>(null);
   const [jalan, setJalan] = useState<{ selesai: number; total: number } | null>(null);
   const [versi, setVersi] = useState(0);
+  const [mode, setMode] = useState<'3d' | 'laporan'>('3d');
   const batalRef = useRef(false);
 
   useEffect(() => {
@@ -71,16 +76,21 @@ export default function LecaGame() {
     return q ? daftar.filter(x => `${x.kode ?? ''} ${x.customer}`.toLowerCase().includes(q)) : daftar;
   }, [daftar, cari]);
 
+  // layout 3D dengan semua posisi rak (okupansi 100%) = lokasi simpan game
+  const layout = useMemo((): LayoutGudang | null => { if (!data) return null; try { return susunLayout(data.t, data.h, { param: { okupansi: 1 } }); } catch { return null; } }, [data]);
   const [sk, errSk] = useMemo((): [Skenario | null, string | null] => {
-    if (!data) return [null, null];
-    try { return [skenarioDariTender(data.t, data.h, { modal: modal ?? undefined, seed, mulai: mulai || undefined }), null]; }
+    if (!data || !layout) return [null, null];
+    try { return [skenarioDariTender(data.t, data.h, { modal: modal ?? undefined, seed, mulai: mulai || undefined, layout }), null]; }
     catch (e) { return [null, `Skenario tidak bisa dibuat: ${(e as Error).message}`]; }
-  }, [data, modal, seed, mulai]);
+  }, [data, layout, modal, seed, mulai]);
+
+  /** Mulai permainan 3D (waktu berjalan dari hari 0 pukul 00.00; tekan "Ke shift berikutnya" untuk langsung ke jam kerja). */
+  const main3d = () => { if (!sk) return; batalRef.current = true; setJalan(null); setDunia(buatDunia(sk)); setMode('3d'); };
 
   /** Jalankan hari per hari (dipecah supaya halaman tetap responsif). */
   const mainkan = () => {
     if (!sk) return;
-    const d = buatDunia(sk); setDunia(d); batalRef.current = false;
+    const d = buatDunia(sk); setDunia(d); setMode('laporan'); batalRef.current = false;
     const total = Math.max(1, Math.min(365, hari));
     setJalan({ selesai: 0, total });
     const langkah = () => {
@@ -123,12 +133,13 @@ export default function LecaGame() {
           <div className="game-isian">
             <label className="f">Modal awal (Rp)<input type="number" step={1000000} value={modal ?? ''} onChange={e => setModal(e.target.value === '' ? null : Number(e.target.value))} />
               <span className="small muted">default 3 × biaya bulanan ({jt(data.h.totalBiayaBulan * 3)})</span></label>
-            <label className="f">Lama main (hari)<input type="number" min={1} max={365} value={hari} onChange={e => setHari(Number(e.target.value))} /></label>
+            <label className="f">Batas hari main<input type="number" min={1} max={365} value={hari} onChange={e => setHari(Number(e.target.value))} /></label>
             <label className="f">Seed<input type="number" value={seed} onChange={e => setSeed(Number(e.target.value) || 0)} /><span className="small muted">seed sama = hasil sama</span></label>
             <label className="f">Tanggal mulai<input type="date" value={mulai} onChange={e => setMulai(e.target.value)} /></label>
             <div className="game-tombol">
               {jalan ? <button type="button" className="ghost" onClick={() => { batalRef.current = true; }}>Hentikan ({jalan.selesai}/{jalan.total})</button>
-                : <button type="button" onClick={mainkan}>Jalankan simulasi</button>}
+                : <><button type="button" onClick={main3d}>{dunia && mode === '3d' ? 'Main ulang 3D' : 'Main di gudang 3D'}</button>
+                  <button type="button" className="ghost" onClick={mainkan}>Jalankan cepat {hari} hari</button></>}
             </div>
           </div>
         )}
@@ -157,7 +168,7 @@ export default function LecaGame() {
               <h3>Productivity (× faktor {angka(sk.faktor, 3)})</h3>
               <table className="sim3d-tabel"><tbody>
                 {(Object.keys(sk.prod) as JenisTugas[]).map(j => (
-                  <tr key={j}><td>{LABEL_TUGAS[j]}</td><td className="num">{angka(sk.prod[j].prod)} {sk.prod[j].satuan}/jam</td><td className="small muted">{sk.prod[j].sumber === 'default' ? 'default' : sk.prod[j].sumber}</td></tr>
+                  <tr key={j}><td>{LABEL_TUGAS[j]}</td><td className="num">{angka(sk.prod[j].prod)} {sk.prod[j].satuan}/jam</td><td className="small muted">{sk.prod[j].luar ? 'pihak luar — tidak ada di tender' : sk.prod[j].sumber}</td></tr>
                 ))}
               </tbody></table>
               <h3>Pekerja & MHE</h3>
@@ -174,7 +185,9 @@ export default function LecaGame() {
         </details>
       )}
 
-      {dunia && r && data && (
+      {dunia && layout && mode === '3d' && <Main3D dunia={dunia} layout={layout} hariMaks={Math.max(1, Math.min(365, hari))} onTick={() => setVersi(v => v + 1)} />}
+
+      {dunia && r && data && r.hari > 0 && (
         <>
           <div className="kpis kpis-hasil">
             <div className="kpi"><span className="small muted">Pendapatan ({r.hari} hari)</span><b>{jt(r.pendapatan)}</b><span className="small muted">≈ {jt(r.pendapatan * per30)} / 30 hari · cost model {jt(rataPend)}</span></div>

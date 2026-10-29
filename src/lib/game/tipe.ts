@@ -76,7 +76,8 @@ export interface Tugas {
 export interface Pekerja { id: string; nama: string; role: string; kemampuan: Kemampuan | null; shift: number; sibuk: string | null; absen: boolean; biayaBulan: number; jamKerja: number }
 export interface Mhe { id: string; nama: string; jenis: 'reach' | 'forklift' | 'stacker' | 'hpt'; sibuk: string | null; jamKerja: number }
 
-export interface Produktivitas { prod: number; satuan: Satuan; sumber: string }
+/** luar = tidak ada aktivitas ini di tender → dikerjakan pihak luar (sopir/vendor), tidak memakai pekerja & MHE gudang. */
+export interface Produktivitas { prod: number; satuan: Satuan; sumber: string; luar?: boolean }
 
 export interface Tarif {
   storagePerPaletBulan: number; inboundPerPalet: number; outboundPerPalet: number; tetapBulan: number;

@@ -11,7 +11,7 @@ const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) 
 
 /** Productivity bawaan bila aktivitas tender tidak ada yang cocok (per jam). */
 export const PROD_DEFAULT: Record<JenisTugas, Produktivitas> = {
-  admin_in: { prod: 6, satuan: 'dokumen', sumber: 'default' }, admin_out: { prod: 6, satuan: 'dokumen', sumber: 'default' },
+  admin_in: { prod: 20, satuan: 'dokumen', sumber: 'default' }, admin_out: { prod: 20, satuan: 'dokumen', sumber: 'default' },
   bongkar: { prod: 25, satuan: 'palet', sumber: 'default' }, cek_in: { prod: 40, satuan: 'palet', sumber: 'default' },
   putaway: { prod: 20, satuan: 'palet', sumber: 'default' }, pick_palet: { prod: 20, satuan: 'palet', sumber: 'default' },
   pick_karton: { prod: 120, satuan: 'karton', sumber: 'default' }, pack: { prod: 150, satuan: 'karton', sumber: 'default' },
@@ -39,7 +39,7 @@ export function prodDariAktivitas(akt: LayoutGudang['aktivitas']): { prod: Recor
   ];
   for (const [j, cocok] of aturan) {
     const a = akt.find(x => x.prod > 0 && cocok(x));
-    if (!a) { catatan.push(`Productivity ${j}: tidak ada aktivitas tender yang cocok → default ${PROD_DEFAULT[j].prod}/jam.`); continue; }
+    if (!a) { prod[j] = { ...PROD_DEFAULT[j], luar: true }; catatan.push(`${j}: tidak ada aktivitas di tender → dianggap dikerjakan pihak luar (sopir/vendor) dengan ${PROD_DEFAULT[j].prod} ${PROD_DEFAULT[j].satuan}/jam, tidak memakai manpower gudang.`); continue; }
     const satuan = isPalet(a.uom) ? 'palet' : isKarton(a.uom) ? 'karton' : PROD_DEFAULT[j].satuan;
     prod[j] = { prod: a.prod, satuan, sumber: `Aktivitas #${a.no} "${a.aktivitas}" (${a.prod} ${a.uom}/jam)` };
   }
