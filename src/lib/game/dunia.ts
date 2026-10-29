@@ -242,7 +242,7 @@ function alokasi(d: Dunia, o: Order) {
 function siapMuat(d: Dunia, o: Order) {
   const tr = o.truk ? d.truk.get(o.truk) : undefined;
   if (!tr || tr.status !== 'di_dock' || o.status !== 'di_staging') return;
-  o.status = 'dimuat';
+  o.status = 'dimuat'; (o.jejak ??= {}).dimuat = d.t;
   tugasBaru(d, 'muat', Math.max(1, Math.ceil(o.paletEq - 1e-9)), o.batas, { order: o.id, truk: tr.id });
   tr.sisaTugas++;
 }
@@ -369,11 +369,11 @@ function tugasSelesai(d: Dunia, tg: Tugas) {
       break;
     }
     case 'pack': tugasBaru(d, 'cek_out', Math.max(1, Math.ceil(o!.paletEq - 1e-9)), o!.batas, { order: o!.id }); break;
-    case 'cek_out': o!.status = 'di_staging'; siapMuat(d, o!); break;
+    case 'cek_out': o!.status = 'di_staging'; (o!.jejak ??= {}).staging = d.t; siapMuat(d, o!); break;
     case 'muat': {
       const lp = [...d.lpn.values()].filter(l => l.order === o!.id);
       for (const l of lp) { txn(d, 'ship', l, -l.karton, { ref: o!.id }); d.hariIni.kartonKeluar += l.karton; hapusLpn(d, l); }
-      o!.status = 'terkirim'; o!.selesai = d.t; o!.tepatWaktu = d.t <= o!.batas;
+      o!.status = 'terkirim'; o!.selesai = d.t; (o!.jejak ??= {}).terkirim = d.t; o!.tepatWaktu = d.t <= o!.batas;
       d.hariIni.orderSelesai++; if (o!.tepatWaktu) d.hariIni.orderTepat++; else d.hariIni.orderTerlambat++;
       d.hariIni.paletKeluarEq += o!.paletEq; d.hariIni.pendapatan += o!.paletEq * sk.tarif.outboundPerPalet;
       if (tr) { tr.sisaTugas--; cekBerangkat(d, tr); }
@@ -383,7 +383,7 @@ function tugasSelesai(d: Dunia, tg: Tugas) {
   }
 }
 function setelahPick(d: Dunia, o: Order) {
-  o.status = 'dipick';
+  o.status = 'dipick'; (o.jejak ??= {}).dipick = d.t;
   if (o.kartonLepas > 0) tugasBaru(d, 'pack', o.kartonLepas, o.batas, { order: o.id });
   else tugasBaru(d, 'cek_out', Math.max(1, Math.ceil(o.paletEq - 1e-9)), o.batas, { order: o.id });
 }

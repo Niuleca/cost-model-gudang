@@ -61,6 +61,8 @@ export interface Order {
   truk: string | null;
   sisaPick: number; kartonLepas: number; paletEq: number;
   selesai?: number; tepatWaktu?: boolean; kurang: number;   // karton yang tidak tersedia
+  /** waktu tiap tahap (untuk pelacakan order) */
+  jejak?: { dipick?: number; staging?: number; dimuat?: number; terkirim?: number };
 }
 
 export type StatusTugas = 'menunggu' | 'jalan' | 'selesai';

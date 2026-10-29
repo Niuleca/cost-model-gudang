@@ -6,9 +6,11 @@ import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { bertugas, jalankanSampai, type Dunia, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, type PasangLapisan } from '../Viewer3D';
+import { forkliftBersih, orangBersih, pinBersih, trukBersih, WARNA_BERSIH } from '../model3d';
 import { WARNA_ORANG } from '../warna';
 
-export interface KontrolGame { jalan: boolean; kecepatan: number; batas: number }
+export type Pilihan = { jenis: 'palet' | 'mhe' | 'pekerja' | 'truk' | 'order'; id: string };
+export interface KontrolGame { jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null }
 
 type V = THREE.Vector3;
 const v = (x: number, z: number, y = 0) => new THREE.Vector3(x, y, z);
@@ -55,8 +57,9 @@ function titikPada(pts: V[], f: number, out: V) {
 interface Rencana { awal: V[]; bawa: V[]; angkatA: number; angkatB: number; bawaPalet: boolean; bawaKarton: boolean; diam: boolean; akhir: V }
 interface Aktor { naik?: string; obj: THREE.Group; pos: V; rumah: V; tugas: string | null; rencana: Rencana | null; garpu?: THREE.Object3D; op?: THREE.Object3D; karton?: THREE.Object3D; lbl?: CSS2DObject }
 
-export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { current: KontrolGame }, onBerhenti: () => void): PasangLapisan {
-  return ({ grup }) => {
+export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { current: KontrolGame }, onBerhenti: () => void, onPilih: (p: Pilihan | null) => void): PasangLapisan {
+  return ({ grup, kamera, kanvas, tema }) => {
+    const bersih = tema === 'bersih';
     const L = layout;
     const gPalet = new THREE.Group(), gTruk = new THREE.Group(), gOrang = new THREE.Group(), gMhe = new THREE.Group();
     gTruk.name = 'truk'; gOrang.name = 'orang';
@@ -105,19 +108,22 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
 
     // ---------- palet (instanced): stok di lokasi + staging + yang sedang dibawa
     const kap = lokSimpan.length + 1200;
-    const alas = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.14, 1.0), mat('#ffffff', { roughness: 0.9, map: teks('palet') }), kap);
+    const alas = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.14, 1.0), bersih ? mat(WARNA_BERSIH.kayu, { roughness: 0.8 }) : mat('#ffffff', { roughness: 0.9, map: teks('palet') }), kap);
     const tinggiMuat = Math.max(0.3, tinggiPalet - 0.22);
-    const muat = new THREE.InstancedMesh(new THREE.BoxGeometry(1.05, tinggiMuat, 0.96), mat('#ffffff', { roughness: 0.4, map: teks('muatan') }), kap);
+    const muat = new THREE.InstancedMesh(new THREE.BoxGeometry(1.05, tinggiMuat, 0.96), bersih ? mat('#ffffff', { roughness: 0.6 }) : mat('#ffffff', { roughness: 0.4, map: teks('muatan') }), kap);
     alas.castShadow = muat.castShadow = lokSimpan.length <= 4000; alas.receiveShadow = muat.receiveShadow = true;
     alas.frustumCulled = muat.frustumCulled = false;
     gPalet.add(alas, muat);
     const warnaSku = new Map<string, THREE.Color>();
-    const palet = ['#ffffff', '#f4efe6', '#ebe3d4', '#fbf7f0', '#e6edf3', '#f1e9dc', '#fde9d9', '#e3f1e6', '#e8e4f5', '#f5f0d8'];
+    const palet = bersih ? ['#d8b07a', '#e2bf8c', '#cfa36c', '#e9cda0', '#d4a874', '#ddb784', '#c99c62', '#e5c596', '#d1aa78', '#dcb27c']
+      : ['#ffffff', '#f4efe6', '#ebe3d4', '#fbf7f0', '#e6edf3', '#f1e9dc', '#fde9d9', '#e3f1e6', '#e8e4f5', '#f5f0d8'];
     [...d.sku.keys()].forEach((s, i) => warnaSku.set(s, new THREE.Color(palet[i % palet.length])));
     const tmp = new THREE.Object3D();
     let n = 0;
-    const taruhPalet = (x: number, y: number, z: number, rot: number, sku: string, isi = 1) => {
+    const idxLpn: (string | null)[] = []; const posPalet = new Map<string, V>();
+    const taruhPalet = (x: number, y: number, z: number, rot: number, sku: string, isi = 1, lpn: string | null = null) => {
       if (n >= kap) return;
+      idxLpn[n] = lpn; if (lpn) posPalet.set(lpn, v(x, z, y + tinggiPalet));
       tmp.position.set(x, y + 0.07, z); tmp.rotation.set(0, rot, 0); tmp.scale.set(1, 1, 1); tmp.updateMatrix(); alas.setMatrixAt(n, tmp.matrix);
       const sk = Math.max(0.15, Math.min(1, isi));
       tmp.position.set(x, y + 0.14 + (tinggiMuat * sk) / 2, z); tmp.scale.set(1, sk, 1); tmp.updateMatrix(); muat.setMatrixAt(n, tmp.matrix);
@@ -125,24 +131,25 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       n++;
     };
     let kunciPalet = '';
-    const gambarPalet = (dibawa: { pos: V; rot: number; sku: string }[]) => {
+    const gambarPalet = (dibawa: { pos: V; rot: number; sku: string; lpn: string | null }[]) => {
       // tugas yang memindahkan palet: palet sumber disembunyikan selama dibawa
       const sembunyi = new Set<string>();
       for (const p of d.pekerja) { const tg = p.sibuk ? d.tugas.get(p.sibuk) : undefined; if (tg?.lpn && (tg.jenis === 'putaway' || tg.jenis === 'pick_palet')) sembunyi.add(tg.lpn); }
       const kunci = `${d.seq}|${dibawa.length}|${dibawa.map(b => `${b.pos.x.toFixed(2)},${b.pos.y.toFixed(2)},${b.pos.z.toFixed(2)}`).join(';')}`;
       if (kunci === kunciPalet) return; kunciPalet = kunci;
-      n = 0;
+      n = 0; posPalet.clear();
       for (const lok of lokSimpan) for (const id of lok.lpn) {
         if (sembunyi.has(id)) continue; const l = d.lpn.get(id)!;
-        taruhPalet(lok.x, lok.y, lok.z, lok.tipe === 'rak' ? Math.PI / 2 : 0, l.sku, l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton));
+        taruhPalet(lok.x, lok.y, lok.z, lok.tipe === 'rak' ? Math.PI / 2 : 0, l.sku, l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton), id);
       }
       for (const [lok, slot] of [[stgIn, slotIn], [stgOut, slotOut]] as const) lok.lpn.forEach((id, i) => {
         if (sembunyi.has(id)) return; const l = d.lpn.get(id)!; const p = slot(i);
-        taruhPalet(p.x, p.y, p.z, 0, l.sku, l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton));
+        taruhPalet(p.x, p.y, p.z, 0, l.sku, l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton), id);
       });
-      for (const b of dibawa) taruhPalet(b.pos.x, b.pos.y, b.pos.z, b.rot, b.sku);
+      for (const b of dibawa) taruhPalet(b.pos.x, b.pos.y, b.pos.z, b.rot, b.sku, 1, b.lpn);
       alas.count = muat.count = n;
       alas.instanceMatrix.needsUpdate = muat.instanceMatrix.needsUpdate = true;
+      alas.boundingSphere = muat.boundingSphere = null;   // supaya klik (raycast) memakai posisi palet terbaru
       if (muat.instanceColor) muat.instanceColor.needsUpdate = true;
     };
 
@@ -150,9 +157,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     interface ObjTruk { g: THREE.Group; lbl: CSS2DObject; truk: string | null; mulai: number }
     const trukDock = new Map<string, ObjTruk>();
     const buatObjTruk = (arus: 'inbound' | 'outbound') => {
-      const g = modelTruk(arus); g.visible = false; gTruk.add(g);
+      const g = bersih ? trukBersih(arus) : modelTruk(arus); g.visible = false; gTruk.add(g);
       const lbl = label('', 'kecil'); lbl.position.set(-7, 4.4, 0); g.add(lbl);
-      return { g, lbl, truk: null, mulai: 0 } as ObjTruk;
+      const o = { g, lbl, truk: null, mulai: 0 } as ObjTruk; g.userData.objTruk = o; return o;
     };
     for (const dk of d.dock) trukDock.set(dk.id, buatObjTruk(dk.arus));
     const antre = { inbound: Array.from({ length: 8 }, () => buatObjTruk('inbound')), outbound: Array.from({ length: 8 }, () => buatObjTruk('outbound')) };
@@ -167,13 +174,13 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       for (const dk of d.dock) {
         const o = trukDock.get(dk.id)!; const p = dockPos.get(dk.id)!;
         if (dk.truk !== o.truk) { o.truk = dk.truk; o.mulai = detikNyata; }
-        o.g.visible = !!dk.truk;
+        o.g.visible = !!dk.truk; o.g.userData.pilih = dk.truk ? { jenis: 'truk', id: dk.truk } : null;
         if (dk.truk) { const f = Math.min(1, (detikNyata - o.mulai) / 1.2); o.g.position.set(-0.4 - (1 - f) * (1 - f) * 25, 0, p.z); isiTeks(o, ketTruk(dk.truk)); }
       }
       for (const arus of ['inbound', 'outbound'] as const) {
         const ids = d.antreDock[arus]; const pool = antre[arus];
         pool.forEach((o, i) => {
-          const id = ids[i]; o.g.visible = !!id;
+          const id = ids[i]; o.g.visible = !!id; o.g.userData.pilih = id ? { jenis: 'truk', id } : null;
           if (id) { o.g.rotation.y = Math.PI / 2; o.g.position.set(-24 - (i % 4) * 4, 0, arus === 'inbound' ? -6 - Math.floor(i / 4) * 16 : L.W + 18 + Math.floor(i / 4) * 16); isiTeks(o, `antre · ${ketTruk(id)}`); }
         });
       }
@@ -183,8 +190,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const parkir = (i: number) => v(Math.min(L.stagingIn.x1 + 1.6, L.L - 1), Math.min(L.W - 1, 1.6 + i * 2.6));
     const mhe = new Map<string, Aktor>();
     d.mhe.forEach((m, i) => {
-      const g = modelMhe(m.jenis, m.jenis === 'reach' ? Math.min(L.tinggiRak, L.H - 0.4) * 0.45 : 2.4);
-      const op = modelOrang(WARNA_ORANG.operator); op.scale.setScalar(0.85); op.position.set(-0.45, 0.35, 0); op.visible = false; g.add(op);
+      const g = (bersih ? forkliftBersih : modelMhe)(m.jenis, m.jenis === 'reach' ? Math.min(L.tinggiRak, L.H - 0.4) * 0.45 : 2.4);
+      g.userData.pilih = { jenis: 'mhe', id: m.id } satisfies Pilihan;
+      const op = (bersih ? orangBersih : modelOrang)(WARNA_ORANG.operator); op.scale.setScalar(0.85); op.position.set(-0.45, 0.35, 0); op.visible = false; g.add(op);
       const lbl = label(m.nama.replace(/^(.{0,14}).*?(\d+)$/, '$1 $2'), 'mhe'); lbl.position.set(0, 3.1, 0); g.add(lbl);
       const p = parkir(i); g.position.copy(p); gMhe.add(g);
       mhe.set(m.id, { obj: g, pos: p.clone(), rumah: p.clone(), tugas: null, rencana: null, garpu: g.getObjectByName('garpu') ?? undefined, op, lbl });
@@ -204,8 +212,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     d.pekerja.forEach((p, i) => {
       if (!p.kemampuan) return;   // supervisor/security: tidak mengerjakan tugas lantai
       const warna = WARNA_ORANG[p.kemampuan] ?? '#64748b';
-      const g = modelOrang(warna);
-      const karton = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.32, 0.38), mat('#c8a26b', { map: teks('muatan') })); karton.position.set(0.32, 1.0, 0); karton.visible = false; g.add(karton);
+      const g = (bersih ? orangBersih : modelOrang)(warna); g.userData.pilih = { jenis: 'pekerja', id: p.id } satisfies Pilihan;
+      const karton = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.32, 0.38), bersih ? mat(WARNA_BERSIH.karton) : mat('#c8a26b', { map: teks('muatan') })); karton.position.set(0.32, 1.0, 0); karton.visible = false; g.add(karton);
       const r = rumahOrang(p.kemampuan, i); g.position.copy(r); gOrang.add(g);
       orang.set(p.id, { obj: g, pos: r.clone(), rumah: r.clone(), tugas: null, rencana: null, karton });
     });
@@ -264,7 +272,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         if (d.t >= k.batas) { k.jalan = false; onBerhenti(); }
       }
       const dtGame = Math.max(0, d.t - tLalu); tLalu = d.t;
-      const dibawa: { pos: V; rot: number; sku: string }[] = [];
+      const dibawa: { pos: V; rot: number; sku: string; lpn: string | null }[] = [];
       const pakaiMhe = new Set<string>();
 
       for (const p of d.pekerja) {
@@ -290,7 +298,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
             if (a.rencana.bawaPalet && bawa) {
               const sku = tg.lpn ? d.lpn.get(tg.lpn)?.sku ?? '' : tg.barisAsn?.sku ?? '';
               const rot = m2.obj.rotation.y;
-              dibawa.push({ pos: v(baru.x + Math.cos(rot) * 1.0, baru.z - Math.sin(rot) * 1.0, hg + 0.02), rot: rot + Math.PI / 2, sku });
+              dibawa.push({ pos: v(baru.x + Math.cos(rot) * 1.0, baru.z - Math.sin(rot) * 1.0, hg + 0.02), rot: rot + Math.PI / 2, sku, lpn: tg.jenis === 'putaway' || tg.jenis === 'pick_palet' ? tg.lpn ?? null : null });
             }
           } else {
             a.obj.visible = tampak; gerakkan(a, baru);
@@ -315,11 +323,62 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       gambarPalet(dibawa);
       perbaruiTruk();
+      perbaruiPin();
     };
+
+    // ---------- pin penanda objek terpilih
+    const pin = pinBersih(); pin.visible = false; grup.add(pin);
+    const cincin = pin.getObjectByName('cincin')!;
+    const posPilihan = (p: Pilihan): V | null => {
+      switch (p.jenis) {
+        case 'palet': return posPalet.get(p.id)?.clone() ?? null;
+        case 'mhe': { const a = mhe.get(p.id); return a ? v(a.obj.position.x, a.obj.position.z, 2.5) : null; }
+        case 'pekerja': { const a = orang.get(p.id); return a && a.obj.visible ? v(a.obj.position.x, a.obj.position.z, 1.9) : null; }
+        case 'truk': {
+          for (const o of [...trukDock.values(), ...antre.inbound, ...antre.outbound]) if (o.g.visible && o.g.userData.pilih?.id === p.id) { const w = new THREE.Vector3(-6, 0, 0); o.g.localToWorld(w); return v(w.x, w.z, 4.2); }
+          return null;
+        }
+        case 'order': {
+          const id = stgOut.lpn.find(x => d.lpn.get(x)?.order === p.id); if (id) return posPalet.get(id)?.clone() ?? null;
+          const o = d.order.get(p.id); return o?.truk ? posPilihan({ jenis: 'truk', id: o.truk }) : null;
+        }
+      }
+    };
+    const perbaruiPin = () => {
+      const p = kontrol.current.pilih; const pos = p ? posPilihan(p) : null;
+      pin.visible = !!pos; if (!pos) return;
+      const naik = Math.sin(detikNyata * 3) * 0.12;
+      pin.position.set(pos.x, pos.y + 0.3 + naik, pos.z); cincin.position.y = -(pos.y + 0.3 + naik) + 0.03;
+      pin.rotation.y = detikNyata * 0.8;
+      const sk = Math.max(0.8, Math.min(2.2, kamera.position.distanceTo(pin.position) / 30)); pin.scale.setScalar(sk);
+    };
+
+    // ---------- klik untuk memilih (bedakan dari drag kamera)
+    const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+    let turun: { x: number; y: number } | null = null;
+    const saatTurun = (e: PointerEvent) => { turun = { x: e.clientX, y: e.clientY }; };
+    const saatNaik = (e: PointerEvent) => {
+      if (!turun || Math.hypot(e.clientX - turun.x, e.clientY - turun.y) > 5) { turun = null; return; }
+      turun = null;
+      const r = kanvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, kamera);
+      const kena = ray.intersectObjects([muat, alas, gMhe, gOrang, gTruk], true);
+      for (const k of kena) {
+        if (!k.object.visible) continue;
+        if ((k.object === muat || k.object === alas) && k.instanceId != null) { const id = idxLpn[k.instanceId]; if (id) { onPilih({ jenis: 'palet', id }); return; } continue; }
+        let o: THREE.Object3D | null = k.object;
+        while (o && !o.userData.pilih) o = o.parent;
+        if (o?.userData.pilih) { onPilih(o.userData.pilih as Pilihan); return; }
+      }
+      onPilih(null);
+    };
+    kanvas.addEventListener('pointerdown', saatTurun); kanvas.addEventListener('pointerup', saatNaik);
 
     return {
       frame,
       buang: () => {
+        kanvas.removeEventListener('pointerdown', saatTurun); kanvas.removeEventListener('pointerup', saatNaik);
+        grup.remove(pin);
         grup.remove(gPalet, gTruk, gOrang, gMhe);
         grup.traverse(o => { if (o instanceof CSS2DObject) o.element.remove(); });
         for (const g of [gPalet, gTruk, gOrang, gMhe]) g.traverse(o => { if (o instanceof CSS2DObject) o.element.remove(); const m = o as THREE.Mesh; m.geometry?.dispose?.(); });

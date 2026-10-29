@@ -8,14 +8,16 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { LayoutGudang, JenisMhe } from '@/lib/simulasi3d/layout';
 import { WARNA_MHE, WARNA_ORANG } from './warna';
 
-export type Kamera = 'iso' | 'atas' | 'dock' | 'lorong';
+export type Kamera = 'iso' | 'atas' | 'dock' | 'lorong' | 'dekat';
 export interface ViewerApi { kamera: (k: Kamera) => void; screenshot: () => string | null; statistik: () => { detikSim: number; siklus: Record<string, number> } }
 /** Kecepatan simulasi: faktor percepatan waktu & lama satu siklus (detik waktu nyata gudang) per alat / role, dari productivity. */
 export interface Kecepatan { faktor: number; siklus: Record<string, number> }
 export interface OpsiViewer { atap: boolean; dinding: boolean; label: boolean; animasi: boolean; truk: boolean; orang: boolean }
 /** Lapisan dinamis (mis. Leca Game): dipasang setelah adegan statis dibangun; frame() dipanggil tiap frame dengan dt detik nyata. */
-export interface KonteksLapisan { scene: THREE.Scene; grup: THREE.Group; layout: LayoutGudang; kamera: THREE.PerspectiveCamera }
+export interface KonteksLapisan { scene: THREE.Scene; grup: THREE.Group; layout: LayoutGudang; kamera: THREE.PerspectiveCamera; kanvas: HTMLCanvasElement; tema: TemaViewer }
 export type PasangLapisan = (k: KonteksLapisan) => { frame: (dt: number) => void; buang: () => void };
+/** Tema tampilan: standar (material foto TapNow) atau bersih (isometrik, warna solid lembut, atap biru). */
+export type TemaViewer = 'standar' | 'bersih';
 
 const WARNA_ZONA: Record<string, string> = {
   stagingIn: '#3b82f6', stagingOut: '#10b981', spr: '#64748b', ddr: '#475569', block: '#a16207', floor: '#b45309', fasilitas: '#8b5cf6', jalur: '#f59e0b', custom: '#0ea5e9',
@@ -102,7 +104,8 @@ export function modelTruk(arus: 'inbound' | 'outbound') {
 
 interface Gerak { obj: THREE.Object3D; a: THREE.Vector3; b: THREE.Vector3; kunci: string; siklusAwal: number; fase: number; garpu?: THREE.Object3D; angkat?: number }
 
-const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; opsi: OpsiViewer; kecepatan: Kecepatan; lapisan?: PasangLapisan }>(function Viewer3D({ layout, shift, opsi, kecepatan, lapisan }, ref) {
+const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; opsi: OpsiViewer; kecepatan: Kecepatan; lapisan?: PasangLapisan; tema?: TemaViewer }>(function Viewer3D({ layout, shift, opsi, kecepatan, lapisan, tema = 'standar' }, ref) {
+  const temaRef = useRef<TemaViewer>(tema); temaRef.current = tema;
   const lapisanRef = useRef<PasangLapisan | undefined>(lapisan);
   lapisanRef.current = lapisan;
   const wadah = useRef<HTMLDivElement>(null);
@@ -130,6 +133,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     const target = new THREE.Vector3(L / 2, 0, W / 2);
     if (k === 'iso') s.cam.position.set(-m * 0.35, m * 0.65, W + m * 0.55);
     if (k === 'atas') { s.cam.position.set(L / 2, m * 1.25, W / 2 + 0.01); }
+    if (k === 'dekat') { const fx = Math.min(L, 36); target.set(fx * 0.12, 0, W * 0.42); s.cam.position.set(target.x - 22 - W * 0.45, 18 + W * 0.45, W + 14 + W * 0.3); }
     if (k === 'dock') { s.cam.position.set(-32, 14, W / 2 + W * 0.35); target.set(4, 2, W / 2); }
     if (k === 'lorong') {
       const lor = layout.lorong[0];
@@ -195,6 +199,10 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     s.lap?.buang(); s.lap = undefined;
     s.grup = {}; s.gerak = []; s.detikSim = 0;
     const { L, W, H, puncak } = layout; Object.assign(s, { L, W, H });
+    const bersih = temaRef.current === 'bersih';
+    const latar = bersih ? '#eef3f9' : '#e8eef5';
+    scene.background = new THREE.Color(latar); scene.fog = new THREE.Fog(latar, bersih ? 220 : 160, bersih ? 520 : 420);
+    if (s.renderer) { s.renderer.shadowMap.type = bersih ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap; s.renderer.toneMappingExposure = bersih ? 1.12 : 1.05; }
     const G = (n: string) => { const g = new THREE.Group(); g.name = n; scene.add(g); s.grup[n] = g; return g; };
     const gBangunan = G('bangunan'), gAtap = G('atap'), gDinding = G('dinding'), gLabel = G('label'), gRak = G('rak'), gTruk = G('truk'), gMhe = G('mhe');
 
@@ -207,9 +215,17 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     const isi = new THREE.AmbientLight('#ffffff', 0.35); gBangunan.add(isi);
 
     // tanah & lantai
-    const tanah = new THREE.Mesh(new THREE.PlaneGeometry(L + 160, W + 160), mat('#b9c0c5', { roughness: 0.95 })); tanah.rotation.x = -Math.PI / 2; tanah.position.set(L / 2 - 20, -0.02, W / 2); tanah.receiveShadow = true; gBangunan.add(tanah);
-    const apron = new THREE.Mesh(new THREE.PlaneGeometry(30, W + 10), mat('#ffffff', { roughness: 0.9, map: teks('aspal', 30 / 6, (W + 10) / 6) })); apron.rotation.x = -Math.PI / 2; apron.position.set(-15, -0.01, W / 2); apron.receiveShadow = true; gBangunan.add(apron);
-    const lantai = new THREE.Mesh(new THREE.BoxGeometry(L, 0.1, W), mat('#ffffff', { roughness: 0.45, metalness: 0.0, map: teks('lantai', L / 6, W / 6) })); lantai.position.set(L / 2, -0.05, W / 2); lantai.receiveShadow = true; gBangunan.add(lantai);
+    const tanah = new THREE.Mesh(new THREE.PlaneGeometry(L + 160, W + 160), mat(bersih ? '#e6ebf1' : '#b9c0c5', { roughness: 0.95 })); tanah.rotation.x = -Math.PI / 2; tanah.position.set(L / 2 - 20, -0.02, W / 2); tanah.receiveShadow = true; gBangunan.add(tanah);
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(30, W + 10), bersih ? mat('#d9e0e8', { roughness: 0.9 }) : mat('#ffffff', { roughness: 0.9, map: teks('aspal', 30 / 6, (W + 10) / 6) })); apron.rotation.x = -Math.PI / 2; apron.position.set(-15, -0.01, W / 2); apron.receiveShadow = true; gBangunan.add(apron);
+    const lantai = new THREE.Mesh(new THREE.BoxGeometry(L, 0.1, W), bersih ? mat('#f5f7fa', { roughness: 0.35 }) : mat('#ffffff', { roughness: 0.45, metalness: 0.0, map: teks('lantai', L / 6, W / 6) }));
+    if (bersih) {
+      // halaman truk: garis parkir kuning & garis jalur putus-putus
+      const cat = (sx: number, sz: number, x: number, z: number, c = '#facc15') => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.012, sz), mat(c, { roughness: 0.6 })); m.position.set(x, 0.006, z); gBangunan.add(m); };
+      for (const dk of layout.dock) { cat(14, 0.12, -7.5, dk.z - 1.6); cat(14, 0.12, -7.5, dk.z + 1.6); }
+      for (let z = -2; z < W + 6; z += 3) cat(0.14, 1.6, -17, z, '#ffffff');
+      for (let i = 0; i < 6; i++) { const z0 = -6 - i * 4.2; cat(13, 0.12, -24, z0); }
+      cat(30, 0.14, -15, -3.5, '#ffffff'); cat(30, 0.14, -15, W + 3.5, '#ffffff');
+    } lantai.position.set(L / 2, -0.05, W / 2); lantai.receiveShadow = true; gBangunan.add(lantai);
     // zona: warna lantai tipis + garis kuning
     const garis = mat('#facc15', { roughness: 0.6 });
     for (const z of layout.zona) {
@@ -231,23 +247,32 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     for (const k of layout.kolom ?? []) { const m = new THREE.Mesh(new THREE.BoxGeometry(k.w, k.tinggi, k.d), mat('#475569', { metalness: 0.5, roughness: 0.4 })); m.position.set(k.x + k.w / 2, k.tinggi / 2, k.z + k.d / 2); m.castShadow = true; gBangunan.add(m); }
 
     // dinding (panel cladding transparan) + kolom baja
-    const panel = (sx: number, sy: number, sz: number, x: number, y: number, z: number) => {
+    const panel = (sx: number, sy: number, sz: number, x: number, y: number, z: number, padat = false) => {
       const panjang = Math.max(sx, sz);
-      const mDinding = new THREE.MeshStandardMaterial({ color: '#ffffff', map: teks('cladding', Math.max(1, panjang / 4), Math.max(1, sy / 4)), transparent: true, opacity: 0.45, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide, depthWrite: false });
-      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mDinding); m.position.set(x, y, z); gDinding.add(m);
+      const mDinding = bersih
+        ? new THREE.MeshStandardMaterial({ color: '#f8fafc', transparent: !padat, opacity: padat ? 1 : 0.35, roughness: 0.6, side: THREE.DoubleSide, depthWrite: padat })
+        : new THREE.MeshStandardMaterial({ color: '#ffffff', map: teks('cladding', Math.max(1, panjang / 4), Math.max(1, sy / 4)), transparent: true, opacity: 0.45, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide, depthWrite: false });
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mDinding); m.position.set(x, y, z); m.receiveShadow = padat; m.castShadow = padat; gDinding.add(m);
     };
-    panel(L, H, 0.15, L / 2, H / 2, 0); panel(L, H, 0.15, L / 2, H / 2, W); panel(0.15, H, W, L, H / 2, W / 2);
+    if (bersih) {
+      // dinding belakang & ujung padat putih; sisi yang menghadap kamera dipotong rendah (cutaway) supaya isi gudang terlihat
+      panel(L, H, 0.2, L / 2, H / 2, 0, true); panel(0.2, H, W, L, H / 2, W / 2, true); panel(L, 1.2, 0.2, L / 2, 0.6, W, true);
+      const lis = mat('#2563eb', { roughness: 0.4 });
+      for (const [x, z] of [[0, 0], [L, 0], [L, W], [0, W]] as const) { const k = new THREE.Mesh(new THREE.BoxGeometry(0.35, z === W && x !== 0 && x !== L ? 1.2 : H, 0.35), lis); k.position.set(x, H / 2, z); k.castShadow = true; gDinding.add(k); }
+      const tepiAtas = (sx: number, sz: number, x: number, z: number, y: number) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.25, sz), lis); m.position.set(x, y, z); gDinding.add(m); };
+      tepiAtas(L, 0.3, L / 2, 0, H); tepiAtas(0.3, W, L, W / 2, H); tepiAtas(L, 0.3, L / 2, W, 1.2);
+    } else { panel(L, H, 0.15, L / 2, H / 2, 0); panel(L, H, 0.15, L / 2, H / 2, W); panel(0.15, H, W, L, H / 2, W / 2); }
     // dinding depan berlubang di pintu dock
     const pintu = 3.2, tinggiPintu = 4.2;
     const zs = [...layout.dock.map(d => d.z)].sort((a, b) => a - b);
     let zPrev = 0;
     for (const zc of zs) { if (zc - pintu / 2 - zPrev > 0.05) panel(0.15, H, zc - pintu / 2 - zPrev, 0, H / 2, (zPrev + zc - pintu / 2) / 2); panel(0.15, H - tinggiPintu, pintu, 0, tinggiPintu + (H - tinggiPintu) / 2, zc); zPrev = zc + pintu / 2; }
     if (W - zPrev > 0.05) panel(0.15, H, W - zPrev, 0, H / 2, (zPrev + W) / 2);
-    const mKolom = mat('#334155', { metalness: 0.6, roughness: 0.4 });
-    for (let x = 0; x <= L + 0.01; x += Math.max(6, L / Math.ceil(L / 8))) for (const z of [0, W]) { const k = new THREE.Mesh(new THREE.BoxGeometry(0.3, H, 0.3), mKolom); k.position.set(x, H / 2, z); k.castShadow = true; gDinding.add(k); }
+    const mKolom = mat(bersih ? '#2563eb' : '#334155', { metalness: bersih ? 0.1 : 0.6, roughness: 0.4 });
+    for (let x = 0; x <= L + 0.01; x += Math.max(6, L / Math.ceil(L / 8))) for (const z of bersih ? [0] : [0, W]) { const k = new THREE.Mesh(new THREE.BoxGeometry(0.3, H, 0.3), mKolom); k.position.set(x, H / 2, z); k.castShadow = true; gDinding.add(k); }
     // atap pelana (bubungan sepanjang X)
     const miring = Math.hypot(W / 2, puncak - H);
-    const mAtap = new THREE.MeshStandardMaterial({ color: '#cbd5e1', roughness: 0.5, metalness: 0.4, side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
+    const mAtap = new THREE.MeshStandardMaterial({ color: bersih ? '#3b82f6' : '#cbd5e1', roughness: 0.5, metalness: bersih ? 0.1 : 0.4, side: THREE.DoubleSide, transparent: true, opacity: bersih ? 0.97 : 0.92 });
     for (const sgn of [-1, 1]) {
       const a = new THREE.Mesh(new THREE.BoxGeometry(L + 1, 0.12, miring + 0.6), mAtap);
       a.position.set(L / 2, (H + puncak) / 2, W / 2 + (sgn * W) / 4); a.rotation.x = sgn * Math.atan2(puncak - H, W / 2); a.castShadow = true; gAtap.add(a);
@@ -257,6 +282,13 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     for (const [i, d] of layout.dock.entries()) {
       const lv = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 2.4), mat('#4b5563', { metalness: 0.5 })); lv.position.set(1.2, 0.06, d.z); gBangunan.add(lv);
       const rangka = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, pintu + 0.3), mat(d.arus === 'inbound' ? '#2563eb' : '#059669')); rangka.position.set(0, tinggiPintu, d.z); gDinding.add(rangka);
+      if (bersih) {
+        // kusen pintu biru tebal + seal dock + bumper
+        const biru = mat('#2563eb', { roughness: 0.4 });
+        for (const dz of [-(pintu / 2 + 0.15), pintu / 2 + 0.15]) { const t2 = new THREE.Mesh(new THREE.BoxGeometry(0.3, tinggiPintu, 0.3), biru); t2.position.set(0, tinggiPintu / 2, d.z + dz); t2.castShadow = true; gDinding.add(t2); }
+        const seal = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.5, pintu + 0.9), mat('#1f2937')); seal.position.set(-0.2, tinggiPintu + 0.1, d.z); gDinding.add(seal);
+        for (const dz of [-1.1, 1.1]) { const bp = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.4, 0.3), mat('#111827')); bp.position.set(-0.15, 1.1, d.z + dz); gBangunan.add(bp); }
+      }
       const tl = label(`${d.arus === 'inbound' ? 'IN' : 'OUT'} ${i + 1}`, 'kecil'); tl.position.set(-0.5, tinggiPintu + 0.6, d.z); gLabel.add(tl);
       if (lapisanRef.current) continue;   // mode game: truk digambar lapisan sesuai jadwal
       const truk = modelTruk(d.arus);
@@ -336,9 +368,9 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
           angkat: u.jenis === 'reach' || u.jenis === 'stacker' ? Math.max(0.5, layout.levelY[Math.min(layout.levelY.length - 1, 1 + (k % Math.max(1, layout.levelY.length - 1)))] ?? 1) : 1.2 });
       }
     }
-    terapkanOpsi(); bangunOrang(); aturKamera('iso');
+    terapkanOpsi(); bangunOrang(); aturKamera(bersih ? 'dekat' : 'iso');
     pasangLapisan();
-  }, [layout]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [layout, tema]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Pasang ulang lapisan dinamis (dipanggil saat layout atau lapisan berubah). */
   function pasangLapisan() {
@@ -347,7 +379,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     const lama = s.grup.game; if (lama) { scene.remove(lama); lama.traverse(o => { if (o instanceof CSS2DObject) o.element.remove(); }); }
     if (!lapisanRef.current) return;
     const g = new THREE.Group(); g.name = 'game'; scene.add(g); s.grup.game = g;
-    s.lap = lapisanRef.current({ scene, grup: g, layout, kamera: s.cam });
+    s.lap = lapisanRef.current({ scene, grup: g, layout, kamera: s.cam, kanvas: s.renderer!.domElement, tema: temaRef.current });
     terapkanOpsi();
   }
 
