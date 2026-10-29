@@ -29,6 +29,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
   { id: 'simulasi', label: 'Simulasi Warehouse', item: [
     { href: '/simulasi', label: 'Simulasi gudang 3D', roles: 'semua' },
     { href: '/simulasi/layout', label: 'Layout editor 2D ⇄ 3D', roles: 'semua' },
+    { href: '/simulasi/game', label: 'Leca Game (simulasi operasi)', roles: 'semua' },
   ] },
   { id: 'price', label: 'Price Inquiry', item: [...PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })),
     { href: '/price/perbandingan', label: 'Comparation Price (vendor)', roles: 'semua' as const, pisah: true }] },
