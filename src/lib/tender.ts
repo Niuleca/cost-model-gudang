@@ -28,6 +28,8 @@ export interface GudangTerpilih {
 
 // Bagian input yang disimpan di tenders.asumsi
 export interface Asumsi {
+  /** Render AI (gambar / video) gudang project ini — dibuat dengan TapNow AI, ditampilkan di menu Simulasi gudang 3D. */
+  renderAi?: { url: string; jenis: 'gambar' | 'video'; judul: string; dibuat: string }[];
   porsiMuat?: Partial<PorsiMuat>;   // porsi palletize vs loose per proses
   cutiTahunanHari: number;
   faktorProduktivitas: number;

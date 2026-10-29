@@ -26,6 +26,9 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/approval-quotation', label: 'Approval quotation', roles: ['admin', 'manager'] },
     { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua' },
   ] },
+  { id: 'simulasi', label: 'Simulasi', item: [
+    { href: '/simulasi', label: 'Simulasi gudang 3D', roles: TIM_TENDER },
+  ] },
   { id: 'price', label: 'Price Inquiry', item: [...PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })),
     { href: '/price/perbandingan', label: 'Comparation Price (vendor)', roles: 'semua' as const, pisah: true }] },
   { id: 'prod', label: 'Productivity', item: [
