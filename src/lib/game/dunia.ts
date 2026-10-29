@@ -2,7 +2,7 @@
 // Alur: truk inbound → bongkar → cek → putaway → stok rak → order → alokasi FIFO/FEFO → pick → pack → cek → muat → truk berangkat.
 // Durasi tugas = 3600 × qty ÷ (prod/jam × faktor) — sama dengan dasar FTE di cost model Leca.
 import { buatAntrian, buatHeap, buatRng, bulatAcak, hariDalamBulan, hariMinggu, pilihBerbobot, tanggalHari } from './dasar';
-import { HARI, JAM, type Dunia, type EventSim, type JenisTugas, type Kemampuan, type LaporanHarian, type Lpn, type Lokasi, type Order, type Skenario, type Tugas, type Truk, type TipeTxn } from './tipe';
+import { ARMADA, HARI, JAM, jenisTrukDari, type JenisTruk, type Dunia, type EventSim, type JenisTugas, type Kemampuan, type LaporanHarian, type Lpn, type Lokasi, type Order, type Skenario, type Tugas, type Truk, type TipeTxn } from './tipe';
 
 const KANDIDAT: Record<JenisTugas, Kemampuan[]> = {
   admin_in: ['admin', 'checker'], admin_out: ['admin', 'checker'],
@@ -264,10 +264,12 @@ function awalHari(d: Dunia) {
     for (let s = 0; s < sk.shift.jumlah; s++) jadwal(d, mulaiShift(d, h, s), 'shift');
     const m0 = mulaiShift(d, h, 0), akhir = mulaiShift(d, h, sk.shift.jumlah - 1) + sk.shift.jamKerja * JAM;
     // truk inbound tersebar di jam operasi (sisakan 2 jam terakhir)
-    const nTruk = bulatAcak(d.rng, sk.permintaan.paletInHari / Math.max(1, sk.permintaan.paletPerTruk));
-    let sisaPalet = Math.round(sk.permintaan.paletInHari);
-    for (let i = 0; i < nTruk; i++) {
-      const jml = i === nTruk - 1 ? Math.max(1, sisaPalet) : Math.max(1, Math.round(sisaPalet / (nTruk - i)));
+    // armada campuran: CDE / Fuso / Tronton / container 40HC; total palet harian = volume tender
+    let sisaPalet = bulatAcak(d.rng, sk.permintaan.paletInHari);
+    const pilihan: JenisTruk[] = ['cde', 'fuso', 'tronton', 'container'], bobotArmada = [0.15, 0.25, 0.35, 0.25];
+    while (sisaPalet > 0) {
+      const jenisTruk = pilihan[pilihBerbobot(d.rng, bobotArmada)];
+      const jml = Math.min(sisaPalet, ARMADA[jenisTruk].kapasitas);
       sisaPalet -= jml;
       const rencana = m0 + Math.floor(d.rng() * Math.max(JAM, akhir - m0 - 2 * JAM));
       const telat = d.rng() < sk.peluang.trukTerlambat ? Math.floor((1 + d.rng() * 3) * JAM) : 0;
@@ -276,7 +278,7 @@ function awalHari(d: Dunia) {
         const { lot, expiry } = lotBaru(d, s.id, 3 + Math.floor(d.rng() * 20));
         return { sku: s.id, lot, expiry, karton: s.kartonPerPalet };
       });
-      const tr: Truk = { id: id(d, 'TI'), arus: 'inbound', rencanaTiba: rencana, tiba: rencana + telat, dock: null, status: 'dijadwalkan', palet, order: [], sisaTugas: 0 };
+      const tr: Truk = { id: id(d, 'TI'), arus: 'inbound', jenis: jenisTrukDari(jml), rencanaTiba: rencana, tiba: rencana + telat, dock: null, status: 'dijadwalkan', palet, order: [], sisaTugas: 0 };
       d.truk.set(tr.id, tr); jadwal(d, tr.tiba, 'truk_tiba', tr.id);
       if (telat) d.hariIni.kejadian.push(`Truk inbound ${tr.id} terlambat ${Math.round(telat / JAM)} jam.`);
     }
@@ -317,7 +319,7 @@ function orderBaru(d: Dunia, shift: number) {
       tr = { id: id(d, 'TO'), arus: 'outbound', rencanaTiba: tiba, tiba, dock: null, status: 'dijadwalkan', palet: [], order: [], sisaTugas: 0 };
       d.truk.set(tr.id, tr); jadwal(d, tiba, 'truk_tiba', tr.id); isi = 0;
     }
-    tr.order.push(o.id); o.truk = tr.id; isi += o.paletEq;
+    tr.order.push(o.id); o.truk = tr.id; isi += o.paletEq; tr.jenis = jenisTrukDari(Math.ceil(isi - 1e-9));
   }
 }
 

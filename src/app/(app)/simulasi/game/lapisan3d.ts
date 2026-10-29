@@ -3,10 +3,10 @@
 // (durasi tugas = productivity, dibagi fase: jalan ke ambil → ambil → bawa → taruh).
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { bertugas, jalankanSampai, type Dunia, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
+import { ARMADA, bertugas, jalankanSampai, jenisTrukDari, type Dunia, type JenisTruk, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, type PasangLapisan } from '../Viewer3D';
-import { forkliftBersih, orangBersih, pinBersih, trukBersih, WARNA_BERSIH } from '../model3d';
+import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pinBersih, trukBersih, WARNA_BERSIH, type Animator } from '../model3d';
 import { WARNA_ORANG } from '../warna';
 
 export type Pilihan = { jenis: 'palet' | 'mhe' | 'pekerja' | 'truk' | 'order'; id: string };
@@ -55,7 +55,7 @@ function titikPada(pts: V[], f: number, out: V) {
 }
 
 interface Rencana { awal: V[]; bawa: V[]; angkatA: number; angkatB: number; bawaPalet: boolean; bawaKarton: boolean; diam: boolean; akhir: V }
-interface Aktor { naik?: string; obj: THREE.Group; pos: V; rumah: V; tugas: string | null; rencana: Rencana | null; garpu?: THREE.Object3D; op?: THREE.Object3D; karton?: THREE.Object3D; lbl?: CSS2DObject }
+interface Aktor { anim?: Animator; sebelum?: V; naik?: string; obj: THREE.Group; pos: V; rumah: V; tugas: string | null; rencana: Rencana | null; garpu?: THREE.Object3D; op?: THREE.Object3D; karton?: THREE.Object3D; lbl?: CSS2DObject }
 
 export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { current: KontrolGame }, onBerhenti: () => void, onPilih: (p: Pilihan | null) => void): PasangLapisan {
   return ({ grup, kamera, kanvas, tema }) => {
@@ -154,12 +154,26 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     };
 
     // ---------- truk: satu per dock + antrean di halaman
-    interface ObjTruk { g: THREE.Group; lbl: CSS2DObject; truk: string | null; mulai: number }
+    interface ObjTruk { g: THREE.Group; lbl: CSS2DObject; truk: string | null; mulai: number; arus: 'inbound' | 'outbound'; jenis: JenisTruk | null; badan: THREE.Group | null }
     const trukDock = new Map<string, ObjTruk>();
+    const PANJANG_TRUK: Record<JenisTruk, number> = { cde: 5.6, fuso: 7.6, tronton: 10.5, container: 16.5 };
     const buatObjTruk = (arus: 'inbound' | 'outbound') => {
-      const g = bersih ? trukBersih(arus) : modelTruk(arus); g.visible = false; gTruk.add(g);
+      const g = new THREE.Group(); g.visible = false; gTruk.add(g);
       const lbl = label('', 'kecil'); lbl.position.set(-7, 4.4, 0); g.add(lbl);
-      const o = { g, lbl, truk: null, mulai: 0 } as ObjTruk; g.userData.objTruk = o; return o;
+      const o: ObjTruk = { g, lbl, truk: null, mulai: 0, arus, jenis: null, badan: null }; g.userData.objTruk = o; return o;
+    };
+    /** Badan truk sesuai jenis (CDE/Fuso/Tronton/container); model kode dulu, lalu diganti model Meshy saat termuat. */
+    const aturJenis = (o: ObjTruk, trukId: string) => {
+      const tr = d.truk.get(trukId);
+      const jenis = tr?.jenis ?? jenisTrukDari(tr?.arus === 'inbound' ? tr.palet.length : 20);
+      if (o.jenis === jenis && o.badan) return;
+      if (o.badan) o.g.remove(o.badan);
+      const badan = new THREE.Group();
+      const kode = bersih ? trukBersih(o.arus) : modelTruk(o.arus);
+      kode.scale.x = (PANJANG_TRUK[jenis] + 0.5) / 14.7; badan.add(kode);
+      if (bersih) pakaiModelMeshy(badan, jenis);
+      o.g.add(badan); o.badan = badan; o.jenis = jenis;
+      o.lbl.position.set(-0.5 - PANJANG_TRUK[jenis] / 2, 4.6, 0);
     };
     for (const dk of d.dock) trukDock.set(dk.id, buatObjTruk(dk.arus));
     const antre = { inbound: Array.from({ length: 8 }, () => buatObjTruk('inbound')), outbound: Array.from({ length: 8 }, () => buatObjTruk('outbound')) };
@@ -167,32 +181,42 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const isiTeks = (o: ObjTruk, s: string) => { if (o.lbl.element.textContent !== s) o.lbl.element.textContent = s; };
     const ketTruk = (id: string) => {
       const tr = d.truk.get(id); if (!tr) return id;
-      if (tr.arus === 'inbound') return `${tr.id} · ${tr.palet.length} plt${tr.sisaTugas > 0 ? ` · sisa ${tr.sisaTugas}` : ''}`;
-      return `${tr.id} · ${tr.order.length} order`;
+      const j = tr.jenis ? `${ARMADA[tr.jenis].nama} · ` : '';
+      if (tr.arus === 'inbound') return `${j}${tr.id} · ${tr.palet.length} plt${tr.sisaTugas > 0 ? ` · sisa ${tr.sisaTugas}` : ''}`;
+      return `${j}${tr.id} · ${tr.order.length} order`;
     };
     const perbaruiTruk = () => {
       for (const dk of d.dock) {
         const o = trukDock.get(dk.id)!; const p = dockPos.get(dk.id)!;
         if (dk.truk !== o.truk) { o.truk = dk.truk; o.mulai = detikNyata; }
         o.g.visible = !!dk.truk; o.g.userData.pilih = dk.truk ? { jenis: 'truk', id: dk.truk } : null;
-        if (dk.truk) { const f = Math.min(1, (detikNyata - o.mulai) / 1.2); o.g.position.set(-0.4 - (1 - f) * (1 - f) * 25, 0, p.z); isiTeks(o, ketTruk(dk.truk)); }
+        if (dk.truk) { aturJenis(o, dk.truk); const f = Math.min(1, (detikNyata - o.mulai) / 1.2); o.g.position.set(-0.4 - (1 - f) * (1 - f) * 25, 0, p.z); isiTeks(o, ketTruk(dk.truk)); }
       }
       for (const arus of ['inbound', 'outbound'] as const) {
         const ids = d.antreDock[arus]; const pool = antre[arus];
         pool.forEach((o, i) => {
           const id = ids[i]; o.g.visible = !!id; o.g.userData.pilih = id ? { jenis: 'truk', id } : null;
-          if (id) { o.g.rotation.y = Math.PI / 2; o.g.position.set(-24 - (i % 4) * 4, 0, arus === 'inbound' ? -6 - Math.floor(i / 4) * 16 : L.W + 18 + Math.floor(i / 4) * 16); isiTeks(o, `antre · ${ketTruk(id)}`); }
+          if (id) { aturJenis(o, id); o.g.rotation.y = Math.PI / 2; o.g.position.set(-24 - (i % 4) * 4, 0, arus === 'inbound' ? -24 - Math.floor(i / 4) * 19 : L.W + 18 + Math.floor(i / 4) * 12); isiTeks(o, `antre · ${ketTruk(id)}`); }
         });
       }
     };
 
     // ---------- MHE & pekerja
     const parkir = (i: number) => v(Math.min(L.stagingIn.x1 + 1.6, L.L - 1), Math.min(L.W - 1, 1.6 + i * 2.6));
+    const animator: Animator[] = [];
     const mhe = new Map<string, Aktor>();
     d.mhe.forEach((m, i) => {
       const g = (bersih ? forkliftBersih : modelMhe)(m.jenis, m.jenis === 'reach' ? Math.min(L.tinggiRak, L.H - 0.4) * 0.45 : 2.4);
       g.userData.pilih = { jenis: 'mhe', id: m.id } satisfies Pilihan;
+      if (bersih) pakaiModelMeshy(g, m.jenis === 'hpt' ? 'hpt' : m.jenis === 'forklift' ? 'forklift' : 'reach');
       const op = (bersih ? orangBersih : modelOrang)(WARNA_ORANG.operator); op.scale.setScalar(0.85); op.position.set(-0.45, 0.35, 0); op.visible = false; g.add(op);
+      if (bersih) {
+        // operator beranimasi: duduk di forklift, berdiri menyamping di reach truck / stacker / HPT
+        const duduk = m.jenis === 'forklift';
+        if (duduk) op.position.set(-0.35, 0.55, 0); else if (m.jenis === 'hpt') op.position.set(-1.05, 0, 0); else op.position.set(-0.55, 0.2, 0);
+        op.scale.setScalar(1);
+        pakaiPekerjaMeshy(op, duduk ? 'duduk' : 'diam', an => animator.push(an));
+      }
       const lbl = label(m.nama.replace(/^(.{0,14}).*?(\d+)$/, '$1 $2'), 'mhe'); lbl.position.set(0, 3.1, 0); g.add(lbl);
       const p = parkir(i); g.position.copy(p); gMhe.add(g);
       mhe.set(m.id, { obj: g, pos: p.clone(), rumah: p.clone(), tugas: null, rencana: null, garpu: g.getObjectByName('garpu') ?? undefined, op, lbl });
@@ -215,7 +239,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       const g = (bersih ? orangBersih : modelOrang)(warna); g.userData.pilih = { jenis: 'pekerja', id: p.id } satisfies Pilihan;
       const karton = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.32, 0.38), bersih ? mat(WARNA_BERSIH.karton) : mat('#c8a26b', { map: teks('muatan') })); karton.position.set(0.32, 1.0, 0); karton.visible = false; g.add(karton);
       const r = rumahOrang(p.kemampuan, i); g.position.copy(r); gOrang.add(g);
-      orang.set(p.id, { obj: g, pos: r.clone(), rumah: r.clone(), tugas: null, rencana: null, karton });
+      const ak: Aktor = { obj: g, pos: r.clone(), rumah: r.clone(), tugas: null, rencana: null, karton };
+      orang.set(p.id, ak);
+      if (bersih) pakaiPekerjaMeshy(g, 'diam', an => { ak.anim = an; animator.push(an); });
     });
 
     /** Rencana gerak satu tugas (dibuat sekali saat tugas mulai). */
@@ -294,7 +320,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
             pakaiMhe.add(m2.obj.uuid); a.obj.visible = false; a.naik = tg.mhe;
             gerakkan(m2, baru); a.pos.copy(baru);
             if (m2.op) m2.op.visible = true;
-            const hg = angkatGarpu(a.rencana, f); if (m2.garpu) m2.garpu.position.y = hg;
+            const hg = angkatGarpu(a.rencana, f); if (m2.garpu) { m2.garpu.position.y = hg; if (m2.garpu.userData.angkatSaja) m2.garpu.visible = hg > 0.3; }
             if (a.rencana.bawaPalet && bawa) {
               const sku = tg.lpn ? d.lpn.get(tg.lpn)?.sku ?? '' : tg.barisAsn?.sku ?? '';
               const rot = m2.obj.rotation.y;
@@ -310,7 +336,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
           // operator tetap di atas MHE sampai MHE kembali ke parkir, lalu turun
           const m2 = mhe.get(a.naik)!; const dipakaiLain = d.mhe.find(x => x.id === a.naik)?.sibuk;
           if (dipakaiLain || m2.pos.distanceTo(m2.rumah) < 0.05) { a.naik = undefined; a.pos.copy(m2.rumah).add(v(0, 1.3)); a.obj.position.copy(a.pos); a.obj.visible = tampak; }
-          else { a.obj.visible = false; menujuRumah(m2, dtGame, KEC_MHE); pakaiMhe.add(m2.obj.uuid); if (m2.op) m2.op.visible = true; if (m2.garpu) m2.garpu.position.y = 0.05; }
+          else { a.obj.visible = false; menujuRumah(m2, dtGame, KEC_MHE); pakaiMhe.add(m2.obj.uuid); if (m2.op) m2.op.visible = true; if (m2.garpu) { m2.garpu.position.y = 0.05; if (m2.garpu.userData.angkatSaja) m2.garpu.visible = false; } }
         } else {
           a.obj.visible = tampak; if (a.karton) a.karton.visible = false;
           menujuRumah(a, dtGame, KEC_JALAN);
@@ -318,12 +344,22 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       for (const m of mhe.values()) {
         if (pakaiMhe.has(m.obj.uuid)) continue;
-        if (m.op) m.op.visible = false; if (m.garpu) m.garpu.position.y = 0.05;
+        if (m.op) m.op.visible = false; if (m.garpu) { m.garpu.position.y = 0.05; if (m.garpu.userData.angkatSaja) m.garpu.visible = false; }
         menujuRumah(m, dtGame, KEC_MHE);
       }
       gambarPalet(dibawa);
       perbaruiTruk();
       perbaruiPin();
+      // animasi pekerja: jalan saat berpindah, gerakan kerja saat cek/admin/packing, selain itu berdiri siaga
+      for (const [pid, a] of orang) {
+        if (!a.anim || !a.obj.visible) continue;
+        const gerak = a.sebelum ? a.sebelum.distanceTo(a.obj.position) > 0.002 : false;
+        (a.sebelum ??= new THREE.Vector3()).copy(a.obj.position);
+        const p = d.pekerja.find(x => x.id === pid); const tg = p?.sibuk ? d.tugas.get(p.sibuk) : undefined;
+        a.anim.main(gerak && k.jalan ? (k.kecepatan >= 300 ? 'lari' : 'jalan') : tg ? 'kerja' : 'diam');
+      }
+      const dtAnim = k.jalan ? Math.min(0.1, dt) * Math.min(3, Math.max(1, Math.log10(k.kecepatan + 1))) : dt * 0.6;
+      for (const an of animator) an.mixer.update(dtAnim);
     };
 
     // ---------- pin penanda objek terpilih

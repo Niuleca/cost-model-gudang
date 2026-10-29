@@ -41,8 +41,15 @@ export type TipeTxn = 'receive' | 'putaway' | 'move' | 'pick' | 'ship' | 'damage
 export interface Txn { t: number; tipe: TipeTxn; sku: string; lot: string; karton: number; lpn: string; dari?: string; ke?: string; ref?: string }
 
 export interface BarisAsn { sku: string; lot: string; expiry: number | null; karton: number }
+/** Jenis armada umum di Indonesia + kapasitas palet. */
+export type JenisTruk = 'cde' | 'fuso' | 'tronton' | 'container';
+export const ARMADA: Record<JenisTruk, { nama: string; kapasitas: number }> = {
+  cde: { nama: 'CDE', kapasitas: 8 }, fuso: { nama: 'Fuso', kapasitas: 14 }, tronton: { nama: 'Tronton', kapasitas: 20 }, container: { nama: 'Container 40HC', kapasitas: 24 },
+};
+/** Jenis truk dari jumlah palet: CDE ≤8, Fuso ≤14, Tronton ≤20, container 40HC >20. */
+export const jenisTrukDari = (palet: number): JenisTruk => (palet <= 8 ? 'cde' : palet <= 14 ? 'fuso' : palet <= 20 ? 'tronton' : 'container');
 export interface Truk {
-  id: string; arus: 'inbound' | 'outbound';
+  id: string; arus: 'inbound' | 'outbound'; jenis?: JenisTruk;
   rencanaTiba: number; tiba: number;
   dock: string | null;
   status: 'dijadwalkan' | 'antre' | 'di_dock' | 'berangkat';

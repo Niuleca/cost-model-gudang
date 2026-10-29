@@ -1,7 +1,7 @@
 'use client';
 // Leca Game · panel mengambang di atas tampilan 3D: info objek terpilih, pelacakan order, daftar dock/MHE/truk.
 import { useState } from 'react';
-import { HARI, JAM, type Dunia, type JenisTugas, type Order } from '@/lib/game';
+import { ARMADA, HARI, JAM, type Dunia, type JenisTugas, type Order } from '@/lib/game';
 import type { Pilihan } from './lapisan3d';
 
 export const LABEL_TUGAS: Record<JenisTugas, string> = {
@@ -88,7 +88,7 @@ export function infoPilihan(d: Dunia, p: Pilihan): Info | null {
       const telat = tr.tiba - tr.rencanaTiba;
       const isi = tr.arus === 'inbound' ? `${tr.palet.length} palet` : `${tr.order.length} order · ${angka(tr.order.reduce((a, o) => a + (d.order.get(o)?.paletEq ?? 0), 0), 1)} palet`;
       return {
-        ikon: 'truk', jenis: tr.arus === 'inbound' ? 'Truk inbound' : 'Truk outbound', judul: tr.id, sub: isi,
+        ikon: 'truk', jenis: `${tr.arus === 'inbound' ? 'Truk inbound' : 'Truk outbound'}${tr.jenis ? ` · ${ARMADA[tr.jenis].nama}` : ''}`, judul: tr.id, sub: isi,
         status: STATUS_TRUK[tr.status] ?? tr.status, nada: tr.status === 'di_dock' ? 'jalan' : tr.status === 'antre' ? 'warn' : 'info',
         baris: [
           ['Dock', tr.dock ? tr.dock.replace('DI', 'IN ').replace('DO', 'OUT ') : '—'], ['Rencana tiba', waktu(d, tr.rencanaTiba)],
@@ -218,7 +218,7 @@ export function PanelArmada({ d, pilih }: { d: Dunia; pilih: (p: Pilihan) => voi
         {tab === 'truk' && (antre.length + datang.length === 0 ? <p className="small muted" style={{ margin: 8 }}>Tidak ada truk yang menuju gudang.</p>
           : [...antre, ...datang].slice(0, 12).map(tr => (
             <button type="button" key={tr.id} className="gm-baris" onClick={() => pilih({ jenis: 'truk', id: tr.id })}>
-              <span className="nama"><b>{tr.id}</b><small>{tr.arus}</small></span>
+              <span className="nama"><b>{tr.id}</b><small>{tr.jenis ? ARMADA[tr.jenis].nama : tr.arus}</small></span>
               <span className="isi">{tr.arus === 'inbound' ? `${tr.palet.length} palet` : `${tr.order.length} order`}</span>
               <span className={`gm-pill ${tr.status === 'antre' ? 'warn' : 'info'}`}>{tr.status === 'antre' ? 'Antre' : 'Dalam perjalanan'}</span>
               <span className="gm-bar"><small>{tr.status === 'antre' ? '' : `${durasi(tr.tiba - d.t)}`}</small></span>

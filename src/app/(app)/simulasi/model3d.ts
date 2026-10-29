@@ -2,6 +2,7 @@
 // Ukuran dalam meter, depan kendaraan = +X.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { JenisMhe } from '@/lib/simulasi3d/layout';
 
 export const WARNA_BERSIH = {
@@ -17,7 +18,7 @@ export function matB(c: string, o: Partial<THREE.MeshStandardMaterialParameters>
 }
 const rb = (w: number, h: number, d: number, r = 0.08) => new RoundedBoxGeometry(w, h, d, 3, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001));
 function pasang(g: THREE.Object3D, geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, bayang = true) {
-  const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); mesh.castShadow = bayang; mesh.receiveShadow = true; g.add(mesh); return mesh;
+  const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); mesh.castShadow = bayang; mesh.receiveShadow = true; mesh.userData.kode = true; g.add(mesh); return mesh;
 }
 function roda(g: THREE.Object3D, x: number, z: number, r: number, lebar = 0.18) {
   const w = pasang(g, new THREE.CylinderGeometry(r, r, lebar, 20), matB(WARNA_BERSIH.hitam, { roughness: 0.8 }), x, r, z); w.rotation.x = Math.PI / 2;
@@ -100,7 +101,7 @@ export function trukBersih(arus: 'inbound' | 'outbound') {
   const sisi = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.45, map: t ?? undefined });
   const polos = matB('#ffffff', { roughness: 0.45 });
   const bak = new THREE.Mesh(rb(11.6, 2.7, 2.45, 0.12), [polos, polos, polos, polos, sisi, sisi]);
-  bak.position.set(-6.3, 2.65, 0); bak.castShadow = true; bak.receiveShadow = true; g.add(bak);
+  bak.position.set(-6.3, 2.65, 0); bak.castShadow = true; bak.receiveShadow = true; bak.userData.kode = true; g.add(bak);
   pasang(g, rb(11.8, 0.25, 2.3, 0.05), matB('#334155'), -6.3, 1.18, 0);                          // rangka
   pasang(g, rb(2.3, 2.3, 2.4, 0.35), biru, -13.4, 2.05, 0);                                       // kabin
   pasang(g, rb(1.0, 1.2, 2.4, 0.2), biru, -14.3, 1.45, 0);                                        // moncong
@@ -123,4 +124,111 @@ export function pinBersih(warna = WARNA_BERSIH.biru) {
   const cincin = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.85, 32), new THREE.MeshBasicMaterial({ color: warna, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }));
   cincin.rotation.x = -Math.PI / 2; cincin.position.y = 0.02; cincin.name = 'cincin'; g.add(cincin);
   return g;
+}
+
+
+// ---------- model detail dari Meshy AI (public/sim3d/model/*.glb, tekstur webp 1024)
+// Model Meshy dinormalisasi: panjang di sumbu X (ternormal ±0,95), atas = +Y. Depan model Meshy = −X → diputar π
+// supaya depan = +X seperti model kode. Skala tidak seragam supaya panjang/lebar/tinggi sesuai ukuran nyata.
+export type JenisModel = 'forklift' | 'reach' | 'hpt' | 'truk' | 'container' | 'cde' | 'fuso' | 'tronton';
+/** sumbu = sumbu panjang model asli ('x' bawaan Meshy text-to-3d, 'z' untuk sebagian model unggahan). */
+interface Spek { panjang: number; lebar: number; tinggi: number; putar: number; pusatX: number; berkas: string; cadangan?: string; sumbu?: 'x' | 'z' }
+const truk = (panjang: number, lebar: number, tinggi: number, berkas: string, cadangan?: string): Spek => ({ panjang, lebar, tinggi, putar: 0, pusatX: -0.5 - panjang / 2, berkas, cadangan });   // ujung belakang di x = −0,5 (menempel dock)
+const SPEK: Record<JenisModel, Spek> = {
+  forklift: { panjang: 3.4, lebar: 1.2, tinggi: 2.25, putar: Math.PI, pusatX: 0.05, berkas: 'forklift' },          // forklift counterbalance (model Meshy dari user)
+  reach: { panjang: 2.6, lebar: 1.15, tinggi: 3.2, putar: -Math.PI / 2, pusatX: 0.1, berkas: 'reach', sumbu: 'z' }, // reach truck (model Meshy dari user, panjang di sumbu Z, garpu di −Z)
+  hpt: { panjang: 1.6, lebar: 0.56, tinggi: 1.25, putar: Math.PI, pusatX: 0.1, berkas: 'hpt' },
+  truk: truk(9.2, 2.5, 3.6, 'truk'),
+  // armada: file model sendiri bila ada (cde.glb / fuso.glb / tronton.glb), kalau belum → truk boks diskalakan ke ukuran jenisnya
+  cde: truk(5.6, 2.0, 2.9, 'cde', 'truk'),
+  fuso: truk(7.6, 2.3, 3.3, 'fuso', 'truk'),
+  tronton: truk(10.5, 2.5, 3.7, 'tronton', 'truk'),
+  container: truk(16.5, 2.5, 4.0, 'container'),   // kepala truk + trailer + container 40 HC
+};
+const pemuat = new GLTFLoader();
+const cacheBerkas = new Map<string, Promise<THREE.Object3D | null>>();
+const muatBerkas = (b: string) => {
+  let p = cacheBerkas.get(b);
+  if (!p) { p = pemuat.loadAsync(`/sim3d/model/${b}.glb`).then(g => g.scene as THREE.Object3D).catch(() => null); cacheBerkas.set(b, p); }
+  return p;
+};
+const cacheModel = new Map<JenisModel, Promise<{ model: THREE.Object3D; berkas: string } | null>>();
+function muatModel(j: JenisModel) {
+  let p = cacheModel.get(j);
+  if (!p) {
+    const sp = SPEK[j];
+    p = muatBerkas(sp.berkas).then(async m => {
+      let berkas = sp.berkas;
+      if (!m && sp.cadangan) { m = await muatBerkas(sp.cadangan); berkas = sp.cadangan; }
+      if (!m) return null;
+      const akar = m.clone(true); akar.updateMatrixWorld(true);   // skala/rotasi simpul (mis. FBX ×100) ikut dihitung
+      const box = new THREE.Box3().setFromObject(akar); const ukuran = box.getSize(new THREE.Vector3()); const pusat = box.getCenter(new THREE.Vector3());
+      const wadah = new THREE.Group(); const isi = new THREE.Group(); wadah.add(isi); isi.add(akar);
+      akar.position.x -= pusat.x; akar.position.y -= box.min.y; akar.position.z -= pusat.z;
+      if (sp.sumbu === 'z') isi.scale.set(sp.lebar / ukuran.x, sp.tinggi / ukuran.y, sp.panjang / ukuran.z);
+      else isi.scale.set(sp.panjang / ukuran.x, sp.tinggi / ukuran.y, sp.lebar / ukuran.z);
+      isi.rotation.y = sp.putar; isi.position.x = sp.pusatX;
+      akar.traverse(o => { const mm = o as THREE.Mesh; if (mm.isMesh) { mm.castShadow = true; mm.receiveShadow = true; } });
+      return { model: wadah, berkas };
+    });
+    cacheModel.set(j, p);
+  }
+  return p;
+}
+/** Ganti badan model kode dengan model Meshy begitu file selesai dimuat (gagal → tetap model kode). */
+export function pakaiModelMeshy(g: THREE.Group, j: JenisModel) {
+  void muatModel(j).then(h => {
+    if (!h || g.getObjectByName('meshy')) return;
+    const salin = h.model.clone(true); salin.name = 'meshy';
+    g.traverse(o => { if (o.userData.kode) o.visible = false; });
+    // garpu kode hanya tampil saat diangkat (garpu model Meshy menempel di lantai)
+    const garpu = g.getObjectByName('garpu'); if (garpu) { garpu.userData.angkatSaja = true; garpu.traverse(o => { o.visible = true; }); garpu.visible = false; }
+    if (h.berkas === 'truk') {
+      // tulisan Leca di kedua sisi bak truk boks
+      const t = teksturTruk(); const sp = SPEK[j];
+      if (t) for (const z of [-1, 1]) {
+        const pl = new THREE.Mesh(new THREE.PlaneGeometry(sp.panjang * 0.56, sp.tinggi * 0.36), new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.5 }));
+        pl.position.set(-0.5 - sp.panjang * 0.39, sp.tinggi * 0.64, z * (sp.lebar / 2 + 0.03)); pl.rotation.y = z > 0 ? 0 : Math.PI; salin.add(pl);
+      }
+    }
+    g.add(salin);
+  });
+}
+
+// ---------- pekerja beranimasi (model Meshy dari user: rig 24 tulang + 10 klip)
+export type AksiPekerja = 'jalan' | 'lari' | 'kerja' | 'diam' | 'duduk';
+const KLIP: Record<AksiPekerja, string> = { jalan: 'Walking', lari: 'Running', kerja: 'Checkout_Gesture', diam: 'Stand_and_Chat', duduk: 'Chair_Sit_Idle_M' };
+export interface Animator { mixer: THREE.AnimationMixer; main: (a: AksiPekerja) => void; aksi: AksiPekerja | null }
+let cachePekerja: Promise<{ akar: THREE.Object3D; klip: THREE.AnimationClip[] } | null> | null = null;
+const muatPekerja = () => (cachePekerja ??= pemuat.loadAsync('/sim3d/model/pekerja.glb').then(g => ({ akar: g.scene, klip: g.animations })).catch(() => null));
+/** Ganti figur kode dengan pekerja beranimasi. Tinggi dinormalkan ke 1,72 m, menghadap +X (sama dengan model kode). */
+export function pakaiPekerjaMeshy(g: THREE.Group, awal: AksiPekerja, siap: (a: Animator) => void) {
+  void Promise.all([muatPekerja(), import('three/examples/jsm/utils/SkeletonUtils.js')]).then(([h, SU]) => {
+    if (!h || g.getObjectByName('meshy')) return;
+    const akar = SU.clone(h.akar); akar.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(akar, true); const tinggi = box.max.y - box.min.y || 1;
+    const wadah = new THREE.Group(); wadah.name = 'meshy';
+    const k = 1.72 / tinggi; akar.scale.multiplyScalar(k); akar.position.y -= box.min.y * k;
+    akar.position.x -= ((box.min.x + box.max.x) / 2) * k; akar.position.z -= ((box.min.z + box.max.z) / 2) * k;
+    wadah.rotation.y = Math.PI / 2;   // model menghadap +Z → putar supaya menghadap +X
+    wadah.add(akar);
+    akar.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; } });
+    g.traverse(o => { if (o.userData.kode) o.visible = false; });
+    g.add(wadah);
+    const mixer = new THREE.AnimationMixer(akar);
+    const aksiKlip = new Map<AksiPekerja, THREE.AnimationAction>();
+    for (const [a, n] of Object.entries(KLIP) as [AksiPekerja, string][]) { const c = h.klip.find(x => x.name === n); if (c) aksiKlip.set(a, mixer.clipAction(c)); }
+    const an: Animator = {
+      mixer, aksi: null,
+      main(a) {
+        if (an.aksi === a) return;
+        const baru = aksiKlip.get(a) ?? aksiKlip.get('diam'); if (!baru) return;
+        const lama = an.aksi ? aksiKlip.get(an.aksi) : undefined;
+        baru.reset().setEffectiveWeight(1).play(); baru.time = Math.random() * baru.getClip().duration;
+        if (lama && lama !== baru) lama.crossFadeTo(baru, 0.25, false);
+        an.aksi = a;
+      },
+    };
+    an.main(awal); siap(an);
+  });
 }
