@@ -9,7 +9,9 @@ import type { LayoutGudang, JenisMhe } from '@/lib/simulasi3d/layout';
 import { WARNA_MHE, WARNA_ORANG } from './warna';
 
 export type Kamera = 'iso' | 'atas' | 'dock' | 'lorong';
-export interface ViewerApi { kamera: (k: Kamera) => void; screenshot: () => string | null }
+export interface ViewerApi { kamera: (k: Kamera) => void; screenshot: () => string | null; statistik: () => { detikSim: number; siklus: Record<string, number> } }
+/** Kecepatan simulasi: faktor percepatan waktu & lama satu siklus (detik waktu nyata gudang) per alat / role, dari productivity. */
+export interface Kecepatan { faktor: number; siklus: Record<string, number> }
 export interface OpsiViewer { atap: boolean; dinding: boolean; label: boolean; animasi: boolean; truk: boolean; orang: boolean }
 
 const WARNA_ZONA: Record<string, string> = {
@@ -78,18 +80,25 @@ function modelOrang(c: string) {
   return g;
 }
 
-interface Gerak { obj: THREE.Object3D; a: THREE.Vector3; b: THREE.Vector3; v: number; fase: number; garpu?: THREE.Object3D; angkat?: number }
+interface Gerak { obj: THREE.Object3D; a: THREE.Vector3; b: THREE.Vector3; kunci: string; siklusAwal: number; fase: number; garpu?: THREE.Object3D; angkat?: number }
 
-const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; opsi: OpsiViewer }>(function Viewer3D({ layout, shift, opsi }, ref) {
+const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; opsi: OpsiViewer; kecepatan: Kecepatan }>(function Viewer3D({ layout, shift, opsi, kecepatan }, ref) {
   const wadah = useRef<HTMLDivElement>(null);
   const st = useRef<{
     renderer?: THREE.WebGLRenderer; lr?: CSS2DRenderer; scene?: THREE.Scene; cam?: THREE.PerspectiveCamera; ctl?: OrbitControls;
-    grup: Record<string, THREE.Group>; kendaraan: { g: THREE.Group; kunci: string }[]; gerak: Gerak[]; gerakOrang: Gerak[]; jalan: boolean; L: number; W: number; H: number;
-  }>({ grup: {}, kendaraan: [], gerak: [], gerakOrang: [], jalan: true, L: 0, W: 0, H: 0 });
+    grup: Record<string, THREE.Group>; kendaraan: { g: THREE.Group; kunci: string }[]; gerak: Gerak[]; gerakOrang: Gerak[]; jalan: boolean; L: number; W: number; H: number; detikSim: number; kec: Kecepatan;
+  }>({ grup: {}, kendaraan: [], gerak: [], gerakOrang: [], jalan: true, L: 0, W: 0, H: 0, detikSim: 0, kec: { faktor: 10, siklus: {} } });
+  st.current.kec = kecepatan;
+  const siklusDari = (g: Gerak) => Math.max(1, st.current.kec.siklus[g.kunci] ?? g.siklusAwal);
 
   useImperativeHandle(ref, () => ({
     kamera: (k: Kamera) => aturKamera(k),
     screenshot: () => { const s = st.current; if (!s.renderer || !s.scene || !s.cam) return null; s.renderer.render(s.scene, s.cam); return s.renderer.domElement.toDataURL('image/png'); },
+    statistik: () => {
+      const s = st.current; const siklus: Record<string, number> = {};
+      for (const g of [...s.gerak, ...s.gerakOrang]) { const n = Math.floor(s.detikSim / siklusDari(g) + g.fase) - Math.floor(g.fase); siklus[g.kunci] = (siklus[g.kunci] ?? 0) + n; }
+      return { detikSim: s.detikSim, siklus };
+    },
   }));
 
   function aturKamera(k: Kamera) {
@@ -101,7 +110,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     if (k === 'dock') { s.cam.position.set(-32, 14, W / 2 + W * 0.35); target.set(4, 2, W / 2); }
     if (k === 'lorong') {
       const lor = layout.lorong[0];
-      if (lor) { s.cam.position.set(lor.x, 1.7, lor.z0 + 0.5); target.set(lor.x, 1.5, lor.z1); } else { s.cam.position.set(L / 2, 1.7, 1); target.set(L / 2, 1.5, W); }
+      if (lor) { s.cam.position.set(lor.x0 - 1, 1.7, lor.z); target.set(lor.x1, 1.5, lor.z); } else { s.cam.position.set(1, 1.7, W / 2); target.set(L, 1.5, W / 2); }
     }
     void H;
     s.ctl.target.copy(target); s.cam.updateProjectionMatrix(); s.ctl.update();
@@ -130,17 +139,20 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     });
     ro.observe(el);
     const jam = new THREE.Clock(); let id = 0;
+    // posisi = bolak-balik a → b → a; satu putaran penuh = satu siklus kerja (mis. 1 palet put-away) dalam waktu gudang
     const pp = (u: number) => { const f = u - Math.floor(u); return f < 0.5 ? f * 2 : 2 - f * 2; };   // ping-pong 0→1→0
     const loop = () => {
       id = requestAnimationFrame(loop);
-      const t = jam.getElapsedTime();
+      const dt = Math.min(0.1, jam.getDelta());
+      if (s.jalan) s.detikSim += dt * Math.max(0, s.kec.faktor);
+      const t = s.detikSim;
       if (s.jalan) for (const g of [...s.gerak, ...s.gerakOrang]) {
-        const len = g.a.distanceTo(g.b) || 1; const u = (t * g.v) / (2 * len) + g.fase; const k = pp(u);
+        const sik = siklusDari(g); const u = t / sik + g.fase; const k = pp(u);
         g.obj.position.lerpVectors(g.a, g.b, k);
         const maju = (u - Math.floor(u)) < 0.5;
         const dir = new THREE.Vector3().subVectors(maju ? g.b : g.a, maju ? g.a : g.b);
         g.obj.rotation.y = Math.atan2(-dir.z, dir.x);
-        if (g.garpu && g.angkat) g.garpu.position.y = (0.5 - 0.5 * Math.cos(t * 0.6 + g.fase * 7)) * g.angkat;
+        if (g.garpu && g.angkat) { const f = u - Math.floor(u); g.garpu.position.y = (f > 0.42 && f < 0.58 ? Math.sin(((f - 0.42) / 0.16) * Math.PI) : 0) * g.angkat; }
       }
       ctl.update(); renderer.render(scene, cam); lr.render(scene, cam);
     };
@@ -156,7 +168,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
   useEffect(() => {
     const s = st.current; const scene = s.scene!; if (!scene) return;
     for (const g of Object.values(s.grup)) { scene.remove(g); g.traverse(o => { const m = o as THREE.Mesh; m.geometry?.dispose?.(); if (o instanceof CSS2DObject) o.element.remove(); }); }
-    s.grup = {}; s.gerak = [];
+    s.grup = {}; s.gerak = []; s.detikSim = 0;
     const { L, W, H, puncak } = layout; Object.assign(s, { L, W, H });
     const G = (n: string) => { const g = new THREE.Group(); g.name = n; scene.add(g); s.grup[n] = g; return g; };
     const gBangunan = G('bangunan'), gAtap = G('atap'), gDinding = G('dinding'), gLabel = G('label'), gRak = G('rak'), gTruk = G('truk'), gMhe = G('mhe');
@@ -186,7 +198,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
       (lb.element as HTMLDivElement).title = z.ket; lb.element.innerHTML = `<b>${z.label}</b><span>${z.ket}</span>`; gLabel.add(lb);
     }
     // garis lorong rak
-    for (const lo of layout.lorong) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.012, lo.z1 - lo.z0), garis); m.position.set(lo.x, 0.016, (lo.z0 + lo.z1) / 2); gBangunan.add(m); }
+    for (const lo of layout.lorong) { const m = new THREE.Mesh(new THREE.BoxGeometry(lo.x1 - lo.x0, 0.012, 0.1), garis); m.position.set((lo.x0 + lo.x1) / 2, 0.016, lo.z); gBangunan.add(m); }
 
     // dinding (panel cladding transparan) + kolom baja
     const panel = (sx: number, sy: number, sz: number, x: number, y: number, z: number) => {
@@ -240,12 +252,13 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     const tiang = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, layout.tinggiRak, 0.09), mat('#1e56a0', { metalness: 0.5, roughness: 0.45 }), Math.max(1, nTiang));
     const beam = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.12, 1), mat('#f97316', { metalness: 0.4, roughness: 0.4 }), Math.max(1, nBeam));
     const tmp = new THREE.Object3D(); let it = 0, ib = 0;
+    // baris rak memanjang di X: tiang di tiap batas bay (muka lorong & muka belakang), beam sejajar X
     for (const rr of layout.rak) {
-      for (let b = 0; b <= rr.nBay; b++) for (const dx of [0.05, rr.depth - 0.05]) {
-        tmp.position.set(rr.x0 + dx, layout.tinggiRak / 2, rr.z0 + b * rr.bayW); tmp.scale.set(1, 1, 1); tmp.updateMatrix(); tiang.setMatrixAt(it++, tmp.matrix);
+      for (let b = 0; b <= rr.nBay; b++) for (const dz of [0.05, rr.depth - 0.05]) {
+        tmp.position.set(rr.x0 + b * rr.bayW, layout.tinggiRak / 2, rr.z0 + dz); tmp.scale.set(1, 1, 1); tmp.rotation.set(0, 0, 0); tmp.updateMatrix(); tiang.setMatrixAt(it++, tmp.matrix);
       }
-      for (let b = 0; b < rr.nBay; b++) for (let l = 1; l < rr.level; l++) for (const dx of [0.05, rr.depth - 0.05]) {
-        tmp.position.set(rr.x0 + dx, layout.levelY[l] - 0.06, rr.z0 + (b + 0.5) * rr.bayW); tmp.scale.set(1, 1, rr.bayW - 0.09); tmp.updateMatrix(); beam.setMatrixAt(ib++, tmp.matrix);
+      for (let b = 0; b < rr.nBay; b++) for (let l = 1; l < rr.level; l++) for (const dz of [0.05, rr.depth - 0.05]) {
+        tmp.position.set(rr.x0 + (b + 0.5) * rr.bayW, layout.levelY[l] - 0.06, rr.z0 + dz); tmp.scale.set(1, 1, rr.bayW - 0.09); tmp.rotation.set(0, Math.PI / 2, 0); tmp.updateMatrix(); beam.setMatrixAt(ib++, tmp.matrix);
       }
     }
     tiang.count = it; beam.count = ib; tiang.castShadow = beam.castShadow = true; tiang.receiveShadow = beam.receiveShadow = true;
@@ -258,12 +271,13 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     const warna = ['#ffffff', '#f4efe6', '#ebe3d4', '#fbf7f0', '#e6edf3', '#f1e9dc'].map(c => new THREE.Color(c));   // variasi halus di atas tekstur karton
     const rnd = (i: number) => { const x2 = Math.sin(i * 12.9898) * 43758.5453; return x2 - Math.floor(x2); };
     layout.palet.forEach((p, i) => {
-      tmp.position.set(p.x, p.y + 0.07, p.z); tmp.scale.set(1, 1, 1); tmp.rotation.set(0, 0, 0); tmp.updateMatrix(); alas.setMatrixAt(i, tmp.matrix);
+      tmp.position.set(p.x, p.y + 0.07, p.z); tmp.scale.set(1, 1, 1); tmp.rotation.set(0, p.rot ? Math.PI / 2 : 0, 0); tmp.updateMatrix(); alas.setMatrixAt(i, tmp.matrix);
       const sk = 0.85 + rnd(i) * 0.15;
       tmp.position.set(p.x, p.y + 0.14 + (tinggiMuat * sk) / 2, p.z); tmp.scale.set(1, sk, 1); tmp.updateMatrix(); muat.setMatrixAt(i, tmp.matrix);
       muat.setColorAt(i, warna[Math.floor(rnd(i + 7) * warna.length)]);
     });
-    alas.count = muat.count = layout.palet.length; alas.castShadow = muat.castShadow = layout.palet.length <= 4000;   // gudang besar: bayangan palet dimatikan supaya tetap lancar alas.receiveShadow = muat.receiveShadow = true;
+    alas.count = muat.count = layout.palet.length; alas.castShadow = muat.castShadow = layout.palet.length <= 4000;   // gudang besar: bayangan palet dimatikan supaya tetap lancar
+    alas.receiveShadow = muat.receiveShadow = true;
     gRak.add(alas, muat);
 
     // ---------- MHE
@@ -277,7 +291,9 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
         const lb = label(`${NAMA_MHE[u.jenis]} ${k + 1}`, 'mhe'); lb.position.set(0, 3.1, 0); (lb.element as HTMLDivElement).title = u.nama; g.add(lb);
         let a: THREE.Vector3, b: THREE.Vector3;
         if ((u.jenis === 'reach' || u.jenis === 'stacker') && lorRak.length) {
-          const lo = lorRak[iLor++ % lorRak.length]; a = new THREE.Vector3(lo.x, 0, lo.z0 + 1.2); b = new THREE.Vector3(lo.x, 0, lo.z1 - 1.2);
+          // reach truck: mulut lorong (jalur utama) ↔ bay tujuan di dalam lorong
+          const lo = lorRak[iLor++ % lorRak.length]; const panjang = Math.max(2, lo.x1 - lo.x0 - 3);
+          a = new THREE.Vector3(lo.x0, 0, lo.z); b = new THREE.Vector3(lo.x0 + 2 + ((k * 0.37 + iLor * 0.23 + 0.2) % 1) * panjang, 0, lo.z);
         } else if (u.jenis === 'hpt') {
           const r2 = iHp++ % 2 === 0 ? layout.stagingIn : layout.stagingOut; const x = r2.x0 + 2.5 + (iHp % 3) * 1.6; a = new THREE.Vector3(x, 0, r2.z0 + 1); b = new THREE.Vector3(x, 0, r2.z1 - 1);
         } else {
@@ -288,7 +304,8 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
         const kunci = u.jenis === 'reach' || u.jenis === 'stacker' ? 'reach' : u.jenis === 'forklift' ? 'forklift' : '';
         if (kunci) s.kendaraan.push({ g, kunci });
         g.position.copy(a); gMhe.add(g);
-        s.gerak.push({ obj: g, a, b, v: u.jenis === 'hpt' ? 0.8 : 1.6, fase: (k * 0.37 + u.unit * 0.11) % 1, garpu: g.getObjectByName('garpu') ?? undefined, angkat: u.jenis === 'reach' ? Math.max(0, layout.levelY[layout.levelY.length - 1] ?? 0) : 1.2 });
+        s.gerak.push({ obj: g, a, b, kunci: `tool:${u.nama}`, siklusAwal: 120, fase: (k * 0.37 + u.unit * 0.11) % 1, garpu: g.getObjectByName('garpu') ?? undefined,
+          angkat: u.jenis === 'reach' || u.jenis === 'stacker' ? Math.max(0.5, layout.levelY[Math.min(layout.levelY.length - 1, 1 + (k % Math.max(1, layout.levelY.length - 1)))] ?? 1) : 1.2 });
       }
     }
     terapkanOpsi(); bangunOrang(); aturKamera('iso');
@@ -320,15 +337,22 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
           case 'admin': p = kantor ? acakTitik(kantor.x0 + 0.6, kantor.x1 - 0.6, kantor.z0 + 0.6, kantor.z1 - 0.6, i + 1) : acakTitik(5, 7, 0.8, 3, i); break;
           case 'checker': {
             const r = /\bIB\b|inbound|receiv/i.test(o.nama) ? L.stagingIn : /\bOB\b|outbound|dispatch/i.test(o.nama) ? L.stagingOut : iChk++ % 2 === 0 ? L.stagingIn : L.stagingOut;
-            p = acakTitik(r.x0 + 4.5, r.x1 - 1, r.z0 + 1, r.z1 - 1, i + 3); break;
+            p = acakTitik(r.x0 + 4.5, r.x1 - 1, r.z0 + 1, r.z1 - 1, i + 3);
+            jalanLorong.push({ obj: new THREE.Object3D(), a: p, b: new THREE.Vector3(p.x, 0, Math.min(r.z1 - 0.8, p.z + 2.5)), kunci: `role:${o.nama}`, siklusAwal: 60, fase: (i * 0.41) % 1 }); break;
           }
-          case 'tkbm': { const d = L.dock[i % Math.max(1, L.dock.length)]; p = new THREE.Vector3(2.6 + (i % 3) * 0.8, 0, (d?.z ?? W / 2) + ((i % 2) ? 1.6 : -1.6)); break; }
+          case 'tkbm': { const d = L.dock[i % Math.max(1, L.dock.length)]; p = new THREE.Vector3(2.6 + (i % 3) * 0.8, 0, (d?.z ?? W / 2) + ((i % 2) ? 1.6 : -1.6));
+            jalanLorong.push({ obj: new THREE.Object3D(), a: p, b: new THREE.Vector3(-2, 1.25, d?.z ?? W / 2), kunci: `role:${o.nama}`, siklusAwal: 60, fase: (i * 0.33) % 1 }); break; }
           case 'supervisor': p = new THREE.Vector3(L.stagingIn.x1 + 1.5 + i * 1.2, 0, W / 2 + (i % 2 ? 1 : -1)); break;
           case 'security': p = new THREE.Vector3(-3 - i, 0, W + 2.5); break;
-          case 'inventory': { const lo = lorRak[i % Math.max(1, lorRak.length)]; p = lo ? new THREE.Vector3(lo.x, 0, lo.z1 - 0.3) : new THREE.Vector3(L.stagingIn.x1 + 2, 0, 2 + i); break; }
+          case 'inventory': {
+            const lo = lorRak[(i * 3 + 1) % Math.max(1, lorRak.length)];
+            if (lo) { p = new THREE.Vector3(lo.x1 - 0.5, 0, lo.z + 0.5); jalanLorong.push({ obj: new THREE.Object3D(), a: p, b: new THREE.Vector3(lo.x0 + 1, 0, lo.z + 0.5), kunci: `role:${o.nama}`, siklusAwal: 300, fase: (i * 0.27) % 1 }); }
+            else p = new THREE.Vector3(L.stagingIn.x1 + 2, 0, 2 + i);
+            break;
+          }
           case 'picker': {
             const lo = lorRak[iPick++ % Math.max(1, lorRak.length)];
-            if (lo) { const a = new THREE.Vector3(lo.x + 0.6, 0, lo.z0 + 1 + (i % 4)); const b = new THREE.Vector3(lo.x + 0.6, 0, lo.z1 - 1); p = a; jalanLorong.push({ obj: new THREE.Object3D(), a, b, v: 0.7, fase: (i * 0.29) % 1 }); }
+            if (lo) { const a = new THREE.Vector3(lo.x0 + 0.5, 0, lo.z + 0.6); const b = new THREE.Vector3(lo.x0 + 2 + ((i * 0.53 + 0.3) % 1) * Math.max(2, lo.x1 - lo.x0 - 3), 0, lo.z + 0.6); p = a; jalanLorong.push({ obj: new THREE.Object3D(), a, b, kunci: `role:${o.nama}`, siklusAwal: 30, fase: (i * 0.29) % 1 }); }
             else p = acakTitik(L.stagingOut.x0 + 4.5, L.stagingOut.x1 - 1, L.stagingOut.z0 + 1, L.stagingOut.z1 - 1, i + 5);
             break;
           }
