@@ -105,3 +105,20 @@ test('performa: 1 hari game < 2 detik, termasuk gudang besar', () => {
   assert.ok(ms < 2000, `${ms.toFixed(0)} ms`);
   assert.deepEqual(d.pelanggaran, []);
 });
+
+test('layout dari Desain gudang 2D ⇄ 3D (versi tersimpan) dipakai game: lokasi = posisi rak editor, 10 hari tanpa pelanggaran', async () => {
+  const { paramAwal, susunLayout } = await import('../../src/lib/simulasi3d/layout');
+  const { dariOtomatis, keLayoutGudang, ringkas } = await import('../../src/lib/simulasi3d/editor');
+  const p = paramAwal(t, h); const auto = susunLayout(t, h, { param: { ...p, okupansi: 1 } });
+  const edit = dariOtomatis(susunLayout(t, h, { param: p }), p, Math.round(h.space.ppDesain ?? 0));
+  // ubah layout: gandakan rak pertama (kapasitas bertambah)
+  const rak = edit.komponen.find(k => k.rak);
+  if (rak) edit.komponen.push({ ...rak, id: 'salinan', z: rak.z + rak.d + 3, rak: { ...rak.rak! } });
+  const lay = keLayoutGudang({ ...edit, okupansi: 1 }, auto);
+  const sk = skenarioDariTender(t, h, { seed: 2, layout: lay });
+  const posisi = sk.lokasi.filter(l => l.tipe === 'rak' || l.tipe === 'lantai').length;
+  assert.equal(posisi, ringkas({ ...edit, okupansi: 1 }).totalRak);
+  const d = buatDunia(sk); jalankanHari(d, 10);
+  assert.deepEqual(d.pelanggaran, []);
+  assert.ok(ringkasDunia(d).orderSelesai > 0);
+});

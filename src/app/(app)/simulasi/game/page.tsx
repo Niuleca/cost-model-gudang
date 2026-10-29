@@ -11,6 +11,7 @@ import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import { labelStatus } from '@/lib/status';
 import { buatDunia, jalankanHari, ringkasDunia, skenarioDariTender, type Dunia, type JenisTugas, type Skenario } from '@/lib/game';
 import { susunLayout, type LayoutGudang } from '@/lib/simulasi3d/layout';
+import { keLayoutGudang, type LayoutEdit } from '@/lib/simulasi3d/editor';
 
 const Main3D = dynamic(() => import('./Main3D'), { ssr: false, loading: () => <div className="card sim3d-wadah sim3d-muat">Menyiapkan gudang 3D…</div> });
 
@@ -39,6 +40,9 @@ export default function LecaGame() {
   const [jalan, setJalan] = useState<{ selesai: number; total: number } | null>(null);
   const [versi, setVersi] = useState(0);
   const [mode, setMode] = useState<'3d' | 'laporan'>('3d');
+  const [layouts, setLayouts] = useState<{ id: string; nama: string; updated_at: string; data: LayoutEdit }[]>([]);
+  const [layoutPilih, setLayoutPilih] = useState('otomatis');
+  const [prodUbah, setProdUbah] = useState<Partial<Record<JenisTugas, number>>>({});
   const batalRef = useRef(false);
 
   useEffect(() => {
@@ -60,11 +64,17 @@ export default function LecaGame() {
       if (error || !row) throw new Error(error?.message ?? 'Tender tidak ditemukan');
       const t = row as TenderRow;
       t.asumsi = { ...ASUMSI_DEFAULT, ...(t.asumsi ?? {}) }; t.asumsi.it = { ...IT_SHEET_DEFAULT, ...(t.asumsi.it ?? {}) };
-      try { const { master } = await muatMaster(sb, t); return { t, h: hitungTender(keInput(t), master) }; }
-      catch { if (t.hasil) return { t, h: t.hasil as HasilTender }; throw new Error('Tender ini belum bisa dihitung — lengkapi input di halaman tender.'); }
+      let h: HasilTender;
+      try { const { master } = await muatMaster(sb, t); h = hitungTender(keInput(t), master); }
+      catch { if (!t.hasil) throw new Error('Tender ini belum bisa dihitung — lengkapi input di halaman tender.'); h = t.hasil as HasilTender; }
+      // versi layout dari Desain gudang 2D ⇄ 3D
+      const { data: vs } = await sb.from('warehouse_layouts').select('id, nama, updated_at, data').eq('tender_id', id).order('updated_at', { ascending: false });
+      return { t, h, vs: (vs ?? []) as { id: string; nama: string; updated_at: string; data: LayoutEdit }[] };
     })().then(r => {
       if (batal) return;
-      setData(r); setModal(Math.round(r.h.totalBiayaBulan * 3));
+      setData({ t: r.t, h: r.h }); setModal(Math.round(r.h.totalBiayaBulan * 3)); setLayouts(r.vs); setProdUbah({});
+      const q = new URLSearchParams(window.location.search).get('layout');
+      setLayoutPilih(q && r.vs.some(v => v.id === q) ? q : r.vs[0]?.id ?? 'otomatis');
       setMulai((r.t.tanggal_go_live || new Date().toISOString()).slice(0, 10));
       const u = new URL(window.location.href); u.searchParams.set('id', id); window.history.replaceState(null, '', u);
     }).catch(e => { if (!batal) { setErr(e.message); setData(null); } }).finally(() => { if (!batal) setMemuat(false); });
@@ -77,12 +87,24 @@ export default function LecaGame() {
   }, [daftar, cari]);
 
   // layout 3D dengan semua posisi rak (okupansi 100%) = lokasi simpan game
-  const layout = useMemo((): LayoutGudang | null => { if (!data) return null; try { return susunLayout(data.t, data.h, { param: { okupansi: 1 } }); } catch { return null; } }, [data]);
+  // gudang = versi layout tersimpan (Desain gudang 2D ⇄ 3D) atau layout otomatis dari Space tender; semua posisi simpan dipakai (okupansi 100%)
+  const layout = useMemo((): LayoutGudang | null => {
+    if (!data) return null;
+    try {
+      const auto = susunLayout(data.t, data.h, { param: { okupansi: 1 } });
+      const v = layouts.find(x => x.id === layoutPilih);
+      return v ? keLayoutGudang({ ...v.data, okupansi: 1 }, auto) : auto;
+    } catch { return null; }
+  }, [data, layouts, layoutPilih]);
   const [sk, errSk] = useMemo((): [Skenario | null, string | null] => {
     if (!data || !layout) return [null, null];
-    try { return [skenarioDariTender(data.t, data.h, { modal: modal ?? undefined, seed, mulai: mulai || undefined, layout }), null]; }
-    catch (e) { return [null, `Skenario tidak bisa dibuat: ${(e as Error).message}`]; }
-  }, [data, layout, modal, seed, mulai]);
+    try {
+      const s2 = skenarioDariTender(data.t, data.h, { modal: modal ?? undefined, seed, mulai: mulai || undefined, layout });
+      // productivity yang diubah di sini menggantikan angka tender (hanya untuk simulasi, tender tidak berubah)
+      for (const [j, v] of Object.entries(prodUbah) as [JenisTugas, number][]) if (v > 0) s2.prod[j] = { ...s2.prod[j], prod: v, sumber: `diubah (tender: ${s2.prod[j].prod})` };
+      return [s2, null];
+    } catch (e) { return [null, `Skenario tidak bisa dibuat: ${(e as Error).message}`]; }
+  }, [data, layout, modal, seed, mulai, prodUbah]);
 
   /** Mulai permainan 3D (waktu berjalan dari hari 0 pukul 00.00; tekan "Ke shift berikutnya" untuk langsung ke jam kerja). */
   const main3d = () => { if (!sk) return; batalRef.current = true; setJalan(null); setDunia(buatDunia(sk)); setMode('3d'); };
@@ -117,7 +139,7 @@ export default function LecaGame() {
       </div>
 
       <div className="card">
-        <p className="small muted" style={{ marginTop: 0 }}>Tahap M1: mesin simulasi tanpa 3D, pakai data tender sungguhan. Manpower, biaya, tarif rate card, productivity aktivitas, dan lokasi rak diambil dari project. Hasilnya bisa dibandingkan langsung dengan cost model.</p>
+        <p className="small muted" style={{ marginTop: 0 }}>Simulasi operasi gudang dengan data tender sungguhan: manpower, biaya, tarif rate card, dan productivity dari project; gudang dari versi layout di <b>Desain gudang 2D ⇄ 3D</b>. Hasilnya bisa dibandingkan langsung dengan cost model.</p>
         <div className="sim3d-pilih">
           <label className="f">Cari project<input value={cari} onChange={e => setCari(e.target.value)} placeholder="kode / customer" /></label>
           <label className="f">Project
@@ -127,6 +149,20 @@ export default function LecaGame() {
             </select>
           </label>
         </div>
+        {data && (
+          <div className="sim3d-pilih" style={{ marginTop: 8 }}>
+            <label className="f">Layout gudang
+              <select value={layoutPilih} onChange={e => { setLayoutPilih(e.target.value); setDunia(null); }}>
+                {layouts.map(v => <option key={v.id} value={v.id}>{v.nama} · {new Date(v.updated_at).toLocaleDateString('id-ID')}</option>)}
+                <option value="otomatis">Otomatis dari Space tender</option>
+              </select>
+            </label>
+            <div className="f small" style={{ alignSelf: 'end' }}>
+              <span className="muted">{layouts.length ? `${layouts.length} versi tersimpan` : 'Belum ada versi layout — memakai layout otomatis.'}</span>
+              <Link href={`/simulasi?id=${data.t.id}`}>Edit di Desain gudang 2D ⇄ 3D →</Link>
+            </div>
+          </div>
+        )}
         {(err || errSk) && <p className="error small" role="alert">{err || errSk}</p>}
         {memuat && <p className="small muted">Menghitung tender…</p>}
         {sk && data && (
@@ -165,10 +201,19 @@ export default function LecaGame() {
               </tbody></table>
             </div>
             <div>
-              <h3>Productivity (× faktor {angka(sk.faktor, 3)})</h3>
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <h3>Productivity (× faktor {angka(sk.faktor, 3)})</h3>
+                {Object.keys(prodUbah).length > 0 && <button type="button" className="ghost" style={{ padding: '3px 8px' }} onClick={() => { setProdUbah({}); setDunia(null); }}>Reset ke tender</button>}
+              </div>
+              <p className="small muted" style={{ margin: '0 0 6px' }}>Kecepatan MHE & manpower di game = angka ini. Ubah untuk mencoba productivity lain (tender tidak berubah); berlaku saat main ulang.</p>
               <table className="sim3d-tabel"><tbody>
                 {(Object.keys(sk.prod) as JenisTugas[]).map(j => (
-                  <tr key={j}><td>{LABEL_TUGAS[j]}</td><td className="num">{angka(sk.prod[j].prod)} {sk.prod[j].satuan}/jam</td><td className="small muted">{sk.prod[j].luar ? 'pihak luar — tidak ada di tender' : sk.prod[j].sumber}</td></tr>
+                  <tr key={j}>
+                    <td>{LABEL_TUGAS[j]}</td>
+                    <td className="num"><input type="number" min={0} step={1} value={prodUbah[j] ?? sk.prod[j].prod} style={{ width: 72, background: prodUbah[j] != null ? 'var(--asumsi)' : undefined }}
+                      onChange={e => { const x = Number(e.target.value); setProdUbah(p => ({ ...p, [j]: Number.isFinite(x) ? x : 0 })); }} /> <span className="small muted">{sk.prod[j].satuan}/jam</span></td>
+                    <td className="small muted">{sk.prod[j].luar ? 'pihak luar — tidak ada di tender' : sk.prod[j].sumber}</td>
+                  </tr>
                 ))}
               </tbody></table>
               <h3>Pekerja & MHE</h3>

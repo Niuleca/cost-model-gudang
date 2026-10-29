@@ -457,3 +457,6 @@ tr.kat-link:hover td { background: var(--res); }
   .game-layar { overflow: visible; }
   .gm-tombol-panel, .game-layar:not(.tanpa-panel) .gm-tombol-panel { position: static; margin-top: 8px; }
 }
+.sim2d-detail { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.sim2d-detail summary { cursor: pointer; list-style: revert; }
+.sim2d-param { display: grid; gap: 6px; margin-top: 6px; }
