@@ -322,6 +322,3 @@ tr.kat-link:hover td { background: var(--res); }
 .sim3d-orang { background: rgba(255,255,255,.95); color: #0f172a; border: 2px solid #64748b; border-radius: 99px; padding: 1px 8px; font: 600 10.5px var(--body); white-space: nowrap; }
 @media (max-width: 1000px) { .sim3d-tata { grid-template-columns: 1fr; } .sim3d-panel { max-height: none; } }
 @media (max-width: 560px) { .sim3d-pilih { grid-template-columns: 1fr; } .sim3d-wadah { height: 60vh; min-height: 340px; } }
-.sim3d-galeri { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.sim3d-galeri figure { margin: 0; display: grid; gap: 6px; }
-.sim3d-galeri img, .sim3d-galeri video { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--g100); display: block; }

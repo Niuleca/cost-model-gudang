@@ -26,8 +26,8 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/approval-quotation', label: 'Approval quotation', roles: ['admin', 'manager'] },
     { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua' },
   ] },
-  { id: 'simulasi', label: 'Simulasi', item: [
-    { href: '/simulasi', label: 'Simulasi gudang 3D', roles: TIM_TENDER },
+  { id: 'simulasi', label: 'Simulasi Warehouse', item: [
+    { href: '/simulasi', label: 'Simulasi gudang 3D', roles: 'semua' },
   ] },
   { id: 'price', label: 'Price Inquiry', item: [...PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })),
     { href: '/price/perbandingan', label: 'Comparation Price (vendor)', roles: 'semua' as const, pisah: true }] },
@@ -98,6 +98,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <button className={`ddbtn${on ? ' on' : ''}`} aria-haspopup="true" aria-expanded={buka === id} onClick={() => {
           if (tutupTimer.current) clearTimeout(tutupTimer.current);
           if (id === 'dashboard') { setBuka(null); router.push('/beranda'); return; }
+          if (id === 'simulasi') { setBuka(null); router.push('/simulasi'); return; }
           // Desktop: klik selalu membuka (tidak menutup menu yang baru terbuka oleh hover); layar sentuh: buka/tutup
           setBuka(hover() ? id : buka === id ? null : id);
         }}>

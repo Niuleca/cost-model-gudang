@@ -33,30 +33,6 @@ export default function SimulasiGudang() {
   const [shift, setShift] = useState(0);
   const [opsi, setOpsi] = useState<OpsiViewer>({ atap: false, dinding: true, label: true, animasi: true, truk: true, orang: true });
   const api = useRef<ViewerApi>(null);
-  const [urlBaru, setUrlBaru] = useState('');
-  const [judulBaru, setJudulBaru] = useState('');
-  const [simpanRender, setSimpanRender] = useState(false);
-
-  /** Simpan daftar render AI ke tenders.asumsi.renderAi (asumsi dibaca ulang dulu supaya isian lain tidak tertimpa). */
-  async function ubahRender(f: (l: NonNullable<TenderRow['asumsi']['renderAi']>) => NonNullable<TenderRow['asumsi']['renderAi']>) {
-    if (!data) return;
-    setSimpanRender(true); setErr(null);
-    const { data: row, error } = await sb.from('tenders').select('asumsi').eq('id', data.t.id).single();
-    if (error || !row) { setErr(error?.message ?? 'Gagal membaca tender'); setSimpanRender(false); return; }
-    const asumsi = { ...(row.asumsi as TenderRow['asumsi']) };
-    asumsi.renderAi = f(asumsi.renderAi ?? []);
-    const { error: e2 } = await sb.from('tenders').update({ asumsi }).eq('id', data.t.id);
-    if (e2) setErr(e2.message); else setData(d => d ? { ...d, t: { ...d.t, asumsi: { ...d.t.asumsi, renderAi: asumsi.renderAi } } } : d);
-    setSimpanRender(false);
-  }
-  function tambahRender() {
-    const url = urlBaru.trim();
-    if (!/^https:\/\/\S+$/i.test(url)) { setErr('Link render harus diawali https://'); return; }
-    const jenis = /\.(mp4|webm|mov)(\?|$)/i.test(url) ? 'video' as const : 'gambar' as const;
-    ubahRender(l => [...l, { url, jenis, judul: judulBaru.trim() || (jenis === 'video' ? 'Video render' : 'Render gudang'), dibuat: new Date().toISOString() }])
-      .then(() => { setUrlBaru(''); setJudulBaru(''); });
-  }
-
   useEffect(() => {
     sb.from('tenders').select('id, kode, customer, status, updated_at').order('updated_at', { ascending: false }).then(({ data: d, error }: { data: unknown[] | null; error: { message: string } | null }) => {
       if (error) setErr(error.message);
@@ -211,35 +187,10 @@ export default function SimulasiGudang() {
                   </ul>
                 </div>
               )}
-              <p className="small muted">Sumber data: Space (lebar gudang, rak, staging, fasilitas), Process design (MHE & manpower per shift), data gudang terpilih (jumlah dock). Ubah di halaman tender, lalu buka ulang simulasi.</p>
+              <p className="small muted">Material 3D (lantai epoxy, karton ber-stretch film, palet kayu, cladding, aspal, kontainer truk) dibuat dengan TapNow AI. Sumber data: Space (lebar gudang, rak, staging, fasilitas), Process design (MHE & manpower per shift), data gudang terpilih (jumlah dock). Ubah di halaman tender, lalu buka ulang simulasi.</p>
             </div>
           </div>
 
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <div><div className="eyebrow">Render AI · TapNow</div><h3 style={{ margin: 0 }}>Gambar & video render gudang</h3></div>
-              <a className="btn ghost" href="https://app.tapnow.ai/" target="_blank" rel="noreferrer">Buka TapNow</a>
-            </div>
-            <p className="small muted">Render fotorealistis (gaya Lumion) untuk presentasi customer, dibuat dari tata letak 3D di atas. Tempel link gambar / video hasil TapNow supaya tersimpan di project ini.</p>
-            {(data.t.asumsi.renderAi ?? []).length > 0 ? (
-              <div className="sim3d-galeri">
-                {(data.t.asumsi.renderAi ?? []).map((r, i) => (
-                  <figure key={`${r.url}-${i}`}>
-                    {r.jenis === 'video' ? <video src={r.url} controls preload="metadata" /> : <a href={r.url} target="_blank" rel="noreferrer"><img src={r.url} alt={r.judul} loading="lazy" /></a>}
-                    <figcaption className="row" style={{ justifyContent: 'space-between' }}>
-                      <span className="small">{r.judul} <span className="muted">· {new Date(r.dibuat).toLocaleDateString('id-ID')}</span></span>
-                      <button className="ghost" style={{ padding: '2px 8px' }} disabled={simpanRender} onClick={() => ubahRender(l => l.filter((_, j) => j !== i))} aria-label={`Hapus ${r.judul}`}>×</button>
-                    </figcaption>
-                  </figure>
-                ))}
-              </div>
-            ) : <p className="small muted">Belum ada render untuk project ini.</p>}
-            <div className="sim3d-pilih" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) auto', alignItems: 'end' }}>
-              <label className="f">Link gambar / video (https)<input value={urlBaru} onChange={e => setUrlBaru(e.target.value)} placeholder="https://…" /></label>
-              <label className="f">Judul<input value={judulBaru} onChange={e => setJudulBaru(e.target.value)} placeholder="mis. Tampak dock outbound" /></label>
-              <button onClick={tambahRender} disabled={simpanRender || !urlBaru.trim()}>Simpan</button>
-            </div>
-          </div>
         </>
       )}
     </>
