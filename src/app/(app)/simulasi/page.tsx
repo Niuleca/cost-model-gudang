@@ -57,7 +57,11 @@ export default function DesainGudang() {
   const [nama, setNama] = useState('Layout A');
   const [edit, setEditS] = useState<LayoutEdit | null>(null);
   const [kotor, setKotor] = useState(false);
-  const [pilih, setPilih] = useState<string | null>(null);
+  const [pilih, setPilihS] = useState<string | null>(null);
+  const [multi, setMultiS] = useState<string[]>([]);
+  const setPilih = useCallback((id: string | null) => { setPilihS(id); setMultiS([]); }, []);
+  /** Seleksi banyak: 1 id → jadi seleksi tunggal (panel properti), ≥ 2 → panel seleksi blok. */
+  const setMulti = useCallback((ids: string[]) => { if (ids.length === 1) { setPilihS(ids[0]); setMultiS([]); } else { setPilihS(null); setMultiS(ids); } }, []);
   const [mode, setMode] = useState<Mode>('pilih');
   const [grid, setGrid] = useState(0.1);
   const [snapTepi, setSnapTepi] = useState(true);
@@ -181,6 +185,12 @@ export default function DesainGudang() {
   const ubahArea = (p: Partial<SpekArea>) => ubahK(k => (k.area ? { ...k, area: { ...k.area, ...p } } : k));
   const ubahAreaRak = (p: Partial<SpekRak>) => ubahK(k => { if (!k.area) return k; const r = { ...k.area.rak, ...p }; return { ...k, tinggi: r2(tinggiRak(r)), area: { ...k.area, rak: r } }; });
   function hapus() { if (!pilih) return; aksi(e => ({ ...e, komponen: e.komponen.filter(k => k.id !== pilih) })); setPilih(null); }
+  function hapusBanyak() {
+    if (!multi.length) return; const set = new Set(multi); const n = multi.length;
+    aksi(e => ({ ...e, komponen: e.komponen.filter(k => !set.has(k.id)) })); setPilih(null);
+    setPesan(`${n} komponen dihapus · Ctrl+Z untuk membatalkan`);
+  }
+  const geserBanyak = (dx: number, dz: number) => { const set = new Set(multi); aksi(e => ({ ...e, komponen: e.komponen.map(k => (set.has(k.id) ? { ...k, x: k.jenis === 'dock' ? k.x : r2(k.x + dx), z: r2(k.z + dz) } : k)) })); };
   function gandakan(n = 1, jarak = 0, arah: 'x' | 'z' = 'z') {
     if (!terpilih) return;
     const salin: Komponen[] = [];
@@ -195,7 +205,15 @@ export default function DesainGudang() {
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return; }
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y') { ev.preventDefault(); redo(); return; }
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'd') { ev.preventDefault(); gandakan(); return; }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'a' && edit) { ev.preventDefault(); setMulti(edit.komponen.map(k => k.id)); return; }
       if (ev.key === 'Escape') { setPilih(null); setMode('pilih'); return; }
+      if (multi.length) {
+        if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); hapusBanyak(); return; }
+        const lang = ev.shiftKey ? 1 : grid || 0.1;
+        const d = ({ ArrowLeft: [-lang, 0], ArrowRight: [lang, 0], ArrowUp: [0, -lang], ArrowDown: [0, lang] } as Record<string, number[]>)[ev.key];
+        if (d) { ev.preventDefault(); geserBanyak(d[0], d[1]); }
+        return;
+      }
       if (!pilih) return;
       if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); hapus(); return; }
       if (ev.key.toLowerCase() === 'r') { ubahK(putar); return; }
@@ -359,7 +377,7 @@ export default function DesainGudang() {
           <div className="card sim2d-kiri">
             <div className="eyebrow">Mode</div>
             <div className="tabs">
-              {([['pilih', 'Pilih / geser'], ['geser', 'Pan'], ['ukur', 'Ukur jarak']] as [Mode, string][]).map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)}>{l}</button>)}
+              {([['pilih', 'Pilih / geser'], ['blok', 'Seleksi blok'], ['geser', 'Pan'], ['ukur', 'Ukur jarak']] as [Mode, string][]).map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)}>{l}</button>)}
             </div>
             <div className="grid2" style={{ gap: 6 }}>
               <label className="f">Snap grid
@@ -421,7 +439,7 @@ export default function DesainGudang() {
             <div className="eyebrow">Ekspor</div>
             <div className="row"><button className="ghost" onClick={unduhPng}>PNG denah</button><button className="ghost" onClick={unduhPdf}>PDF A3</button>
               <button className="ghost" onClick={() => { const u = api3.current?.screenshot(); if (u) { const a = document.createElement('a'); a.href = u; a.download = `${namaFile()}_3D.png`; a.click(); } }} disabled={tampil === '2d'}>PNG 3D</button></div>
-            <p className="small muted">Pintasan: Delete hapus · R putar · Ctrl+D gandakan · panah geser (Shift = 1 m) · Ctrl+Z / Ctrl+Y · scroll zoom · seret area kosong = pan.</p>
+            <p className="small muted">Pintasan: Seleksi blok / Shift + seret = pilih banyak (seret ke kanan = yang masuk penuh, ke kiri = yang tersentuh) · Shift/Ctrl + klik tambah/buang · Ctrl+A pilih semua · Delete hapus · R putar · Ctrl+D gandakan · panah geser (Shift = 1 m) · Ctrl+Z / Ctrl+Y · scroll zoom · seret area kosong = pan.</p>
           </div>
 
           {/* ---------- tengah: kanvas */}
@@ -451,7 +469,7 @@ export default function DesainGudang() {
             </div>
             <div className={`sim2d-kanvas ${tampil}`}>
               <div className="sim2d-panel2d" style={{ display: tampil === '3d' ? 'none' : undefined }}>
-                <Editor2D ref={ed2} edit={edit} pilih={pilih} setPilih={setPilih} mulaiAksi={mulaiAksi} ubah={ubah} mode={mode} grid={grid} snapTepi={snapTepi}
+                <Editor2D ref={ed2} edit={edit} pilih={pilih} setPilih={setPilih} multi={multi} setMulti={setMulti} mulaiAksi={mulaiAksi} ubah={ubah} mode={mode} grid={grid} snapTepi={snapTepi}
                   potong={potongan ? { sumbu: potongan.arah === 'depan' ? 'x' : 'z', nilai: potongan.nilai } : null} />
               </div>
               {tampil !== '2d' && layout3d && (
@@ -481,6 +499,23 @@ export default function DesainGudang() {
 
           {/* ---------- kanan: properti & kapasitas */}
           <div className="card sim2d-kanan">
+            {multi.length > 1 && (() => {
+              const set = new Set(multi); const dipilih = edit.komponen.filter(k => set.has(k.id));
+              const perJenis = new Map<string, number>(); for (const k of dipilih) perJenis.set(k.jenis, (perJenis.get(k.jenis) ?? 0) + 1);
+              const nama = (j: string) => PALET.find(p => p.jenis === j)?.label.split(' (')[0] ?? j;
+              return (<div className="sim2d-multi">
+                <div className="row" style={{ justifyContent: 'space-between' }}><div className="eyebrow">{dipilih.length} komponen terpilih</div><button className="ghost" style={{ padding: '2px 8px' }} onClick={() => setPilih(null)}>×</button></div>
+                <table className="sim3d-tabel"><tbody>
+                  {[...perJenis].map(([j, n]) => (<tr key={j}><td>{nama(j)}</td><td className="num">{n}</td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button className="ghost" style={{ padding: '1px 6px' }} title="Pilih hanya jenis ini" onClick={() => setMulti(dipilih.filter(k => k.jenis === j).map(k => k.id))}>hanya</button>
+                      <button className="ghost" style={{ padding: '1px 6px' }} title="Buang jenis ini dari seleksi" onClick={() => setMulti(dipilih.filter(k => k.jenis !== j).map(k => k.id))}>×</button>
+                    </td></tr>))}
+                </tbody></table>
+                <div className="row"><button className="danger" onClick={hapusBanyak}>Hapus {dipilih.length} komponen</button></div>
+                <p className="small muted" style={{ margin: 0 }}>Seret salah satu komponen bertanda oranye untuk menggeser semuanya, atau pakai tombol panah. Ctrl+Z membatalkan penghapusan.</p>
+              </div>);
+            })()}
             {terpilih ? (
               <>
                 <div className="row" style={{ justifyContent: 'space-between' }}><div className="eyebrow">Komponen terpilih</div><button className="ghost" style={{ padding: '2px 8px' }} onClick={() => setPilih(null)}>×</button></div>
@@ -588,7 +623,7 @@ export default function DesainGudang() {
                 </div>
                 <p className="small muted" style={{ margin: 0 }}>Garis oranye di denah = jarak bebas ke rintangan / dinding terdekat. Untuk lorong rak, isi jarak = lebar lorong (mis. 2 × corridor).</p>
               </>
-            ) : <p className="small muted">Klik komponen di denah untuk mengedit posisi, ukuran, tinggi, dan spesifikasinya.</p>}
+            ) : multi.length > 1 ? null : <p className="small muted">Klik komponen di denah untuk mengedit posisi, ukuran, tinggi, dan spesifikasinya. Untuk menghapus banyak sekaligus: mode <b>Seleksi blok</b> (atau Shift + seret), lalu Delete.</p>}
 
             <div className="eyebrow">Kapasitas (otomatis)</div>
             <table className="sim3d-tabel"><tbody>
