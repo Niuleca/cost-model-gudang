@@ -122,3 +122,14 @@ test('layout dari Desain gudang 2D ⇄ 3D (versi tersimpan) dipakai game: lokasi
   assert.deepEqual(d.pelanggaran, []);
   assert.ok(ringkasDunia(d).orderSelesai > 0);
 });
+
+test('red flag: gudang kekurangan orang memunculkan bottleneck/overload; skenario normal tanpa flag kritis operasional', async () => {
+  const { hitungRedFlag } = await import('../../src/lib/game/redflag');
+  const normal = buatDunia(skenarioDariTender(t, h, { seed: 4 })); jalankanHari(normal, 5);
+  const fn = hitungRedFlag(normal);
+  assert.ok(!fn.some(x => x.tingkat === 'kritis' && /^(ANTRE|UTIL|SLA|TERTUNDA)/.test(x.kode)), JSON.stringify(fn.map(x => x.kode)));
+  const sk = skenarioDariTender(t, h, { seed: 4 }); sk.permintaan.paletInHari *= 3; sk.permintaan.paletOutHari *= 3; sk.permintaan.orderHari *= 3;
+  const berat = buatDunia(sk); jalankanHari(berat, 3);
+  const fb = hitungRedFlag(berat).map(x => x.kode);
+  assert.ok(fb.some(k => /^(ANTRE|UTIL|LEMBUR|SLA|TERTUNDA|DOCK)/.test(k)), JSON.stringify(fb));
+});

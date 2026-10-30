@@ -3,14 +3,27 @@
 // (durasi tugas = productivity, dibagi fase: jalan ke ambil → ambil → bawa → taruh).
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { ARMADA, bertugas, jalankanSampai, jenisTrukDari, type Dunia, type JenisTruk, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
+import { ARMADA, bertugas, jalankanSampai, jenisTrukDari, type Dunia, type JenisTruk, type JenisTugas, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, type PasangLapisan } from '../Viewer3D';
 import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pinBersih, trukBersih, WARNA_BERSIH, type Animator } from '../model3d';
 import { WARNA_ORANG } from '../warna';
 
 export type Pilihan = { jenis: 'palet' | 'mhe' | 'pekerja' | 'truk' | 'order'; id: string };
-export interface KontrolGame { jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null }
+/** Data observasi untuk panel mode jelajah (ditulis lapisan, dibaca UI). */
+export interface Amatan {
+  id: string; jenis: 'pekerja' | 'mhe'; nama: string; jarak: number;
+  tugas: { id: string; jenis: JenisTugas; fase: string; langkah: number; f: number; durasiStd: number; berjalan: number; jarakJalur: number; kecepatan: number } | null;
+}
+/** Kecepatan gerak tersirat per jenis tugas = jarak jalur layout ÷ porsi waktu jalan dari durasi productivity. */
+export interface StatGerak { n: number; kecTotal: number; kecMaks: number; jarakTotal: number; olehOrang: number }
+export interface KontrolGame {
+  jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null;
+  jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean };
+  amatan: Amatan | null; statGerak: Partial<Record<JenisTugas, StatGerak>>;
+}
+export const LANGKAH_TUGAS = ['Jalan ke titik ambil', 'Ambil / angkat', 'Bawa ke tujuan', 'Taruh / turunkan'];
+export const LANGKAH_DIAM = ['Jalan ke lokasi kerja', 'Mengerjakan (cek / admin / packing)'];
 
 type V = THREE.Vector3;
 const v = (x: number, z: number, y = 0) => new THREE.Vector3(x, y, z);
@@ -54,11 +67,11 @@ function titikPada(pts: V[], f: number, out: V) {
   return out.copy(pts[pts.length - 1]);
 }
 
-interface Rencana { awal: V[]; bawa: V[]; angkatA: number; angkatB: number; bawaPalet: boolean; bawaKarton: boolean; diam: boolean; akhir: V }
+interface Rencana { jarak: number; awal: V[]; bawa: V[]; angkatA: number; angkatB: number; bawaPalet: boolean; bawaKarton: boolean; diam: boolean; akhir: V }
 interface Aktor { anim?: Animator; sebelum?: V; naik?: string; obj: THREE.Group; pos: V; rumah: V; tugas: string | null; rencana: Rencana | null; garpu?: THREE.Object3D; op?: THREE.Object3D; karton?: THREE.Object3D; lbl?: CSS2DObject }
 
 export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { current: KontrolGame }, onBerhenti: () => void, onPilih: (p: Pilihan | null) => void): PasangLapisan {
-  return ({ grup, kamera, kanvas, tema }) => {
+  return ({ grup, kamera, kanvas, tema, kontrolKamera }) => {
     const bersih = tema === 'bersih';
     const L = layout;
     const gPalet = new THREE.Group(), gTruk = new THREE.Group(), gOrang = new THREE.Group(), gMhe = new THREE.Group();
@@ -273,7 +286,16 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         default: A = tt(titikKantor.clone().add(v(((Number(tg.id.slice(1)) * 0.37) % 1) * 2 - 1, 0))); B = A; diam = true;
       }
       const awal = jalur({ p: dari.clone(), lo: lorongSlot(lorongRak, dari.x, dari.z), y: 0 }, A);
-      return { awal, bawa: diam ? [A.p.clone()] : jalur(A, B), angkatA: A.y, angkatB: B.y, bawaPalet, bawaKarton, diam, akhir: (diam ? A.p : B.p).clone() };
+      const bawa = diam ? [A.p.clone()] : jalur(A, B);
+      const panjang = (pts: V[]) => pts.reduce((a, q, i) => (i ? a + q.distanceTo(pts[i - 1]) : 0), 0);
+      const jarak = panjang(awal) + panjang(bawa);
+      // kecepatan tersirat: jalan = 78% durasi (tugas bawa) atau 15% (tugas di tempat)
+      if (tg.durasi && jarak > 0.5) {
+        const kec = jarak / (tg.durasi * (diam ? 0.15 : 0.78));
+        const sg = (kontrol.current.statGerak[tg.jenis] ??= { n: 0, kecTotal: 0, kecMaks: 0, jarakTotal: 0, olehOrang: 0 });
+        sg.n++; sg.kecTotal += kec; sg.kecMaks = Math.max(sg.kecMaks, kec); sg.jarakTotal += jarak; if (!tg.mhe) sg.olehOrang++;
+      }
+      return { jarak, awal, bawa, angkatA: A.y, angkatB: B.y, bawaPalet, bawaKarton, diam, akhir: (diam ? A.p : B.p).clone() };
     };
 
     const arah = new THREE.Vector3(), baru = new THREE.Vector3();
@@ -301,8 +323,88 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       return r.bawaPalet && f >= 0.32 ? 0.12 : 0.05;
     };
 
+    // ---------- mode jelajah: 1 karakter yang dikendalikan pemain
+    const pemain = (bersih ? orangBersih : modelOrang)('#0ea5e9'); pemain.name = 'pemain'; pemain.visible = false; grup.add(pemain);
+    const lblPemain = label('Anda', 'mhe'); lblPemain.position.set(0, 2.2, 0); pemain.add(lblPemain);
+    const tandaPemain = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.65, 32), new THREE.MeshBasicMaterial({ color: '#0ea5e9', transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+    tandaPemain.rotation.x = -Math.PI / 2; tandaPemain.position.y = 0.03; pemain.add(tandaPemain);
+    let animPemain: Animator | null = null;
+    if (bersih) pakaiPekerjaMeshy(pemain, 'diam', an => { animPemain = an; });
+    const posPemain = v(Math.min(L.stagingIn.x1 + 2.5, L.L - 1), L.W / 2);
+    pemain.position.copy(posPemain);
+    // rintangan: tapak rak & fasilitas (diperlebar 0,25 m)
+    const rintangan: { x0: number; x1: number; z0: number; z1: number }[] = [
+      ...L.rak.map(r => { const pj = r.nBay * r.bayW; return r.arah === 'z' ? { x0: r.x0, x1: r.x0 + r.depth, z0: r.z0, z1: r.z0 + pj } : { x0: r.x0, x1: r.x0 + pj, z0: r.z0, z1: r.z0 + r.depth }; }),
+      ...L.fasilitas.map(fa => ({ x0: fa.x0, x1: fa.x1, z0: fa.z0, z1: fa.z1 })),
+    ].map(b => ({ x0: b.x0 - 0.25, x1: b.x1 + 0.25, z0: b.z0 - 0.25, z1: b.z1 + 0.25 }));
+    const bebas = (x: number, z: number) => {
+      if (x < -30 || x > L.L - 0.3 || z < -12 || z > L.W + 12) return false;
+      if (x > 0.25) { if (z < 0.3 || z > L.W - 0.3) return false; return !rintangan.some(b => x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1); }
+      if (x > -0.25) return L.dock.some(dk => Math.abs(z - dk.z) < 1.5);   // dinding depan: hanya lewat pintu dock
+      return true;
+    };
+    const keyTombol = (e: KeyboardEvent, nilai: boolean) => {
+      const k2 = kontrol.current; if (!k2.jelajah) return;
+      const tg = e.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return;
+      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'kiri', arrowleft: 'kiri', d: 'kanan', arrowright: 'kanan', shift: 'lari' };
+      const t2 = peta[e.key.toLowerCase()]; if (!t2) return;
+      k2.tombol[t2] = nilai; e.preventDefault();
+    };
+    const keyTurun = (e: KeyboardEvent) => keyTombol(e, true), keyNaik = (e: KeyboardEvent) => keyTombol(e, false);
+    window.addEventListener('keydown', keyTurun); window.addEventListener('keyup', keyNaik);
+    let jelajahLalu = false;
+    const maju = new THREE.Vector3(), kanan = new THREE.Vector3(), langkahV = new THREE.Vector3();
+    const FASE = (r: Rencana, f: number) => (r.diam ? (f < 0.15 ? 0 : 1) : f < 0.22 ? 0 : f < 0.32 ? 1 : f < 0.88 ? 2 : 3);
+    const updateJelajah = (dt: number) => {
+      const k = kontrol.current;
+      pemain.visible = k.jelajah;
+      if (!k.jelajah) { if (jelajahLalu) { kontrolKamera.minDistance = 0; } jelajahLalu = false; k.amatan = null; return; }
+      if (!jelajahLalu) {
+        // masuk mode jelajah: kamera orang-ketiga di belakang pemain
+        kontrolKamera.target.set(posPemain.x, 1.5, posPemain.z);
+        kamera.position.set(posPemain.x - 7, 4.5, posPemain.z + 5); kontrolKamera.minDistance = 2.5;
+        jelajahLalu = true;
+      }
+      const t = k.tombol;
+      const gx = (t.kanan ? 1 : 0) - (t.kiri ? 1 : 0), gz = (t.maju ? 1 : 0) - (t.mundur ? 1 : 0);
+      const lama = posPemain.clone();
+      if (gx || gz) {
+        maju.subVectors(kontrolKamera.target, kamera.position); maju.y = 0; maju.normalize();
+        kanan.set(-maju.z, 0, maju.x);
+        langkahV.copy(maju).multiplyScalar(gz).addScaledVector(kanan, gx).normalize().multiplyScalar((t.lari ? 4.5 : 1.6) * Math.min(0.1, dt));
+        const nx = posPemain.x + langkahV.x, nz = posPemain.z + langkahV.z;
+        if (bebas(nx, posPemain.z)) posPemain.x = nx;
+        if (bebas(posPemain.x, nz)) posPemain.z = nz;
+        pemain.rotation.y = Math.atan2(-langkahV.z, langkahV.x);
+      }
+      const geser = posPemain.clone().sub(lama);
+      pemain.position.set(posPemain.x, 0, posPemain.z);
+      kamera.position.add(geser); kontrolKamera.target.add(geser);
+      animPemain?.main(gx || gz ? (t.lari ? 'lari' : 'jalan') : 'diam');
+      animPemain?.mixer.update(Math.min(0.1, dt));
+      // observasi: pekerja / MHE terdekat dalam 8 m
+      let terbaik: Amatan | null = null; let dMin = 8;
+      for (const p of d.pekerja) {
+        const a = orang.get(p.id); if (!a) continue;
+        const tg = p.sibuk ? d.tugas.get(p.sibuk) : undefined;
+        const posA = tg?.mhe ? mhe.get(tg.mhe)?.obj.position : a.obj.visible ? a.obj.position : undefined;
+        if (!posA) continue;
+        const jarak = Math.hypot(posA.x - posPemain.x, posA.z - posPemain.z); if (jarak > dMin) continue;
+        dMin = jarak;
+        let tugas: Amatan['tugas'] = null;
+        if (tg && a.rencana && tg.mulai != null && tg.durasi) {
+          const f = Math.max(0, Math.min(1, (d.t - tg.mulai) / tg.durasi)); const ix = FASE(a.rencana, f);
+          tugas = { id: tg.id, jenis: tg.jenis, fase: (a.rencana.diam ? LANGKAH_DIAM : LANGKAH_TUGAS)[ix], langkah: ix, f, durasiStd: tg.durasi, berjalan: d.t - tg.mulai, jarakJalur: a.rencana.jarak,
+            kecepatan: a.rencana.jarak / (tg.durasi * (a.rencana.diam ? 0.15 : 0.78)) };
+        }
+        terbaik = tg?.mhe ? { id: tg.mhe, jenis: 'mhe', nama: `${d.mhe.find(m => m.id === tg.mhe)?.nama ?? tg.mhe} · ${p.nama}`, jarak, tugas } : { id: p.id, jenis: 'pekerja', nama: p.nama, jarak, tugas };
+      }
+      k.amatan = terbaik;
+    };
+
     let tLalu = d.t;
     const frame = (dt: number) => {
+      updateJelajah(dt);
       detikNyata += dt;
       const k = kontrol.current;
       if (k.jalan && d.t < k.batas) {
@@ -426,7 +528,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       frame,
       buang: () => {
         kanvas.removeEventListener('pointerdown', saatTurun); kanvas.removeEventListener('pointerup', saatNaik);
-        grup.remove(pin);
+        window.removeEventListener('keydown', keyTurun); window.removeEventListener('keyup', keyNaik);
+        grup.remove(pin, pemain); lblPemain.element.remove();
         grup.remove(gPalet, gTruk, gOrang, gMhe);
         grup.traverse(o => { if (o instanceof CSS2DObject) o.element.remove(); });
         for (const g of [gPalet, gTruk, gOrang, gMhe]) g.traverse(o => { if (o instanceof CSS2DObject) o.element.remove(); const m = o as THREE.Mesh; m.geometry?.dispose?.(); });

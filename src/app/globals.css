@@ -457,6 +457,37 @@ tr.kat-link:hover td { background: var(--res); }
   .game-layar { overflow: visible; }
   .gm-tombol-panel, .game-layar:not(.tanpa-panel) .gm-tombol-panel { position: static; margin-top: 8px; }
 }
+/* Leca Game: mode jelajah, observasi, red flag, tab bawah */
+.gm-amati { position: absolute; top: 12px; right: 12px; width: 360px; max-height: calc(100% - 24px); overflow: auto; padding: 14px; display: grid; gap: 8px; z-index: 2; }
+.gm-amati .gm-judul { display: flex; align-items: center; gap: 6px; }
+.gm-amati-nama { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.gm-langkah-list { margin: 0; padding-left: 20px; display: grid; gap: 3px; font-size: 12.5px; }
+.gm-langkah-list li { color: #94a3b8; }
+.gm-langkah-list li.lewat { color: #15803d; }
+.gm-langkah-list li.kini { color: #1d4ed8; font-weight: 600; }
+.gm-catat { display: grid; gap: 6px; border-top: 1px solid #eef2f7; padding-top: 8px; }
+.gm-catat .sim3d-tabel { font-size: 12px; }
+.gm-dpad { position: absolute; left: 16px; bottom: 16px; display: grid; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); gap: 4px; z-index: 2; touch-action: none; user-select: none; }
+.gm-dpad button { padding: 0; font-size: 18px; border-radius: 12px; background: rgba(255,255,255,.9); box-shadow: 0 2px 8px rgba(15,23,42,.12); }
+.gm-dpad button:active { background: #dbeafe; }
+.gm-dpad .atas { grid-column: 2; grid-row: 1; } .gm-dpad .kiri { grid-column: 1; grid-row: 2; }
+.gm-dpad .kanan { grid-column: 3; grid-row: 2; } .gm-dpad .bawah { grid-column: 2; grid-row: 3; }
+.gm-dpad .lari { grid-column: 3; grid-row: 3; font-size: 11px; font-weight: 600; }
+.gm-petunjuk { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); margin: 0; padding: 4px 12px; border-radius: 999px; background: rgba(15,23,42,.7); color: #fff; z-index: 2; pointer-events: none; white-space: nowrap; }
+.gm-flag-tombol.kritis { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+.gm-pill.kritis { background: #fee2e2; color: #b91c1c; }
+.game-tab-bawah { margin-top: 12px; flex-wrap: wrap; }
+.game-bawah-isi { margin-top: 8px; }
+.gm-flag-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.gm-flag { border: 1px solid var(--line); border-left: 4px solid #94a3b8; border-radius: 10px; padding: 10px 12px; background: var(--white); }
+.gm-flag.kritis { border-left-color: #dc2626; } .gm-flag.peringatan { border-left-color: #f59e0b; }
+.gm-flag .kepala { display: flex; gap: 8px; align-items: center; }
+.gm-flag p { margin: 6px 0 0; }
+@media (max-width: 900px) {
+  .gm-amati { position: static; width: auto; max-height: none; margin-top: 8px; }
+  .gm-petunjuk { display: none; }
+  .gm-flag-list { grid-template-columns: 1fr; }
+}
 .sim2d-detail { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .sim2d-detail summary { cursor: pointer; list-style: revert; }
 .sim2d-param { display: grid; gap: 6px; margin-top: 6px; }

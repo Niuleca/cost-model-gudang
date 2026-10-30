@@ -14,7 +14,7 @@ export interface ViewerApi { kamera: (k: Kamera) => void; screenshot: () => stri
 export interface Kecepatan { faktor: number; siklus: Record<string, number> }
 export interface OpsiViewer { atap: boolean; dinding: boolean; label: boolean; animasi: boolean; truk: boolean; orang: boolean }
 /** Lapisan dinamis (mis. Leca Game): dipasang setelah adegan statis dibangun; frame() dipanggil tiap frame dengan dt detik nyata. */
-export interface KonteksLapisan { scene: THREE.Scene; grup: THREE.Group; layout: LayoutGudang; kamera: THREE.PerspectiveCamera; kanvas: HTMLCanvasElement; tema: TemaViewer }
+export interface KonteksLapisan { scene: THREE.Scene; grup: THREE.Group; layout: LayoutGudang; kamera: THREE.PerspectiveCamera; kanvas: HTMLCanvasElement; tema: TemaViewer; kontrolKamera: OrbitControls }
 export type PasangLapisan = (k: KonteksLapisan) => { frame: (dt: number) => void; buang: () => void };
 /** Tema tampilan: standar (material foto TapNow) atau bersih (isometrik, warna solid lembut, atap biru). */
 export type TemaViewer = 'standar' | 'bersih';
@@ -379,7 +379,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     const lama = s.grup.game; if (lama) { scene.remove(lama); lama.traverse(o => { if (o instanceof CSS2DObject) o.element.remove(); }); }
     if (!lapisanRef.current) return;
     const g = new THREE.Group(); g.name = 'game'; scene.add(g); s.grup.game = g;
-    s.lap = lapisanRef.current({ scene, grup: g, layout, kamera: s.cam, kanvas: s.renderer!.domElement, tema: temaRef.current });
+    s.lap = lapisanRef.current({ scene, grup: g, layout, kamera: s.cam, kanvas: s.renderer!.domElement, tema: temaRef.current, kontrolKamera: s.ctl! });
     terapkanOpsi();
   }
 

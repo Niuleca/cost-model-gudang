@@ -58,6 +58,7 @@ export interface Truk {
   order: string[];                         // outbound: order yang dimuat
   sisaTugas: number;
   berangkat?: number;
+  masukDock?: number;                     // waktu mulai sandar di dock
 }
 
 export interface BarisOrder { sku: string; karton: number; teralokasi: number; terpick: number }
@@ -80,6 +81,7 @@ export interface Tugas {
   status: StatusTugas;
   lpn?: string; order?: string; truk?: string; ke?: string; barisAsn?: BarisAsn;
   pekerja?: string; mhe?: string; mulai?: number; selesai?: number; durasi?: number;
+  akhirShift?: number;                      // akhir shift pekerja saat tugas dimulai (untuk hitung lembur)
   dibuat: number;
 }
 
@@ -157,7 +159,16 @@ export interface Dunia {
   hariKasNegatif: number;
   bangkrut: boolean;
   pelanggaran: string[];
+  /** statistik kumulatif untuk red flag & observasi */
+  stat: StatSim;
 }
 
 export interface EventSim { t: number; seq: number; jenis: 'truk_tiba' | 'tugas_selesai' | 'shift' | 'order_baru' | 'akhir_hari' | 'awal_hari' | 'bayar'; ref?: string }
 export interface AntrianEvent { push: (e: EventSim) => void; pop: () => EventSim | undefined; peek: () => EventSim | undefined; size: () => number }
+
+export interface StatSim {
+  lemburJam: number;                                     // jam kerja melewati akhir shift
+  tungguTruk: { n: number; jam: number; maks: number };  // tunggu dari tiba sampai sandar di dock
+  selesai: Partial<Record<JenisTugas, { n: number; jam: number }>>;
+  jamTersedia: number;                                   // jam-orang tersedia (pekerja hadir × jam shift), untuk utilisasi
+}

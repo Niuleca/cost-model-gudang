@@ -35,6 +35,7 @@ export function buatDunia(sk: Skenario): Dunia {
     antrian: buatAntrian(), seq: 0,
     kas: sk.modal, piutang: [], akrual: { pendapatan: 0, biaya: 0 },
     hariIni: kosongHari(), laporan: [], hariKasNegatif: 0, bangkrut: false, pelanggaran: [],
+    stat: { lemburJam: 0, tungguTruk: { n: 0, jam: 0, maks: 0 }, selesai: {}, jamTersedia: 0 },
   };
   stokAwal(d);
   jadwal(d, 0, 'awal_hari');
@@ -48,6 +49,12 @@ const hariKe = (t: number) => Math.floor(t / HARI);
 const tanggal = (d: Dunia, t: number) => tanggalHari(d.sk.mulai, hariKe(t));
 const hariOperasi = (d: Dunia, hari: number) => hari >= 0 && d.sk.hariKerja.includes(hariMinggu(tanggalHari(d.sk.mulai, hari)));
 const mulaiShift = (d: Dunia, hari: number, s: number) => hari * HARI + (d.sk.shift.mulaiJam + s * d.sk.shift.jamKerja) * JAM;
+/** Akhir shift yang sedang berjalan (atau t bila di luar shift). */
+function akhirShift(d: Dunia, shift: number, t: number) {
+  const h = hariKe(t);
+  for (const k of [h, h - 1]) { const s = mulaiShift(d, k, shift); if (t >= s && t < s + d.sk.shift.jamKerja * JAM) return s + d.sk.shift.jamKerja * JAM; }
+  return t;
+}
 export function bertugas(d: Dunia, shift: number, t: number) {
   const h = hariKe(t);
   for (const k of [h, h - 1]) {
@@ -184,6 +191,7 @@ function jadwalkan(d: Dunia) {
     const p = bebas.splice(pk, 1)[0];
     tg.status = 'jalan'; tg.pekerja = p.id; tg.mulai = d.t; tg.durasi = durasi(d, tg); tg.selesai = d.t + tg.durasi;
     p.sibuk = tg.id; if (alat) { alat.sibuk = tg.id; tg.mhe = alat.id; }
+    tg.akhirShift = akhirShift(d, p.shift, d.t);
     d.menunggu.delete(tg.id);
     jadwal(d, tg.selesai, 'tugas_selesai', tg.id);
   }
@@ -193,7 +201,8 @@ function jadwalkan(d: Dunia) {
 function dockkan(d: Dunia, tr: Truk) {
   const dk = d.dock.find(x => x.arus === tr.arus && !x.truk);
   if (!dk) { tr.status = 'antre'; d.antreDock[tr.arus].push(tr.id); return; }
-  dk.truk = tr.id; tr.dock = dk.id; tr.status = 'di_dock';
+  dk.truk = tr.id; tr.dock = dk.id; tr.status = 'di_dock'; tr.masukDock = d.t;
+  const tunggu = Math.max(0, d.t - tr.tiba) / JAM; const st = d.stat.tungguTruk; st.n++; st.jam += tunggu; st.maks = Math.max(st.maks, tunggu);
   if (tr.arus === 'inbound') {
     const pr = d.t + 4 * JAM;
     tugasBaru(d, 'admin_in', 1, pr, { truk: tr.id });
@@ -259,6 +268,7 @@ function awalHari(d: Dunia) {
   d.hariIni = kosongHari();
   for (const p of d.pekerja) { p.absen = d.rng() < sk.peluang.absenPerOrang; }
   const absen = d.pekerja.filter(p => p.absen).length;
+  if (hariOperasi(d, h)) d.stat.jamTersedia += d.pekerja.filter(p => !p.absen && p.kemampuan).length * sk.shift.jamKerja;
   if (absen && hariOperasi(d, h)) d.hariIni.kejadian.push(`${absen} pekerja tidak masuk.`);
   if (hariOperasi(d, h)) {
     for (let s = 0; s < sk.shift.jumlah; s++) jadwal(d, mulaiShift(d, h, s), 'shift');
@@ -326,6 +336,8 @@ function orderBaru(d: Dunia, shift: number) {
 function tugasSelesai(d: Dunia, tg: Tugas) {
   tg.status = 'selesai';
   const p = d.pekerja.find(x => x.id === tg.pekerja); if (p) { p.sibuk = null; p.jamKerja += (tg.durasi ?? 0) / JAM; }
+  if (tg.akhirShift != null && d.t > tg.akhirShift) d.stat.lemburJam += (d.t - Math.max(tg.akhirShift, tg.mulai ?? d.t)) / JAM;
+  const sj = (d.stat.selesai[tg.jenis] ??= { n: 0, jam: 0 }); sj.n++; sj.jam += (tg.durasi ?? 0) / JAM;
   const m = d.mhe.find(x => x.id === tg.mhe); if (m) { m.sibuk = null; m.jamKerja += (tg.durasi ?? 0) / JAM; }
   const sk = d.sk; const tr = tg.truk ? d.truk.get(tg.truk) : undefined; const o = tg.order ? d.order.get(tg.order) : undefined;
   switch (tg.jenis) {
