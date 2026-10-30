@@ -122,6 +122,41 @@ export function putar(k: Komponen): Komponen {
   return n;
 }
 
+/**
+ * Tarik rak otomatis: setiap baris rak dipanjangkan (atau dipendekkan) searah barisnya sampai rintangan terdekat
+ * (komponen lain yang sejajar: jalur, staging, block, office, rak lain, kolom, zona) atau dinding dikurangi jarak bebas,
+ * lalu dibulatkan ke kelipatan bay penuh. Rak arah X (memanjang menjauhi dock) tetap di titik awalnya dan ditarik ke dinding belakang;
+ * rak arah Z ditarik ke dua sisi. Rak diproses berurutan sehingga rak segaris tidak saling tumpang.
+ */
+export function tarikRak(e: LayoutEdit, opsi: { ids?: string[]; jarakDinding: number }): { edit: LayoutEdit; n: number; bayAwal: number; bayAkhir: number; posAwal: number; posAkhir: number } {
+  const g = e.gedung; const m = Math.max(0, opsi.jarakDinding);
+  const komp = e.komponen.map(k => ({ ...k }));
+  let n = 0, bayAwal = 0, bayAkhir = 0, posAwal = 0, posAkhir = 0;
+  for (const k of komp) {
+    if (!k.rak || (opsi.ids && !opsi.ids.includes(k.id))) continue;
+    const s = k.rak; const ax = s.arah === 'x';
+    // sumbu sepanjang baris (a) & melintang (b)
+    const a0 = ax ? k.x : k.z, b0 = ax ? k.z : k.x, lb = ax ? k.d : k.w, batas = ax ? g.L : g.W;
+    let mulai = m, akhir = batas - m;
+    for (const o of komp) {
+      if (o.id === k.id || o.jenis === 'dock') continue;
+      const oa = ax ? o.x : o.z, op = ax ? o.w : o.d, ob = ax ? o.z : o.x, ol = ax ? o.d : o.w;
+      if (!(ob < b0 + lb - EPS && b0 < ob + ol - EPS)) continue;      // tidak sejajar dengan baris ini
+      if (oa + op <= a0 + EPS) mulai = Math.max(mulai, oa + op);      // di belakang titik awal
+      else if (oa > a0 + EPS) akhir = Math.min(akhir, oa);             // di depan (termasuk yang sekarang tertabrak)
+      else akhir = Math.min(akhir, a0);                                 // tumpang di titik awal → tidak bisa ditarik
+    }
+    const awal = ax ? a0 : mulai;                                       // arah X: tetap di titik awal
+    const nb = Math.floor((akhir - awal) / s.bayW + 1e-6);
+    const nbLama = nBay(k), kapLama = kapasitasRak(k);
+    if (nb < 1) continue;
+    const pjBaru = r2(nb * s.bayW);
+    if (ax) { k.x = r2(awal); k.w = pjBaru; } else { k.z = r2(awal); k.d = pjBaru; }
+    n++; bayAwal += nbLama; bayAkhir += nb; posAwal += kapLama; posAkhir += kapasitasRak(k);
+  }
+  return { edit: { ...e, komponen: komp }, n, bayAwal, bayAkhir, posAwal, posAkhir };
+}
+
 const solid = (k: Komponen) => ['spr', 'ddr', 'block', 'fasilitas', 'kolom'].includes(k.jenis);
 const EPS = 0.02;   // toleransi pembulatan (cm)
 const tumpang = (a: Komponen, b: Komponen) => a.x < b.x + b.w - EPS && b.x < a.x + a.w - EPS && a.z < b.z + b.d - EPS && b.z < a.z + a.d - EPS;

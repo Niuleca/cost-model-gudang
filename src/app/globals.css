@@ -488,6 +488,9 @@ tr.kat-link:hover td { background: var(--res); }
   .gm-petunjuk { display: none; }
   .gm-flag-list { grid-template-columns: 1fr; }
 }
+.sim2d-tarik { display: grid; gap: 4px; }
+.sim2d-tarik label { display: flex; align-items: center; gap: 6px; color: var(--g700); }
+.sim2d-tarik input { width: 64px; padding: 3px 6px; }
 .sim2d-detail { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .sim2d-detail summary { cursor: pointer; list-style: revert; }
 .sim2d-param { display: grid; gap: 6px; margin-top: 6px; }

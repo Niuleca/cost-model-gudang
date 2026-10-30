@@ -11,7 +11,7 @@ import { ASUMSI_DEFAULT, keInput, muatMaster, type TenderRow } from '@/lib/tende
 import { IT_SHEET_DEFAULT } from '@/lib/it';
 import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import { paramAwal, susunLayout, type LayoutGudang, type ParamSim } from '@/lib/simulasi3d/layout';
-import { dariOtomatis, keLayoutGudang, komponenBaru, levelDariTinggi, nBay, pasanganRak, putar, ringkas, tinggiRak, uid, kapasitasRak, tapakBlok, dimRak,
+import { dariOtomatis, tarikRak, keLayoutGudang, komponenBaru, levelDariTinggi, nBay, pasanganRak, putar, ringkas, tinggiRak, uid, kapasitasRak, tapakBlok, dimRak,
   type JenisKomp, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 import { bacaDxf } from '@/lib/simulasi3d/dxf';
 import { labelStatus } from '@/lib/status';
@@ -62,6 +62,7 @@ export default function DesainGudang() {
   const [err, setErr] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [lapis, setLapis] = useState({ n: 2, jarak: 0, arah: 'z' as 'x' | 'z' });
+  const [jarakDinding, setJarakDinding] = useState(0.5);
   const [param, setParam] = useState<ParamSim | null>(null);
   const [opsi3d, setOpsi3d] = useState<OpsiViewer>({ atap: false, dinding: true, label: true, animasi: true, truk: true, orang: true });
   const riwayat = useRef<{ lalu: LayoutEdit[]; depan: LayoutEdit[] }>({ lalu: [], depan: [] });
@@ -118,6 +119,16 @@ export default function DesainGudang() {
   const kec = useMemo(() => ({ faktor: 10, siklus: {} }), []);
 
   const terpilih = edit?.komponen.find(k => k.id === pilih) ?? null;
+  /** Tarik rak otomatis: rak terpilih saja (kalau yang dipilih rak), selain itu semua rak. */
+  const tarik = (hanyaTerpilih: boolean) => {
+    if (!edit) return;
+    const ids = hanyaTerpilih && pilih ? [pilih] : undefined;
+    const h = tarikRak(edit, { ids, jarakDinding });
+    if (!h.n) { setPesan('Tidak ada rak yang bisa ditarik — ujung rak sudah menempel rintangan atau dinding.'); return; }
+    aksi(() => h.edit);
+    const sel = (a: number, b: number) => `${b - a >= 0 ? '+' : ''}${(b - a).toLocaleString('id-ID')}`;
+    setPesan(`${h.n} baris rak ditarik: ${h.bayAwal.toLocaleString('id-ID')} → ${h.bayAkhir.toLocaleString('id-ID')} bay (${sel(h.bayAwal, h.bayAkhir)}), kapasitas ${h.posAwal.toLocaleString('id-ID')} → ${h.posAkhir.toLocaleString('id-ID')} posisi (${sel(h.posAwal, h.posAkhir)}).`);
+  };
   const ubahK = (f: (k: Komponen) => Komponen) => { if (!pilih) return; aksi(e => ({ ...e, komponen: e.komponen.map(k => (k.id === pilih ? f(k) : k)) })); };
 
   function tambah(j: (typeof PALET)[number]['jenis']) {
@@ -311,6 +322,10 @@ export default function DesainGudang() {
               <button className="ghost" onClick={undo} title="Ctrl+Z">↶ Undo</button><button className="ghost" onClick={redo} title="Ctrl+Y">↷ Redo</button>
               <button className="ghost" onClick={() => ed2.current?.pasFit()}>Pas layar</button>
             </div>
+            <div className="sim2d-tarik">
+              <button type="button" onClick={() => tarik(false)} title="Panjangkan semua baris rak sampai rintangan / dinding terdekat; jumlah bay & kapasitas menyesuaikan">↔ Tarik rak otomatis</button>
+              <label className="small">Jarak ke dinding <input type="number" min={0} step={0.1} value={jarakDinding} onChange={e => setJarakDinding(Math.max(0, Number(e.target.value) || 0))} /> m</label>
+            </div>
             <div className="eyebrow">Tambah komponen</div>
             <div className="sim2d-palet">
               {PALET.map(p => (
@@ -430,6 +445,7 @@ export default function DesainGudang() {
                 {['fasilitas', 'kolom', 'dock'].includes(terpilih.jenis) && <Angka l="Tinggi" u="m" step={0.1} v={terpilih.tinggi} set={x => ubahK(k => ({ ...k, tinggi: Math.max(0.1, x) }))} />}
                 {terpilih.jenis === 'zona' && <label className="f">Warna<input type="color" value={terpilih.warna ?? '#0ea5e9'} onChange={e => ubahK(k => ({ ...k, warna: e.target.value }))} /></label>}
                 <div className="row">
+                  {terpilih.rak && <button className="ghost" onClick={() => tarik(true)} title="Panjangkan rak ini sampai rintangan / dinding terdekat">↔ Tarik otomatis</button>}
                   <button className="ghost" onClick={() => ubahK(putar)}>Putar 90°</button>
                   <button className="ghost" onClick={() => gandakan()}>Gandakan</button>
                   <button className="ghost danger" onClick={hapus}>Hapus</button>
