@@ -2,13 +2,13 @@
 // Editor denah 2D (SVG): tampak atas, X = panjang gudang (dock di kiri), Z = lebar gudang (ke bawah).
 // Pilih, geser (drag), ubah ukuran (handle), ukur jarak, garis ukur otomatis ke rintangan / dinding, latar denah gambar / DXF.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { dimRak, jarakBebas, nBay, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { dimRak, jarakBebas, nBay, ringkasArea, uraiArea, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 
 export type Mode = 'pilih' | 'ukur' | 'geser';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
 
 export const WARNA_KOMP: Record<string, { isi: string; garis: string }> = {
-  spr: { isi: '#dbe7f7', garis: '#1e56a0' }, ddr: { isi: '#cbd8ee', garis: '#173f78' }, block: { isi: '#f3e3c8', garis: '#a16207' },
+  spr: { isi: '#dbe7f7', garis: '#1e56a0' }, areaRak: { isi: '#f1f6fd', garis: '#1e56a0' }, ddr: { isi: '#cbd8ee', garis: '#173f78' }, block: { isi: '#f3e3c8', garis: '#a16207' },
   stagingIn: { isi: '#dbeafe', garis: '#2563eb' }, stagingOut: { isi: '#d1fae5', garis: '#059669' }, fasilitas: { isi: '#ede9fe', garis: '#6d28d9' },
   dock: { isi: '#1f2937', garis: '#111827' }, kolom: { isi: '#475569', garis: '#1e293b' }, jalur: { isi: '#fef3c7', garis: '#d97706' }, zona: { isi: '#e0f2fe', garis: '#0284c7' },
 };
@@ -24,9 +24,11 @@ interface Props {
   edit: LayoutEdit; pilih: string | null; setPilih: (id: string | null) => void;
   mulaiAksi: () => void; ubah: (f: (e: LayoutEdit) => LayoutEdit) => void;
   mode: Mode; grid: number; snapTepi: boolean;
+  /** Garis potong untuk view potongan (sumbu tetap & nilainya, m). */
+  potong?: { sumbu: 'x' | 'z'; nilai: number } | null;
 }
 
-const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih, setPilih, mulaiAksi, ubah, mode, grid, snapTepi }, ref) {
+const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih, setPilih, mulaiAksi, ubah, mode, grid, snapTepi, potong }, ref) {
   const svg = useRef<SVGSVGElement>(null);
   const [view, setView] = useState({ x: -5, z: -5, w: 100 });     // viewBox: kiri, atas, lebar (m)
   const [ukuran, setUkuran] = useState({ w: 800, h: 500 });
@@ -148,27 +150,40 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     );
   };
 
+  /** Bay & muka lorong satu baris rak. */
+  const gambarRak = (k: Komponen, garis: string, kunci: string) => {
+    const el: React.ReactNode[] = []; if (!k.rak) return el;
+    const n = nBay(k); const { dalam } = dimRak(k);
+    for (let b = 1; b < n; b++) el.push(k.rak.arah === 'x'
+      ? <line key={`${kunci}b${b}`} x1={k.x + b * k.rak.bayW} y1={k.z} x2={k.x + b * k.rak.bayW} y2={k.z + dalam} stroke={garis} strokeWidth={fs * 0.04} />
+      : <line key={`${kunci}b${b}`} x1={k.x} y1={k.z + b * k.rak.bayW} x2={k.x + dalam} y2={k.z + b * k.rak.bayW} stroke={garis} strokeWidth={fs * 0.04} />);
+    // muka lorong: garis oranye (beam) di sisi hadap
+    const muka = k.rak.arah === 'x' ? (k.rak.hadap === 1 ? [k.x, k.z + k.d, k.x + k.w, k.z + k.d] : [k.x, k.z, k.x + k.w, k.z]) : (k.rak.hadap === 1 ? [k.x + k.w, k.z, k.x + k.w, k.z + k.d] : [k.x, k.z, k.x, k.z + k.d]);
+    el.push(<line key={`${kunci}muka`} x1={muka[0]} y1={muka[1]} x2={muka[2]} y2={muka[3]} stroke="#f97316" strokeWidth={fs * 0.2} />);
+    return el;
+  };
+
   const gambarKomp = (k: Komponen) => {
     const w = WARNA_KOMP[k.jenis] ?? WARNA_KOMP.zona; const dipilih = k.id === pilih;
     const isi = k.warna ?? w.isi;
     const el: React.ReactNode[] = [];
     el.push(<rect key="r" x={k.x} y={k.z} width={k.w} height={k.d} fill={k.jenis === 'jalur' ? 'url(#arsir)' : isi} fillOpacity={k.jenis === 'zona' ? 0.5 : 1}
-      stroke={dipilih ? '#f97316' : w.garis} strokeWidth={dipilih ? fs * 0.18 : fs * 0.07} strokeDasharray={k.jenis === 'jalur' || k.jenis === 'zona' ? `${fs * 0.4} ${fs * 0.25}` : undefined} />);
-    if (k.rak) {
-      const n = nBay(k); const { dalam } = dimRak(k);
-      for (let b = 1; b < n; b++) el.push(k.rak.arah === 'x'
-        ? <line key={`b${b}`} x1={k.x + b * k.rak.bayW} y1={k.z} x2={k.x + b * k.rak.bayW} y2={k.z + dalam} stroke={w.garis} strokeWidth={fs * 0.04} />
-        : <line key={`b${b}`} x1={k.x} y1={k.z + b * k.rak.bayW} x2={k.x + dalam} y2={k.z + b * k.rak.bayW} stroke={w.garis} strokeWidth={fs * 0.04} />);
-      // muka lorong: garis oranye (beam) di sisi hadap
-      const muka = k.rak.arah === 'x' ? (k.rak.hadap === 1 ? [k.x, k.z + k.d, k.x + k.w, k.z + k.d] : [k.x, k.z, k.x + k.w, k.z]) : (k.rak.hadap === 1 ? [k.x + k.w, k.z, k.x + k.w, k.z + k.d] : [k.x, k.z, k.x, k.z + k.d]);
-      el.push(<line key="muka" x1={muka[0]} y1={muka[1]} x2={muka[2]} y2={muka[3]} stroke="#f97316" strokeWidth={fs * 0.2} />);
+      stroke={dipilih ? '#f97316' : w.garis} strokeWidth={dipilih ? fs * 0.18 : fs * 0.07} strokeDasharray={k.jenis === 'jalur' || k.jenis === 'zona' || k.jenis === 'areaRak' ? `${fs * 0.4} ${fs * 0.25}` : undefined} />);
+    el.push(...gambarRak(k, w.garis, ''));
+    if (k.area) {
+      const sub = WARNA_KOMP[k.area.jenisRak];
+      for (const r of uraiArea(k)) {
+        el.push(<rect key={`${r.id}r`} x={r.x} y={r.z} width={r.w} height={r.d} fill={sub.isi} stroke={sub.garis} strokeWidth={fs * 0.06} />);
+        el.push(...gambarRak(r, sub.garis, r.id));
+      }
     }
     if (k.jenis === 'dock') el.push(<path key="p" d={`M ${k.x + k.w} ${k.z + k.d / 2} l ${fs * 0.9} ${-fs * 0.5} l 0 ${fs} z`} fill={k.arus === 'outbound' ? '#059669' : '#2563eb'} />);
-    const label = k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? `${k.label} · tumpuk ${k.tumpuk ?? 1}` : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.label;
+    const ra = k.area ? ringkasArea(k) : null;
+    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? `${k.label} · tumpuk ${k.tumpuk ?? 1}` : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.label;
     const muat = Math.max(k.w, k.d) > label.length * fs * 0.45 || dipilih;
     if (muat && k.jenis !== 'kolom') {
-      const tegak = k.d > k.w * 1.6 && k.jenis !== 'dock';
-      const cx = k.jenis === 'dock' ? k.x - fs * 0.4 : k.x + k.w / 2, cz = k.z + k.d / 2;
+      const tegak = k.d > k.w * 1.6 && k.jenis !== 'dock' && !k.area;
+      const cx = k.jenis === 'dock' ? k.x - fs * 0.4 : k.x + k.w / 2, cz = k.area ? k.z - fs * 0.55 : k.z + k.d / 2;
       el.push(<text key="t" x={cx} y={cz} fontSize={fs * 0.8} textAnchor={k.jenis === 'dock' ? 'end' : 'middle'} dominantBaseline="middle" fill="#0f172a"
         transform={tegak ? `rotate(-90 ${cx} ${cz})` : undefined} style={{ paintOrder: 'stroke', stroke: '#ffffffcc', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>{label}</text>);
     }
@@ -227,6 +242,16 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         </g>
       )}
       {terpilih && mode === 'pilih' && handle(terpilih)}
+      {/* garis potong (view potongan) */}
+      {potong && (() => {
+        const [x1, z1, x2, z2] = potong.sumbu === 'z' ? [-1, potong.nilai, g.L + 1, potong.nilai] : [potong.nilai, -1, potong.nilai, g.W + 1];
+        return (
+          <g data-ekspor="tidak" style={{ pointerEvents: 'none' }}>
+            <line x1={x1} y1={z1} x2={x2} y2={z2} stroke="#dc2626" strokeWidth={fs * 0.12} strokeDasharray={`${fs * 0.8} ${fs * 0.3} ${fs * 0.15} ${fs * 0.3}`} />
+            <text x={x1 + (potong.sumbu === 'z' ? fs * 0.3 : fs * 0.3)} y={z1 + (potong.sumbu === 'z' ? -fs * 0.35 : fs * 1.2)} fontSize={fs * 0.8} fill="#dc2626" fontWeight={700}>Potongan {potong.sumbu === 'z' ? `Z = ${f1(potong.nilai)} m` : `X = ${f1(potong.nilai)} m`}</text>
+          </g>
+        );
+      })()}
       {kursor && <text data-ekspor="tidak" x={view.x + fs * 0.5} y={view.z + tinggiView - fs * 0.6} fontSize={fs * 0.75} fill="#64748b">x {f1(kursor.x)} m · z {f1(kursor.z)} m</text>}
     </svg>
   );

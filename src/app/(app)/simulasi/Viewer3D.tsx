@@ -1,6 +1,6 @@
 'use client';
 // Viewer 3D gudang (three.js): bangunan, dock & truk, rak SPR/DDR, palet, staging, fasilitas, MHE bergerak, manpower per shift.
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
@@ -104,7 +104,8 @@ export function modelTruk(arus: 'inbound' | 'outbound') {
 
 interface Gerak { obj: THREE.Object3D; a: THREE.Vector3; b: THREE.Vector3; kunci: string; siklusAwal: number; fase: number; garpu?: THREE.Object3D; angkat?: number }
 
-const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; opsi: OpsiViewer; kecepatan: Kecepatan; lapisan?: PasangLapisan; tema?: TemaViewer }>(function Viewer3D({ layout, shift, opsi, kecepatan, lapisan, tema = 'standar' }, ref) {
+/** apiRef: next/dynamic tidak meneruskan ref, jadi halaman memakai prop ini untuk tombol kamera / screenshot. */
+const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; opsi: OpsiViewer; kecepatan: Kecepatan; lapisan?: PasangLapisan; tema?: TemaViewer; apiRef?: MutableRefObject<ViewerApi | null> }>(function Viewer3D({ layout, shift, opsi, kecepatan, lapisan, tema = 'standar', apiRef }, ref) {
   const temaRef = useRef<TemaViewer>(tema); temaRef.current = tema;
   const lapisanRef = useRef<PasangLapisan | undefined>(lapisan);
   lapisanRef.current = lapisan;
@@ -117,7 +118,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
   st.current.kec = kecepatan;
   const siklusDari = (g: Gerak) => Math.max(1, st.current.kec.siklus[g.kunci] ?? g.siklusAwal);
 
-  useImperativeHandle(ref, () => ({
+  const buatApi = (): ViewerApi => ({
     kamera: (k: Kamera) => aturKamera(k),
     screenshot: () => { const s = st.current; if (!s.renderer || !s.scene || !s.cam) return null; s.renderer.render(s.scene, s.cam); return s.renderer.domElement.toDataURL('image/png'); },
     statistik: () => {
@@ -125,14 +126,21 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
       for (const g of [...s.gerak, ...s.gerakOrang]) { const n = Math.floor(s.detikSim / siklusDari(g) + g.fase) - Math.floor(g.fase); siklus[g.kunci] = (siklus[g.kunci] ?? 0) + n; }
       return { detikSim: s.detikSim, siklus };
     },
-  }));
+  });
+  useImperativeHandle(ref, buatApi);
+  useEffect(() => { if (!apiRef) return; apiRef.current = buatApi(); return () => { apiRef.current = null; }; });
 
   function aturKamera(k: Kamera) {
     const s = st.current; if (!s.cam || !s.ctl) return;
     const { L, W, H } = s; const m = Math.max(L, W);
     const target = new THREE.Vector3(L / 2, 0, W / 2);
     if (k === 'iso') s.cam.position.set(-m * 0.35, m * 0.65, W + m * 0.55);
-    if (k === 'atas') { s.cam.position.set(L / 2, m * 1.25, W / 2 + 0.01); }
+    if (k === 'atas') {
+      // pas ke gedung + apron dock sesuai rasio panel
+      const t = Math.tan(THREE.MathUtils.degToRad(s.cam.fov / 2)); const cx = L / 2 - 6;
+      const jarak = Math.max((W / 2 + 4) / t, (L / 2 + 12) / (t * Math.max(0.2, s.cam.aspect))) * 1.05;
+      s.cam.position.set(cx, jarak, W / 2 + 0.01); target.set(cx, 0, W / 2);
+    }
     if (k === 'dekat') { const fx = Math.min(L, 36); target.set(fx * 0.12, 0, W * 0.42); s.cam.position.set(target.x - 22 - W * 0.45, 18 + W * 0.45, W + 14 + W * 0.3); }
     if (k === 'dock') { s.cam.position.set(-32, 14, W / 2 + W * 0.35); target.set(4, 2, W / 2); }
     if (k === 'lorong') {

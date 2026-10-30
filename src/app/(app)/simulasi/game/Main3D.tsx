@@ -120,7 +120,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick }: { dunia: Dun
       </div>
 
       <div className={`game-layar${panel ? '' : ' tanpa-panel'}`}>
-        <Viewer3D ref={api} layout={layout} shift={0} opsi={opsi} kecepatan={{ faktor: 0, siklus: {} }} lapisan={lapisan} tema={tema} />
+        <Viewer3D apiRef={api} layout={layout} shift={0} opsi={opsi} kecepatan={{ faktor: 0, siklus: {} }} lapisan={lapisan} tema={tema} />
         <div className="gm-kpi">
           <div className="gm-kartu"><span className="gm-ikon"><Ikon n="palet" /></span><div><small>Stok di gudang</small><b>{angka(stok)}</b><span>palet · {kap ? angka((stok / kap) * 100) : 0}% terisi <em className={hi.paletMasuk - Math.round(hi.paletKeluarEq) >= 0 ? 'naik' : 'turun'}>{hi.paletMasuk - Math.round(hi.paletKeluarEq) >= 0 ? '▲' : '▼'} {Math.abs(hi.paletMasuk - Math.round(hi.paletKeluarEq))}</em></span></div></div>
           <div className="gm-kartu"><span className="gm-ikon"><Ikon n="truk" /></span><div><small>Truk di lokasi</small><b>{trukDiLokasi}</b><span>{inbDiLokasi} inbound · {trukDiLokasi - inbDiLokasi} outbound</span></div></div>

@@ -3,7 +3,7 @@
 // Satuan meter. X = panjang gudang (0 = dinding dock), Z = lebar gudang (kiri → kanan).
 import type { BarisRak, Dock, Fasilitas, LayoutGudang, Lorong, Palet, ParamSim, Zona, JenisZona } from './layout';
 
-export type JenisKomp = 'spr' | 'ddr' | 'block' | 'stagingIn' | 'stagingOut' | 'fasilitas' | 'dock' | 'kolom' | 'jalur' | 'zona';
+export type JenisKomp = 'spr' | 'ddr' | 'areaRak' | 'block' | 'stagingIn' | 'stagingOut' | 'fasilitas' | 'dock' | 'kolom' | 'jalur' | 'zona';
 export interface SpekRak {
   arah: 'x' | 'z';          // arah baris memanjang (bay berjejer di sumbu ini)
   hadap: 1 | -1;            // sisi muka lorong (+1 = ke arah sumbu tegak lurus yang lebih besar)
@@ -16,12 +16,30 @@ export interface SpekRak {
   beamMm: number;
   lebarLorong: number;      // lebar lorong yang dibutuhkan di muka rak (m)
 }
+/**
+ * Area rak (gaya CLASS "static rack"): satu kotak yang bisa ditarik; baris rak, lorong, dan cross aisle di dalamnya
+ * dibentuk otomatis dari parameter. rak.arah = arah baris memanjang; rak.lebarLorong = lebar lorong muka-ke-muka.
+ */
+export interface SpekArea {
+  rak: SpekRak;
+  jenisRak: 'spr' | 'ddr';
+  konfigurasi: 'single' | 'b2b';   // baris tunggal atau back-to-back
+  mulai: 'rak' | 'lorong';         // dari tepi area: mulai dengan baris rak (tunggal di tepi) atau lorong
+  dalam: number;                   // kedalaman 1 baris rak (m)
+  b2b: number;                     // jarak antar punggung rak back-to-back (m)
+  crossAwal: number;               // cross aisle di awal baris (m)
+  crossTengah: number;             // lebar tiap cross aisle tengah (m)
+  nTengah: number;                 // jumlah cross aisle tengah
+  crossAkhir: number;              // cross aisle di ujung baris (m)
+}
 export interface Komponen {
   id: string; jenis: JenisKomp; label: string;
   x: number; z: number; w: number; d: number;   // kiri-atas (x, z) + ukuran sumbu X (w) & Z (d)
   tinggi: number;                               // m (rak dihitung dari level; lainnya isian)
   warna?: string;
   rak?: SpekRak;
+  area?: SpekArea;
+  induk?: string;                               // baris rak hasil urai area → id area
   tumpuk?: number;                              // block / staging
   palet?: number;                               // staging: palet per sequence
   arus?: 'inbound' | 'outbound';                // dock
@@ -88,6 +106,70 @@ export function dariOtomatis(L: LayoutGudang, p: ParamSim, stokDesain: number): 
   return { versi: 1, gedung: { L: r2(L.L), W: r2(L.W), sideMm: p.sideMm, centerMm: p.centerMm }, komponen: k, ukur: [], latar: null, okupansi: null, stokDesain, tinggiPalet: L.tinggiPalet };
 }
 
+/** Baris rak di dalam satu area rak (dibentuk ulang setiap kali area ditarik / parameternya diubah). */
+export function uraiArea(k: Komponen): Komponen[] {
+  const a = k.area; if (!a) return [];
+  const s = a.rak; const ax = s.arah === 'x';
+  const A0 = ax ? k.x : k.z, A = ax ? k.w : k.d, B0 = ax ? k.z : k.x, B = ax ? k.d : k.w;
+  const D = Math.max(0.3, a.dalam), Lor = Math.max(0, s.lebarLorong), gap = Math.max(0, a.b2b);
+  // sepanjang baris: segmen dipisah cross aisle tengah, tiap segmen bay penuh
+  const nSeg = Math.max(0, Math.round(a.nTengah)) + 1;
+  const pakai = A - a.crossAwal - a.crossAkhir - (nSeg - 1) * a.crossTengah;
+  const nbSeg = Math.floor(pakai / nSeg / s.bayW + 1e-6);
+  if (nbSeg < 1 || D > B + 1e-6) return [];
+  const seg: number[] = []; for (let i = 0, p = A0 + a.crossAwal; i < nSeg; i++, p += nbSeg * s.bayW + a.crossTengah) seg.push(p);
+  // melintang: [tepi tunggal] lorong [pasangan / tunggal] lorong ... [sisa tunggal]
+  const baris: { b: number; hadap: 1 | -1 }[] = [];
+  let q = 0;
+  if (a.mulai === 'lorong') q = Lor; else { baris.push({ b: 0, hadap: 1 }); q = D + Lor; }
+  const unit = a.konfigurasi === 'b2b' ? 2 * D + gap : D;
+  while (q + unit <= B + 1e-6) {
+    if (a.konfigurasi === 'b2b') baris.push({ b: q, hadap: -1 }, { b: q + D + gap, hadap: 1 }); else baris.push({ b: q, hadap: 1 });
+    q += unit + Lor;
+  }
+  if (q + D <= B + 1e-6) baris.push({ b: q, hadap: -1 });                 // sisa: tunggal menghadap lorong sebelumnya
+  const out: Komponen[] = []; let i = 0;
+  const tinggi = r2(tinggiRak(s));
+  for (const br of baris) for (const sa of seg) {
+    const pj = r2(nbSeg * s.bayW);
+    const pos = ax ? { x: r2(sa), z: r2(B0 + br.b), w: pj, d: r2(D) } : { x: r2(B0 + br.b), z: r2(sa), w: r2(D), d: pj };
+    out.push({ id: `${k.id}~${i++}`, jenis: a.jenisRak, label: k.label, ...pos, tinggi, rak: { ...s, hadap: br.hadap }, induk: k.id });
+  }
+  return out;
+}
+/** Semua komponen dengan area rak diganti baris-baris raknya (dipakai kapasitas, cek, dan 3D). */
+export const uraiKomponen = (ks: Komponen[]) => ks.flatMap(k => (k.area ? uraiArea(k) : [k]));
+export const ringkasArea = (k: Komponen) => {
+  const rows = uraiArea(k); const per = new Set(rows.map(r => (k.area!.rak.arah === 'x' ? r.z : r.x)));
+  return { baris: per.size, bay: rows.reduce((a, r) => a + nBay(r), 0), posisi: rows.reduce((a, r) => a + kapasitasRak(r), 0) };
+};
+/** Area rak → baris rak satuan (bisa diedit satu per satu). */
+export const pecahArea = (k: Komponen): Komponen[] => uraiArea(k).map(r => ({ ...r, id: uid(), induk: undefined, label: r.jenis === 'ddr' ? 'Rak DDR' : 'Rak SPR' }));
+
+/**
+ * Rak satuan → area rak: semua rak sejenis & searah yang sekolom dengan rak terpilih (rentang sepanjang baris sama)
+ * digabung jadi satu area; parameter (bay, kedalaman, lorong, jarak back-to-back) diambil dari rak yang ada.
+ */
+export function gabungJadiArea(e: LayoutEdit, id: string): { edit: LayoutEdit; id: string } | null {
+  const k = e.komponen.find(c => c.id === id); if (!k?.rak) return null;
+  const s = k.rak; const ax = s.arah === 'x';
+  const sp = (c: Komponen) => (ax ? [c.x, c.w] : [c.z, c.d]), lt = (c: Komponen) => (ax ? [c.z, c.d] : [c.x, c.w]);
+  const [a0, pj] = sp(k);
+  const grup = e.komponen.filter(c => c.rak && c.jenis === k.jenis && c.rak.arah === s.arah && Math.abs(sp(c)[0] - a0) < 0.05 && Math.abs(sp(c)[1] - pj) < 0.05)
+    .sort((p, q) => lt(p)[0] - lt(q)[0]);
+  const dalam = lt(k)[1];
+  const b0 = lt(grup[0])[0], b1 = Math.max(...grup.map(c => lt(c)[0] + lt(c)[1]));
+  // jarak back-to-back = celah terkecil antar baris yang saling membelakangi; lorong = celah terkecil antar muka
+  let gap = Infinity, lorong = s.lebarLorong;
+  for (let i = 1; i < grup.length; i++) { const c = lt(grup[i])[0] - (lt(grup[i - 1])[0] + lt(grup[i - 1])[1]); if (grup[i - 1].rak!.hadap === -1 && grup[i].rak!.hadap === 1) gap = Math.min(gap, c); else if (c > 0.5) lorong = Math.min(lorong, c); }
+  const area: SpekArea = { rak: { ...s, hadap: 1 }, jenisRak: k.jenis as 'spr' | 'ddr', konfigurasi: Number.isFinite(gap) ? 'b2b' : 'single', mulai: grup[0].rak!.hadap === 1 ? 'rak' : 'lorong',
+    dalam, b2b: Number.isFinite(gap) ? r2(Math.max(0, gap)) : 0.3, crossAwal: 0, crossTengah: 3, nTengah: 0, crossAkhir: 0 };
+  area.rak.lebarLorong = r2(lorong);
+  const nb: Komponen = { id: uid(), jenis: 'areaRak', label: `Area ${k.jenis === 'ddr' ? 'DDR' : 'SPR'}`, ...(ax ? { x: a0, w: pj, z: b0, d: r2(b1 - b0) } : { z: a0, d: pj, x: b0, w: r2(b1 - b0) }), tinggi: r2(tinggiRak(s)), area };
+  const ids = new Set(grup.map(c => c.id));
+  return { edit: { ...e, komponen: [...e.komponen.filter(c => !ids.has(c.id)), nb] }, id: nb.id };
+}
+
 /** Komponen baru dari palet alat. */
 export function komponenBaru(jenis: JenisKomp, p: ParamSim, pusat: { x: number; z: number }, tinggiPalet: number): Komponen[] {
   const dasar = { id: uid(), x: r2(pusat.x), z: r2(pusat.z) };
@@ -95,6 +177,11 @@ export function komponenBaru(jenis: JenisKomp, p: ParamSim, pusat: { x: number; 
     case 'spr': case 'ddr': {
       const s = DEFAULT_RAK(p, jenis === 'ddr'); const depth = jenis === 'ddr' ? p.ddr.depth : p.spr.depth;
       return [{ ...dasar, jenis, label: jenis === 'spr' ? 'Rak SPR' : 'Rak DDR', w: r2(10 * s.bayW), d: depth, tinggi: r2(tinggiRak(s)), rak: s }];
+    }
+    case 'areaRak': {
+      const s = DEFAULT_RAK(p, false);
+      return [{ ...dasar, jenis, label: 'Area rak SPR', w: 30, d: 20, tinggi: r2(tinggiRak(s)),
+        area: { rak: s, jenisRak: 'spr', konfigurasi: 'b2b', mulai: 'rak', dalam: p.spr.depth, b2b: 0.3, crossAwal: 3, crossTengah: 3, nTengah: 0, crossAkhir: 3 } }];
     }
     case 'block': return [{ ...dasar, jenis, label: 'Block stack', w: 7.8, d: 6.6, tumpuk: Math.max(1, Math.round(p.blockTumpuk)), tinggi: r2(Math.max(1, Math.round(p.blockTumpuk)) * tinggiPalet) }];
     case 'stagingIn': return [{ ...dasar, jenis, label: 'Staging inbound', w: 8, d: 8, palet: 20, tumpuk: 1, tinggi: 0 }];
@@ -119,6 +206,7 @@ export function pasanganRak(p: ParamSim, ddr: boolean, pusat: { x: number; z: nu
 export function putar(k: Komponen): Komponen {
   const n: Komponen = { ...k, w: k.d, d: k.w };
   if (k.rak) n.rak = { ...k.rak, arah: k.rak.arah === 'x' ? 'z' : 'x' };
+  if (k.area) n.area = { ...k.area, rak: { ...k.area.rak, arah: k.area.rak.arah === 'x' ? 'z' : 'x' } };
   return n;
 }
 
@@ -157,7 +245,7 @@ export function tarikRak(e: LayoutEdit, opsi: { ids?: string[]; jarakDinding: nu
   return { edit: { ...e, komponen: komp }, n, bayAwal, bayAkhir, posAwal, posAkhir };
 }
 
-const solid = (k: Komponen) => ['spr', 'ddr', 'block', 'fasilitas', 'kolom'].includes(k.jenis);
+const solid = (k: Komponen) => ['spr', 'ddr', 'areaRak', 'block', 'fasilitas', 'kolom'].includes(k.jenis);
 const EPS = 0.02;   // toleransi pembulatan (cm)
 const tumpang = (a: Komponen, b: Komponen) => a.x < b.x + b.w - EPS && b.x < a.x + a.w - EPS && a.z < b.z + b.d - EPS && b.z < a.z + a.d - EPS;
 
@@ -187,8 +275,8 @@ export interface Ringkasan {
   peringatan: { level: 'kritis' | 'peringatan'; pesan: string; id?: string }[];
 }
 
-export function ringkas(e: LayoutEdit): Ringkasan {
-  const ks = e.komponen; const g = e.gedung;
+export function ringkas(e0: LayoutEdit): Ringkasan {
+  const ks = uraiKomponen(e0.komponen); const e = { ...e0, komponen: ks }; const g = e.gedung;
   const posisiSpr = ks.filter(k => k.jenis === 'spr').reduce((s, k) => s + kapasitasRak(k), 0);
   const posisiDdr = ks.filter(k => k.jenis === 'ddr').reduce((s, k) => s + kapasitasRak(k), 0);
   const posisiBlock = ks.filter(k => k.jenis === 'block').reduce((s, k) => s + tapakBlok(k) * Math.max(1, k.tumpuk ?? 1), 0);
@@ -198,20 +286,21 @@ export function ringkas(e: LayoutEdit): Ringkasan {
   const okupansi = e.okupansi != null ? e.okupansi : totalRak > 0 ? Math.min(1, e.stokDesain / totalRak) : 0;
   const peringatan: Ringkasan['peringatan'] = [];
   const sideM = g.sideMm / 1000;
+  for (const k of e0.komponen) if (k.area && uraiArea(k).length === 0) peringatan.push({ level: 'peringatan', pesan: `${k.label}: area terlalu kecil untuk 1 baris rak.`, id: k.id });
   for (const k of ks) {
-    if (k.x < -EPS || k.z < -EPS || k.x + k.w > g.L + EPS || k.z + k.d > g.W + EPS) peringatan.push({ level: 'kritis', pesan: `${k.label} keluar dari batas gedung.`, id: k.id });
-    if (k.rak && tinggiRak(k.rak) > sideM + 1e-6) peringatan.push({ level: 'kritis', pesan: `${k.label}: tinggi rak ${r2(tinggiRak(k.rak))} m melebihi side height ${r2(sideM)} m.`, id: k.id });
+    if (k.x < -EPS || k.z < -EPS || k.x + k.w > g.L + EPS || k.z + k.d > g.W + EPS) peringatan.push({ level: 'kritis', pesan: `${k.label} keluar dari batas gedung.`, id: k.induk ?? k.id });
+    if (k.rak && tinggiRak(k.rak) > sideM + 1e-6) peringatan.push({ level: 'kritis', pesan: `${k.label}: tinggi rak ${r2(tinggiRak(k.rak))} m melebihi side height ${r2(sideM)} m.`, id: k.induk ?? k.id });
     if (k.rak) {
       const jb = jarakBebas(e, k);
       const muka = k.rak.arah === 'x' ? (k.rak.hadap === 1 ? jb.kanan : jb.kiri) : (k.rak.hadap === 1 ? jb.belakang : jb.depan);
-      if (muka.jarak + 1e-6 < k.rak.lebarLorong) peringatan.push({ level: 'peringatan', pesan: `${k.label}: lorong di muka rak ${r2(muka.jarak)} m < kebutuhan ${r2(k.rak.lebarLorong)} m.`, id: k.id });
+      if (muka.jarak + 1e-6 < k.rak.lebarLorong) peringatan.push({ level: 'peringatan', pesan: `${k.label}: lorong di muka rak ${r2(muka.jarak)} m < kebutuhan ${r2(k.rak.lebarLorong)} m.`, id: k.induk ?? k.id });
       const sisa = dimRak(k).panjang - nBay(k) * k.rak.bayW;
-      if (sisa > 0.05) peringatan.push({ level: 'peringatan', pesan: `${k.label}: panjang tidak pas kelipatan bay (sisa ${r2(sisa)} m).`, id: k.id });
+      if (sisa > 0.05) peringatan.push({ level: 'peringatan', pesan: `${k.label}: panjang tidak pas kelipatan bay (sisa ${r2(sisa)} m).`, id: k.induk ?? k.id });
     }
   }
   const pad = ks.filter(solid);
   for (let i = 0; i < pad.length; i++) for (let j = i + 1; j < pad.length; j++)
-    if (tumpang(pad[i], pad[j])) peringatan.push({ level: 'kritis', pesan: `${pad[i].label} bertabrakan dengan ${pad[j].label}.`, id: pad[i].id });
+    if (tumpang(pad[i], pad[j])) peringatan.push({ level: 'kritis', pesan: `${pad[i].label} bertabrakan dengan ${pad[j].label}.`, id: pad[i].induk ?? pad[i].id });
   if (totalRak > 0 && e.stokDesain > totalRak) peringatan.push({ level: 'kritis', pesan: `Kapasitas ${totalRak.toLocaleString('id-ID')} posisi < stok desain ${e.stokDesain.toLocaleString('id-ID')} palet.` });
   return { posisiSpr, posisiDdr, posisiBlock, posisiStaging, totalRak, luasGedung: g.L * g.W, luasRak: luas(k => !!k.rak), luasBlock: luas(k => k.jenis === 'block'),
     luasStaging: luas(k => k.jenis === 'stagingIn' || k.jenis === 'stagingOut'), luasFasilitas: luas(k => k.jenis === 'fasilitas'), luasJalur: luas(k => k.jenis === 'jalur'),
@@ -222,7 +311,7 @@ function acak(seed: number) { let s = seed >>> 0; return () => { s = (s * 166452
 
 /** Layout edit → LayoutGudang untuk viewer 3D (MHE, manpower, aktivitas diambil dari layout otomatis). */
 export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang & { kolom: { x: number; z: number; w: number; d: number; tinggi: number }[] } {
-  const g = e.gedung; const ks = e.komponen; const rk = ringkas(e);
+  const g = e.gedung; const ks = uraiKomponen(e.komponen); const rk = ringkas(e);
   const zona: Zona[] = []; const rak: BarisRak[] = []; const palet: Palet[] = []; const lorong: Lorong[] = []; const dock: Dock[] = []; const fasilitas: Fasilitas[] = [];
   const kolom: { x: number; z: number; w: number; d: number; tinggi: number }[] = [];
   const tp = e.tinggiPalet || 1.4;
