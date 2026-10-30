@@ -12,7 +12,7 @@ const f2 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('id-ID', { 
 
 /** Posisi potong awal: tengah baris rak terpanjang (supaya langsung memotong rak). */
 export function potongAwal(e: LayoutEdit, arah: ArahPotong): number {
-  const rak = uraiKomponen(e.komponen).filter(k => k.rak).sort((a, b) => b.w * b.d - a.w * a.d)[0];
+  const rak = uraiKomponen(e.komponen, e).filter(k => k.rak).sort((a, b) => b.w * b.d - a.w * a.d)[0];
   if (!rak) return arah === 'depan' ? e.gedung.L / 2 : e.gedung.W / 2;
   return Math.round((arah === 'depan' ? rak.x + rak.w / 2 : rak.z + rak.d / 2) * 100) / 100;
 }
@@ -32,7 +32,7 @@ const Potongan = forwardRef<PotonganApi, { edit: LayoutEdit; arah: ArahPotong; n
   const keU = (x0: number, x1: number): [number, number] => (arah === 'kiri' ? [g.L - x1, g.L - x0] : [x0, x1]);
   const rentangU = (k: Komponen) => (samping ? keU(k.x, k.x + k.w) : [k.z, k.z + k.d] as [number, number]);
   const rentangPotong = (k: Komponen): [number, number] => (samping ? [k.z, k.z + k.d] : [k.x, k.x + k.w]);
-  const ks = uraiKomponen(edit.komponen).filter(k => k.jenis !== 'dock' && k.jenis !== 'zona');
+  const ks = uraiKomponen(edit.komponen, edit).filter(k => k.jenis !== 'dock' && k.jenis !== 'zona');
   const kena = ks.filter(k => { const [a, b] = rentangPotong(k); return nilai >= a - 1e-6 && nilai <= b + 1e-6; });
   const belakang = ks.filter(k => { const [a, b] = rentangPotong(k); return arah === 'kanan' ? b < nilai - 1e-6 : a > nilai + 1e-6; })
     .sort((p, q) => { const jp = Math.abs(rentangPotong(p)[0] - nilai), jq = Math.abs(rentangPotong(q)[0] - nilai); return jq - jp; });

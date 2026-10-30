@@ -167,18 +167,18 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     const w = WARNA_KOMP[k.jenis] ?? WARNA_KOMP.zona; const dipilih = k.id === pilih;
     const isi = k.warna ?? w.isi;
     const el: React.ReactNode[] = [];
-    el.push(<rect key="r" x={k.x} y={k.z} width={k.w} height={k.d} fill={k.jenis === 'jalur' ? 'url(#arsir)' : isi} fillOpacity={k.jenis === 'zona' ? 0.5 : 1}
+    el.push(<rect key="r" x={k.x} y={k.z} width={k.w} height={k.d} fill={k.jenis === 'jalur' ? 'url(#arsir)' : isi} fillOpacity={k.jenis === 'zona' ? 0.5 : k.jenis === 'areaRak' ? 0.45 : 1}
       stroke={dipilih ? '#f97316' : w.garis} strokeWidth={dipilih ? fs * 0.18 : fs * 0.07} strokeDasharray={k.jenis === 'jalur' || k.jenis === 'zona' || k.jenis === 'areaRak' ? `${fs * 0.4} ${fs * 0.25}` : undefined} />);
     el.push(...gambarRak(k, w.garis, ''));
     if (k.area) {
       const sub = WARNA_KOMP[k.area.jenisRak];
-      for (const r of uraiArea(k)) {
+      for (const r of uraiArea(k, edit)) {
         el.push(<rect key={`${r.id}r`} x={r.x} y={r.z} width={r.w} height={r.d} fill={sub.isi} stroke={sub.garis} strokeWidth={fs * 0.06} />);
         el.push(...gambarRak(r, sub.garis, r.id));
       }
     }
     if (k.jenis === 'dock') el.push(<path key="p" d={`M ${k.x + k.w} ${k.z + k.d / 2} l ${fs * 0.9} ${-fs * 0.5} l 0 ${fs} z`} fill={k.arus === 'outbound' ? '#059669' : '#2563eb'} />);
-    const ra = k.area ? ringkasArea(k) : null;
+    const ra = k.area ? ringkasArea(k, edit) : null;
     const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? `${k.label} · tumpuk ${k.tumpuk ?? 1}` : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.label;
     const muat = Math.max(k.w, k.d) > label.length * fs * 0.45 || dipilih;
     if (muat && k.jenis !== 'kolom') {
@@ -221,8 +221,9 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
           <path d={edit.latar.garis.map(([a, b, c, d]) => `M${a} ${b}L${c} ${d}`).join('')} stroke="#334155" strokeWidth={0.04 / Math.max(0.001, edit.latar.w)} fill="none" />
         </g>
       )}
+      {edit.komponen.filter(k => k.jenis === 'areaRak').map(gambarKomp)}
       {edit.komponen.filter(k => k.jenis === 'jalur' || k.jenis === 'zona').map(gambarKomp)}
-      {edit.komponen.filter(k => k.jenis !== 'jalur' && k.jenis !== 'zona').map(gambarKomp)}
+      {edit.komponen.filter(k => k.jenis !== 'jalur' && k.jenis !== 'zona' && k.jenis !== 'areaRak').map(gambarKomp)}
       {/* dinding */}
       <rect x={0} y={0} width={g.L} height={g.W} fill="none" stroke="#0f172a" strokeWidth={fs * 0.22} style={{ pointerEvents: 'none' }} />
       {/* dimensi gedung */}
@@ -244,8 +245,8 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       {terpilih && mode === 'pilih' && handle(terpilih)}
       {/* area rak terpilih: lebar cross aisle aktual (awal / tengah / akhir) */}
       {terpilih?.area && (() => {
-        const k = terpilih; const c = celahArea(k); if (!c) return null;
-        const ax = k.area!.rak.arah === 'x'; const A0 = ax ? k.x : k.z; const m = ax ? k.z + k.d / 2 : k.x + k.w / 2; const bw = k.area!.rak.bayW;
+        const k = terpilih; const c = celahArea(k, edit); if (!c) return null;
+        const ax = k.area!.rak.arah === 'x'; const A0 = c.a0; const m = ax ? k.z + k.d / 2 : k.x + k.w / 2; const bw = k.area!.rak.bayW;
         const celah: [number, number][] = []; let p = A0;
         celah.push([p, p + c.awal]); p += c.awal;
         c.bay.forEach((nb, i) => { p += nb * bw; if (i < c.bay.length - 1) { celah.push([p, p + c.tengah]); p += c.tengah; } });

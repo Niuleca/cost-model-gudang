@@ -28,11 +28,12 @@ interface Versi { id: string; nama: string; updated_at: string; data: LayoutEdit
 const angka = (v: number, d = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d });
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
-const PALET: { jenis: JenisKomp | 'pasSpr' | 'pasDdr'; label: string }[] = [
-  { jenis: 'areaRak', label: 'Area rak otomatis (tarik → baris & lorong terbentuk)' },
+const PALET: { jenis: JenisKomp | 'pasSpr' | 'pasDdr' | 'areaAdaptif' | 'ramp'; label: string }[] = [
+  { jenis: 'areaRak', label: 'Area rak otomatis 1 · grid (tarik → baris & lorong terbentuk)' },
+  { jenis: 'areaAdaptif', label: 'Area rak otomatis 2 · adaptif (hindari kolom, dinding, office, ramp)' },
   { jenis: 'spr', label: 'Rak SPR (1 baris)' }, { jenis: 'pasSpr', label: 'Rak SPR back-to-back' }, { jenis: 'ddr', label: 'Rak DDR (1 baris)' }, { jenis: 'pasDdr', label: 'Rak DDR back-to-back' },
   { jenis: 'block', label: 'Block stack' }, { jenis: 'stagingIn', label: 'Staging inbound' }, { jenis: 'stagingOut', label: 'Staging outbound' },
-  { jenis: 'dock', label: 'Dock' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'kolom', label: 'Kolom' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
+  { jenis: 'dock', label: 'Dock' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'kolom', label: 'Kolom' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
 ];
 
 /** Isian angka di panel properti. */
@@ -143,7 +144,15 @@ export default function DesainGudang() {
     if (!edit || !data) return;
     const c = ed2.current?.pusatLayar() ?? { x: edit.gedung.L / 2, z: edit.gedung.W / 2 };
     const pos = { x: r2(Math.max(0, c.x - 5)), z: r2(Math.max(0, c.z - 1)) };
-    const baru = j === 'pasSpr' ? pasanganRak(data.p, false, pos) : j === 'pasDdr' ? pasanganRak(data.p, true, pos) : komponenBaru(j, data.p, pos, edit.tinggiPalet);
+    let baru: Komponen[];
+    if (j === 'areaAdaptif') {
+      // opsi 2: mulai menutupi seluruh gudang; rak menyesuaikan kolom, dinding, office, ramp & bangunan existing
+      const [a] = komponenBaru('areaRak', data.p, { x: 0, z: 0 }, edit.tinggiPalet);
+      baru = [{ ...a, label: 'Area rak adaptif', x: 0, z: 0, w: edit.gedung.L, d: edit.gedung.W,
+        area: { ...a.area!, mode: 'adaptif', crossAwal: 0, crossAkhir: 0, kelonggaran: 0.1, bebasRintangan: 0.3, bebasDinding: 0.5, rak: { ...a.area!.rak, lebarLorong: Math.max(3.4, a.area!.rak.lebarLorong) } } }];
+    } else if (j === 'ramp') {
+      const [z] = komponenBaru('zona', data.p, pos, edit.tinggiPalet); baru = [{ ...z, label: 'Ramp', w: 8, d: 4, warna: '#94a3b8' }];
+    } else baru = j === 'pasSpr' ? pasanganRak(data.p, false, pos) : j === 'pasDdr' ? pasanganRak(data.p, true, pos) : komponenBaru(j, data.p, pos, edit.tinggiPalet);
     aksi(e => ({ ...e, komponen: [...e.komponen, ...baru] })); setPilih(baru[0].id); setMode('pilih');
   }
   /** Rak satuan sekolom → 1 area rak yang bisa ditarik. */
@@ -165,7 +174,7 @@ export default function DesainGudang() {
   /** Area rak → baris rak satuan. */
   function pecah() {
     if (!terpilih?.area) return;
-    const rows = pecahArea(terpilih); const id = terpilih.id;
+    const rows = pecahArea(terpilih, edit ?? undefined); const id = terpilih.id;
     aksi(e => ({ ...e, komponen: [...e.komponen.filter(k => k.id !== id), ...rows] })); setPilih(null);
     setPesan(`Area dipecah jadi ${rows.length} baris rak satuan.`);
   }
@@ -487,8 +496,20 @@ export default function DesainGudang() {
                     <Angka l="Lebar (Z)" u="m" v={terpilih.d} set={x => ubahK(k => ({ ...k, d: Math.max(0.1, x) }))} />
                   </>)}
                 </div>
-                {terpilih.area && data && (() => { const a = terpilih.area; const s = a.rak; const ra = ringkasArea(terpilih); const cl = celahArea(terpilih); return (
+                {terpilih.area && data && (() => { const a = terpilih.area; const s = a.rak; const ra = ringkasArea(terpilih, edit); const cl = celahArea(terpilih, edit); const adaptif = a.mode === 'adaptif'; return (
                   <>
+                    <label className="f">Mode penyusunan<select value={a.mode ?? 'grid'} onChange={e => ubahArea(e.target.value === 'adaptif'
+                      ? { mode: 'adaptif', kelonggaran: a.kelonggaran ?? 0.1, bebasRintangan: a.bebasRintangan ?? 0.3, bebasDinding: a.bebasDinding ?? 0.5 } : { mode: 'grid' })}>
+                      <option value="grid">1 · Grid tetap (pola sama di seluruh area)</option><option value="adaptif">2 · Adaptif (hindari kolom, dinding, office, ramp)</option></select></label>
+                    {adaptif && (
+                      <div className="grid2" style={{ gap: 6 }}>
+                        <Angka l="Kelonggaran ke kolom / sisi" u="m" step={0.05} v={a.kelonggaran ?? 0.1} set={x => ubahArea({ kelonggaran: Math.max(0, x) })} />
+                        <Angka l="Jarak bebas ke office / ramp" u="m" step={0.1} v={a.bebasRintangan ?? 0.3} set={x => ubahArea({ bebasRintangan: Math.max(0, x) })} />
+                        <Angka l="Jarak bebas ke dinding" u="m" step={0.1} v={a.bebasDinding ?? 0.5} set={x => ubahArea({ bebasDinding: Math.max(0, x) })} />
+                        <button type="button" className="ghost" style={{ alignSelf: 'end' }} onClick={() => ubahK(k => ({ ...k, x: 0, z: 0, w: edit.gedung.L, d: edit.gedung.W }))} title="Area menutupi seluruh gudang; rak mengisi semua ruang yang bebas">⤢ Seluruh gudang</button>
+                        <p className="small muted" style={{ gridColumn: '1 / -1', margin: 0 }}>Kolom diletakkan di row spacer: lebar spacer = lebar kolom + {angka((a.kelonggaran ?? 0.1) * 2, 2)} m (mis. kolom 0,5 → {angka(0.5 + (a.kelonggaran ?? 0.1) * 2, 2)} m; 1,0 → {angka(1 + (a.kelonggaran ?? 0.1) * 2, 2)} m); lorong sebelumnya melebar seperlunya. Bila tidak bisa, baris rak dipotong di sekitar kolom. Office, ramp, staging, jalur & zona otomatis dihindari; panjang baris tanpa minimum (≥ 1 bay).</p>
+                      </div>
+                    )}
                     <div className="eyebrow">Rak</div>
                     <div className="grid2" style={{ gap: 6 }}>
                       <label className="f">Jenis rak<select value={a.jenisRak} onChange={e => { const ddr = e.target.value === 'ddr'; const d = DEFAULT_RAK(data.p, ddr);
@@ -508,7 +529,7 @@ export default function DesainGudang() {
                     </div>
                     <div className="eyebrow">Lorong</div>
                     <div className="grid2" style={{ gap: 6 }}>
-                      <Angka l="Lebar lorong (muka-ke-muka)" u="m" step={0.1} v={s.lebarLorong} set={x => ubahAreaRak({ lebarLorong: Math.max(0.5, x) })} />
+                      <Angka l={adaptif ? 'Lebar lorong minimum' : 'Lebar lorong (muka-ke-muka)'} u="m" step={0.1} v={s.lebarLorong} set={x => ubahAreaRak({ lebarLorong: Math.max(0.5, x) })} />
                       <Angka l="Cross aisle awal" u="m" step={0.5} v={a.crossAwal} set={x => ubahArea({ crossAwal: Math.max(0, x) })} />
                       <Angka l="Jumlah cross aisle tengah" step={1} min={0} v={a.nTengah} set={x => ubahArea({ nTengah: Math.max(0, Math.round(x)) })} />
                       <Angka l="Lebar cross aisle tengah" u="m" step={0.5} v={a.crossTengah} set={x => ubahArea({ crossTengah: Math.max(0, x) })} />
