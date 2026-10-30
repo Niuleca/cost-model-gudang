@@ -2,7 +2,7 @@
 // Editor denah 2D (SVG): tampak atas, X = panjang gudang (dock di kiri), Z = lebar gudang (ke bawah).
 // Pilih, geser (drag), ubah ukuran (handle), ukur jarak, garis ukur otomatis ke rintangan / dinding, latar denah gambar / DXF.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { dimRak, jarakBebas, nBay, ringkasArea, uraiArea, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { celahArea, dimRak, jarakBebas, nBay, ringkasArea, uraiArea, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 
 export type Mode = 'pilih' | 'ukur' | 'geser';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
@@ -242,6 +242,18 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         </g>
       )}
       {terpilih && mode === 'pilih' && handle(terpilih)}
+      {/* area rak terpilih: lebar cross aisle aktual (awal / tengah / akhir) */}
+      {terpilih?.area && (() => {
+        const k = terpilih; const c = celahArea(k); if (!c) return null;
+        const ax = k.area!.rak.arah === 'x'; const A0 = ax ? k.x : k.z; const m = ax ? k.z + k.d / 2 : k.x + k.w / 2; const bw = k.area!.rak.bayW;
+        const celah: [number, number][] = []; let p = A0;
+        celah.push([p, p + c.awal]); p += c.awal;
+        c.bay.forEach((nb, i) => { p += nb * bw; if (i < c.bay.length - 1) { celah.push([p, p + c.tengah]); p += c.tengah; } });
+        celah.push([p, p + c.akhir]);
+        return <g data-ekspor="tidak">{celah.filter(([a, b]) => b - a > 0.05).map(([a, b], i) => (ax
+          ? garisUkur(a, m, b, m, `${f1(b - a)} m`, '#7c3aed', `ca${i}`)
+          : garisUkur(m, a, m, b, `${f1(b - a)} m`, '#7c3aed', `ca${i}`)))}</g>;
+      })()}
       {/* garis potong (view potongan) */}
       {potong && (() => {
         const [x1, z1, x2, z2] = potong.sumbu === 'z' ? [-1, potong.nilai, g.L + 1, potong.nilai] : [potong.nilai, -1, potong.nilai, g.W + 1];

@@ -31,6 +31,8 @@ export interface SpekArea {
   crossTengah: number;             // lebar tiap cross aisle tengah (m)
   nTengah: number;                 // jumlah cross aisle tengah
   crossAkhir: number;              // cross aisle di ujung baris (m)
+  /** Sisa panjang (< 1 bay) ditaruh di mana. otomatis = ke cross aisle tengah bila ada, kalau tidak dibagi rata awal & akhir. */
+  sisa?: 'otomatis' | 'awal' | 'akhir';
 }
 export interface Komponen {
   id: string; jenis: JenisKomp; label: string;
@@ -106,18 +108,36 @@ export function dariOtomatis(L: LayoutGudang, p: ParamSim, stokDesain: number): 
   return { versi: 1, gedung: { L: r2(L.L), W: r2(L.W), sideMm: p.sideMm, centerMm: p.centerMm }, komponen: k, ukur: [], latar: null, okupansi: null, stokDesain, tinggiPalet: L.tinggiPalet };
 }
 
+/**
+ * Cross aisle aktual sepanjang baris: jumlah bay per segmen (selisih maks 1 bay) dan lebar awal / tengah / akhir
+ * setelah sisa panjang (< 1 bay) ditaruh sesuai pilihan.
+ */
+export function celahArea(k: Komponen): { awal: number; tengah: number; akhir: number; bay: number[]; sisa: number } | null {
+  const a = k.area; if (!a) return null;
+  const s = a.rak; const A = s.arah === 'x' ? k.w : k.d;
+  const nT = Math.max(0, Math.round(a.nTengah)), nSeg = nT + 1;
+  const awal = Math.max(0, a.crossAwal), akhir = Math.max(0, a.crossAkhir), tengah = Math.max(0, a.crossTengah);
+  const pakai = A - awal - akhir - nT * tengah;
+  const nbTot = Math.floor(pakai / s.bayW + 1e-6);
+  if (nbTot < nSeg) return null;
+  const bay = Array.from({ length: nSeg }, (_, i) => Math.floor(nbTot / nSeg) + (i < nbTot % nSeg ? 1 : 0));
+  const sisa = Math.max(0, pakai - nbTot * s.bayW);
+  const mode = a.sisa ?? 'otomatis';
+  const g = { awal, tengah, akhir };
+  if (mode === 'awal') g.awal += sisa; else if (mode === 'akhir') g.akhir += sisa;
+  else if (nT > 0) g.tengah += sisa / nT; else { g.awal += sisa / 2; g.akhir += sisa / 2; }
+  return { ...g, bay, sisa };
+}
+
 /** Baris rak di dalam satu area rak (dibentuk ulang setiap kali area ditarik / parameternya diubah). */
 export function uraiArea(k: Komponen): Komponen[] {
   const a = k.area; if (!a) return [];
   const s = a.rak; const ax = s.arah === 'x';
   const A0 = ax ? k.x : k.z, A = ax ? k.w : k.d, B0 = ax ? k.z : k.x, B = ax ? k.d : k.w;
   const D = Math.max(0.3, a.dalam), Lor = Math.max(0, s.lebarLorong), gap = Math.max(0, a.b2b);
-  // sepanjang baris: segmen dipisah cross aisle tengah, tiap segmen bay penuh
-  const nSeg = Math.max(0, Math.round(a.nTengah)) + 1;
-  const pakai = A - a.crossAwal - a.crossAkhir - (nSeg - 1) * a.crossTengah;
-  const nbSeg = Math.floor(pakai / nSeg / s.bayW + 1e-6);
-  if (nbSeg < 1 || D > B + 1e-6) return [];
-  const seg: number[] = []; for (let i = 0, p = A0 + a.crossAwal; i < nSeg; i++, p += nbSeg * s.bayW + a.crossTengah) seg.push(p);
+  // sepanjang baris: segmen dipisah cross aisle tengah (bay penuh); cross aisle awal & akhir dipatuhi
+  const c = celahArea(k); if (!c || D > B + 1e-6) return [];
+  const seg: { p: number; nb: number }[] = []; for (let i = 0, p = A0 + c.awal; i < c.bay.length; p += c.bay[i] * s.bayW + c.tengah, i++) seg.push({ p, nb: c.bay[i] });
   // melintang: [tepi tunggal] lorong [pasangan / tunggal] lorong ... [sisa tunggal]
   const baris: { b: number; hadap: 1 | -1 }[] = [];
   let q = 0;
@@ -131,8 +151,8 @@ export function uraiArea(k: Komponen): Komponen[] {
   const out: Komponen[] = []; let i = 0;
   const tinggi = r2(tinggiRak(s));
   for (const br of baris) for (const sa of seg) {
-    const pj = r2(nbSeg * s.bayW);
-    const pos = ax ? { x: r2(sa), z: r2(B0 + br.b), w: pj, d: r2(D) } : { x: r2(B0 + br.b), z: r2(sa), w: r2(D), d: pj };
+    const pj = r2(sa.nb * s.bayW);
+    const pos = ax ? { x: r2(sa.p), z: r2(B0 + br.b), w: pj, d: r2(D) } : { x: r2(B0 + br.b), z: r2(sa.p), w: r2(D), d: pj };
     out.push({ id: `${k.id}~${i++}`, jenis: a.jenisRak, label: k.label, ...pos, tinggi, rak: { ...s, hadap: br.hadap }, induk: k.id });
   }
   return out;

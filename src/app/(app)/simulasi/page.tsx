@@ -12,7 +12,7 @@ import { IT_SHEET_DEFAULT } from '@/lib/it';
 import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import { paramAwal, susunLayout, type LayoutGudang, type ParamSim } from '@/lib/simulasi3d/layout';
 import { dariOtomatis, tarikRak, keLayoutGudang, komponenBaru, levelDariTinggi, nBay, pasanganRak, putar, ringkas, tinggiRak, uid, kapasitasRak, tapakBlok, dimRak,
-  DEFAULT_RAK, gabungJadiArea, pecahArea, ringkasArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
+  DEFAULT_RAK, celahArea, gabungJadiArea, pecahArea, ringkasArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
 import { bacaDxf } from '@/lib/simulasi3d/dxf';
 import { labelStatus } from '@/lib/status';
 import Editor2D, { WARNA_KOMP, type Editor2DApi, type Mode } from './layout/Editor2D';
@@ -475,7 +475,7 @@ export default function DesainGudang() {
                     <Angka l="Lebar (Z)" u="m" v={terpilih.d} set={x => ubahK(k => ({ ...k, d: Math.max(0.1, x) }))} />
                   </>)}
                 </div>
-                {terpilih.area && data && (() => { const a = terpilih.area; const s = a.rak; const ra = ringkasArea(terpilih); return (
+                {terpilih.area && data && (() => { const a = terpilih.area; const s = a.rak; const ra = ringkasArea(terpilih); const cl = celahArea(terpilih); return (
                   <>
                     <div className="eyebrow">Rak</div>
                     <div className="grid2" style={{ gap: 6 }}>
@@ -501,7 +501,10 @@ export default function DesainGudang() {
                       <Angka l="Jumlah cross aisle tengah" step={1} min={0} v={a.nTengah} set={x => ubahArea({ nTengah: Math.max(0, Math.round(x)) })} />
                       <Angka l="Lebar cross aisle tengah" u="m" step={0.5} v={a.crossTengah} set={x => ubahArea({ crossTengah: Math.max(0, x) })} />
                       <Angka l="Cross aisle akhir" u="m" step={0.5} v={a.crossAkhir} set={x => ubahArea({ crossAkhir: Math.max(0, x) })} />
+                      <label className="f">Sisa panjang (&lt; 1 bay) ke<select value={a.sisa ?? 'otomatis'} onChange={e => ubahArea({ sisa: e.target.value as SpekArea['sisa'] })}>
+                        <option value="otomatis">Otomatis (cross aisle tengah / dibagi rata)</option><option value="awal">Cross aisle awal</option><option value="akhir">Cross aisle akhir</option></select></label>
                     </div>
+                    {cl && <p className="small" style={{ margin: 0 }}>Hasil di denah: cross aisle awal <b>{angka(cl.awal, 2)} m</b>{a.nTengah > 0 && <> · tengah <b>{angka(cl.tengah, 2)} m</b> × {a.nTengah}</>} · akhir <b>{angka(cl.akhir, 2)} m</b> · bay per segmen {cl.bay.join(' / ')}{cl.sisa > 0.005 && <span className="muted"> (sisa {angka(cl.sisa, 2)} m)</span>}</p>}
                     <p className="small muted" style={{ margin: 0 }}><b>{ra.baris} baris · {angka(ra.bay)} bay · {angka(ra.posisi)} posisi</b> · tinggi rak {angka(tinggiRak(s), 2)} m. Tarik tepi area di denah — baris, lorong, dan bay terbentuk ulang otomatis.</p>
                   </>); })()}
                 {terpilih.rak && (() => { const s = terpilih.rak; const set = (p: Partial<typeof s>) => ubahK(k => { const r = { ...k.rak!, ...p }; return { ...k, rak: r, tinggi: r2(tinggiRak(r)) }; }); return (

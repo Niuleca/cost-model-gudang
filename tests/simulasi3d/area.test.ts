@@ -34,3 +34,18 @@ test('rak layout otomatis → area (per kolom) → kapasitas sama; pecah lagi �
   const pecah = { ...x, komponen: x.komponen.flatMap(k => (k.area ? pecahArea(k) : [k])) };
   assert.equal(ringkas(pecah).totalRak, awal);
 });
+
+test('cross aisle akhir & awal dipatuhi tepat; sisa < 1 bay ke tengah / dibagi rata / sesuai pilihan', () => {
+  const [a] = komponenBaru('areaRak', p, { x: 10, z: 0 }, 1.4);
+  const bw = a.area!.rak.bayW; const ujung = (k: typeof a) => Math.max(...uraiArea(k).map(r => r.x + r.w)); const awal = (k: typeof a) => Math.min(...uraiArea(k).map(r => r.x));
+  for (const akhir of [0, 1, 2.5, 4]) {
+    const k = { ...a, w: 40, area: { ...a.area!, crossAwal: 0, crossAkhir: akhir, nTengah: 1, crossTengah: 3.4 } };
+    assert.ok(Math.abs(k.x + k.w - ujung(k) - akhir) < 0.011, `akhir ${akhir}: ${k.x + k.w - ujung(k)}`);
+    assert.ok(Math.abs(awal(k) - k.x) < 0.011);
+  }
+  const tanpaTengah = { ...a, w: 40, area: { ...a.area!, crossAwal: 0, crossAkhir: 1, nTengah: 0, sisa: 'akhir' as const } };
+  assert.ok(Math.abs(awal(tanpaTengah) - tanpaTengah.x) < 0.011);
+  const keAwal = { ...tanpaTengah, area: { ...tanpaTengah.area, sisa: 'awal' as const } };
+  assert.ok(Math.abs(keAwal.x + keAwal.w - ujung(keAwal) - 1) < 0.011);
+  assert.ok(ringkasArea(keAwal).bay === ringkasArea(tanpaTengah).bay && bw > 0);
+});
