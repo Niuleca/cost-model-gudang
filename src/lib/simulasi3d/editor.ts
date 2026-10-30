@@ -160,8 +160,7 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
   const D = Math.max(0.3, a.dalam), Lor = Math.max(0, s.lebarLorong), gap0 = Math.max(0, a.b2b);
   const kel = Math.max(0, a.kelonggaran ?? 0.1), bebas = Math.max(0, a.bebasRintangan ?? 0.3);
   if (adaptif && e) { const m = Math.max(0, a.bebasDinding ?? 0.5), Wb = ax ? e.gedung.W : e.gedung.L; B0 = Math.max(B0, m); B1 = Math.min(B1, Wb - m); }
-  const B = B1 - B0;
-  const c = celahArea(k, e); if (!c || D > B + 1e-6) return [];
+  const c = celahArea(k, e); if (!c) return [];
   const seg: { p: number; pj: number }[] = []; for (let i = 0, p = c.a0 + c.awal; i < c.bay.length; p += c.bay[i] * s.bayW + c.tengah, i++) seg.push({ p, pj: c.bay[i] * s.bayW });
   // rintangan (mode adaptif): kotak di koordinat A (sepanjang baris) & B (melintang), sudah ditambah kelonggaran
   const { A0 } = rentangA(k, e); const A1 = A0 + rentangA(k, e).A;
@@ -176,6 +175,14 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
     const g = garisKolom[garisKolom.length - 1];
     if (g && r.inti.b0 <= g.b1 + 0.05) g.b1 = Math.max(g.b1, r.inti.b1); else garisKolom.push({ ...r.inti });
   }
+  // kolom tepi (menempel / dekat dinding): rak tepi digeser melewati kolom (+ kelonggaran), bukan dipotong
+  if (adaptif) {
+    const dekat = 0.3 + kel;
+    for (const g of garisKolom) if (g.b0 <= B0 + dekat && g.b1 + kel > B0) B0 = g.b1 + kel;
+    for (const g of [...garisKolom].reverse()) if (g.b1 >= B1 - dekat && g.b0 - kel < B1) B1 = g.b0 - kel;
+    for (let i = garisKolom.length - 1; i >= 0; i--) if (garisKolom[i].b1 <= B0 || garisKolom[i].b0 >= B1) garisKolom.splice(i, 1);
+  }
+  const B = B1 - B0; if (D > B + 1e-6) return [];
   // melintang: [tepi tunggal] lorong [pasangan / tunggal] lorong ... [sisa tunggal]
   const baris: { b: number; hadap: 1 | -1 }[] = [];
   const pair = 2 * D + gap0;
@@ -243,6 +250,34 @@ export const ringkasArea = (k: Komponen, e?: KonteksArea) => {
   const rows = uraiArea(k, e); const per = new Set(rows.map(r => (k.area!.rak.arah === 'x' ? r.z : r.x)));
   return { baris: per.size, bay: rows.reduce((a, r) => a + nBay(r), 0), posisi: rows.reduce((a, r) => a + kapasitasRak(r), 0) };
 };
+/**
+ * Lorong & row spacer aktual di dalam area (dari baris yang terbentuk): lebar melintang, posisi garis ukur sepanjang baris.
+ * jenis 'lorong' = jarak antarbaris ≥ lebar lorong minimum; 'spacer' = celah back-to-back (termasuk spacer kolom).
+ */
+export function lorongArea(k: Komponen, e?: KonteksArea): { jenis: 'lorong' | 'spacer'; b0: number; b1: number; lebar: number; a: number }[] {
+  const a = k.area; if (!a) return [];
+  const ax = a.rak.arah === 'x'; const D = Math.max(0.3, a.dalam); const Lor = Math.max(0, a.rak.lebarLorong);
+  const strip = new Map<number, { b: number; a0: number; a1: number; hadap: number }>();
+  for (const r of uraiArea(k, e)) {
+    const b = ax ? r.z : r.x, a0 = ax ? r.x : r.z, a1 = a0 + (ax ? r.w : r.d);
+    const t = strip.get(b); if (t) { t.a0 = Math.min(t.a0, a0); t.a1 = Math.max(t.a1, a1); } else strip.set(b, { b, a0, a1, hadap: r.rak!.hadap });
+  }
+  const st = [...strip.values()].sort((p, q) => p.b - q.b); const out: ReturnType<typeof lorongArea> = [];
+  const tepi = e ? (ax ? e.gedung.W : e.gedung.L) : Infinity;
+  const tambah = (jenis: 'lorong' | 'spacer', b0: number, b1: number, a0: number, a1: number) => {
+    const lebar = r2(b1 - b0); if (lebar < 0.01) return;
+    out.push({ jenis, b0, b1, lebar, a: a1 - a0 > 2.4 ? a0 + 1.2 : (a0 + a1) / 2 });
+  };
+  if (st.length && st[0].hadap === -1 && st[0].b >= Lor - 0.05 && st[0].b < Lor * 3) tambah('lorong', 0, st[0].b, st[0].a0, st[0].a1);
+  for (let i = 0; i + 1 < st.length; i++) {
+    const p = st[i], q = st[i + 1]; const b0 = p.b + D, b1 = q.b; if (b1 - b0 < 0.01) continue;
+    const a0 = Math.max(p.a0, q.a0), a1 = Math.min(p.a1, q.a1);
+    tambah(b1 - b0 >= Lor - 0.05 ? 'lorong' : 'spacer', b0, b1, a1 > a0 ? a0 : p.a0, a1 > a0 ? a1 : p.a1);
+  }
+  const l = st[st.length - 1];
+  if (l && l.hadap === 1 && tepi - (l.b + D) >= Lor - 0.05 && tepi - (l.b + D) < Lor * 3) tambah('lorong', l.b + D, tepi, l.a0, l.a1);
+  return out;
+}
 /** Area rak → baris rak satuan (bisa diedit satu per satu). */
 export const pecahArea = (k: Komponen, e?: KonteksArea): Komponen[] => uraiArea(k, e).map(r => ({ ...r, id: uid(), induk: undefined, label: r.jenis === 'ddr' ? 'Rak DDR' : 'Rak SPR' }));
 

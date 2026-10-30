@@ -2,7 +2,7 @@
 // Editor denah 2D (SVG): tampak atas, X = panjang gudang (dock di kiri), Z = lebar gudang (ke bawah).
 // Pilih, geser (drag), ubah ukuran (handle), ukur jarak, garis ukur otomatis ke rintangan / dinding, latar denah gambar / DXF.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { celahArea, dimRak, jarakBebas, nBay, ringkasArea, uraiArea, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 
 export type Mode = 'pilih' | 'blok' | 'ukur' | 'geser';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
@@ -298,7 +298,15 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       )}
       {terpilih && mode === 'pilih' && handle(terpilih)}
       {/* area rak terpilih: lebar cross aisle aktual (awal / tengah / akhir) */}
-      {terpilih?.area && (() => {
+      {/* lebar lorong aktual tiap area rak (ikut ekspor); row spacer hanya saat area dipilih */}
+      {edit.komponen.filter(k => k.area).map(k => {
+        const ax = k.area!.rak.arah === 'x'; const dipilih = k.id === pilih;
+        return <g key={`lor${k.id}`} style={{ pointerEvents: 'none' }}>{lorongArea(k, edit).filter(l => l.jenis === 'lorong' || dipilih).map((l, i) => {
+          const w = l.jenis === 'lorong' ? '#7c3aed' : '#64748b'; const t = `${f1(l.lebar)}${l.jenis === 'lorong' ? ' m' : ''}`;
+          return ax ? garisUkur(l.a, l.b0, l.a, l.b1, t, w, `l${i}`, l.jenis === 'lorong') : garisUkur(l.b0, l.a, l.b1, l.a, t, w, `l${i}`, l.jenis === 'lorong');
+        })}</g>;
+      })}
+      {terpilih?.area && terpilih.area.mode !== 'adaptif' && (() => {
         const k = terpilih; const c = celahArea(k, edit); if (!c) return null;
         const ax = k.area!.rak.arah === 'x'; const A0 = c.a0; const m = ax ? k.z + k.d / 2 : k.x + k.w / 2; const bw = k.area!.rak.bayW;
         const celah: [number, number][] = []; let p = A0;
