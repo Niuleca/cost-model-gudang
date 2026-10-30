@@ -171,4 +171,5 @@ export interface StatSim {
   tungguTruk: { n: number; jam: number; maks: number };  // tunggu dari tiba sampai sandar di dock
   selesai: Partial<Record<JenisTugas, { n: number; jam: number }>>;
   jamTersedia: number;                                   // jam-orang tersedia (pekerja hadir × jam shift), untuk utilisasi
+  stagingMaks: { in: number; out: number };              // isi tertinggi area staging (palet)
 }

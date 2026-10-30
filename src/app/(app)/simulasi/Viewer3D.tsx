@@ -190,6 +190,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
         if (g.garpu && g.angkat) { const f = u - Math.floor(u); g.garpu.position.y = (f > 0.42 && f < 0.58 ? Math.sin(((f - 0.42) / 0.16) * Math.PI) : 0) * g.angkat; }
       }
       s.lap?.frame(dt);
+      if (!el.clientWidth) return;   // panel 3D disembunyikan (mis. mode 2D): simulasi tetap jalan, render dilewati
       ctl.update(); renderer.render(scene, cam); lr.render(scene, cam);
     };
     loop();

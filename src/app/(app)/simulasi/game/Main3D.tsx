@@ -10,6 +10,8 @@ import type { Kamera, OpsiViewer, TemaViewer, ViewerApi } from '../Viewer3D';
 import { WARNA_ORANG } from '../warna';
 import { buatLapisanGame, LANGKAH_DIAM, LANGKAH_TUGAS, type KontrolGame, type Pilihan, type StatGerak } from './lapisan3d';
 import { Ikon, LABEL_TUGAS, PanelArmada, PanelInfo, PanelOrder, orderDilacak } from './panel';
+import Sim2D, { type Opsi2D } from './Sim2D';
+import Analisis from './Analisis';
 
 const Viewer3D = dynamic(() => import('../Viewer3D'), { ssr: false, loading: () => <div className="sim3d-wadah sim3d-muat">Menyiapkan 3D…</div> });
 
@@ -20,7 +22,8 @@ const jt = (v: number) => `${(v / 1e6).toLocaleString('id-ID', { maximumFraction
 const hariId = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const angka = (v: number, k = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: k });
 const durasiTeks = (det: number) => { const s = Math.max(0, Math.round(det)); return s >= 3600 ? `${Math.floor(s / 3600)} j ${Math.floor((s % 3600) / 60)} m` : s >= 60 ? `${Math.floor(s / 60)} m ${s % 60} d` : `${s} d`; };
-type TabBawah = 'tugas' | 'flag' | 'prod' | 'kejadian' | 'tampilan';
+type TabBawah = 'tugas' | 'flag' | 'analisis' | 'prod' | 'kejadian' | 'tampilan';
+export type TampilSim = '3d' | '2d' | 'split';
 
 /** Red flag dari jarak layout: kecepatan gerak yang dituntut productivity (jarak ÷ waktu jalan) dibanding batas wajar. */
 function flagGerak(sg: Partial<Record<JenisTugas, StatGerak>>): RedFlag[] {
@@ -35,7 +38,9 @@ function flagGerak(sg: Partial<Record<JenisTugas, StatGerak>>): RedFlag[] {
   return out;
 }
 
-export default function Main3D({ dunia, layout, hariMaks, onTick }: { dunia: Dunia; layout: LayoutGudang; hariMaks: number; onTick: () => void }) {
+export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '3d' }: { dunia: Dunia; layout: LayoutGudang; hariMaks: number; onTick: () => void; tampilAwal?: TampilSim }) {
+  const [tampilan, setTampilan] = useState<TampilSim>(tampilAwal);
+  const [opsi2d, setOpsi2d] = useState<Opsi2D>({ alur: false, okupansi: true, label: true });
   const kontrol = useRef<KontrolGame>({ jalan: false, kecepatan: 60, batas: hariMaks * HARI - 1, pilih: null,
     jelajah: false, tombol: { maju: false, mundur: false, kiri: false, kanan: false, lari: false }, amatan: null, statGerak: {} });
   const [jelajah, setJelajahS] = useState(false);
@@ -50,7 +55,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick }: { dunia: Dun
   const [tema, setTema] = useState<TemaViewer>('bersih');
   const [, setVersi] = useState(0);
   const [opsi, setOpsi] = useState<OpsiViewer>({ atap: false, dinding: true, label: false, animasi: true, truk: true, orang: true });
-  const [panel, setPanel] = useState(true);
+  const [panel, setPanel] = useState(tampilAwal === '3d');
   const api = useRef<ViewerApi>(null);
   const onTickRef = useRef(onTick); onTickRef.current = onTick;
   const setPilih = (p: Pilihan | null) => { kontrol.current.pilih = p; setPilihState(p); };
@@ -114,13 +119,17 @@ export default function Main3D({ dunia, layout, hariMaks, onTick }: { dunia: Dun
           </div>
           <button type="button" className="ghost" disabled={selesai} onClick={() => lompat(shiftBerikut(dunia))}>Ke shift berikutnya ⏭</button>
           <button type="button" className="ghost" disabled={selesai} onClick={() => lompat((w.hari + 1) * HARI - 1)}>Selesaikan hari ini</button>
-          <button type="button" className={jelajah ? '' : 'ghost'} onClick={() => setJelajah(!jelajah)} title="Kendalikan 1 karakter untuk menjelajah gudang dan mengamati pekerjaan">{jelajah ? '✕ Keluar jelajah' : '🧭 Mode jelajah'}</button>
+          <div className="tabs" role="group" aria-label="Tampilan">
+            {([['2d', '2D'], ['split', '2D + 3D'], ['3d', '3D']] as [TampilSim, string][]).map(([k, l]) => <button key={k} type="button" className={tampilan === k ? 'on' : ''} onClick={() => { setTampilan(k); if (k === '2d' && jelajah) setJelajah(false); if (k !== '3d') setPanel(false); }}>{l}</button>)}
+          </div>
+          <button type="button" className={jelajah ? '' : 'ghost'} disabled={tampilan === '2d'} onClick={() => setJelajah(!jelajah)} title="Kendalikan 1 karakter untuk menjelajah gudang dan mengamati pekerjaan">{jelajah ? '✕ Keluar jelajah' : '🧭 Mode jelajah'}</button>
           <button type="button" className={`ghost gm-flag-tombol${nKritis ? ' kritis' : ''}`} onClick={() => setTabBawah('flag')}>⚑ {flags.length} red flag{nKritis ? ` · ${nKritis} kritis` : ''}</button>
         </div>
       </div>
 
-      <div className={`game-layar${panel ? '' : ' tanpa-panel'}`}>
-        <Viewer3D apiRef={api} layout={layout} shift={0} opsi={opsi} kecepatan={{ faktor: 0, siklus: {} }} lapisan={lapisan} tema={tema} />
+      <div className={`game-layar tampil-${tampilan}${panel ? '' : ' tanpa-panel'}`}>
+        {tampilan !== '3d' && <Sim2D dunia={dunia} layout={layout} kontrol={kontrol} pilih={pilih} onPilih={p => setPilih(p)} opsi={opsi2d} />}
+        <div className="gm-3d"><Viewer3D apiRef={api} layout={layout} shift={0} opsi={opsi} kecepatan={{ faktor: 0, siklus: {} }} lapisan={lapisan} tema={tema} /></div>
         <div className="gm-kpi">
           <div className="gm-kartu"><span className="gm-ikon"><Ikon n="palet" /></span><div><small>Stok di gudang</small><b>{angka(stok)}</b><span>palet · {kap ? angka((stok / kap) * 100) : 0}% terisi <em className={hi.paletMasuk - Math.round(hi.paletKeluarEq) >= 0 ? 'naik' : 'turun'}>{hi.paletMasuk - Math.round(hi.paletKeluarEq) >= 0 ? '▲' : '▼'} {Math.abs(hi.paletMasuk - Math.round(hi.paletKeluarEq))}</em></span></div></div>
           <div className="gm-kartu"><span className="gm-ikon"><Ikon n="truk" /></span><div><small>Truk di lokasi</small><b>{trukDiLokasi}</b><span>{inbDiLokasi} inbound · {trukDiLokasi - inbDiLokasi} outbound</span></div></div>
@@ -187,7 +196,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick }: { dunia: Dun
       </div>
 
       <div className="tabs game-tab-bawah" role="tablist">
-        {([['flag', `Red flag (${flags.length})`], ['tugas', 'Tugas'], ['prod', 'Productivity'], ['kejadian', 'Kejadian'], ['tampilan', 'Tampilan']] as [TabBawah, string][]).map(([k, l]) => (
+        {([['flag', `Red flag (${flags.length})`], ['analisis', 'Analisis KPI'], ['tugas', 'Tugas'], ['prod', 'Productivity'], ['kejadian', 'Kejadian'], ['tampilan', 'Tampilan']] as [TabBawah, string][]).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tabBawah === k} className={tabBawah === k ? 'on' : ''} onClick={() => setTabBawah(k)}>{l}</button>
         ))}
       </div>
@@ -241,9 +250,17 @@ export default function Main3D({ dunia, layout, hariMaks, onTick }: { dunia: Dun
           </>
         )}
         {tabBawah === 'kejadian' && <ul className="small game-kejadian">{hi.kejadian.length ? hi.kejadian.slice(-12).reverse().map((k, i) => <li key={i}>{k}</li>) : <li className="muted">Belum ada kejadian.</li>}</ul>}
+        {tabBawah === 'analisis' && <Analisis d={dunia} layout={layout} />}
         {tabBawah === 'tampilan' && (
           <div>
             <div className="game-opsi">
+              <b className="small">2D:</b>
+              {([['okupansi', 'Okupansi rak'], ['alur', 'Peta alur (flow)'], ['label', 'Label']] as [keyof Opsi2D, string][]).map(([k, l]) => (
+                <label key={k} className="small"><input type="checkbox" checked={opsi2d[k]} onChange={e => setOpsi2d({ ...opsi2d, [k]: e.target.checked })} /> {l}</label>
+              ))}
+            </div>
+            <div className="game-opsi">
+              <b className="small">3D:</b>
               {([['label', 'Label'], ['dinding', 'Dinding'], ['atap', 'Atap'], ['truk', 'Truk'], ['orang', 'Pekerja']] as const).map(([k, l]) => (
                 <label key={k} className="small"><input type="checkbox" checked={opsi[k]} onChange={e => setOpsi({ ...opsi, [k]: e.target.checked })} /> {l}</label>
               ))}

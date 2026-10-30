@@ -35,7 +35,7 @@ export function buatDunia(sk: Skenario): Dunia {
     antrian: buatAntrian(), seq: 0,
     kas: sk.modal, piutang: [], akrual: { pendapatan: 0, biaya: 0 },
     hariIni: kosongHari(), laporan: [], hariKasNegatif: 0, bangkrut: false, pelanggaran: [],
-    stat: { lemburJam: 0, tungguTruk: { n: 0, jam: 0, maks: 0 }, selesai: {}, jamTersedia: 0 },
+    stat: { lemburJam: 0, tungguTruk: { n: 0, jam: 0, maks: 0 }, selesai: {}, jamTersedia: 0, stagingMaks: { in: 0, out: 0 } },
   };
   stokAwal(d);
   jadwal(d, 0, 'awal_hari');
@@ -72,7 +72,9 @@ function txn(d: Dunia, tipe: TipeTxn, l: Lpn, karton: number, extra: { dari?: st
 function buang(a: string[], x: string) { const i = a.lastIndexOf(x); if (i >= 0) a.splice(i, 1); }
 function taruh(d: Dunia, l: Lpn, lokasi: string) {
   const lama = d.lokasi.get(l.lokasi); if (lama) buang(lama.lpn, l.id);
-  l.lokasi = lokasi; d.lokasi.get(lokasi)!.lpn.push(l.id);
+  const lok = d.lokasi.get(lokasi)!; l.lokasi = lokasi; lok.lpn.push(l.id);
+  if (lok.tipe === 'staging_in') d.stat.stagingMaks.in = Math.max(d.stat.stagingMaks.in, lok.lpn.length);
+  else if (lok.tipe === 'staging_out') d.stat.stagingMaks.out = Math.max(d.stat.stagingMaks.out, lok.lpn.length);
 }
 function hapusLpn(d: Dunia, l: Lpn) {
   const lok = d.lokasi.get(l.lokasi); if (lok) buang(lok.lpn, l.id);

@@ -20,7 +20,8 @@ import Potongan, { potongAwal, type ArahPotong, type PotonganApi } from './layou
 import ParamSpace from './ParamSpace';
 import type { Kamera, OpsiViewer, ViewerApi } from './Viewer3D';
 
-const Viewer3D = dynamic(() => import('./Viewer3D'), { ssr: false, loading: () => <div className="sim3d-wadah sim3d-muat">Menyiapkan 3D…</div> });
+const Desain3D = dynamic(() => import('./desain/Desain3D'), { ssr: false, loading: () => <div className="sim3d-wadah sim3d-muat">Menyiapkan 3D…</div> });
+const SimulasiDesain = dynamic(() => import('./desain/SimulasiDesain'), { ssr: false, loading: () => <div className="card sim3d-wadah sim3d-muat">Menyiapkan simulasi…</div> });
 
 interface T { id: string; kode: string | null; customer: string; status: string }
 interface Versi { id: string; nama: string; updated_at: string; data: LayoutEdit }
@@ -65,6 +66,8 @@ export default function DesainGudang() {
   const [sibuk, setSibuk] = useState(false);
   const [lapis, setLapis] = useState({ n: 2, jarak: 0, arah: 'z' as 'x' | 'z' });
   const [jarakDinding, setJarakDinding] = useState(0.5);
+  const [langkah, setLangkah] = useState<'layout' | 'simulasi'>('layout');
+  const [gaya3d, setGaya3d] = useState<'leca' | 'skematik'>('leca');
   const [potongan, setPotongan] = useState<{ arah: ArahPotong; nilai: number } | null>(null);
   const apiPotong = useRef<PotonganApi>(null);
   const [zoomPotong, setZoomPotong] = useState(1);
@@ -334,7 +337,14 @@ export default function DesainGudang() {
         {sibuk && <p className="small muted">Memuat…</p>}
       </div>
 
-      {edit && data && rk && (
+      {edit && data && (
+        <div className="tabs sim-langkah" role="tablist" aria-label="Langkah">
+          <button type="button" role="tab" aria-selected={langkah === 'layout'} className={langkah === 'layout' ? 'on' : ''} onClick={() => setLangkah('layout')}>① Desain layout</button>
+          <button type="button" role="tab" aria-selected={langkah === 'simulasi'} className={langkah === 'simulasi' ? 'on' : ''} onClick={() => setLangkah('simulasi')}>② Simulasi operasi (2D & 3D)</button>
+        </div>
+      )}
+      {edit && data && langkah === 'simulasi' && <SimulasiDesain edit={edit} data={data} kotor={kotor} />}
+      {edit && data && rk && langkah === 'layout' && (
         <div className="sim2d-tata">
           {/* ---------- kiri: alat & komponen */}
           <div className="card sim2d-kiri">
@@ -421,6 +431,8 @@ export default function DesainGudang() {
                 </div>
                 {tampil !== '2d' && (<>
                   <div className="tabs">{([['iso', 'Iso'], ['atas', 'Atas'], ['dock', 'Dock'], ['lorong', 'Lorong']] as [Kamera, string][]).map(([k, l]) => <button key={k} onClick={() => { setPotongan(null); setTimeout(() => api3.current?.kamera(k), 0); }}>{l}</button>)}</div>
+                  <label className="small sim3d-cek" title="Leca = visual Leca Game (model 3D detail, palet bertekstur); skematik = model sederhana">Gaya 3D
+                    <select value={gaya3d} onChange={e => setGaya3d(e.target.value as 'leca' | 'skematik')}><option value="leca">Leca (detail)</option><option value="skematik">Skematik</option></select></label>
                   {([['label', 'Label'], ['orang', 'Manpower'], ['truk', 'Truk'], ['dinding', 'Dinding'], ['atap', 'Atap']] as [keyof OpsiViewer, string][]).map(([k, l]) => (
                     <label key={k} className="sim3d-cek small"><input type="checkbox" checked={opsi3d[k]} onChange={e => setOpsi3d(o => ({ ...o, [k]: e.target.checked }))} />{l}</label>
                   ))}
@@ -435,7 +447,7 @@ export default function DesainGudang() {
               </div>
               {tampil !== '2d' && layout3d && (
                 <div className="sim2d-panel3d">
-                  <div style={{ display: potongan ? 'none' : 'contents' }}><Viewer3D apiRef={api3} layout={layout3d} shift={layout3d.shiftAktif[0] ?? 0} opsi={opsi3d} kecepatan={kec} /></div>
+                  <div style={{ display: potongan ? 'none' : 'contents' }}>{edit3d && <Desain3D edit={edit3d} data={data} layoutSkematik={layout3d} gaya={gaya3d} opsi={opsi3d} apiRef={api3} kec={kec} />}</div>
                   {potongan && (
                     <div className="sim2d-potong-wadah">
                       <div className="sim2d-potong-gulir"><div style={{ width: `${zoomPotong * 100}%`, height: `${zoomPotong * 100}%` }}><Potongan ref={apiPotong} edit={edit} arah={potongan.arah} nilai={potongan.nilai} /></div></div>

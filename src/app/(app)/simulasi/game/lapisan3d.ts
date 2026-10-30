@@ -17,10 +17,13 @@ export interface Amatan {
 }
 /** Kecepatan gerak tersirat per jenis tugas = jarak jalur layout ÷ porsi waktu jalan dari durasi productivity. */
 export interface StatGerak { n: number; kecTotal: number; kecMaks: number; jarakTotal: number; olehOrang: number }
+/** Posisi aktor untuk tampilan 2D (ditulis lapisan tiap frame). */
+export interface Aktor2D { id: string; jenis: 'mhe' | 'pekerja'; x: number; z: number; rot: number; sibuk: boolean; bawa: 'palet' | 'karton' | null; kemampuan?: string; mhe?: string; tugas?: JenisTugas }
 export interface KontrolGame {
   jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null;
   jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean };
   amatan: Amatan | null; statGerak: Partial<Record<JenisTugas, StatGerak>>;
+  aktor2d?: Aktor2D[];
 }
 export const LANGKAH_TUGAS = ['Jalan ke titik ambil', 'Ambil / angkat', 'Bawa ke tujuan', 'Taruh / turunkan'];
 export const LANGKAH_DIAM = ['Jalan ke lokasi kerja', 'Mengerjakan (cek / admin / packing)'];
@@ -462,6 +465,20 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         menujuRumah(m, dtGame, KEC_MHE);
       }
       gambarPalet(dibawa);
+      // snapshot posisi untuk tampilan 2D
+      const a2: Aktor2D[] = [];
+      const mheSibuk = new Map<string, { bawa: Aktor2D['bawa']; tugas: JenisTugas }>();
+      for (const p of d.pekerja) {
+        const a = orang.get(p.id); if (!a) continue;
+        const tg = p.sibuk ? d.tugas.get(p.sibuk) : undefined;
+        const f = tg && tg.mulai != null && tg.durasi ? (d.t - tg.mulai) / tg.durasi : 0;
+        const bawa: Aktor2D['bawa'] = tg && a.rencana && f >= 0.32 && f < 0.92 ? (a.rencana.bawaPalet ? 'palet' : a.rencana.bawaKarton ? 'karton' : null) : null;
+        if (tg?.mhe) mheSibuk.set(tg.mhe, { bawa, tugas: tg.jenis });
+        if (!a.obj.visible) continue;
+        a2.push({ id: p.id, jenis: 'pekerja', x: a.obj.position.x, z: a.obj.position.z, rot: a.obj.rotation.y, sibuk: !!tg, bawa, kemampuan: p.kemampuan ?? undefined, tugas: tg?.jenis });
+      }
+      for (const [id, m] of mhe) { const s = mheSibuk.get(id); a2.push({ id, jenis: 'mhe', x: m.obj.position.x, z: m.obj.position.z, rot: m.obj.rotation.y, sibuk: !!s || !!d.mhe.find(x => x.id === id)?.sibuk, bawa: s?.bawa ?? null, mhe: d.mhe.find(x => x.id === id)?.jenis, tugas: s?.tugas }); }
+      k.aktor2d = a2;
       perbaruiTruk();
       perbaruiPin();
       // animasi pekerja: jalan saat berpindah, gerakan kerja saat cek/admin/packing, selain itu berdiri siaga
