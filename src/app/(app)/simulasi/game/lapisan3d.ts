@@ -24,7 +24,7 @@ export interface StatGerak { n: number; kecTotal: number; kecMaks: number; jarak
 export interface Aktor2D { id: string; jenis: 'mhe' | 'pekerja' | 'pemain'; x: number; z: number; rot: number; sibuk: boolean; bawa: 'palet' | 'karton' | null; kemampuan?: string; mhe?: string; tugas?: JenisTugas }
 export interface KontrolGame {
   jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null;
-  jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean };
+  jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean; putarKiri?: boolean; putarKanan?: boolean };
   amatan: Amatan | null; statGerak: Partial<Record<JenisTugas, StatGerak>>;
   aktor2d?: Aktor2D[];
   /** mode kerja pemain (motion study) */
@@ -435,11 +435,12 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const keyTombol = (e: KeyboardEvent, nilai: boolean) => {
       const k2 = kontrol.current; if (!k2.jelajah) return;
       const tg = e.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return;
-      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'kiri', arrowleft: 'kiri', d: 'kanan', arrowright: 'kanan', shift: 'lari' };
+      // W/S maju-mundur, Q/E putar kiri-kanan, A/D geser kiri-kanan (kendaraan: belok), Shift lari
+      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'kiri', arrowleft: 'kiri', d: 'kanan', arrowright: 'kanan', shift: 'lari', q: 'putarKiri', e: 'putarKanan' };
       const kunci = e.key.toLowerCase();
       if (nilai && !e.repeat && k2.pemain) {
-        // tombol sekali tekan mode kerja: E = aksi, R / F = naik / turun level garpu
-        if (kunci === 'e') { k2.pemain.minta++; e.preventDefault(); return; }
+        // tombol sekali tekan mode kerja: Spasi / Enter = aksi, R / F = naik / turun level garpu
+        if (kunci === ' ' || kunci === 'spacebar' || kunci === 'enter') { k2.pemain.minta++; e.preventDefault(); return; }
         if (kunci === 'r') { k2.pemain.level = Math.min(L.levelY.length - 1, k2.pemain.level + 1); e.preventDefault(); return; }
         if (kunci === 'f') { k2.pemain.level = Math.max(0, k2.pemain.level - 1); e.preventDefault(); return; }
         if (kunci === 't' && k2.pemain.mode === 'hpt') { k2.pemain.tarik = !k2.pemain.tarik; e.preventDefault(); return; }
@@ -679,16 +680,16 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       if (aksiP) return `${LABEL_AKSI[aksiP.nama] ?? aksiP.nama}…`;
       if (m === 'cbt' || m === 'reach' || m === 'hpt') {
         const jd = m === 'hpt' ? 1.0 : 1.6;
-        if (!bawaP) { const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0]; return p ? `E = ambil palet (tinggi ${f1(p.y)} m)` : m === 'hpt' ? 'Arahkan garpu ke palet di lantai' : `Arahkan garpu ke palet — target level ${sp.level + 1} (R/F ganti level)`; }
-        const tj = tujuanTaruh(jd, sp, m === 'hpt'); return tj ? `E = taruh di ${tj.ket} (tinggi ${f1(tj.y)} m)` : m === 'hpt' ? 'Cari lantai kosong (penanda biru)' : 'Arahkan garpu ke slot hijau berkedip (≤ 1 m) lalu E — level menyesuaikan otomatis';
+        if (!bawaP) { const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0]; return p ? `Spasi = ambil palet (tinggi ${f1(p.y)} m)` : m === 'hpt' ? 'Arahkan garpu ke palet di lantai' : `Arahkan garpu ke palet — target level ${sp.level + 1} (R/F ganti level)`; }
+        const tj = tujuanTaruh(jd, sp, m === 'hpt'); return tj ? `Spasi = taruh di ${tj.ket} (tinggi ${f1(tj.y)} m)` : m === 'hpt' ? 'Cari lantai kosong (penanda biru)' : 'Arahkan garpu ke slot hijau berkedip (≤ 1 m) lalu Spasi — level menyesuaikan otomatis';
       }
       if (m === 'picker') {
-        if (kartonP.visible) { const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined).sort((x, y) => Number(y.id === ORDER) - Number(x.id === ORDER))[0]; return p ? `E = taruh karton di ${p.id === ORDER ? 'palet order' : 'palet ini'}` : 'Bawa karton ke palet order (penanda biru)'; }
+        if (kartonP.visible) { const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined).sort((x, y) => Number(y.id === ORDER) - Number(x.id === ORDER))[0]; return p ? `Spasi = taruh karton di ${p.id === ORDER ? 'palet order' : 'palet ini'}` : 'Bawa karton ke palet order (penanda biru)'; }
         const ps = paletDepan(0.8, 1.8, { ...sp, level: 0 }, ORDER).filter(x => sisaKarton(x.id) > 0)[0];
-        return ps ? `E = ambil 1 karton (sisa ${sisaKarton(ps.id)} karton di palet ini)` : 'Jalan ke pick face (palet rak level 1) — ikuti penanda biru';
+        return ps ? `Spasi = ambil 1 karton (sisa ${sisaKarton(ps.id)} karton di palet ini)` : 'Jalan ke pick face (palet rak level 1) — ikuti penanda biru';
       }
-      if (m === 'checker') return paletDepan(0.9, 2.6, { ...sp, level: 0 }).filter(x => x.id !== ORDER)[0] ? 'E = scan & cek palet' : 'Dekati palet untuk dicek (penanda biru)';
-      if (m === 'admin') return dokP.visible ? (dekatMeja() ? 'E = input & konfirmasi dokumen' : 'Bawa dokumen ke meja admin (dekat staging)') : dekatDock() ? 'E = terima dokumen dari sopir' : 'Jalan ke pintu dock untuk menerima dokumen';
+      if (m === 'checker') return paletDepan(0.9, 2.6, { ...sp, level: 0 }).filter(x => x.id !== ORDER)[0] ? 'Spasi = scan & cek palet' : 'Dekati palet untuk dicek (penanda biru)';
+      if (m === 'admin') return dokP.visible ? (dekatMeja() ? 'Spasi = input & konfirmasi dokumen' : 'Bawa dokumen ke meja admin (dekat staging)') : dekatDock() ? 'Spasi = terima dokumen dari sopir' : 'Jalan ke pintu dock untuk menerima dokumen';
       return '';
     };
     /** Jalankan aksi berjalan, ukur elemen siklus, posisi garpu & palet yang dibawa. */
@@ -715,7 +716,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       penanda.visible = !!tg && sp.target!.jarak > 1.6;
       if (tg) { penanda.position.set(tg.x, 0, tg.z); const tx = `${tg.label} · ${sp.target!.jarak.toFixed(0)} m`; if (lblT.element.textContent !== tx) lblT.element.textContent = tx; cincinT.scale.setScalar(1 + 0.15 * Math.sin(jamP * 4)); }
       // tanda hijau: objek yang akan dikenai aksi E saat ini
-      const sasaran = !aksiP && sp.petunjuk.startsWith('E = ') ? sasaranE(sp) : null;
+      const sasaran = !aksiP && sp.petunjuk.startsWith('Spasi = ') ? sasaranE(sp) : null;
       tandaJangkau.visible = !!sasaran; if (sasaran) tandaJangkau.position.set(sasaran.x, sasaran.y + 0.03, sasaran.z);
       // badan pemain & hand pallet: ditarik (operator di depan, garpu di belakang) atau didorong
       const kendaraanAktif = sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt';
@@ -732,7 +733,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     };
     let bawaPemain: { pos: V; rot: number; sku: string; lpn: string | null } | null = null;
     // ---------- kamera ikut (gaya survival): di atas-belakang karakter; boleh diputar/zoom, kembali sendiri 3 dtk setelah dilepas
-    let kamPegang = false, kamLepas = -99, jamKam = 0;
+    let kamPegang = false, kamLepas = -99, jamKam = 0, kamGerak = -99;
     const kamMulai = () => { kamPegang = true; }, kamSelesai = () => { kamPegang = false; kamLepas = jamKam; };
     kontrolKamera.addEventListener('start', kamMulai); kontrolKamera.addEventListener('end', kamSelesai);
     /** Garis kamera→karakter bebas rak (di bawah puncak rak) & dinding. */
@@ -753,7 +754,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       const sp = kontrol.current.pemain; const besar = !!sp && (sp.mode === 'cbt' || sp.mode === 'reach');
       const ty = besar ? 1.8 : 1.5, jarakI = besar ? 7.5 : 5.2, tinggiI = besar ? 3.4 : 2.4;
       const tgt = v(posPemain.x, posPemain.z, ty);
-      if (!langsung && (kamPegang || jamKam - kamLepas < 3)) {   // sedang/baru melihat sekitar: hanya ikut bergeser, tapi tetap tidak menembus rak
+      // melihat sekitar: selama mouse ditahan, atau 3 dtk setelah dilepas selama karakter belum bergerak
+      if (!langsung && (kamPegang || (jamKam - kamLepas < 3 && kamGerak < kamLepas))) {   // sedang/baru melihat sekitar: hanya ikut bergeser, tapi tetap tidak menembus rak
         const o2 = kamera.position.clone().sub(kontrolKamera.target);
         for (let kk = 1; kk >= 0.15; kk -= 0.05) {
           const c = kontrolKamera.target.clone().addScaledVector(o2, kk);
@@ -763,7 +765,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       const off = kamera.position.clone().sub(kontrolKamera.target);
       let yaw = Math.atan2(off.z, -off.x); const h = pemain.rotation.y;
-      yaw = langsung ? h : yaw + beda(h, yaw) * (1 - Math.exp(-dt * 5));
+      yaw = langsung ? h : yaw + beda(h, yaw) * (1 - Math.exp(-dt * 8));
       let hd = jarakI * 0.2;
       for (let kk = 1; kk >= 0.2; kk -= 0.1) if (garisBebas(yaw, jarakI * kk, ty + tinggiI, ty)) { hd = jarakI * kk; break; }
       const cy = ty + tinggiI * (hd < jarakI * 0.6 ? 1.35 : 1);
@@ -773,15 +775,24 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     // ---------- tabrakan: palet lantai & aktor lain (lingkaran)
     const halangan: { x: number; z: number; r: number }[] = [];
     const tabrak = (x: number, z: number, r: number) => halangan.some(h => (h.x - x) ** 2 + (h.z - z) ** 2 < (h.r + r) ** 2);
+    /** Total tumpang tindih lingkaran (m) dengan halangan. */
+    const tumpang = (x: number, z: number, r: number) => { let t = 0; for (const h of halangan) { const j = Math.hypot(h.x - x, h.z - z); if (j < h.r + r) t += h.r + r - j; } return t; };
+    /** Kedalaman masuk ke rak / fasilitas / dinding (m); 0 = titik bebas. */
+    const dalamRintangan = (x: number, z: number) => {
+      if (bebas(x, z)) return 0;
+      let d0 = 0;
+      for (const b of rintangan) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) d0 = Math.max(d0, Math.min(x - b.x0, b.x1 - x, z - b.z0, b.z1 - z));
+      if (x > 0.25) d0 = Math.max(d0, 0.3 - z, z - (L.W - 0.3), x - (L.L - 0.3));
+      else if (x > -0.25) d0 = Math.max(d0, Math.min(x + 0.25, 0.25 - x));
+      else d0 = Math.max(d0, -30 - x, -12 - z, z - (L.W + 12));
+      return Math.max(0.01, d0);
+    };
     const susunHalangan = () => {
       halangan.length = 0;
       for (const p of instPalet) if (p.y < 0.1) halangan.push({ x: p.x, z: p.z, r: 0.55 });
       for (const a of orang.values()) if (a.obj.visible) halangan.push({ x: a.obj.position.x, z: a.obj.position.z, r: 0.3 });
       for (const m of mhe.values()) halangan.push({ x: m.obj.position.x, z: m.obj.position.z, r: 0.8 });
       if (kontrol.current.pemain?.mode === 'picker') halangan.push({ x: posOrder.x, z: posOrder.z, r: 0.55 });
-      // halangan yang sudah bertumpuk dengan pemain (mis. baru pindah mode) diabaikan supaya pemain tidak terkunci
-      const m0 = kontrol.current.pemain?.mode; const rB = m0 === 'cbt' || m0 === 'reach' ? 0.75 : 0.32;
-      for (let i = halangan.length - 1; i >= 0; i--) { const h = halangan[i]; if ((h.x - posPemain.x) ** 2 + (h.z - posPemain.z) ** 2 < (h.r + rB) ** 2) halangan.splice(i, 1); }
     };
     // ---------- slot rak kosong berkedip hijau saat membawa palet (forklift / reach truck)
     const MAKS_SLOT = 500;
@@ -827,27 +838,52 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       if (sp.mode !== modeLalu) gantiMode(sp, modeLalu);
       const naikKendaraan = sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt';
-      // kendali gaya game survival: W/S maju-mundur searah hadap, A/D belok; kamera tetap di belakang karakter
-      const putar = (t.kiri ? 1 : 0) - (t.kanan ? 1 : 0), majuK = (t.maju ? 1 : 0) - (t.mundur ? 1 : 0);
+      // kendali: W/S maju-mundur searah hadap, Q/E putar kiri-kanan, A/D geser samping (kendaraan: A/D ikut belok);
+      // kamera tetap di belakang karakter mengikuti arah hadap
+      const kendaraanBesar = sp.mode === 'cbt' || sp.mode === 'reach';
+      const putar = Math.max(-1, Math.min(1, (t.putarKiri ? 1 : 0) - (t.putarKanan ? 1 : 0) + (naikKendaraan ? (t.kiri ? 1 : 0) - (t.kanan ? 1 : 0) : 0)));
+      const majuK = (t.maju ? 1 : 0) - (t.mundur ? 1 : 0), geserS = naikKendaraan ? 0 : (t.kiri ? 1 : 0) - (t.kanan ? 1 : 0);
       const lama = posPemain.clone(); const dtc = Math.min(0.1, dt);
       const mk = MODE_PEMAIN[sp.mode]; const kec = sp.mode === 'bebas' && t.lari ? 4.5 : sp.bawa ? mk.kec.bawa : mk.kec.kosong;
       if (!aksiP) {
-        if (putar) pemain.rotation.y += putar * (naikKendaraan && sp.mode !== 'hpt' ? 1.5 : 2.8) * dtc;
-        if (majuK) {
-          const ux = Math.cos(pemain.rotation.y) * majuK, uz = -Math.sin(pemain.rotation.y) * majuK;
-          const lj = kec * (majuK < 0 ? 0.6 : 1) * dtc;
-          const nx = posPemain.x + ux * lj, nz = posPemain.z + uz * lj;
-          // tidak menembus: rak/fasilitas (bebas), palet di lantai, pekerja & MHE lain; palet yang dibawa ikut dicek
-          const fx = Math.cos(rotGarpu()), fz = -Math.sin(rotGarpu()), dp = sp.mode === 'hpt' ? 0.45 : 1.0;
-          const lolos = (x: number, z: number) => bebas(x, z) && (!naikKendaraan || bebas(x + ux * 0.9, z + uz * 0.9))
-            && !tabrak(x, z, naikKendaraan && sp.mode !== 'hpt' ? 0.75 : 0.32)
-            && (!naikKendaraan || sp.mode === 'hpt' || !tabrak(x - fx * 0.9, z - fz * 0.9, 0.55))
-            && (!bawaP || (!tabrak(x + fx * dp, z + fz * dp, 0.55) && bebas(x + fx * dp, z + fz * dp)));
-          if (lolos(nx, posPemain.z)) posPemain.x = nx;
-          if (lolos(posPemain.x, nz)) posPemain.z = nz;
+        // penetrasi pose (0 = bebas): badan, ujung depan/belakang kendaraan & palet yang dibawa terhadap rak, dinding, palet lantai,
+        // pekerja & MHE lain. Langkah diterima bila penetrasi tidak bertambah → selalu bisa keluar, tidak pernah tersangkut.
+        const dp = sp.mode === 'hpt' ? 0.45 : 1.0;
+        const pen = (x: number, z: number, rot: number) => {
+          const gr = rot + wadahK.rotation.y, fx = Math.cos(gr), fz = -Math.sin(gr);
+          let p = dalamRintangan(x, z) + tumpang(x, z, kendaraanBesar ? 0.75 : 0.32);
+          if (kendaraanBesar) p += dalamRintangan(x + fx * 0.9, z + fz * 0.9) + dalamRintangan(x - fx * 0.9, z - fz * 0.9) + tumpang(x - fx * 0.9, z - fz * 0.9, 0.55);
+          if (bawaP) p += dalamRintangan(x + fx * dp, z + fz * dp) + tumpang(x + fx * dp, z + fz * dp, 0.55);
+          return p;
+        };
+        let rot = pemain.rotation.y, p0 = pen(posPemain.x, posPemain.z, rot);
+        if (putar) {
+          const r1 = rot + putar * (kendaraanBesar ? 1.5 : sp.mode === 'hpt' ? 2.2 : 2.8) * dtc;
+          let ok = pen(posPemain.x, posPemain.z, r1) <= p0 + 1e-4;
+          // berputar dekat rak: geser sedikit (≤ 15 cm) supaya tetap bisa berputar
+          if (!ok) for (const s of [0.05, 0.1, 0.15]) { for (let a = 0; a < 8 && !ok; a++) { const x = posPemain.x + Math.cos(a * Math.PI / 4) * s, z = posPemain.z + Math.sin(a * Math.PI / 4) * s; if (pen(x, z, r1) <= p0 + 1e-4) { posPemain.x = x; posPemain.z = z; ok = true; } } if (ok) break; }
+          if (ok) { rot = r1; pemain.rotation.y = r1; p0 = pen(posPemain.x, posPemain.z, rot); }
         }
+        if (majuK || geserS) {
+          const hx = Math.cos(rot), hz = -Math.sin(rot);
+          let ux = hx * majuK * (majuK < 0 ? 0.6 : 1) + hz * geserS * 0.8, uz = hz * majuK * (majuK < 0 ? 0.6 : 1) - hx * geserS * 0.8;
+          const pj = Math.hypot(ux, uz); if (pj > 1) { ux /= pj; uz /= pj; }
+          const total = kec * dtc, n = Math.max(1, Math.ceil(total / 0.08));
+          const lx = (ux * total) / n, lz = (uz * total) / n;
+          for (let i = 0; i < n; i++) {
+            let jalan = false;
+            // langsung → menyusur (sumbu x / z, lalu menyerong ±35° / ±70°) supaya meluncur di sepanjang rak & orang
+            for (const [ax, az] of [[lx, lz], [lx, 0], [0, lz], ...[0.61, -0.61, 1.22, -1.22].map(a => [(lx * Math.cos(a) - lz * Math.sin(a)) * Math.cos(a), (lx * Math.sin(a) + lz * Math.cos(a)) * Math.cos(a)])]) {
+              if (Math.abs(ax) + Math.abs(az) < 1e-5) continue;
+              const p1 = pen(posPemain.x + ax, posPemain.z + az, rot);
+              if (p1 <= p0 + 1e-4) { posPemain.x += ax; posPemain.z += az; p0 = p1; jalan = true; break; }
+            }
+            if (!jalan) break;
+          }
+        }
+        if (majuK || geserS || putar) kamGerak = jamKam;   // bergerak → kamera kembali mengikuti arah hadap
       }
-      const gx = putar, gz = majuK;
+      const gx = putar || geserS, gz = majuK;
       const geser = posPemain.clone().sub(lama);
       pemain.position.set(posPemain.x, 0, posPemain.z);
       kamera.position.add(geser); kontrolKamera.target.add(geser);
@@ -882,29 +918,75 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     };
 
     let tLalu = d.t, tPatroli = 0;
-    /** Saling menghindar: pekerja, MHE & pemain yang berdekatan bergeser menjauh (halus) supaya tidak saling tembus. */
+    /** Lalu lintas tanpa tabrakan: pekerja, MHE & pemain.
+     *  1) Saat berpapasan / mendekat, masing-masing menepi ke kirinya (lajur kiri) sebelum bersentuhan — orang menepi lebih jauh dari MHE.
+     *  2) Sisa tumpang tindih diselesaikan penuh setiap frame (bobot: pemain tidak bergeser, MHE 4× lebih berat dari orang),
+     *     tanpa pernah mendorong ke dalam rak / dinding. Posisi dasar dari rute tugas tidak diubah, hanya offset tampilan. */
     const geserA = new Map<THREE.Object3D, V>();
-    const hindari = (dtGame: number, dt: number) => {
-      void dtGame;
-      const ak: { o: THREE.Object3D; x: number; z: number; r: number; tetap: boolean }[] = [];
-      for (const a of orang.values()) if (a.obj.visible) ak.push({ o: a.obj, x: a.pos.x, z: a.pos.z, r: 0.35, tetap: false });
-      for (const m of mhe.values()) ak.push({ o: m.obj, x: m.pos.x, z: m.pos.z, r: 0.9, tetap: false });
-      if (kontrol.current.jelajah) ak.push({ o: pemain, x: posPemain.x, z: posPemain.z, r: kontrol.current.pemain && ['cbt', 'reach'].includes(kontrol.current.pemain.mode) ? 0.9 : 0.35, tetap: true });
-      const dorong = new Map<THREE.Object3D, V>();
+    const dasarLalu = new Map<THREE.Object3D, V>();
+    const hindari = (dt: number) => {
+      type Ak = { o: THREE.Object3D; bx: number; bz: number; x: number; z: number; r: number; m: number; hx: number; hz: number; g: V };
+      const ak: Ak[] = [];
+      const tambah = (o: THREE.Object3D, bx: number, bz: number, r: number, m: number) => {
+        const lalu = dasarLalu.get(o); let hx = 0, hz = 0;
+        if (lalu) { const dx = bx - lalu.x, dz = bz - lalu.z, j = Math.hypot(dx, dz); if (j > 0.002 && j < 3) { hx = dx / j; hz = dz / j; } }
+        if (!hx && !hz && m !== Infinity) { hx = Math.cos(o.rotation.y) * 0.3; hz = -Math.sin(o.rotation.y) * 0.3; }   // diam: arah hadap (lemah)
+        dasarLalu.set(o, v(bx, bz));
+        const g = geserA.get(o) ?? v(0, 0); geserA.set(o, g);
+        ak.push({ o, bx, bz, x: bx + g.x, z: bz + g.z, r, m, hx, hz, g });
+      };
+      for (const a of orang.values()) if (a.obj.visible) tambah(a.obj, a.pos.x, a.pos.z, 0.36, 1);
+      for (const m of mhe.values()) tambah(m.obj, m.pos.x, m.pos.z, 1.0, 4);
+      const spJ = kontrol.current.pemain;
+      if (kontrol.current.jelajah) tambah(pemain, posPemain.x, posPemain.z, spJ && ['cbt', 'reach'].includes(spJ.mode) ? 1.0 : 0.36, Infinity);
+      // 1) menepi (antisipasi) — target offset lateral
+      const ingin = ak.map(() => v(0, 0));
       for (let i = 0; i < ak.length; i++) for (let j = i + 1; j < ak.length; j++) {
-        const A = ak[i], B = ak[j]; const dx = A.x - B.x, dz = A.z - B.z; const jr = Math.hypot(dx, dz), min = A.r + B.r;
-        if (jr >= min || jr < 1e-4) continue;
-        const ux = dx / jr, uz = dz / jr, k2 = (min - jr) * (A.tetap || B.tetap ? 1 : 0.5);
-        if (!A.tetap) { const v0 = dorong.get(A.o) ?? v(0, 0); v0.x += ux * k2; v0.z += uz * k2; dorong.set(A.o, v0); }
-        if (!B.tetap) { const v0 = dorong.get(B.o) ?? v(0, 0); v0.x -= ux * k2; v0.z -= uz * k2; dorong.set(B.o, v0); }
+        const A = ak[i], B = ak[j]; const dx = B.bx - A.bx, dz = B.bz - A.bz; const jr = Math.hypot(dx, dz), min = A.r + B.r, R = min + 1.6;
+        if (jr >= R) continue;
+        const w = Math.max(0, Math.min(1, (R - jr) / (R - min * 0.6)));
+        const bagian = (X: Ak, Y: Ak) => X.m === Infinity ? 0 : Y.m === Infinity ? 1 : Y.m / (X.m + Y.m);
+        for (const [X, Y, ix, sx, sz] of [[A, B, i, dx, dz], [B, A, j, -dx, -dz]] as [Ak, Ak, number, number, number][]) {
+          const bg = bagian(X, Y); if (!bg) continue;
+          // hanya bila Y ada di depan X (atau keduanya sangat dekat)
+          const depan = X.hx * sx + X.hz * sz;
+          if (depan < -0.2 * jr && jr > min) continue;
+          let lx = X.hz, lz = -X.hx;   // kiri dari arah gerak
+          if (!X.hx && !X.hz) { lx = -sx / (jr || 1); lz = -sz / (jr || 1); }
+          ingin[ix].x += lx * w * min * 1.1 * bg; ingin[ix].z += lz * w * min * 1.1 * bg;
+        }
       }
-      const f = 1 - Math.exp(-dt * 6);
+      const f = 1 - Math.exp(-dt * 8);
+      ak.forEach((A, i) => {
+        if (A.m === Infinity) return;
+        const t = ingin[i]; const pj = Math.hypot(t.x, t.z); if (pj > 1.8) { t.x *= 1.8 / pj; t.z *= 1.8 / pj; }
+        let gx = A.g.x + (t.x - A.g.x) * f, gz = A.g.z + (t.z - A.g.z) * f;
+        // jangan menepi ke dalam rak / dinding: kecilkan offset sampai bebas
+        for (let k = 0; k < 4 && (gx || gz) && !bebas(A.bx + gx, A.bz + gz); k++) { gx *= 0.5; gz *= 0.5; }
+        if (!bebas(A.bx + gx, A.bz + gz)) { gx = 0; gz = 0; }
+        A.x = A.bx + gx; A.z = A.bz + gz;
+      });
+      // 2) pemisahan keras: tidak ada yang saling tembus
+      for (let it = 0; it < 4; it++) {
+        let ada = false;
+        for (let i = 0; i < ak.length; i++) for (let j = i + 1; j < ak.length; j++) {
+          const A = ak[i], B = ak[j]; if (A.m === Infinity && B.m === Infinity) continue;
+          let dx = A.x - B.x, dz = A.z - B.z; let jr = Math.hypot(dx, dz); const min = A.r + B.r;
+          if (jr >= min) continue;
+          ada = true;
+          if (jr < 1e-4) { dx = Math.cos(i + j); dz = Math.sin(i + j); jr = 1; } else { dx /= jr; dz /= jr; }
+          const lap = min - jr + 0.01;
+          const wa = A.m === Infinity ? 0 : B.m === Infinity ? 1 : B.m / (A.m + B.m), wb = 1 - wa;
+          const geser = (X: Ak, s: number) => { if (X.m === Infinity || !s) return; const nx = X.x + dx * s, nz = X.z + dz * s;
+            if (bebas(nx, nz)) { X.x = nx; X.z = nz; } else if (bebas(nx, X.z)) X.x = nx; else if (bebas(X.x, nz)) X.z = nz; };
+          geser(A, lap * wa); geser(B, -lap * wb);
+        }
+        if (!ada) break;
+      }
       for (const A of ak) {
-        if (A.tetap) continue;
-        const g0 = geserA.get(A.o) ?? v(0, 0); const ingin = dorong.get(A.o) ?? v(0, 0);
-        g0.x += (ingin.x - g0.x) * f; g0.z += (ingin.z - g0.z) * f; geserA.set(A.o, g0);
-        const nx = A.x + g0.x, nz = A.z + g0.z;
-        if (Math.abs(g0.x) + Math.abs(g0.z) > 0.002 && bebas(nx, nz)) A.o.position.set(nx, A.o.position.y, nz);
+        if (A.m === Infinity) continue;
+        A.g.x = A.x - A.bx; A.g.z = A.z - A.bz;
+        A.o.position.set(A.x, A.o.position.y, A.z);
       }
     };
     const panjangRute = (r: V[]) => [...r, r[0]].reduce((a, q, i, arr) => (i ? a + q.distanceTo(arr[i - 1]) : 0), 0);
@@ -918,7 +1000,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       const dtGame = Math.max(0, d.t - tLalu); tLalu = d.t;
       const dibawa: { pos: V; rot: number; sku: string; lpn: string | null }[] = [];
-      const pakaiMhe = new Set<string>();
+      const pakaiMhe = new Set<string>(); const bawaNanti: (() => void)[] = [];
       if (bawaPemain && kontrol.current.jelajah) dibawa.push(bawaPemain);
 
       if (k.jalan) tPatroli += Math.min(0.1, dt) * Math.min(3, Math.max(1, Math.log10(k.kecepatan + 1)));
@@ -949,8 +1031,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
             const hg = angkatGarpu(a.rencana, f); aturMast(m2.obj, hg);
             if (a.rencana.bawaPalet && bawa) {
               const sku = tg.lpn ? d.lpn.get(tg.lpn)?.sku ?? '' : tg.barisAsn?.sku ?? '';
-              const rot = m2.obj.rotation.y;
-              dibawa.push({ pos: v(baru.x + Math.cos(rot) * 1.0, baru.z - Math.sin(rot) * 1.0, hg + 0.02), rot: rot + Math.PI / 2, sku, lpn: tg.jenis === 'putaway' || tg.jenis === 'pick_palet' ? tg.lpn ?? null : null });
+              const mObj = m2.obj, lpnB = tg.jenis === 'putaway' || tg.jenis === 'pick_palet' ? tg.lpn ?? null : null;
+              // posisi palet dihitung setelah lalu lintas (MHE bisa menepi) supaya tetap di garpu
+              bawaNanti.push(() => { const rot = mObj.rotation.y; dibawa.push({ pos: v(mObj.position.x + Math.cos(rot) * 1.0, mObj.position.z - Math.sin(rot) * 1.0, hg + 0.02), rot: rot + Math.PI / 2, sku, lpn: lpnB }); });
             }
           } else {
             a.obj.visible = tampak; gerakkan(a, baru);
@@ -974,6 +1057,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         if (m.op) m.op.visible = false; aturMast(m.obj, 0.05);
         menujuRumah(m, dtGame, KEC_MHE);
       }
+      hindari(Math.min(0.1, dt));
+      for (const f of bawaNanti) f();
       gambarPalet(dibawa);
       // snapshot posisi untuk tampilan 2D
       const a2: Aktor2D[] = [];
@@ -990,7 +1075,6 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       for (const [id, m] of mhe) { const s = mheSibuk.get(id); a2.push({ id, jenis: 'mhe', x: m.obj.position.x, z: m.obj.position.z, rot: m.obj.rotation.y, sibuk: !!s || !!d.mhe.find(x => x.id === id)?.sibuk, bawa: s?.bawa ?? null, mhe: d.mhe.find(x => x.id === id)?.jenis, tugas: s?.tugas }); }
       if (k.jelajah && k.pemain) a2.push({ id: 'pemain', jenis: 'pemain', x: posPemain.x, z: posPemain.z, rot: rotGarpu(), sibuk: !!aksiP, bawa: bawaP ? 'palet' : kartonP.visible ? 'karton' : null, mhe: k.pemain.mode });
       k.aktor2d = a2;
-      hindari(dtGame, dt);
       perbaruiTruk();
       perbaruiPin();
       // animasi pekerja: jalan saat berpindah, gerakan kerja saat cek/admin/packing, selain itu berdiri siaga
