@@ -15,6 +15,7 @@ import { dariOtomatis, tarikRak, keLayoutGudang, komponenBaru, levelDariTinggi, 
   DEFAULT_RAK, celahArea, gabungJadiArea, pecahArea, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
 import { bacaDxf } from '@/lib/simulasi3d/dxf';
 import { labelStatus } from '@/lib/status';
+import { dataTanpaProject, GEDUNG_BARU, ID_PRIBADI, layoutKosong, type SpekGedungBaru } from '@/lib/simulasi3d/tanpaProject';
 import Editor2D, { WARNA_KOMP, type Editor2DApi, type Mode } from './layout/Editor2D';
 import Potongan, { potongAwal, type ArahPotong, type PotonganApi } from './layout/Potongan';
 import ParamSpace from './ParamSpace';
@@ -77,6 +78,9 @@ export default function DesainGudang() {
   const apiPotong = useRef<PotonganApi>(null);
   const [zoomPotong, setZoomPotong] = useState(1);
   const [param, setParam] = useState<ParamSim | null>(null);
+  const [formBaru, setFormBaru] = useState<SpekGedungBaru | null>(null);
+  const baruTertunda = useRef<SpekGedungBaru | null>(null);
+  const pribadi = id === ID_PRIBADI;
   const [opsi3d, setOpsi3d] = useState<OpsiViewer>({ atap: false, dinding: true, label: true, animasi: true, truk: true, orang: true });
   const riwayat = useRef<{ lalu: LayoutEdit[]; depan: LayoutEdit[] }>({ lalu: [], depan: [] });
   const ed2 = useRef<Editor2DApi>(null);
@@ -102,6 +106,15 @@ export default function DesainGudang() {
     if (!id) { setData(null); setEditS(null); return; }
     let batal = false; setSibuk(true); setErr(null); setPesan(null);
     (async () => {
+      if (id === ID_PRIBADI) {
+        // desain tanpa project: data tender contoh + versi pribadi milik akun ini (RLS: hanya pembuatnya)
+        const { data: vs, error: ev } = await sb.from('warehouse_layouts').select('id, nama, updated_at, data').is('tender_id', null).order('updated_at', { ascending: false });
+        if (ev) throw new Error(ev.message);
+        const spek = baruTertunda.current; const v0 = (vs ?? [])[0] as Versi | undefined;
+        const tinggi = spek ? spek.tinggi : v0 ? v0.data.gedung.sideMm / 1000 : GEDUNG_BARU.tinggi;
+        const r = dataTanpaProject(tinggi);
+        return { ...r, vs: (vs ?? []) as Versi[] };
+      }
       const { data: row, error } = await sb.from('tenders').select('*').eq('id', id).single();
       if (error || !row) throw new Error(error?.message ?? 'Tender tidak ditemukan');
       const t = row as TenderRow;
@@ -116,6 +129,13 @@ export default function DesainGudang() {
     })().then(r => {
       if (batal) return;
       setData({ t: r.t, h: r.h, p: r.p, auto: r.auto }); setVersi(r.vs); setParam(r.p);
+      const spek = baruTertunda.current; baruTertunda.current = null;
+      if (id === ID_PRIBADI && (spek || !r.vs.length)) {
+        setVersiId(null); setNama(`Desain ${r.vs.length + 1}`); setEditS(layoutKosong(r.p, r.auto.tinggiPalet, spek ?? GEDUNG_BARU)); setKotor(true);
+        riwayat.current = { lalu: [], depan: [] }; setPilih(null); setPesan('Gedung baru dibuat. Ubah ukuran gedung di panel kiri, tambah komponen, lalu Simpan — tersimpan di akun Anda.');
+        const u = new URL(window.location.href); u.searchParams.set('id', id); window.history.replaceState(null, '', u);
+        return;
+      }
       if (r.vs.length) { setVersiId(r.vs[0].id); setNama(r.vs[0].nama); setEditS(r.vs[0].data); }
       else { setVersiId(null); setNama('Layout A'); setEditS(dariOtomatis(r.auto, r.p, Math.round(r.h.space.ppDesain ?? 0))); }
       riwayat.current = { lalu: [], depan: [] }; setKotor(false); setPilih(null);
@@ -228,7 +248,7 @@ export default function DesainGudang() {
   async function simpan(sebagaiBaru = false) {
     if (!edit || !data) return;
     setSibuk(true); setErr(null);
-    const isi = { tender_id: data.t.id, nama: nama.trim() || 'Layout', data: edit };
+    const isi = { tender_id: pribadi ? null : data.t.id, nama: nama.trim() || 'Layout', data: edit };
     const q = !sebagaiBaru && versiId ? sb.from('warehouse_layouts').update(isi).eq('id', versiId).select('id, nama, updated_at, data').single()
       : sb.from('warehouse_layouts').insert(isi).select('id, nama, updated_at, data').single();
     const { data: row, error } = await q;
@@ -248,10 +268,25 @@ export default function DesainGudang() {
   function bukaVersi(v: string) {
     if (kotor && !window.confirm('Perubahan belum disimpan akan hilang. Lanjut?')) return;
     if (v === 'baru') {
-      if (!data) return; setVersiId(null); setNama(`Layout ${String.fromCharCode(65 + versi.length)}`);
+      if (!data) return; setVersiId(null);
+      if (pribadi) { setNama(`Desain ${versi.length + 1}`); setEditS(layoutKosong(data.p, data.auto.tinggiPalet, GEDUNG_BARU)); setKotor(true); riwayat.current = { lalu: [], depan: [] }; setPilih(null); return; }
+      setNama(`Layout ${String.fromCharCode(65 + versi.length)}`);
       setEditS(dariOtomatis(data.auto, data.p, Math.round(data.h.space.ppDesain ?? 0))); setKotor(true);
     } else { const x = versi.find(y => y.id === v); if (!x) return; setVersiId(x.id); setNama(x.nama); setEditS(x.data); setKotor(false); }
     riwayat.current = { lalu: [], depan: [] }; setPilih(null);
+  }
+
+  /** Desain baru tanpa project: gedung kosong ukuran bebas, disimpan sebagai layout pribadi akun ini. */
+  function buatTanpaProject(spek: SpekGedungBaru) {
+    if (kotor && !window.confirm('Perubahan belum disimpan akan hilang. Lanjut?')) return;
+    setFormBaru(null); setLangkah('layout');
+    if (id === ID_PRIBADI && data) {
+      const d2 = dataTanpaProject(spek.tinggi); setData(d2); setParam(d2.p);
+      setVersiId(null); setNama(`Desain ${versi.length + 1}`); setEditS(layoutKosong(d2.p, d2.auto.tinggiPalet, spek)); setKotor(true);
+      riwayat.current = { lalu: [], depan: [] }; setPilih(null); setPesan('Gedung baru dibuat — Simpan untuk menyimpannya di akun Anda.');
+      return;
+    }
+    baruTertunda.current = spek; setKotor(false); setId(ID_PRIBADI);
   }
 
   // ---------- susun ulang layout otomatis dari parameter Space (revisi)
@@ -327,10 +362,11 @@ export default function DesainGudang() {
       <div className="head">
         <div><div className="eyebrow">Simulasi Warehouse</div><h1>Desain gudang 2D ⇄ 3D</h1></div>
         <div className="row">
-          {data && (versiId && !kotor
+          {data && !pribadi && (versiId && !kotor
             ? <Link className="btn" href={`/simulasi/game?id=${data.t.id}&layout=${versiId}`}>▶ Main di Leca Game</Link>
             : <button type="button" className="ghost" disabled={sibuk || !edit} title="Simpan dulu supaya layout ini bisa dipakai di Leca Game" onClick={() => simpan(false)}>Simpan untuk Leca Game</button>)}
-          {data && <Link className="btn ghost" href={`/tender/${data.t.id}`}>Buka tender</Link>}
+          {data && !pribadi && <Link className="btn ghost" href={`/tender/${data.t.id}`}>Buka tender</Link>}
+          <button type="button" onClick={() => setFormBaru(formBaru ? null : { ...GEDUNG_BARU })}>＋ Desain baru tanpa project</button>
         </div>
       </div>
 
@@ -339,6 +375,7 @@ export default function DesainGudang() {
           <label className="f">Project
             <select value={id} onChange={e => { if (kotor && !window.confirm('Perubahan belum disimpan akan hilang. Lanjut?')) return; setId(e.target.value); }}>
               <option value="">— pilih project —</option>
+              <option value={ID_PRIBADI}>★ Desain saya (tanpa project)</option>
               {tersaring.map(x => <option key={x.id} value={x.id}>{x.kode ? `${x.kode} · ` : ''}{x.customer} ({labelStatus(x.status)})</option>)}
             </select>
           </label>
@@ -346,7 +383,7 @@ export default function DesainGudang() {
             <label className="f">Versi layout
               <select value={versiId ?? 'baru'} onChange={e => bukaVersi(e.target.value)}>
                 {versi.map(v => <option key={v.id} value={v.id}>{v.nama} · {new Date(v.updated_at).toLocaleDateString('id-ID')}</option>)}
-                <option value="baru">+ Baru dari layout otomatis</option>
+                <option value="baru">{pribadi ? '+ Gedung kosong baru' : '+ Baru dari layout otomatis'}</option>
               </select>
             </label>
             <label className="f">Nama versi<input value={nama} onChange={e => { setNama(e.target.value); setKotor(true); }} /></label>
@@ -357,10 +394,24 @@ export default function DesainGudang() {
             </div>
           </>)}
         </div>
+        {formBaru && (
+          <div className="sim-baru">
+            <div className="eyebrow">Desain baru tanpa project · tersimpan di akun Anda</div>
+            <div className="sim-baru-isi">
+              {([['L', 'Panjang gedung (m)', 10, 400, 0.5], ['W', 'Lebar gedung (m)', 8, 300, 0.5], ['tinggi', 'Tinggi sisi (m)', 4, 40, 0.5], ['dockIn', 'Dock inbound', 1, 30, 1], ['dockOut', 'Dock outbound', 1, 30, 1]] as const).map(([k, l, mn, mx, st]) => (
+                <label key={k} className="f">{l}<input type="number" min={mn} max={mx} step={st} value={formBaru[k]} onChange={e => setFormBaru({ ...formBaru, [k]: Math.min(mx, Math.max(mn, Number(e.target.value) || mn)) })} /></label>
+              ))}
+              <label className="sim3d-cek" style={{ alignSelf: 'end' }}><input type="checkbox" checked={formBaru.isiRak} onChange={e => setFormBaru({ ...formBaru, isiRak: e.target.checked })} />Isi rak otomatis (area adaptif)</label>
+              <div className="row" style={{ alignSelf: 'end' }}><button type="button" onClick={() => buatTanpaProject(formBaru)}>Buat gedung</button><button type="button" className="ghost" onClick={() => setFormBaru(null)}>Batal</button></div>
+            </div>
+            <p className="small muted" style={{ margin: 0 }}>Luas {(formBaru.L * formBaru.W).toLocaleString('id-ID')} m². Dock, staging & jalur utama dibuat di sisi depan; semua bisa digeser, diubah, atau dihapus. Simulasi memakai volume, manpower & productivity contoh karena tidak ada data tender.</p>
+          </div>
+        )}
         {err && <p className="error small" role="alert">{err}</p>}
         {pesan && !err && <p className="small muted">{pesan}{kotor ? ' · ada perubahan belum disimpan' : ''}</p>}
         {!pesan && kotor && <p className="small" style={{ color: 'var(--warn)' }}>Ada perubahan belum disimpan.</p>}
-        {!id && <p className="small muted">Pilih project. Desain dimulai dari layout otomatis (parameter Space tender, bisa direvisi lalu disusun ulang); setiap komponen bisa digeser, diubah ukuran & tingginya, ditambah atau dihapus — 3D mengikuti. Versi yang disimpan dipakai sebagai gudang di Leca Game.</p>}
+        {pribadi && data && <p className="small muted">Desain pribadi tanpa project — hanya terlihat oleh akun Anda. Simulasi operasi memakai data contoh (1.200 palet/bulan in & out, 1 shift).</p>}
+        {!id && <p className="small muted">Pilih project, atau buat <b>desain baru tanpa project</b> (tersimpan di akun Anda). Desain dimulai dari layout otomatis (parameter Space tender, bisa direvisi lalu disusun ulang); setiap komponen bisa digeser, diubah ukuran & tingginya, ditambah atau dihapus — 3D mengikuti. Versi yang disimpan dipakai sebagai gudang di Leca Game.</p>}
         {sibuk && <p className="small muted">Memuat…</p>}
       </div>
 
@@ -415,7 +466,7 @@ export default function DesainGudang() {
                 {edit.okupansi != null && <button className="ghost" style={{ padding: '4px 10px' }} onClick={() => ubah(x => ({ ...x, okupansi: null }))}>Reset</button>}
               </div>
             </label>
-            {param && (
+            {param && !pribadi && (
               <details className="sim2d-detail">
                 <summary className="eyebrow">Parameter Space (layout otomatis)</summary>
                 <ParamSpace param={param} awal={data.p} setParam={setParam} level={autoParam ? { level: autoParam.level, tinggi: autoParam.tinggiRak } : undefined} />

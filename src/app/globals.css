@@ -544,6 +544,8 @@ tr.kat-link:hover td { background: var(--res); }
 .gm-grafik-legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 @media (max-width: 900px) { .game-layar.tampil-split { grid-template-columns: 1fr; } .gm-2d { height: 60vh; min-height: 380px; } .gm-2d-legenda { position: static; margin: 6px; } }
 .sim-langkah { margin: 4px 0 10px; width: fit-content; }
+.sim-baru { display: grid; gap: 8px; margin-top: 10px; padding: 12px; border: 1px dashed var(--line, #d9d9d9); border-radius: 8px; background: #fafafa; }
+.sim-baru-isi { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; align-items: end; }
 .sim-langkah button { padding: 8px 16px; font-weight: 600; }
 .sim-desain-setup { display: grid; grid-template-columns: minmax(0, 1fr) 110px 90px auto; gap: 12px; align-items: end; }
 @media (max-width: 760px) { .sim-desain-setup { grid-template-columns: 1fr 1fr; } .sim-desain-setup > div { grid-column: 1 / -1; } }
