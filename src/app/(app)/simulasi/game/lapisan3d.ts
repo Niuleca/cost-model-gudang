@@ -147,6 +147,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const tmp = new THREE.Object3D();
     let n = 0;
     const idxLpn: (string | null)[] = []; const posPalet = new Map<string, V>();
+    /** Tinggi palet yang tergambar (palet + karton, mengecil saat isinya tinggal sebagian). */
+    const tinggiVisual = (isi: number) => { const sk = Math.max(0.15, Math.min(1, isi)); return bersih ? tinggiImpostor * (0.3 + 0.7 * sk) : 0.14 + tinggiMuat * sk; };
     const taruhPalet = (x: number, y: number, z: number, rot: number, sku: string, isi = 1, lpn: string | null = null) => {
       if (n >= kap) return;
       idxLpn[n] = lpn; if (lpn) posPalet.set(lpn, v(x, z, y + tinggiPalet));
@@ -166,14 +168,24 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       const kunci = `${d.seq}|${dibawa.length}|${dibawa.map(b => `${b.pos.x.toFixed(2)},${b.pos.y.toFixed(2)},${b.pos.z.toFixed(2)}`).join(';')}`;
       if (kunci === kunciPalet) return; kunciPalet = kunci;
       n = 0; posPalet.clear();
+      // palet di lantai (block stack) & staging bertumpuk: diletakkan dari bawah menurut tinggi nyata palet di bawahnya,
+      // jadi tidak ada palet melayang saat palet bawah sudah diambil atau isinya tinggal sebagian
+      const tumpuk: { x: number; y: number; z: number; sku: string; isi: number; id: string; urut: number }[] = [];
       for (const lok of lokSimpan) for (const id of lok.lpn) {
-        if (sembunyi.has(id)) continue; const l = d.lpn.get(id)!;
-        taruhPalet(lok.x, lok.y, lok.z, lok.tipe === 'rak' ? Math.PI / 2 : 0, l.sku, l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton), id);
+        if (sembunyi.has(id)) continue; const l = d.lpn.get(id)!; const isi = l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton);
+        if (lok.tipe === 'rak') taruhPalet(lok.x, lok.y, lok.z, Math.PI / 2, l.sku, isi, id);
+        else tumpuk.push({ x: lok.x, y: lok.y, z: lok.z, sku: l.sku, isi, id, urut: lok.y });
       }
       for (const [lok, slot] of [[stgIn, slotIn], [stgOut, slotOut]] as const) lok.lpn.forEach((id, i) => {
         if (sembunyi.has(id)) return; const l = d.lpn.get(id)!; const p = slot(i);
-        taruhPalet(p.x, p.y, p.z, 0, l.sku, l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton), id);
+        tumpuk.push({ x: p.x, y: p.y, z: p.z, sku: l.sku, isi: l.karton / (d.sku.get(l.sku)?.kartonPerPalet ?? l.karton), id, urut: p.y + i * 1e-6 });
       });
+      const puncak = new Map<string, number>();
+      for (const t of tumpuk.sort((a, b) => a.urut - b.urut)) {
+        const k = `${Math.round(t.x * 10)},${Math.round(t.z * 10)}`; const y = puncak.get(k) ?? 0;
+        puncak.set(k, y + tinggiVisual(t.isi) + 0.01);
+        taruhPalet(t.x, y, t.z, 0, t.sku, t.isi, t.id);
+      }
       for (const b of dibawa) taruhPalet(b.pos.x, b.pos.y, b.pos.z, b.rot, b.sku, 1, b.lpn);
       muat.count = n; alas.count = bersih ? 0 : n;
       alas.instanceMatrix.needsUpdate = muat.instanceMatrix.needsUpdate = true;
