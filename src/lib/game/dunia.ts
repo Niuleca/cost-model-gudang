@@ -11,6 +11,38 @@ const KANDIDAT: Record<JenisTugas, Kemampuan[]> = {
   putaway: ['operator'], pick_palet: ['operator'],
   pick_karton: ['picker', 'tkbm', 'checker'], pack: ['picker', 'tkbm', 'checker'],
 };
+/** Tugas utama tiap role (sesuai job description). */
+const PRIMER: Record<Kemampuan, JenisTugas[]> = {
+  admin: ['admin_in', 'admin_out'], checker: ['cek_in', 'cek_out'], operator: ['putaway', 'pick_palet', 'bongkar', 'muat'],
+  picker: ['pick_karton', 'pack'], tkbm: ['bongkar', 'muat', 'pack'],
+};
+/** Bantu: role serumpun boleh membantu saat antrean tugas utamanya kosong (dokumen/verifikasi ↔, handling manual ↔). Operator tidak meninggalkan MHE. */
+const BANTU: Partial<Record<Kemampuan, JenisTugas[]>> = {
+  admin: ['cek_in', 'cek_out'], checker: ['admin_in', 'admin_out'], picker: ['bongkar', 'muat'], tkbm: ['pick_karton'],
+};
+const ARUS_TUGAS: Record<JenisTugas, 'in' | 'out'> = {
+  admin_in: 'in', bongkar: 'in', cek_in: 'in', putaway: 'in', admin_out: 'out', pick_palet: 'out', pick_karton: 'out', pack: 'out', cek_out: 'out', muat: 'out',
+};
+export interface PeranKerja { utama: Set<JenisTugas>; bantu: Set<JenisTugas> }
+/**
+ * Tugas tiap pekerja. Utama: role utama & arusnya cocok → kalau tidak ada orangnya, role utama arus lain → kalau tetap tidak ada,
+ * role lain (KANDIDAT). Bantu: role serumpun di arus yang sama, hanya saat antrean tugas utamanya kosong.
+ */
+const PERAN = new WeakMap<Dunia, Map<string, PeranKerja>>();
+export function peranPekerja(d: Dunia) {
+  let m = PERAN.get(d); if (m) return m;
+  m = new Map(d.pekerja.map(p => [p.id, { utama: new Set<JenisTugas>(), bantu: new Set<JenisTugas>() }]));
+  const cocokArus = (p: Dunia['pekerja'][number], j: JenisTugas) => !p.arus || p.arus === ARUS_TUGAS[j];
+  for (const j of Object.keys(KANDIDAT) as JenisTugas[]) {
+    const utama = d.pekerja.filter(p => p.kemampuan && PRIMER[p.kemampuan].includes(j));
+    let pilih = utama.filter(p => cocokArus(p, j));
+    if (!pilih.length) pilih = utama;
+    if (!pilih.length) for (const k of KANDIDAT[j]) { pilih = d.pekerja.filter(p => p.kemampuan === k); if (pilih.length) break; }
+    for (const p of pilih) m.get(p.id)!.utama.add(j);
+    for (const p of d.pekerja) if (p.kemampuan && BANTU[p.kemampuan]?.includes(j) && cocokArus(p, j) && !m.get(p.id)!.utama.has(j)) m.get(p.id)!.bantu.add(j);
+  }
+  PERAN.set(d, m); return m;
+}
 const MHE_UNTUK: Partial<Record<JenisTugas, ('reach' | 'forklift' | 'stacker' | 'hpt')[]>> = {
   putaway: ['reach', 'forklift', 'stacker'], pick_palet: ['reach', 'forklift', 'stacker'],
   bongkar: ['forklift', 'hpt', 'stacker', 'reach'], muat: ['forklift', 'hpt', 'stacker', 'reach'],
@@ -174,15 +206,21 @@ function jadwalkan(d: Dunia) {
     for (const [j, hp] of antre) { if (buntu.has(j)) continue; const x = hp.peek(); if (x && (!tg || lebihDulu(x, tg))) tg = x; }
     if (!tg) return;
     let pk = -1, alat: (typeof d.mhe)[number] | undefined;
-    for (const k of KANDIDAT[tg.jenis]) {
-      const i = bebas.findIndex(p => p.kemampuan === k);
-      if (i < 0) continue;
-      if (k === 'operator') {
-        const boleh = MHE_UNTUK[tg.jenis] ?? ['forklift', 'reach', 'stacker', 'hpt'];
-        alat = boleh.map(j => d.mhe.find(m => !m.sibuk && m.jenis === j)).find(Boolean);
-        if (!alat) continue;
+    const peran = peranPekerja(d);
+    const antreKosong = (js: Set<JenisTugas>) => [...js].every(j => !antre.get(j)!.size);
+    let bantu = false;
+    for (const tahap of ['utama', 'bantu'] as const) {
+      for (let i = 0; i < bebas.length; i++) {
+        const p = bebas[i]; const pr = peran.get(p.id); if (!pr?.[tahap].has(tg.jenis)) continue;
+        if (tahap === 'bantu' && !antreKosong(pr.utama)) continue;
+        if (p.kemampuan === 'operator') {
+          const boleh = MHE_UNTUK[tg.jenis] ?? ['forklift', 'reach', 'stacker', 'hpt'];
+          alat = boleh.map(j => d.mhe.find(m => !m.sibuk && m.jenis === j)).find(Boolean);
+          if (!alat) continue;
+        }
+        pk = i; bantu = tahap === 'bantu'; break;
       }
-      pk = i; break;
+      if (pk >= 0) break;
     }
     if (pk < 0) { buntu.add(tg.jenis); continue; }
     if (tg.jenis === 'putaway') {
@@ -191,7 +229,7 @@ function jadwalkan(d: Dunia) {
     }
     antre.get(tg.jenis)!.pop();
     const p = bebas.splice(pk, 1)[0];
-    tg.status = 'jalan'; tg.pekerja = p.id; tg.mulai = d.t; tg.durasi = durasi(d, tg); tg.selesai = d.t + tg.durasi;
+    tg.status = 'jalan'; tg.pekerja = p.id; if (bantu) tg.bantu = true; tg.mulai = d.t; tg.durasi = durasi(d, tg); tg.selesai = d.t + tg.durasi;
     p.sibuk = tg.id; if (alat) { alat.sibuk = tg.id; tg.mhe = alat.id; }
     tg.akhirShift = akhirShift(d, p.shift, d.t);
     d.menunggu.delete(tg.id);

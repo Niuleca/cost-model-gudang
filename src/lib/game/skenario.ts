@@ -7,6 +7,9 @@ import { kategoriOrang, jenisMhe, susunLayout, type LayoutGudang } from '../simu
 import { buatRng } from './dasar';
 import type { JenisTugas, Kemampuan, Lokasi, Produktivitas, Skenario, Sku } from './tipe';
 
+/** Role khusus arus dari namanya: "Inbound Admin" → in, "Outbound Checker" → out, selain itu umum. */
+export const arusPeran = (nama: string): 'in' | 'out' | undefined =>
+  /inbound|receiv|penerima|\bin\b|unload|bongkar/i.test(nama) ? 'in' : /outbound|dispatch|shipping|pengirim|\bout\b|delivery|loading|muat/i.test(nama) ? 'out' : undefined;
 const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
 /** Productivity bawaan bila aktivitas tender tidak ada yang cocok (per jam). */
@@ -120,7 +123,7 @@ export function skenarioDariTender(t: TenderRow, h: HasilTender, o: OpsiSkenario
       // distribusi shift proporsional rencana per shift; sisanya (pengganti) bergiliran
       let shift = k % nShift;
       if (totPs > 0) { let acc = 0; const pos = ((k + 0.5) / n) * totPs; for (let s = 0; s < ps.length; s++) { acc += ps[s]; if (pos <= acc) { shift = s; break; } } }
-      pekerja.push({ id: `W${pekerja.length + 1}`, nama: `${mp.roleName} ${k + 1}`, role: mp.roleName, kemampuan, shift, biayaBulan: biaya });
+      pekerja.push({ id: `W${pekerja.length + 1}`, nama: `${mp.roleName} ${k + 1}`, role: mp.roleName, kemampuan, arus: arusPeran(mp.roleName), shift, biayaBulan: biaya });
     }
   }
   if (!pekerja.some(p => p.kemampuan === 'operator') && !pekerja.some(p => p.kemampuan === 'tkbm')) asumsi.push('Tidak ada operator/TKBM di manpower tender — bongkar, putaway & picking palet tidak bisa berjalan.');
@@ -136,7 +139,16 @@ export function skenarioDariTender(t: TenderRow, h: HasilTender, o: OpsiSkenario
 
   // ---- Productivity dari aktivitas tender
   const { prod, catatan } = prodDariAktivitas(layout.aktivitas);
-  asumsi.push(...catatan);
+  // role yang ada di manpower mengerjakan aktivitasnya sendiri walau aktivitas itu tidak tercantum di tender (productivity default)
+  const ada = (k: Kemampuan) => pekerja.some(p => p.kemampuan === k);
+  const ambilAlih: [JenisTugas, Kemampuan][] = [['admin_in', 'admin'], ['admin_out', 'admin'], ['cek_in', 'checker'], ['cek_out', 'checker'], ['bongkar', 'tkbm'], ['muat', 'tkbm']];
+  const diambil = new Set<string>();
+  for (const [j, k] of ambilAlih) if (prod[j].luar && ada(k)) {
+    diambil.add(j);
+    prod[j] = { ...PROD_DEFAULT[j], sumber: `default ${PROD_DEFAULT[j].prod} ${PROD_DEFAULT[j].satuan}/jam — ${k} ada di manpower, aktivitas belum ada di tender` };
+    asumsi.push(`${j}: dikerjakan ${k} gudang dengan productivity default ${PROD_DEFAULT[j].prod} ${PROD_DEFAULT[j].satuan}/jam (aktivitas belum ada di tender).`);
+  }
+  asumsi.push(...catatan.filter(c => !diambil.has(c.split(':')[0])));
   const faktor = num(t.asumsi.faktorProduktivitas, 0.95) * num(t.asumsi.efisiensi, 0.9);
 
   // ---- Permintaan harian

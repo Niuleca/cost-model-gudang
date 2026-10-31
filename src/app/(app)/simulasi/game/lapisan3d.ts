@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { ARMADA, bertugas, jalankanSampai, jenisTrukDari, type Dunia, type JenisTruk, type JenisTugas, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
+import { kategoriOrang } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, type PasangLapisan } from '../Viewer3D';
 import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pinBersih, trukBersih, WARNA_BERSIH, type Animator } from '../model3d';
 import { WARNA_ORANG } from '../warna';
@@ -13,7 +14,8 @@ export type Pilihan = { jenis: 'palet' | 'mhe' | 'pekerja' | 'truk' | 'order'; i
 /** Data observasi untuk panel mode jelajah (ditulis lapisan, dibaca UI). */
 export interface Amatan {
   id: string; jenis: 'pekerja' | 'mhe'; nama: string; jarak: number;
-  tugas: { id: string; jenis: JenisTugas; fase: string; langkah: number; f: number; durasiStd: number; berjalan: number; jarakJalur: number; kecepatan: number } | null;
+  role?: string; ket?: string;
+  tugas: { id: string; jenis: JenisTugas; fase: string; langkah: number; langkahList: string[]; f: number; durasiStd: number; berjalan: number; jarakJalur: number; kecepatan: number; bantu?: boolean; porsiJalan: number } | null;
 }
 /** Kecepatan gerak tersirat per jenis tugas = jarak jalur layout ÷ porsi waktu jalan dari durasi productivity. */
 export interface StatGerak { n: number; kecTotal: number; kecMaks: number; jarakTotal: number; olehOrang: number }
@@ -27,6 +29,19 @@ export interface KontrolGame {
 }
 export const LANGKAH_TUGAS = ['Jalan ke titik ambil', 'Ambil / angkat', 'Bawa ke tujuan', 'Taruh / turunkan'];
 export const LANGKAH_DIAM = ['Jalan ke lokasi kerja', 'Mengerjakan (cek / admin / packing)'];
+/** Urutan langkah kerja tiap jenis tugas (untuk observasi / motion study). */
+export const LANGKAH: Record<JenisTugas, string[]> = {
+  admin_in: ['Jalan ke dock / sopir', 'Terima surat jalan & ASN', 'Kembali ke meja inbound', 'Input & konfirmasi GR'],
+  admin_out: ['Jalan ke staging outbound', 'Cocokkan order & palet', 'Bawa dokumen ke dock', 'Serahkan DO ke sopir'],
+  bongkar: ['Jalan ke truk', 'Ambil palet dari truk', 'Bawa ke staging inbound', 'Turunkan di staging'],
+  cek_in: ['Jalan ke palet di staging', 'Cek qty / lot / kondisi'],
+  putaway: ['Jalan ke staging inbound', 'Angkat palet', 'Bawa ke lokasi rak', 'Taruh di rak'],
+  pick_palet: ['Jalan ke lokasi rak', 'Turunkan palet dari rak', 'Bawa ke staging outbound', 'Taruh di staging'],
+  pick_karton: ['Jalan ke lokasi pick', 'Ambil karton', 'Bawa ke staging outbound', 'Susun di palet order'],
+  pack: ['Jalan ke palet order', 'Packing / wrapping'],
+  cek_out: ['Jalan ke palet order', 'Cek qty / label order'],
+  muat: ['Jalan ke staging outbound', 'Angkat palet', 'Bawa ke truk', 'Taruh di truk'],
+};
 
 type V = THREE.Vector3;
 const v = (x: number, z: number, y = 0) => new THREE.Vector3(x, y, z);
@@ -71,7 +86,7 @@ function titikPada(pts: V[], f: number, out: V) {
 }
 
 interface Rencana { jarak: number; awal: V[]; bawa: V[]; angkatA: number; angkatB: number; bawaPalet: boolean; bawaKarton: boolean; diam: boolean; akhir: V }
-interface Aktor { anim?: Animator; sebelum?: V; naik?: string; obj: THREE.Group; pos: V; rumah: V; tugas: string | null; rencana: Rencana | null; garpu?: THREE.Object3D; op?: THREE.Object3D; karton?: THREE.Object3D; lbl?: CSS2DObject }
+interface Aktor { patroli?: V[]; anim?: Animator; sebelum?: V; naik?: string; obj: THREE.Group; pos: V; rumah: V; tugas: string | null; rencana: Rencana | null; garpu?: THREE.Object3D; op?: THREE.Object3D; karton?: THREE.Object3D; lbl?: CSS2DObject }
 
 export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { current: KontrolGame }, onBerhenti: () => void, onPilih: (p: Pilihan | null) => void): PasangLapisan {
   return ({ grup, kamera, kanvas, tema, kontrolKamera }) => {
@@ -264,7 +279,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const rumahOrang = (k: Kemampuan | null, i: number): V => {
       const j = (a: number) => ((i * 0.618 + a) % 1);
       switch (k) {
-        case 'admin': return kantor ? v(kantor.x0 + 0.6 + j(0.1) * (kantor.x1 - kantor.x0 - 1.2), kantor.z0 + 0.6 + j(0.4) * (kantor.z1 - kantor.z0 - 1.2)) : v(5, 1.5 + i);
+        // meja admin di depan (dekat dock & staging): inbound di sisi staging inbound, outbound di sisi staging outbound
+        case 'admin': { const ar = d.pekerja[i]?.arus; const xm = Math.min(L.stagingIn.x1 + 0.9, L.L - 1);
+          return ar === 'in' ? v(xm, L.stagingIn.z0 + 1.2 + j(0.1) * 1.5) : ar === 'out' ? v(xm, L.stagingOut.z1 - 1.2 - j(0.1) * 1.5) : v(xm, (L.stagingIn.z1 + L.stagingOut.z0) / 2 + j(0.4) * 2 - 1); }
         case 'checker': return v(L.stagingIn.x1 - 1.2, L.stagingIn.z1 - 1 - j(0.2) * 3);
         case 'picker': return v(L.stagingOut.x1 - 1.2, L.stagingOut.z0 + 1 + j(0.3) * 3);
         case 'tkbm': return v(3.2 + j(0.5) * 1.5, (dIn[i % Math.max(1, dIn.length)]?.z ?? 3) + (i % 2 ? 1.8 : -1.8));
@@ -273,8 +290,25 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
     };
     const orang = new Map<string, Aktor>();
+    // supervisor & security: tidak mengambil tugas, tapi berpatroli selama shift (supervisor menyusuri staging → jalur utama → lorong;
+    // security menyusuri apron dock di luar gedung)
+    const jalurPatroli = (kat: string, i: number): V[] => {
+      const xj = Math.min(L.stagingIn.x1 + 1.6, L.L - 1), zA = 1.2, zB = L.W - 1.2;
+      if (kat === 'security') return [v(-7, zA), v(-7, zB), v(-3.5, zB), v(-3.5, zA)];
+      const lo = L.lorong[(i * 3) % Math.max(1, L.lorong.length)];
+      const masuk: V[] = lo ? (Math.abs(lo.z1 - lo.z0) < 1e-6 ? [v(xj, lo.z0), v(Math.min(lo.x1, lo.x0 + 18), lo.z0), v(xj, lo.z0)] : []) : [];
+      return [v(xj, zA), ...masuk, v(xj, zB), v(L.stagingOut.x1 - 1, zB), v(L.stagingIn.x1 - 1, zA)];
+    };
     d.pekerja.forEach((p, i) => {
-      if (!p.kemampuan) return;   // supervisor/security: tidak mengerjakan tugas lantai
+      if (!p.kemampuan) {
+        const kat = kategoriOrang(p.role); if (kat !== 'supervisor' && kat !== 'security') return;
+        const g = (bersih ? orangBersih : modelOrang)(WARNA_ORANG[kat]); g.userData.pilih = { jenis: 'pekerja', id: p.id } satisfies Pilihan;
+        const rute = jalurPatroli(kat, i); g.position.copy(rute[0]); gOrang.add(g);
+        const ak: Aktor = { obj: g, pos: rute[0].clone(), rumah: rute[0].clone(), tugas: null, rencana: null, patroli: rute };
+        orang.set(p.id, ak);
+        if (bersih) pakaiPekerjaMeshy(g, 'diam', an => { ak.anim = an; animator.push(an); });
+        return;
+      }
       const warna = WARNA_ORANG[p.kemampuan] ?? '#64748b';
       const g = (bersih ? orangBersih : modelOrang)(warna); g.userData.pilih = { jenis: 'pekerja', id: p.id } satisfies Pilihan;
       const karton = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.32, 0.38), bersih ? mat(WARNA_BERSIH.karton) : mat('#c8a26b', { map: teks('muatan') })); karton.position.set(0.32, 1.0, 0); karton.visible = false; g.add(karton);
@@ -298,6 +332,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         case 'pick_karton': A = lpn ? posLpn(lpn) : tt(slotOut(0)); B = titikLokasi(stgOut.id); bawaKarton = true; break;
         case 'pack': case 'cek_out': A = lpnOrder(); A = { ...A, p: A.p.clone().add(v(0, 0.9)) }; B = A; diam = true; break;
         case 'muat': A = lpnOrder(); B = tt(dockPos.get(tr?.dock ?? '')?.clone() ?? v(1.6, L.stagingOut.z1 - 2)); bawaPalet = !!tg.mhe; bawaKarton = !tg.mhe; break;
+        // admin: ke sopir di dock lalu kembali ke meja (inbound) / ke palet order lalu ke dock (outbound)
+        case 'admin_in': A = tt((dockPos.get(tr?.dock ?? '')?.clone() ?? v(1.6, L.stagingIn.z0 + 2)).add(v(1.2, 0))); B = tt(dari.clone()); break;
+        case 'admin_out': { A = lpnOrder(); A = { ...A, p: A.p.clone().add(v(0, 0.9)) }; const trk = o?.truk ? d.truk.get(o.truk) : undefined; B = tt((dockPos.get(trk?.dock ?? '')?.clone() ?? v(1.6, L.stagingOut.z1 - 2)).add(v(1.2, 0))); break; }
         default: A = tt(titikKantor.clone().add(v(((Number(tg.id.slice(1)) * 0.37) % 1) * 2 - 1, 0))); B = A; diam = true;
       }
       const awal = jalur({ p: dari.clone(), lo: lorongSlot(lorongRak, dari.x, dari.z), y: 0 }, A);
@@ -409,15 +446,18 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         let tugas: Amatan['tugas'] = null;
         if (tg && a.rencana && tg.mulai != null && tg.durasi) {
           const f = Math.max(0, Math.min(1, (d.t - tg.mulai) / tg.durasi)); const ix = FASE(a.rencana, f);
-          tugas = { id: tg.id, jenis: tg.jenis, fase: (a.rencana.diam ? LANGKAH_DIAM : LANGKAH_TUGAS)[ix], langkah: ix, f, durasiStd: tg.durasi, berjalan: d.t - tg.mulai, jarakJalur: a.rencana.jarak,
-            kecepatan: a.rencana.jarak / (tg.durasi * (a.rencana.diam ? 0.15 : 0.78)) };
+          const ll = LANGKAH[tg.jenis].length === (a.rencana.diam ? 2 : 4) ? LANGKAH[tg.jenis] : a.rencana.diam ? LANGKAH_DIAM : LANGKAH_TUGAS;
+          tugas = { id: tg.id, jenis: tg.jenis, fase: ll[ix], langkah: ix, langkahList: ll, f, durasiStd: tg.durasi, berjalan: d.t - tg.mulai, jarakJalur: a.rencana.jarak,
+            kecepatan: a.rencana.jarak / (tg.durasi * (a.rencana.diam ? 0.15 : 0.78)), bantu: tg.bantu, porsiJalan: a.rencana.diam ? 0.15 : 0.78 };
         }
-        terbaik = tg?.mhe ? { id: tg.mhe, jenis: 'mhe', nama: `${d.mhe.find(m => m.id === tg.mhe)?.nama ?? tg.mhe} · ${p.nama}`, jarak, tugas } : { id: p.id, jenis: 'pekerja', nama: p.nama, jarak, tugas };
+        const ket = a.patroli ? (kategoriOrang(p.role) === 'security' ? 'Patroli keamanan di area dock' : 'Supervisi & patroli area kerja') : undefined;
+        terbaik = tg?.mhe ? { id: tg.mhe, jenis: 'mhe', nama: `${d.mhe.find(m => m.id === tg.mhe)?.nama ?? tg.mhe} · ${p.nama}`, role: p.role, jarak, tugas } : { id: p.id, jenis: 'pekerja', nama: p.nama, role: p.role, ket, jarak, tugas };
       }
       k.amatan = terbaik;
     };
 
-    let tLalu = d.t;
+    let tLalu = d.t, tPatroli = 0;
+    const panjangRute = (r: V[]) => [...r, r[0]].reduce((a, q, i, arr) => (i ? a + q.distanceTo(arr[i - 1]) : 0), 0);
     const frame = (dt: number) => {
       updateJelajah(dt);
       detikNyata += dt;
@@ -430,8 +470,14 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       const dibawa: { pos: V; rot: number; sku: string; lpn: string | null }[] = [];
       const pakaiMhe = new Set<string>();
 
+      if (k.jalan) tPatroli += Math.min(0.1, dt) * Math.min(3, Math.max(1, Math.log10(k.kecepatan + 1)));
       for (const p of d.pekerja) {
         const a = orang.get(p.id); if (!a) continue;
+        if (a.patroli) {
+          a.obj.visible = !p.absen && bertugas(d, p.shift, d.t);
+          if (a.obj.visible) { titikPada([...a.patroli, a.patroli[0]], ((tPatroli * 1.1 + p.id.length * 7.3) % panjangRute(a.patroli)) / panjangRute(a.patroli), baru); gerakkan(a, baru); }
+          continue;
+        }
         const tg = p.sibuk ? d.tugas.get(p.sibuk) : undefined;
         const tampak = !p.absen && (!!tg || bertugas(d, p.shift, d.t));
         // tugas berganti → posisi awal = titik akhir tugas sebelumnya
@@ -487,7 +533,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         const bawa: Aktor2D['bawa'] = tg && a.rencana && f >= 0.32 && f < 0.92 ? (a.rencana.bawaPalet ? 'palet' : a.rencana.bawaKarton ? 'karton' : null) : null;
         if (tg?.mhe) mheSibuk.set(tg.mhe, { bawa, tugas: tg.jenis });
         if (!a.obj.visible) continue;
-        a2.push({ id: p.id, jenis: 'pekerja', x: a.obj.position.x, z: a.obj.position.z, rot: a.obj.rotation.y, sibuk: !!tg, bawa, kemampuan: p.kemampuan ?? undefined, tugas: tg?.jenis });
+        a2.push({ id: p.id, jenis: 'pekerja', x: a.obj.position.x, z: a.obj.position.z, rot: a.obj.rotation.y, sibuk: !!tg || !!a.patroli, bawa, kemampuan: p.kemampuan ?? kategoriOrang(p.role), tugas: tg?.jenis });
       }
       for (const [id, m] of mhe) { const s = mheSibuk.get(id); a2.push({ id, jenis: 'mhe', x: m.obj.position.x, z: m.obj.position.z, rot: m.obj.rotation.y, sibuk: !!s || !!d.mhe.find(x => x.id === id)?.sibuk, bawa: s?.bawa ?? null, mhe: d.mhe.find(x => x.id === id)?.jenis, tugas: s?.tugas }); }
       k.aktor2d = a2;

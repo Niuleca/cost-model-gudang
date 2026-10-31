@@ -80,12 +80,14 @@ export interface Tugas {
   prioritas: number;                        // makin kecil makin dulu (batas waktu)
   status: StatusTugas;
   lpn?: string; order?: string; truk?: string; ke?: string; barisAsn?: BarisAsn;
+  /** dikerjakan role serumpun yang membantu (bukan role utamanya) */ bantu?: boolean;
   pekerja?: string; mhe?: string; mulai?: number; selesai?: number; durasi?: number;
   akhirShift?: number;                      // akhir shift pekerja saat tugas dimulai (untuk hitung lembur)
   dibuat: number;
 }
 
-export interface Pekerja { id: string; nama: string; role: string; kemampuan: Kemampuan | null; shift: number; sibuk: string | null; absen: boolean; biayaBulan: number; jamKerja: number }
+/** arus: role khusus inbound / outbound (mis. "Inbound Admin") — hanya mengerjakan tugas arus itu. */
+export interface Pekerja { id: string; nama: string; role: string; kemampuan: Kemampuan | null; arus?: 'in' | 'out'; shift: number; sibuk: string | null; absen: boolean; biayaBulan: number; jamKerja: number }
 export interface Mhe { id: string; nama: string; jenis: 'reach' | 'forklift' | 'stacker' | 'hpt'; sibuk: string | null; jamKerja: number }
 
 /** luar = tidak ada aktivitas ini di tender → dikerjakan pihak luar (sopir/vendor), tidak memakai pekerja & MHE gudang. */

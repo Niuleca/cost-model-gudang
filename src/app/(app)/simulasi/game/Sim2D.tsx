@@ -318,7 +318,7 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
       {hover && <div className="gm-2d-tip" style={{ left: hover.x + 12, top: hover.y + 12 }}>{hover.teks}</div>}
       <div className="gm-2d-legenda small">
         <span><i className="mhe" />MHE sibuk</span><span><i className="mhe idle" />MHE siaga</span>
-        <span><i className="org" style={{ background: WARNA_ORANG.operator }} />operator</span><span><i className="org" style={{ background: WARNA_ORANG.checker }} />checker</span><span><i className="org" style={{ background: WARNA_ORANG.picker }} />picker</span><span><i className="org" style={{ background: WARNA_ORANG.tkbm }} />TKBM</span>
+        <span><i className="org" style={{ background: WARNA_ORANG.operator }} />operator</span><span><i className="org" style={{ background: WARNA_ORANG.checker }} />checker</span><span><i className="org" style={{ background: WARNA_ORANG.picker }} />picker</span><span><i className="org" style={{ background: WARNA_ORANG.tkbm }} />TKBM</span><span><i className="org" style={{ background: WARNA_ORANG.admin }} />admin</span><span><i className="org" style={{ background: WARNA_ORANG.supervisor }} />supervisor</span><span><i className="org" style={{ background: WARNA_ORANG.security }} />security</span>
         <span><i className="lampu" style={{ background: '#16a34a' }} /><i className="lampu" style={{ background: '#f59e0b' }} /><i className="lampu" style={{ background: '#dc2626' }} />isi staging &lt;60 · &lt;85 · ≥85%</span>
         <span><i className="slot" />rak terisi (makin gelap = makin penuh)</span>
       </div>

@@ -8,7 +8,7 @@ import { HARI, hitungRedFlag, jalankanSampai, shiftBerikut, waktuGame, type Duni
 import type { LayoutGudang } from '@/lib/simulasi3d/layout';
 import type { Kamera, OpsiViewer, TemaViewer, ViewerApi } from '../Viewer3D';
 import { WARNA_ORANG } from '../warna';
-import { buatLapisanGame, LANGKAH_DIAM, LANGKAH_TUGAS, type KontrolGame, type Pilihan, type StatGerak } from './lapisan3d';
+import { buatLapisanGame, type KontrolGame, type Pilihan, type StatGerak } from './lapisan3d';
 import { Ikon, LABEL_TUGAS, PanelArmada, PanelInfo, PanelOrder, orderDilacak } from './panel';
 import Sim2D, { type Opsi2D } from './Sim2D';
 import Analisis from './Analisis';
@@ -93,16 +93,20 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
   // stopwatch time study: tugas yang selesai oleh resource ini sejak mulai dicatat
   const hasilCatat = (() => {
     if (!catat) return null;
-    const jamAmati = (dunia.t - catat.mulai) / 3600;
-    const per = new Map<JenisTugas, { n: number; qty: number; satuan: string; jamKerja: number }>();
+    const jamAmati = Math.max(0, dunia.t - catat.mulai) / 3600;
+    const per = new Map<JenisTugas, { n: number; qty: number; satuan: string; jamSiklus: number; jarak: number }>();
+    let kerja = 0, jalanTugas = 0;
     for (const t of dunia.tugas.values()) {
-      if (t.status !== 'selesai' || (t.selesai ?? 0) < catat.mulai) continue;
-      if (catat.jenis === 'pekerja' ? t.pekerja !== catat.id : t.mhe !== catat.id) continue;
-      const x = per.get(t.jenis) ?? { n: 0, qty: 0, satuan: t.satuan, jamKerja: 0 }; x.n++; x.qty += t.qty; x.jamKerja += (t.durasi ?? 0) / 3600; per.set(t.jenis, x);
+      if (t.mulai == null || (catat.jenis === 'pekerja' ? t.pekerja !== catat.id : t.mhe !== catat.id)) continue;
+      const akhir = t.status === 'selesai' ? t.selesai ?? dunia.t : dunia.t;
+      const tumpang = Math.max(0, Math.min(akhir, dunia.t) - Math.max(t.mulai, catat.mulai)); if (tumpang <= 0) continue;
+      kerja += tumpang / 3600; if (t.status !== 'selesai') { jalanTugas++; continue; }
+      if ((t.selesai ?? 0) < catat.mulai) continue;
+      const x = per.get(t.jenis) ?? { n: 0, qty: 0, satuan: t.satuan, jamSiklus: 0, jarak: 0 }; x.n++; x.qty += t.qty; x.jamSiklus += (t.durasi ?? 0) / 3600; per.set(t.jenis, x);
     }
-    const kerja = [...per.values()].reduce((a, x) => a + x.jamKerja, 0);
-    return { jamAmati, per, utilisasi: jamAmati > 0 ? kerja / jamAmati : 0 };
+    return { jamAmati, per, kerja, jalanTugas, utilisasi: jamAmati > 0 ? Math.min(1, kerja / jamAmati) : 0 };
   })();
+  const [amatKecil, setAmatKecil] = useState(false);
   const ubahProd = (j: JenisTugas, x: number) => { if (!(x > 0)) return; dunia.sk.prod[j] = { ...dunia.sk.prod[j], prod: x, sumber: 'diubah saat main' }; setVersi(v => v + 1); };
 
   return (
@@ -139,44 +143,58 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
         {pilih && panel && !jelajah && <PanelInfo d={dunia} p={pilih} tutup={() => setPilih(null)} />}
         {jelajah && (
           <>
-            <div className="gm-kartu gm-amati">
-              <div className="gm-judul"><Ikon n="orang" /> <b>Observasi</b><span className="small muted" style={{ marginLeft: 'auto' }}>dekati pekerja / MHE ≤ 8 m</span></div>
-              {!am ? <p className="small muted">Tidak ada pekerja atau MHE di dekat Anda. Jalan ke area staging, lorong rak, atau dock.</p> : (
+            <div className={`gm-kartu gm-amati${amatKecil ? ' kecil' : ''}`}>
+              <div className="gm-judul"><Ikon n="orang" /> <b>Motion study</b>
+                <span className="small muted" style={{ marginLeft: 'auto' }}>{am ? `${angka(am.jarak, 1)} m` : 'dekati ≤ 8 m'}</span>
+                <button type="button" className="ghost gm-amati-lipat" onClick={() => setAmatKecil(!amatKecil)} aria-label={amatKecil ? 'Buka panel' : 'Kecilkan panel'}>{amatKecil ? '▴' : '▾'}</button>
+              </div>
+              {!am ? <p className="small muted" style={{ margin: 0 }}>Jalan (W/A/S/D) mendekati pekerja atau MHE di staging, lorong rak, atau dock.</p> : (
                 <>
-                  <div className="gm-amati-nama"><b>{am.nama}</b><span className="small muted">{angka(am.jarak, 1)} m dari Anda</span></div>
-                  {!am.tugas ? <p className="small"><span className="gm-pill info">Siaga</span> tidak sedang mengerjakan tugas.</p> : (
-                    <>
-                      <div className="small"><span className="gm-pill jalan">{LABEL_TUGAS[am.tugas.jenis]}</span> <span className="muted">{am.tugas.id}</span></div>
-                      <ol className="gm-langkah-list">
-                        {(am.tugas.fase.startsWith('Jalan ke lokasi') || am.tugas.fase.startsWith('Mengerjakan') ? LANGKAH_DIAM : LANGKAH_TUGAS).map((l, i) => (
-                          <li key={l} className={i < am.tugas!.langkah ? 'lewat' : i === am.tugas!.langkah ? 'kini' : ''}>{l}</li>
-                        ))}
-                      </ol>
-                      <dl className="gm-info-baris">
-                        <div><dt>Waktu standar (productivity)</dt><dd>{durasiTeks(am.tugas.durasiStd)}</dd></div>
-                        <div><dt>Berjalan</dt><dd>{durasiTeks(am.tugas.berjalan)} · {Math.round(am.tugas.f * 100)}%</dd></div>
-                        <div><dt>Jarak jalur di layout</dt><dd>{angka(am.tugas.jarakJalur)} m</dd></div>
-                        <div><dt>Kecepatan yang dituntut</dt><dd style={{ color: am.tugas.kecepatan > (am.jenis === 'mhe' ? 3 : 1.8) ? 'var(--bad)' : undefined }}>{angka(am.tugas.kecepatan, 2)} m/dtk {am.tugas.kecepatan > (am.jenis === 'mhe' ? 3 : 1.8) ? '— tidak realistis' : '— wajar'}</dd></div>
-                      </dl>
-                    </>
-                  )}
+                  <div className="gm-amati-nama"><b>{am.nama}</b>{am.role && am.jenis === 'pekerja' && <span className="small muted">{am.role}</span>}</div>
+                  {!am.tugas ? <p className="small" style={{ margin: 0 }}><span className="gm-pill info">{am.ket ? 'Patroli' : 'Siaga'}</span> {am.ket ?? 'menunggu tugas berikutnya di area kerjanya.'}</p> : (() => {
+                    const tg = am.tugas; const realistis = tg.kecepatan <= (am.jenis === 'mhe' ? 3 : 1.8);
+                    const sisa = Math.max(0, tg.durasiStd - tg.berjalan);
+                    return (<>
+                      <div className="small"><span className="gm-pill jalan">{LABEL_TUGAS[tg.jenis]}</span>{tg.bantu && <span className="gm-pill info" title="Role serumpun membantu karena antrean tugas utamanya kosong">membantu</span>} <span className="muted">{tg.id}</span></div>
+                      <div className="gm-fase" style={{ gridTemplateColumns: `repeat(${tg.langkahList.length}, 1fr)` }}>
+                        {tg.langkahList.map((l, i) => <div key={l} className={i < tg.langkah ? 'lewat' : i === tg.langkah ? 'kini' : ''} title={l}><i style={i === tg.langkah ? { width: `${Math.round(Math.min(1, Math.max(0, (tg.f - [0, 0.22, 0.32, 0.88][i]) / ([0.22, 0.1, 0.56, 0.12][i] || 1))) * 100)}%` } : undefined} /></div>)}
+                      </div>
+                      <div className="small"><b>Langkah {tg.langkah + 1}/{tg.langkahList.length}:</b> {tg.fase}</div>
+                      {!amatKecil && catat && <div className="small muted">Standar {durasiTeks(tg.durasiStd)} · progres {Math.round(tg.f * 100)}% · {angka(tg.jarakJalur)} m · <span style={{ color: realistis ? undefined : 'var(--bad)' }}>{angka(tg.kecepatan, 2)} m/dtk ({realistis ? 'wajar' : 'tidak realistis'})</span></div>}
+                      {!amatKecil && !catat && <div className="gm-amati-grid">
+                        <div><small>Waktu standar</small><b>{durasiTeks(tg.durasiStd)}</b><span>dari productivity</span></div>
+                        <div><small>Progres</small><b>{Math.round(tg.f * 100)}%</b><span>sisa {durasiTeks(sisa)}</span></div>
+                        <div><small>Jarak tempuh</small><b>{angka(tg.jarakJalur)} m</b><span>jalur di layout</span></div>
+                        <div className={realistis ? '' : 'buruk'}><small>Kecepatan dituntut</small><b>{angka(tg.kecepatan, 2)} m/dtk</b><span>{realistis ? 'wajar' : 'tidak realistis'}</span></div>
+                      </div>}
+                    </>);
+                  })()}
                   {catat?.id === am.id
-                    ? <button type="button" className="ghost" onClick={() => setCatat(null)}>■ Hentikan catatan</button>
-                    : <button type="button" onClick={() => setCatat({ id: am.id, jenis: am.jenis, nama: am.nama, mulai: dunia.t })}>⏱ Mulai catat (time study)</button>}
+                    ? <button type="button" className="ghost" onClick={() => setCatat(null)}>■ Hentikan time study</button>
+                    : <button type="button" onClick={() => setCatat({ id: am.id, jenis: am.jenis, nama: am.nama, mulai: dunia.t })}>⏱ Mulai time study</button>}
                 </>
               )}
-              {catat && hasilCatat && (
+              {catat && hasilCatat && !amatKecil && (
                 <div className="gm-catat">
-                  <div className="small"><b>Time study: {catat.nama}</b> · diamati {durasiTeks(hasilCatat.jamAmati * 3600)} · utilisasi {Math.round(hasilCatat.utilisasi * 100)}%</div>
-                  <table className="sim3d-tabel"><thead><tr><th>Tugas</th><th className="num">Selesai</th><th className="num">Aktual /jam</th><th className="num">Standar /jam</th></tr></thead><tbody>
-                    {[...hasilCatat.per.entries()].map(([j, x]) => {
-                      const p = dunia.sk.prod[j]; const std = p.prod * dunia.sk.faktor;
-                      const aktual = x.jamKerja > 0 ? x.qty / x.jamKerja : 0;
-                      return <tr key={j}><td>{LABEL_TUGAS[j]}</td><td className="num">{x.n} · {angka(x.qty)} {x.satuan}</td><td className="num">{x.satuan === p.satuan ? angka(aktual, 1) : `${angka(x.n / Math.max(0.001, x.jamKerja), 1)} tugas`}</td><td className="num">{angka(std, 1)} {p.satuan}</td></tr>;
-                    })}
-                    {!hasilCatat.per.size && <tr><td colSpan={4} className="small muted">Belum ada tugas selesai sejak dicatat — jalankan waktu (▶).</td></tr>}
-                  </tbody></table>
-                  <p className="small muted" style={{ margin: 0 }}>Aktual = qty ÷ jam kerja (tanpa waktu menganggur). Utilisasi = jam kerja ÷ waktu diamati.</p>
+                  <div className="small"><b>Time study · {catat.nama}</b></div>
+                  {!jalan && hasilCatat.jamAmati < 1 / 60 && <p className="small gm-catat-tip">Waktu sedang dijeda — tekan <b>▶ Jalan</b> supaya pekerja bergerak dan hasil terisi.</p>}
+                  <div className="gm-amati-grid">
+                    <div><small>Diamati</small><b>{durasiTeks(hasilCatat.jamAmati * 3600)}</b><span>waktu game</span></div>
+                    <div><small>Bekerja</small><b>{durasiTeks(hasilCatat.kerja * 3600)}</b><span>{hasilCatat.jalanTugas ? '1 tugas berjalan' : 'tidak ada tugas berjalan'}</span></div>
+                    <div><small>Menganggur</small><b>{durasiTeks(Math.max(0, hasilCatat.jamAmati - hasilCatat.kerja) * 3600)}</b><span>menunggu tugas</span></div>
+                    <div className={hasilCatat.utilisasi < 0.5 && hasilCatat.jamAmati > 0.25 ? 'buruk' : ''}><small>Utilisasi</small><b>{Math.round(hasilCatat.utilisasi * 100)}%</b><span>bekerja ÷ diamati</span></div>
+                  </div>
+                  {hasilCatat.per.size > 0 ? (
+                    <table className="sim3d-tabel"><thead><tr><th>Tugas</th><th className="num">Selesai</th><th className="num">Siklus</th><th className="num" title="hasil ÷ waktu diamati, dibanding standar productivity">Output / standar per jam</th></tr></thead><tbody>
+                      {[...hasilCatat.per.entries()].map(([j, x]) => {
+                        const p = dunia.sk.prod[j]; const std = p.prod * dunia.sk.faktor;
+                        const out = hasilCatat.jamAmati > 0 ? x.qty / hasilCatat.jamAmati : 0;
+                        return <tr key={j}><td>{LABEL_TUGAS[j]}</td><td className="num">{x.n}×</td><td className="num">{durasiTeks((x.jamSiklus / x.n) * 3600)}</td>
+                          <td className="num"><b style={{ color: out < std * 0.5 ? 'var(--bad)' : undefined }}>{angka(out, 1)}</b> / {angka(std, 1)} {p.satuan}</td></tr>;
+                      })}
+                    </tbody></table>
+                  ) : <p className="small muted" style={{ margin: 0 }}>Belum ada tugas yang selesai sejak time study dimulai.</p>}
+                  <p className="small muted" style={{ margin: 0 }}>Siklus = waktu rata-rata per tugas. Output /jam = hasil ÷ waktu diamati (termasuk menganggur) — bandingkan dengan standar untuk melihat kapasitas yang tidak terpakai.</p>
                 </div>
               )}
             </div>
