@@ -23,6 +23,9 @@ export interface StudiPemain {
   berjalan: SiklusBerjalan | null;
   kecepatan: number;                     // m/detik saat ini
   posisi?: { x: number; z: number };
+  target?: { x: number; z: number; label: string; jarak: number } | null;
+  pesan?: string;                        // umpan balik saat E tidak bisa dijalankan
+  tarik?: boolean;                       // hand pallet: ditarik (true) / didorong
 }
 export const studiAwal = (): StudiPemain => ({ mode: 'bebas', level: 0, minta: 0, aksi: null, bawa: null, petunjuk: '', siklus: [], berjalan: null, kecepatan: 0 });
 
@@ -30,9 +33,9 @@ export const MODE_PEMAIN: Record<ModePemain, { label: string; ikon: string; ket:
   bebas: { label: 'Gerak bebas', ikon: '🚶', ket: 'Jalan bebas & amati pekerja lain (Shift = lari).', kec: { kosong: 1.4, bawa: 1.4 } },
   cbt: { label: 'Forklift CB', ikon: '🚜', ket: 'Counterbalance: ambil palet dari rak / lantai / staging dan taruh di lokasi kosong.', kec: { kosong: 3.0, bawa: 2.5 } },
   reach: { label: 'Reach truck', ikon: '🏗️', ket: 'Reach truck di lorong rak: putaway & picking palet sampai level atas.', kec: { kosong: 2.5, bawa: 2.0 } },
-  hpt: { label: 'Hand pallet', ikon: '🛒', ket: 'Pindahkan palet di lantai (dock ↔ staging ↔ lantai).', kec: { kosong: 1.2, bawa: 0.9 } },
+  hpt: { label: 'Hand pallet', ikon: '🛒', ket: 'Pindahkan palet di lantai (dock ↔ staging ↔ lantai). T = ganti ditarik / didorong; dorong saat memasukkan garpu ke palet.', kec: { kosong: 1.2, bawa: 0.9 } },
   checker: { label: 'Checking', ikon: '✅', ket: 'Scan & cek qty / lot / kondisi palet.', kec: { kosong: 1.25, bawa: 1.25 } },
-  picker: { label: 'Picking karton', ikon: '📦', ket: 'Ambil karton dari palet lalu susun di palet tujuan (palet order).', kec: { kosong: 1.25, bawa: 1.1 } },
+  picker: { label: 'Picking karton', ikon: '📦', ket: 'Ambil karton dari pick face (palet rak level 1) lalu susun di palet order di staging outbound.', kec: { kosong: 1.25, bawa: 1.1 } },
   admin: { label: 'Admin', ikon: '🗂️', ket: 'Terima dokumen di dock, lalu input & konfirmasi di meja admin.', kec: { kosong: 1.3, bawa: 1.3 } },
 };
 

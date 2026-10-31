@@ -31,6 +31,7 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
   const kanvas = useRef<HTMLCanvasElement>(null);
   const view = useRef({ s: 8, ox: 40, oy: 40 });
   const seret = useRef<{ x: number; y: number; ox: number; oy: number; gerak: boolean } | null>(null);
+  const diatur = useRef(false);   // pengguna sudah menggeser / zoom → jangan pas-layar otomatis
   const [hover, setHover] = useState<{ x: number; y: number; teks: string } | null>(null);
   const [skala, setSkala] = useState(8);
   const opsiRef = useRef(opsi); opsiRef.current = opsi;
@@ -97,7 +98,7 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
   useEffect(() => {
     const el = wadah.current!, cv = kanvas.current!;
     const ukur = () => { const dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = el.clientWidth * dpr; cv.height = el.clientHeight * dpr; cv.style.width = `${el.clientWidth}px`; cv.style.height = `${el.clientHeight}px`; };
-    const ro = new ResizeObserver(() => { const awal = !cv.width; ukur(); if (awal) pasLayar(); }); ro.observe(el); ukur(); pasLayar();
+    const ro = new ResizeObserver(() => { ukur(); if (!diatur.current) pasLayar(); }); ro.observe(el); ukur(); pasLayar();
     let id = 0;
     const g = cv.getContext('2d')!;
     const loop = () => {
@@ -254,6 +255,26 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
         if (a.bawa) { g.fillStyle = '#d6a35c'; g.fillRect(X(a.x) + r * 0.6, Y(a.z) - r * 0.6, r * 1.1, r * 1.1); }
         if (pl?.jenis === 'pekerja' && pl.id === a.id) { g.strokeStyle = '#f97316'; g.lineWidth = 3; g.beginPath(); g.arc(X(a.x), Y(a.z), r + 5, 0, Math.PI * 2); g.stroke(); }
       }
+      // pemain (mode jelajah) & titik kerja berikutnya — sama persis dengan 3D
+      const pm = aktor.find(a => a.jenis === 'pemain'); const sp = kontrol.current.pemain;
+      if (pm) {
+        const tg = sp?.target;
+        if (tg) {
+          g.setLineDash([6, 4]); g.strokeStyle = '#0ea5e9'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(pm.x), Y(pm.z)); g.lineTo(X(tg.x), Y(tg.z)); g.stroke(); g.setLineDash([]);
+          const rr = Math.max(6, 0.7 * s) * (1 + 0.15 * Math.sin(performance.now() / 160));
+          g.beginPath(); g.arc(X(tg.x), Y(tg.z), rr, 0, Math.PI * 2); g.strokeStyle = '#0ea5e9'; g.lineWidth = 3; g.stroke();
+          teks(`${tg.label} · ${tg.jarak.toFixed(0)} m`, tg.x, tg.z - 1.2, fs(0.8, 10, 13), '#0369a1');
+        }
+        const ux = Math.cos(pm.rot), uz = -Math.sin(pm.rot); const r = Math.max(6, 0.55 * s);
+        g.beginPath(); g.moveTo(X(pm.x + ux * 1.4), Y(pm.z + uz * 1.4)); g.lineTo(X(pm.x - uz * 0.6), Y(pm.z + ux * 0.6)); g.lineTo(X(pm.x + uz * 0.6), Y(pm.z - ux * 0.6)); g.closePath();
+        g.fillStyle = 'rgba(14,165,233,.35)'; g.fill();
+        g.beginPath(); g.arc(X(pm.x), Y(pm.z), r, 0, Math.PI * 2); g.fillStyle = '#0ea5e9'; g.fill(); g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.stroke();
+        if (pm.bawa) { g.fillStyle = pm.bawa === 'palet' ? '#b7791f' : '#d6a35c'; g.fillRect(X(pm.x + ux * 1.1) - 0.45 * s, Y(pm.z + uz * 1.1) - 0.45 * s, 0.9 * s, 0.9 * s); }
+        teks('Anda', pm.x, pm.z + 1.6, fs(0.8, 10, 13), '#0369a1');
+        // ikuti pemain: geser peta bila pemain mendekati tepi
+        const px = X(pm.x), py = Y(pm.z), mx = el.clientWidth * 0.15, my = el.clientHeight * 0.15;
+        if (px < mx || px > el.clientWidth - mx || py < my || py > el.clientHeight - my) { view.current.ox += el.clientWidth / 2 - px; view.current.oy += el.clientHeight / 2 - py; }
+      }
       // palet terpilih
       if (pl?.jenis === 'palet') { const l = d.lpn.get(pl.id); const lok = l ? d.lokasi.get(l.lokasi) : null; if (lok && (lok.tipe === 'rak' || lok.tipe === 'lantai')) { g.strokeStyle = '#f97316'; g.lineWidth = 3; g.strokeRect(X(lok.x - 0.7), Y(lok.z - 0.7), 1.4 * s, 1.4 * s); } }
       // skala
@@ -287,7 +308,7 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
     }
     return null;
   };
-  const turun = (e: React.PointerEvent) => { (e.target as Element).setPointerCapture?.(e.pointerId); seret.current = { x: e.clientX, y: e.clientY, ox: view.current.ox, oy: view.current.oy, gerak: false }; };
+  const turun = (e: React.PointerEvent) => { diatur.current = true; (e.target as Element).setPointerCapture?.(e.pointerId); seret.current = { x: e.clientX, y: e.clientY, ox: view.current.ox, oy: view.current.oy, gerak: false }; };
   const gerak = (e: React.PointerEvent) => {
     const sr = seret.current;
     if (sr) {
@@ -304,6 +325,7 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
   useEffect(() => {
     const cv = kanvas.current!;
     const roda = (e: WheelEvent) => {
+      diatur.current = true;
       e.preventDefault(); const r = cv.getBoundingClientRect(); const cx = e.clientX - r.left, cy = e.clientY - r.top;
       const v0 = view.current; const s = Math.max(1.5, Math.min(80, v0.s * Math.exp(-e.deltaY * 0.0015)));
       view.current = { s, ox: cx - ((cx - v0.ox) * s) / v0.s, oy: cy - ((cy - v0.oy) * s) / v0.s }; setSkala(s);
@@ -318,11 +340,11 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
       {hover && <div className="gm-2d-tip" style={{ left: hover.x + 12, top: hover.y + 12 }}>{hover.teks}</div>}
       <div className="gm-2d-legenda small">
         <span><i className="mhe" />MHE sibuk</span><span><i className="mhe idle" />MHE siaga</span>
-        <span><i className="org" style={{ background: WARNA_ORANG.operator }} />operator</span><span><i className="org" style={{ background: WARNA_ORANG.checker }} />checker</span><span><i className="org" style={{ background: WARNA_ORANG.picker }} />picker</span><span><i className="org" style={{ background: WARNA_ORANG.tkbm }} />TKBM</span><span><i className="org" style={{ background: WARNA_ORANG.admin }} />admin</span><span><i className="org" style={{ background: WARNA_ORANG.supervisor }} />supervisor</span><span><i className="org" style={{ background: WARNA_ORANG.security }} />security</span>
+        <span><i className="org" style={{ background: WARNA_ORANG.operator }} />operator</span><span><i className="org" style={{ background: WARNA_ORANG.checker }} />checker</span><span><i className="org" style={{ background: WARNA_ORANG.picker }} />picker</span><span><i className="org" style={{ background: WARNA_ORANG.tkbm }} />TKBM</span><span><i className="org" style={{ background: WARNA_ORANG.admin }} />admin</span><span><i className="org" style={{ background: WARNA_ORANG.supervisor }} />supervisor</span><span><i className="org" style={{ background: WARNA_ORANG.security }} />security</span>{kontrol.current.jelajah && <span><i className="org" style={{ background: '#0ea5e9' }} />Anda · <i className="org" style={{ background: 'transparent', border: '2px solid #0ea5e9' }} />target</span>}
         <span><i className="lampu" style={{ background: '#16a34a' }} /><i className="lampu" style={{ background: '#f59e0b' }} /><i className="lampu" style={{ background: '#dc2626' }} />isi staging &lt;60 · &lt;85 · ≥85%</span>
         <span><i className="slot" />rak terisi (makin gelap = makin penuh)</span>
       </div>
-      <button type="button" className="ghost gm-2d-pas" onClick={pasLayar}>Pas layar · {skala.toFixed(1)} px/m</button>
+      <button type="button" className="ghost gm-2d-pas" onClick={() => { diatur.current = false; pasLayar(); }}>Pas layar · {skala.toFixed(1)} px/m</button>
     </div>
   );
 }

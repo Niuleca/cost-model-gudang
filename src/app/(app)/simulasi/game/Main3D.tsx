@@ -108,7 +108,8 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
     }
     return { jamAmati, per, kerja, jalanTugas, utilisasi: jamAmati > 0 ? Math.min(1, kerja / jamAmati) : 0 };
   })();
-  const [amatKecil, setAmatKecil] = useState(false);
+  const [ukuranPanel, setUkuranPanel] = useState(1);   // 0 ringkas · 1 sedang · 2 besar (hasil lengkap)
+  const amatKecil = ukuranPanel === 0;
   const sp = (kontrol.current.pemain ??= studiAwal());
   const pilihMode = (m: ModePemain) => { sp.mode = m; setVersi(x => x + 1); };
   const unduhStudi = () => {
@@ -154,28 +155,39 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
         {pilih && panel && !jelajah && <PanelInfo d={dunia} p={pilih} tutup={() => setPilih(null)} />}
         {jelajah && (
           <>
-            <div className={`gm-kartu gm-amati${amatKecil ? ' kecil' : ''}`}>
+            <div className={`gm-kartu gm-amati ukuran-${ukuranPanel}`}>
               <div className="gm-judul"><Ikon n="orang" /> <b>Motion study</b>
                 <span className="small muted" style={{ marginLeft: 'auto' }}>{sp.mode === 'bebas' ? (am ? `${angka(am.jarak, 1)} m` : 'dekati ≤ 8 m') : `${angka(sp.kecepatan, 1)} m/dtk`}</span>
-                <button type="button" className="ghost gm-amati-lipat" onClick={() => setAmatKecil(!amatKecil)} aria-label={amatKecil ? 'Buka panel' : 'Kecilkan panel'}>{amatKecil ? '▴' : '▾'}</button>
+                <span className="gm-ukuran" role="group" aria-label="Ukuran panel">
+                  <button type="button" className="ghost" disabled={ukuranPanel === 0} onClick={() => setUkuranPanel(u => Math.max(0, u - 1))} aria-label="Perkecil panel" title="Perkecil">−</button>
+                  <button type="button" className="ghost" disabled={ukuranPanel === 2} onClick={() => setUkuranPanel(u => Math.min(2, u + 1))} aria-label="Perbesar panel" title="Perbesar">+</button>
+                </span>
               </div>
-              <div className="gm-mode-pemain" role="group" aria-label="Mode kerja">
-                {(Object.keys(MODE_PEMAIN) as ModePemain[]).map(m => <button key={m} type="button" className={sp.mode === m ? 'on' : 'ghost'} title={MODE_PEMAIN[m].ket} onClick={() => pilihMode(m)}>{MODE_PEMAIN[m].ikon} {MODE_PEMAIN[m].label}</button>)}
-              </div>
+              {amatKecil ? (
+                <select value={sp.mode} onChange={e => pilihMode(e.target.value as ModePemain)} aria-label="Mode kerja">
+                  {(Object.keys(MODE_PEMAIN) as ModePemain[]).map(m => <option key={m} value={m}>{MODE_PEMAIN[m].ikon} {MODE_PEMAIN[m].label}</option>)}
+                </select>
+              ) : (
+                <div className="gm-mode-pemain" role="group" aria-label="Mode kerja">
+                  {(Object.keys(MODE_PEMAIN) as ModePemain[]).map(m => <button key={m} type="button" className={sp.mode === m ? 'on' : 'ghost'} title={MODE_PEMAIN[m].ket} onClick={() => pilihMode(m)}>{MODE_PEMAIN[m].ikon} {MODE_PEMAIN[m].label}</button>)}
+                </div>
+              )}
               {sp.mode !== 'bebas' && (
                 <div className="gm-kerja">
-                  <p className="small muted" style={{ margin: 0 }}>{MODE_PEMAIN[sp.mode].ket}</p>
+                  {!amatKecil && <p className="small muted" style={{ margin: 0 }}>{MODE_PEMAIN[sp.mode].ket}</p>}
                   <div className="gm-kerja-aksi">
                     <button type="button" disabled={!!sp.aksi} onClick={() => { sp.minta++; }}>E · {sp.aksi ? LABEL_AKSI[sp.aksi.nama] ?? sp.aksi.nama : 'Aksi'}</button>
+                    {sp.mode === 'hpt' && <button type="button" className="ghost" onClick={() => { sp.tarik = !sp.tarik; setVersi(x => x + 1); }} title="T">{sp.tarik ? '↩ Ditarik' : '↪ Didorong'} (T)</button>}
                     {(sp.mode === 'cbt' || sp.mode === 'reach') && <span className="gm-level">
                       <button type="button" className="ghost" onClick={() => { sp.level = Math.max(0, sp.level - 1); setVersi(x => x + 1); }} title="F">▼</button>
                       <b>Level {sp.level + 1}</b><span className="small muted">{angka(layout.levelY[sp.level] ?? 0, 2)} m</span>
                       <button type="button" className="ghost" onClick={() => { sp.level = Math.min(layout.levelY.length - 1, sp.level + 1); setVersi(x => x + 1); }} title="R">▲</button>
                     </span>}
                   </div>
-                  <div className="small gm-kerja-petunjuk">{sp.petunjuk}</div>
+                  {sp.pesan ? <div className="small gm-kerja-pesan" role="status">⚠ {sp.pesan}</div> : <div className="small gm-kerja-petunjuk">{sp.petunjuk}</div>}
+                  {sp.target && !sp.aksi && !amatKecil && <div className="small muted">🎯 {sp.target.label} · {angka(sp.target.jarak, 0)} m — ikuti penanda biru (3D & 2D)</div>}
                   {sp.aksi && <div className="gm-fase" style={{ gridTemplateColumns: '1fr' }}><div className="kini"><i style={{ width: `${Math.round(sp.aksi.f * 100)}%` }} /></div></div>}
-                  {berjalan && (
+                  {berjalan && !amatKecil && (
                     <div className="gm-amati-grid">
                       <div><small>Siklus berjalan</small><b>{detik(berjalan.jalan.s + berjalan.bawa.s + berjalan.diam + Object.values(berjalan.aksi).reduce((a, b) => a + b, 0))}</b><span>{sp.bawa ? `membawa ${sp.bawa}` : 'tanpa muatan'}</span></div>
                       <div><small>Jalan kosong</small><b>{detik(berjalan.jalan.s)}</b><span>{angka(berjalan.jalan.m, 1)} m</span></div>
@@ -185,7 +197,9 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
                   )}
                 </div>
               )}
-              {sp.siklus.length > 0 && !amatKecil && (
+              {sp.siklus.length > 0 && ukuranPanel === 1 && (() => { const r = studi[studi.length - 1]; return (
+                <button type="button" className="ghost gm-ringkas-hasil" onClick={() => setUkuranPanel(2)}>📊 {sp.siklus.length} siklus · {LABEL_TUGAS[r.jenis]} rata² {detik(r.siklus)} → <b>{angka(r.standarJam, 1)} {r.satuan}/jam</b> · lihat hasil (+)</button>); })()}
+              {sp.siklus.length > 0 && ukuranPanel === 2 && (
                 <div className="gm-catat">
                   <div className="small"><b>Hasil motion study · {sp.siklus.length} siklus</b></div>
                   <table className="sim3d-tabel"><thead><tr><th>Pekerjaan</th><th className="num">n</th><th className="num">Siklus rata²</th><th className="num">Output /jam</th></tr></thead><tbody>

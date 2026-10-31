@@ -180,9 +180,9 @@ function muatModel(j: JenisModel) {
 /** Ganti badan model kode dengan model Meshy begitu file selesai dimuat (gagal → tetap model kode). */
 export function pakaiModelMeshy(g: THREE.Group, j: JenisModel) {
   void muatModel(j).then(h => {
-    if (!h || g.getObjectByName('meshy')) return;
+    if (!h || g.children.some(c => c.name === 'meshy')) return;   // anak langsung saja (operator di dalamnya punya 'meshy' sendiri)
     const salin = h.model.clone(true); salin.name = 'meshy';
-    g.traverse(o => { if (o.userData.kode) o.visible = false; });
+    g.traverse(o => { if (o.userData.kode && !o.parent?.userData.operator && o.parent?.name !== 'operator') o.visible = false; });
     // garpu kode hanya tampil saat diangkat (garpu model Meshy menempel di lantai)
     const garpu = g.getObjectByName('garpu'); if (garpu) { garpu.userData.angkatSaja = true; garpu.traverse(o => { o.visible = true; }); garpu.visible = false; }
     if (h.berkas === 'truk') {
@@ -198,15 +198,31 @@ export function pakaiModelMeshy(g: THREE.Group, j: JenisModel) {
 }
 
 // ---------- pekerja beranimasi (model Meshy dari user: rig 24 tulang + 10 klip)
-export type AksiPekerja = 'jalan' | 'lari' | 'kerja' | 'diam' | 'duduk';
-const KLIP: Record<AksiPekerja, string> = { jalan: 'Walking', lari: 'Running', kerja: 'Checkout_Gesture', diam: 'Stand_and_Chat', duduk: 'Chair_Sit_Idle_M' };
+export type AksiPekerja = 'jalan' | 'lari' | 'kerja' | 'diam' | 'duduk' | 'berdiri';
+const KLIP: Record<AksiPekerja, string> = { jalan: 'Walking', lari: 'Running', kerja: 'Checkout_Gesture', diam: 'Stand_and_Chat', duduk: 'Chair_Sit_Idle_M', berdiri: 'Listening_Gesture' };
 export interface Animator { mixer: THREE.AnimationMixer; main: (a: AksiPekerja) => void; aksi: AksiPekerja | null }
-let cachePekerja: Promise<{ akar: THREE.Object3D; klip: THREE.AnimationClip[] } | null> | null = null;
-const muatPekerja = () => (cachePekerja ??= pemuat.loadAsync('/sim3d/model/pekerja.glb').then(g => ({ akar: g.scene, klip: g.animations })).catch(() => null));
+let cachePekerja: Promise<{ akar: THREE.Object3D; klip: THREE.AnimationClip[]; koreksi: Map<string, number> } | null> | null = null;
+/** Arah hadap klip (dari rotasi pinggul frame pertama) — tiap klip Meshy menghadap arah berbeda (jalan vs duduk ±90°). */
+const arahKlip = (c: THREE.AnimationClip) => {
+  const tr = c.tracks.find(t => /Hips\.quaternion$/.test(t.name)); if (!tr) return 0;
+  const v = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion().fromArray(tr.values, 0));
+  return Math.atan2(-v.z, v.x);
+};
+const muatPekerja = () => (cachePekerja ??= pemuat.loadAsync('/sim3d/model/pekerja.glb').then(g => {
+  // klip dibuat "di tempat": pergeseran pinggul (x/z) frame pertama dihapus supaya tubuh tetap di titik akarnya
+  for (const c of g.animations) {
+    const tr = c.tracks.find(t => /Hips\.position$/.test(t.name)); if (!tr) continue;
+    const x0 = tr.values[0], z0 = tr.values[2];
+    for (let i = 0; i < tr.values.length; i += 3) { tr.values[i] -= x0; tr.values[i + 2] -= z0; }
+  }
+  const jalan = g.animations.find(c => c.name === KLIP.jalan); const aJalan = jalan ? arahKlip(jalan) : 0;
+  const koreksi = new Map(g.animations.map(c => [c.name, aJalan - arahKlip(c)]));
+  return { akar: g.scene, klip: g.animations, koreksi };
+}).catch(() => null));
 /** Ganti figur kode dengan pekerja beranimasi. Tinggi dinormalkan ke 1,72 m, menghadap +X (sama dengan model kode). */
 export function pakaiPekerjaMeshy(g: THREE.Group, awal: AksiPekerja, siap: (a: Animator) => void) {
   void Promise.all([muatPekerja(), import('three/examples/jsm/utils/SkeletonUtils.js')]).then(([h, SU]) => {
-    if (!h || g.getObjectByName('meshy')) return;
+    if (!h || g.children.some(c => c.name === 'meshy')) return;
     const akar = SU.clone(h.akar); akar.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(akar, true); const tinggi = box.max.y - box.min.y || 1;
     const wadah = new THREE.Group(); wadah.name = 'meshy';
@@ -215,7 +231,7 @@ export function pakaiPekerjaMeshy(g: THREE.Group, awal: AksiPekerja, siap: (a: A
     wadah.rotation.y = Math.PI / 2;   // model menghadap +Z → putar supaya menghadap +X
     wadah.add(akar);
     akar.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; } });
-    g.traverse(o => { if (o.userData.kode) o.visible = false; });
+    for (const c of g.children) if (c.userData.kode) c.visible = false;   // figur kode milik orang ini saja
     g.add(wadah);
     const mixer = new THREE.AnimationMixer(akar);
     const aksiKlip = new Map<AksiPekerja, THREE.AnimationAction>();
@@ -227,10 +243,35 @@ export function pakaiPekerjaMeshy(g: THREE.Group, awal: AksiPekerja, siap: (a: A
         const baru = aksiKlip.get(a) ?? aksiKlip.get('diam'); if (!baru) return;
         const lama = an.aksi ? aksiKlip.get(an.aksi) : undefined;
         baru.reset().setEffectiveWeight(1).play(); baru.time = Math.random() * baru.getClip().duration;
+        wadah.rotation.y = Math.PI / 2 + (h.koreksi.get(baru.getClip().name) ?? 0);   // semua klip menghadap +X
         if (lama && lama !== baru) lama.crossFadeTo(baru, 0.25, false);
         an.aksi = a;
       },
     };
     an.main(awal); siap(an);
   });
+}
+
+// ---------- operator di MHE: duduk di jok forklift, berdiri di reach truck, berjalan memegang tangkai hand pallet
+export type JenisKendaraan = 'forklift' | 'reach' | 'hpt';
+/** Titik pinggul (duduk) / telapak kaki (berdiri, jalan) operator di koordinat kendaraan (+X = arah garpu). */
+export const POSISI_OPERATOR: Record<JenisKendaraan, { x: number; y: number; z: number; pose: AksiPekerja; putar: number }> = {
+  forklift: { x: -0.6, y: 1.12, z: 0, pose: 'duduk', putar: 0 },
+  reach: { x: -0.72, y: 0.18, z: 0, pose: 'berdiri', putar: 0 },
+  hpt: { x: -1.08, y: 0, z: 0, pose: 'jalan', putar: 0 },
+};
+export function pasangOperator(kendaraan: THREE.Group, jenis: JenisKendaraan, warna: string, siap?: (a: Animator, op: THREE.Group) => void) {
+  const s = POSISI_OPERATOR[jenis];
+  const op = orangBersih(warna); op.name = 'operator'; op.scale.setScalar(0.94); op.position.set(s.x, s.pose === 'duduk' ? s.y - 0.55 : s.y, s.z); op.rotation.y = s.putar;
+  kendaraan.add(op);
+  pakaiPekerjaMeshy(op, s.pose, an => {
+    if (s.pose === 'duduk') {
+      // pinggul tepat di atas jok (tinggi pinggul klip duduk berbeda-beda) — diukur dari tulang Hips
+      an.mixer.update(0); op.updateWorldMatrix(true, true);
+      const hips = op.getObjectByName('Hips');
+      if (hips) { const p = kendaraan.worldToLocal(hips.getWorldPosition(new THREE.Vector3())); op.position.x += s.x - p.x; op.position.y += s.y - p.y; op.position.z += s.z - p.z; }
+    }
+    siap?.(an, op);
+  });
+  return op;
 }

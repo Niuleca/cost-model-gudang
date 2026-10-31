@@ -7,7 +7,7 @@ import { ARMADA, bertugas, jalankanSampai, jenisTrukDari, type Dunia, type Jenis
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
 import { kategoriOrang } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, type PasangLapisan } from '../Viewer3D';
-import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pinBersih, trukBersih, WARNA_BERSIH, type Animator } from '../model3d';
+import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pasangOperator, pinBersih, POSISI_OPERATOR, trukBersih, WARNA_BERSIH, type Animator, type JenisKendaraan } from '../model3d';
 import { WARNA_ORANG } from '../warna';
 import { ELEMEN, LABEL_AKSI, MODE_PEMAIN, studiAwal, type ModePemain, type SiklusStudi, type StudiPemain } from './pemain';
 
@@ -21,7 +21,7 @@ export interface Amatan {
 /** Kecepatan gerak tersirat per jenis tugas = jarak jalur layout ÷ porsi waktu jalan dari durasi productivity. */
 export interface StatGerak { n: number; kecTotal: number; kecMaks: number; jarakTotal: number; olehOrang: number }
 /** Posisi aktor untuk tampilan 2D (ditulis lapisan tiap frame). */
-export interface Aktor2D { id: string; jenis: 'mhe' | 'pekerja'; x: number; z: number; rot: number; sibuk: boolean; bawa: 'palet' | 'karton' | null; kemampuan?: string; mhe?: string; tugas?: JenisTugas }
+export interface Aktor2D { id: string; jenis: 'mhe' | 'pekerja' | 'pemain'; x: number; z: number; rot: number; sibuk: boolean; bawa: 'palet' | 'karton' | null; kemampuan?: string; mhe?: string; tugas?: JenisTugas }
 export interface KontrolGame {
   jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null;
   jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean };
@@ -278,18 +278,17 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const parkir = (i: number) => v(Math.min(L.stagingIn.x1 + 1.6, L.L - 1), Math.min(L.W - 1, 1.6 + i * 2.6));
     const animator: Animator[] = [];
     const mhe = new Map<string, Aktor>();
+    const hptAnim = new Map<string, Animator>();
     d.mhe.forEach((m, i) => {
       const g = (bersih ? forkliftBersih : modelMhe)(m.jenis, m.jenis === 'reach' ? Math.min(L.tinggiRak, L.H - 0.4) * 0.45 : 2.4);
       g.userData.pilih = { jenis: 'mhe', id: m.id } satisfies Pilihan;
       if (bersih) pakaiModelMeshy(g, m.jenis === 'hpt' ? 'hpt' : m.jenis === 'forklift' ? 'forklift' : 'reach');
-      const op = (bersih ? orangBersih : modelOrang)(WARNA_ORANG.operator); op.scale.setScalar(0.85); op.position.set(-0.45, 0.35, 0); op.visible = false; g.add(op);
-      if (bersih) {
-        // operator beranimasi: duduk di forklift, berdiri menyamping di reach truck / stacker / HPT
-        const duduk = m.jenis === 'forklift';
-        if (duduk) op.position.set(-0.35, 0.55, 0); else if (m.jenis === 'hpt') op.position.set(-1.05, 0, 0); else op.position.set(-0.55, 0.2, 0);
-        op.scale.setScalar(1);
-        pakaiPekerjaMeshy(op, duduk ? 'duduk' : 'diam', an => animator.push(an));
-      }
+      // operator: duduk di jok forklift, berdiri di reach truck / stacker, berjalan memegang tangkai hand pallet
+      const kj: JenisKendaraan = m.jenis === 'forklift' ? 'forklift' : m.jenis === 'hpt' ? 'hpt' : 'reach';
+      let animOp: Animator | undefined;
+      const op = bersih ? pasangOperator(g, kj, WARNA_ORANG.operator, an => { animOp = an; animator.push(an); if (kj === 'hpt') hptAnim.set(m.id, an); })
+        : (() => { const o = modelOrang(WARNA_ORANG.operator); o.scale.setScalar(0.85); o.position.set(-0.45, 0.35, 0); g.add(o); return o; })();
+      op.visible = false; void animOp;
       const lbl = label(m.nama.replace(/^(.{0,14}).*?(\d+)$/, '$1 $2'), 'mhe'); lbl.position.set(0, 3.1, 0); g.add(lbl);
       const p = parkir(i); g.position.copy(p); gMhe.add(g);
       mhe.set(m.id, { obj: g, pos: p.clone(), rumah: p.clone(), tugas: null, rencana: null, garpu: g.getObjectByName('garpu') ?? undefined, op, lbl });
@@ -423,6 +422,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         if (kunci === 'e') { k2.pemain.minta++; e.preventDefault(); return; }
         if (kunci === 'r') { k2.pemain.level = Math.min(L.levelY.length - 1, k2.pemain.level + 1); e.preventDefault(); return; }
         if (kunci === 'f') { k2.pemain.level = Math.max(0, k2.pemain.level - 1); e.preventDefault(); return; }
+        if (kunci === 't' && k2.pemain.mode === 'hpt') { k2.pemain.tarik = !k2.pemain.tarik; e.preventDefault(); return; }
       }
       const t2 = peta[kunci]; if (!t2) return;
       k2.tombol[t2] = nilai; e.preventDefault();
@@ -434,7 +434,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     // ---------- mode kerja pemain (motion study): kendaraan, aksi ambil/taruh/cek/dokumen & pengukuran elemen
     let modeLalu: ModePemain = 'bebas';
     const wadahK = new THREE.Group(); wadahK.name = 'kendaraan'; pemain.add(wadahK);
-    const kendaraanP = new Map<string, { g: THREE.Group; garpu?: THREE.Object3D; op: THREE.Object3D }>();
+    const kendaraanP = new Map<string, { g: THREE.Group; garpu?: THREE.Object3D; op: THREE.Object3D; an?: Animator }>();
     const kartonP = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.32, 0.38), bersih ? mat(WARNA_BERSIH.karton) : mat('#c8a26b', { map: teks('muatan') }));
     kartonP.position.set(0.35, 1.0, 0); kartonP.visible = false; pemain.add(kartonP);
     const dokP = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.22), mat('#ffffff')); dokP.position.set(0.3, 1.05, 0.12); dokP.visible = false; pemain.add(dokP);
@@ -451,32 +451,57 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     let bawaP: { lpn: string; sku: string } | null = null;
     let aksiP: { nama: string; mulai: number; durasi: number; garpu?: (f: number) => number; lekat?: number; saatLekat?: () => void; selesai: () => void; lekatSudah?: boolean } | null = null;
     let jamP = 0, mintaLalu = 0, kartonDari: string | null = null, dokumenDari = '';
-    const arahP = () => ({ x: Math.cos(pemain.rotation.y), z: -Math.sin(pemain.rotation.y) });
+    const rotGarpu = () => pemain.rotation.y + wadahK.rotation.y;   // arah garpu (hand pallet ditarik → garpu di belakang)
+    const arahP = () => ({ x: Math.cos(rotGarpu()), z: -Math.sin(rotGarpu()) });
     const depanP = (jarak: number) => { const a = arahP(); return { x: posPemain.x + a.x * jarak, z: posPemain.z + a.z * jarak }; };
     const ambilKendaraan = (mode: ModePemain) => {
       let o = kendaraanP.get(mode); if (o) return o;
-      const jenis = mode === 'cbt' ? 'forklift' : mode === 'reach' ? 'reach' : 'hpt';
+      const jenis: JenisKendaraan = mode === 'cbt' ? 'forklift' : mode === 'reach' ? 'reach' : 'hpt';
       const g = (bersih ? forkliftBersih : modelMhe)(jenis, jenis === 'reach' ? Math.min(L.tinggiRak, L.H - 0.4) * 0.45 : 2.4);
       if (bersih) pakaiModelMeshy(g, jenis);
-      const op = (bersih ? orangBersih : modelOrang)('#0ea5e9'); op.scale.setScalar(0.85);
-      if (jenis === 'forklift') op.position.set(-0.35, 0.55, 0); else if (jenis === 'hpt') op.position.set(-1.05, 0, 0); else op.position.set(-0.55, 0.2, 0);
-      g.add(op); if (bersih) pakaiPekerjaMeshy(op, jenis === 'forklift' ? 'duduk' : 'diam', an => animator.push(an));
-      o = { g, garpu: g.getObjectByName('garpu') ?? undefined, op }; kendaraanP.set(mode, o); return o;
+      const ob: { g: THREE.Group; garpu?: THREE.Object3D; op: THREE.Object3D; an?: Animator } = { g, garpu: g.getObjectByName('garpu') ?? undefined, op: null as unknown as THREE.Object3D };
+      ob.op = bersih ? pasangOperator(g, jenis, '#0ea5e9', an => { ob.an = an; animator.push(an); })
+        : (() => { const x = modelOrang('#0ea5e9'); x.scale.setScalar(0.85); x.position.set(-0.45, 0.35, 0); g.add(x); return x; })();
+      kendaraanP.set(mode, ob); return ob;
     };
     const lepasBawaan = () => { if (bawaP) { angkatP = null; bawaP = null; verPemain++; } kartonP.visible = false; dokP.visible = false; kartonDari = null; dokumenDari = ''; };
     const gantiMode = (sp: StudiPemain, lalu: ModePemain) => {
       void lalu; aksiP = null; sp.aksi = null; lepasBawaan(); sp.bawa = null; sp.berjalan = null; garpuP = 0.15;
       modeLalu = sp.mode;
-      wadahK.clear(); const kendaraan = sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt';
+      wadahK.clear(); wadahK.rotation.y = 0; const kendaraan = sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt';
       if (kendaraan) wadahK.add(ambilKendaraan(sp.mode).g);
-      for (const c of pemain.children) if (c !== wadahK && c !== lblPemain && c !== tandaPemain && c !== kartonP && c !== dokP) c.visible = !kendaraan;
-      meja.visible = sp.mode === 'admin';
+      meja.visible = sp.mode === 'admin'; paletOrder.visible = sp.mode === 'picker'; sp.tarik = false;
       sp.level = 0;
     };
+    /** Badan pemain: figur kode ATAU model beranimasi (tidak pernah dua-duanya); disembunyikan saat naik kendaraan. */
+    const badanPemain = (tampil: boolean) => {
+      const adaMeshy = pemain.children.some(c => c.name === 'meshy');
+      for (const c of pemain.children) {
+        if (c === wadahK || c === lblPemain || c === tandaPemain || c === kartonP || c === dokP) continue;
+        c.visible = c.name === 'meshy' ? tampil : c.userData.kode ? tampil && !adaMeshy : c.visible;
+      }
+    };
+    // palet tujuan picking (palet order kosong) di depan staging outbound
+    const posOrder = v(Math.min(L.L - 1, L.stagingOut.x1 + 0.9), Math.min(L.stagingOut.z1 - 1, L.stagingOut.z0 + 1.6));   // tepi jalur utama, di depan staging outbound
+    const paletOrder = new THREE.Group(); paletOrder.visible = false; grup.add(paletOrder);
+    { const alasO = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.14, 1.0), bersih ? mat(WARNA_BERSIH.kayu, { roughness: 0.8 }) : mat('#b7791f')); alasO.position.y = 0.07; paletOrder.add(alasO);
+      const lb = label('Palet order (tujuan picking)', 'mhe'); lb.position.set(0, 1.4, 0); paletOrder.add(lb); paletOrder.position.copy(posOrder); }
+    const ORDER = '__order__';
+    // penanda target (mengarahkan pemain ke titik kerja berikutnya)
+    const penanda = new THREE.Group(); penanda.visible = false; grup.add(penanda);
+    const sinar = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 3.2, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#0ea5e9', transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+    sinar.position.y = 1.6; penanda.add(sinar);
+    const cincinT = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 32), new THREE.MeshBasicMaterial({ color: '#0ea5e9', transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+    cincinT.rotation.x = -Math.PI / 2; cincinT.position.y = 0.04; penanda.add(cincinT);
+    const lblT = label('', 'mhe'); lblT.position.set(0, 3.5, 0); penanda.add(lblT);
+    const tandaJangkau = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 32), new THREE.MeshBasicMaterial({ color: '#16a34a', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+    tandaJangkau.rotation.x = -Math.PI / 2; tandaJangkau.visible = false; grup.add(tandaJangkau);
+    const dicek = new Set<string>();
     /** Kandidat palet di depan pemain (dalam jangkauan), diurutkan menurut kedekatan ke level target. */
     const paletDepan = (jarakDepan: number, maksY: number, sp: StudiPemain, kecuali?: string) => {
       const f = depanP(jarakDepan); const ty = L.levelY[sp.level] ?? 0;
-      return instPalet.filter(p => p.id !== kecuali && p.y <= maksY && Math.hypot(p.x - f.x, p.z - f.z) < 1.15)
+      const daftar = sp.mode === 'picker' ? [...instPalet, { id: ORDER, x: posOrder.x, y: 0, z: posOrder.z, h: 0.15, lok: null }] : instPalet;
+      return daftar.filter(p => p.id !== kecuali && p.y <= maksY && Math.hypot(p.x - f.x, p.z - f.z) < 1.15)
         .sort((a, b) => Math.abs(a.y - ty) - Math.abs(b.y - ty) || Math.hypot(a.x - f.x, a.z - f.z) - Math.hypot(b.x - f.x, b.z - f.z));
     };
     /** Tujuan taruh palet: slot rak / lantai kosong di depan (level target), atau lantai bebas. */
@@ -488,7 +513,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
           .sort((a, b) => Math.abs(a.y - ty) - Math.abs(b.y - ty) || Math.hypot(a.x - f.x, a.z - f.z) - Math.hypot(b.x - f.x, b.z - f.z))[0];
         if (lok && (sp.level > 0 || lok.y < 0.1)) return { x: lok.x, y: lok.y, z: lok.z, lok: lok.id, rot: lok.tipe === 'rak' ? Math.PI / 2 : 0, ket: lok.tipe === 'rak' ? `rak level ${levelDari(lok.y) + 1}` : 'lokasi lantai' };
       }
-      if (sp.level === 0 && bebas(f.x, f.z) && !instPalet.some(p => p.y < 0.1 && Math.hypot(p.x - f.x, p.z - f.z) < 1.0)) return { x: f.x, y: 0, z: f.z, lok: null, rot: pemain.rotation.y + Math.PI / 2, ket: 'lantai' };
+      if (sp.level === 0 && bebas(f.x, f.z) && !instPalet.some(p => p.y < 0.1 && Math.hypot(p.x - f.x, p.z - f.z) < 1.0)) return { x: f.x, y: 0, z: f.z, lok: null, rot: rotGarpu() + Math.PI / 2, ket: 'lantai' };
       return null;
     };
     const levelDari = (y: number) => L.levelY.reduce((b, ly, i) => (Math.abs(ly - y) < Math.abs(L.levelY[b] - y) ? i : b), 0);
@@ -505,12 +530,55 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       sp.siklus.push({ no: sp.siklus.length + 1, mode: sp.mode, jenis, ket, qty, satuan, jalan: { ...b.jalan }, bawa: { ...b.bawa }, aksi: { ...b.aksi }, diam: b.diam, total: b.jalan.s + b.bawa.s + totalAksi + b.diam, tinggi });
       sp.berjalan = null;
     };
+    const gagal = (sp: StudiPemain, pesan: string) => { sp.pesan = pesan; pesanSampai = jamP + 4; };
+    let pesanSampai = 0;
+    /** Titik kerja berikutnya untuk penanda biru (3D) & 2D. */
+    const cariTarget = (sp: StudiPemain): { x: number; z: number; label: string } | null => {
+      const m = sp.mode; const jauh = (a: { x: number; z: number }) => Math.hypot(a.x - posPemain.x, a.z - posPemain.z);
+      const terdekat = <T extends { x: number; z: number }>(xs: T[]) => xs.reduce<T | null>((b, a) => (!b || jauh(a) < jauh(b) ? a : b), null);
+      const ty = L.levelY[sp.level] ?? 0;
+      if (m === 'cbt' || m === 'reach' || m === 'hpt') {
+        if (!bawaP) {
+          const xs = instPalet.filter(p => (m === 'hpt' ? p.y < 0.1 : Math.abs(p.y - ty) < 0.3) && !(m === 'hpt' && p.lok && d.lokasi.get(p.lok)?.tipe === 'rak'));
+          const t = terdekat(xs.length ? xs : instPalet.filter(p => m !== 'hpt' || p.y < 0.1)); return t ? { x: t.x, z: t.z, label: `Ambil palet${t.y > 0.1 ? ` · tinggi ${t.y.toFixed(1)} m` : ''}` } : null;
+        }
+        if (m !== 'hpt') {
+          const terpakai = new Set([...pindahP.values()].map(o => o.lokTaruh));
+          const xs = lokSimpan.filter(l => !l.lpn.length && !l.dipesan && !terpakai.has(l.id) && Math.abs(l.y - ty) < 0.3);
+          const t = terdekat(xs); if (t && sp.level > 0) return { x: t.x, z: t.z, label: `Taruh di slot kosong level ${sp.level + 1}` };
+        }
+        return { x: (L.stagingOut.x0 + L.stagingOut.x1) / 2, z: (L.stagingOut.z0 + L.stagingOut.z1) / 2, label: 'Taruh di lantai staging outbound' };
+      }
+      if (m === 'picker') {
+        if (kartonP.visible) return { x: posOrder.x, z: posOrder.z, label: 'Susun karton di palet order' };
+        const t = terdekat(instPalet.filter(p => p.y < 0.1)); return t ? { x: t.x, z: t.z, label: 'Ambil karton (pick face)' } : null;
+      }
+      if (m === 'checker') {
+        const di = (p: { x: number; z: number }, z: { x0: number; x1: number; z0: number; z1: number }) => p.x >= z.x0 - 0.5 && p.x <= z.x1 + 0.5 && p.z >= z.z0 - 0.5 && p.z <= z.z1 + 0.5;
+        const xs = instPalet.filter(p => !dicek.has(p.id) && (di(p, L.stagingIn) || di(p, L.stagingOut)));
+        const t = terdekat(xs.length ? xs : instPalet.filter(p => !dicek.has(p.id) && p.y < 0.1)); return t ? { x: t.x, z: t.z, label: xs.length ? 'Cek palet di staging' : 'Cek palet (pick face)' } : null;
+      }
+      if (m === 'admin') {
+        if (dokP.visible) return { x: mejaAdmin.x + 0.9, z: mejaAdmin.z, label: 'Input dokumen di meja admin' };
+        const t = terdekat(L.dock.map(dk => ({ x: 1.2, z: dk.z }))); return t ? { ...t, label: 'Terima dokumen di dock' } : null;
+      }
+      return null;
+    };
+    const sasaranE = (sp: StudiPemain): { x: number; y: number; z: number } | null => {
+      const m = sp.mode;
+      if (m === 'cbt' || m === 'reach' || m === 'hpt') { const jd = m === 'hpt' ? 1.0 : 1.6; if (!bawaP) { const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0]; return p ?? null; } const t = tujuanTaruh(jd, sp, m === 'hpt'); return t ?? null; }
+      if (m === 'picker') { const p = kartonP.visible ? paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined).sort((a, b) => Number(b.id === ORDER) - Number(a.id === ORDER))[0] : paletDepan(0.8, 1.8, { ...sp, level: 0 }, ORDER)[0]; return p ?? null; }
+      if (m === 'checker') return paletDepan(0.9, 2.6, { ...sp, level: 0 }).filter(x => x.id !== ORDER)[0] ?? null;
+      if (m === 'admin') return dokP.visible ? (dekatMeja() ? { x: mejaAdmin.x + 0.9, y: 0, z: mejaAdmin.z } : null) : dekatDock() ? { x: posPemain.x, y: 0, z: posPemain.z } : null;
+      return null;
+    };
     const mulaiAksiP = (sp: StudiPemain) => {
       const m = sp.mode; const kendaraan = m === 'cbt' || m === 'reach';
       if (m === 'cbt' || m === 'reach' || m === 'hpt') {
         const jd = m === 'hpt' ? 1.0 : 1.6;
         if (!bawaP) {
-          const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0]; if (!p) return;
+          const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0];
+          if (!p) return gagal(sp, m === 'hpt' ? 'Tidak ada palet lantai di depan garpu (≤ 1 m). Ikuti penanda biru.' : `Tidak ada palet di depan garpu pada level ${sp.level + 1}. Hadapkan garpu ke palet (≤ 1 m) atau ganti level (R/F).`);
           const l = d.lpn.get(p.id)!;
           const dariRak = !!p.lok && d.lokasi.get(p.lok)?.tipe === 'rak' && p.y > 0.1;
           const pr = kendaraan ? profilGarpu(garpuP, p.y + 0.05, p.y + 0.15, ELEMEN.posisi, Math.abs(p.y + 0.05 - garpuP) / ELEMEN.naik[m], ELEMEN.masukAngkat, (p.y + 0.15 - 0.15) / ELEMEN.turun[m]) : null;
@@ -518,7 +586,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
             saatLekat: () => { if (pindahP.has(p.id)) lepasPindah(p.id); angkatP = p.id; bawaP = { lpn: p.id, sku: l.sku }; sp.bawa = 'palet'; verPemain++; kartonDari = dariRak ? 'rak' : 'lantai'; tinggiSiklus = Math.max(tinggiSiklus, p.y); },
             selesai: () => { garpuP = m === 'hpt' ? 0.08 : 0.15; } };
         } else {
-          const tj = tujuanTaruh(jd, sp, m === 'hpt'); if (!tj) return;
+          const tj = tujuanTaruh(jd, sp, m === 'hpt');
+          if (!tj) return gagal(sp, sp.level > 0 ? `Tidak ada slot kosong level ${sp.level + 1} di depan garpu. Ikuti penanda biru atau ganti level (R/F).` : 'Lantai di depan garpu tidak kosong / di dalam rak. Cari lantai kosong (penanda biru).');
           const pr = kendaraan ? profilGarpu(garpuP, tj.y + 0.15, tj.y + 0.02, ELEMEN.posisi, Math.abs(tj.y + 0.15 - garpuP) / ELEMEN.naikBeban[m], ELEMEN.letakMundur, (tj.y + 0.02 - 0.15) / ELEMEN.turun[m]) : null;
           const asal = d.lpn.get(bawaP.lpn)!; const lokAsal = asal.lokasi;
           aksiP = { nama: 'taruh', mulai: jamP, durasi: pr ? pr.T : ELEMEN.hptTaruh, garpu: pr?.f, lekat: pr ? pr.lekat : 0.5,
@@ -536,11 +605,12 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         }
       } else if (m === 'picker') {
         if (!kartonP.visible) {
-          const p = paletDepan(0.8, 1.8, { ...sp, level: 0 })[0]; if (!p) return;
+          const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, ORDER)[0]; if (!p) return gagal(sp, 'Tidak ada palet stok di depan Anda — ikuti penanda biru ke pick face (rak level 1).');
           const jangkau = p.y > 1.0 || p.y + p.h > 1.6 ? ELEMEN.kartonJangkau : 0;
           aksiP = { nama: 'karton_ambil', mulai: jamP, durasi: ELEMEN.kartonAmbil + jangkau, selesai: () => { kartonP.visible = true; sp.bawa = 'karton'; kartonDari = p.id; tinggiSiklus = p.y; } };
         } else {
-          const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined)[0]; if (!p) return;
+          const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined).sort((a, b) => Number(b.id === ORDER) - Number(a.id === ORDER))[0];
+          if (!p) return gagal(sp, 'Bawa karton ke palet order (penanda biru di staging outbound).');
           aksiP = { nama: 'karton_taruh', mulai: jamP, durasi: ELEMEN.kartonTaruh, selesai: () => {
             kartonP.visible = false; sp.bawa = null;
             const i = kartonTaruh.get(p.id) ?? 0; kartonTaruh.set(p.id, i + 1);
@@ -552,17 +622,17 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
           } };
         }
       } else if (m === 'checker') {
-        const p = paletDepan(0.9, 2.6, { ...sp, level: 0 })[0]; if (!p) return;
+        const p = paletDepan(0.9, 2.6, { ...sp, level: 0 }).filter(x => x.id !== ORDER)[0]; if (!p) return gagal(sp, 'Tidak ada palet di depan Anda — dekati palet (penanda biru).');
         aksiP = { nama: 'scan', mulai: jamP, durasi: ELEMEN.scan, selesai: () => {
           if (gCekP.children.length < 300) { const c = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.05, 8, 20), new THREE.MeshBasicMaterial({ color: '#16a34a' })); c.rotation.x = Math.PI / 2; c.position.set(p.x, p.y + p.h + 0.08, p.z); gCekP.add(c); }
-          selesaiSiklus(sp, 'cek_in', 'scan & cek 1 palet', 1, 'palet', p.y);
+          dicek.add(p.id); selesaiSiklus(sp, 'cek_in', 'scan & cek 1 palet', 1, 'palet', p.y);
         } };
       } else if (m === 'admin') {
         if (!dokP.visible) {
-          if (!dekatDock()) return;
+          if (!dekatDock()) return gagal(sp, 'Jalan ke pintu dock (penanda biru) untuk menerima dokumen dari sopir.');
           aksiP = { nama: 'dok_terima', mulai: jamP, durasi: ELEMEN.dokTerima, selesai: () => { dokP.visible = true; sp.bawa = 'dokumen'; dokumenDari = 'dock'; } };
         } else {
-          if (!dekatMeja()) return;
+          if (!dekatMeja()) return gagal(sp, 'Bawa dokumen ke meja admin (penanda biru).');
           aksiP = { nama: 'dok_input', mulai: jamP, durasi: ELEMEN.dokInput, selesai: () => { dokP.visible = false; sp.bawa = null; selesaiSiklus(sp, 'admin_in', `dokumen dari ${dokumenDari} → input di meja`, 1, 'dokumen', 0); } };
         }
       }
@@ -579,8 +649,11 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         if (!bawaP) { const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0]; return p ? `E = ambil palet (tinggi ${f1(p.y)} m)` : m === 'hpt' ? 'Arahkan garpu ke palet di lantai' : `Arahkan garpu ke palet — target level ${sp.level + 1} (R/F ganti level)`; }
         const tj = tujuanTaruh(jd, sp, m === 'hpt'); return tj ? `E = taruh di ${tj.ket} (tinggi ${f1(tj.y)} m)` : sp.level > 0 ? `Cari slot rak kosong level ${sp.level + 1} (R/F ganti level)` : 'Cari lantai kosong / slot kosong';
       }
-      if (m === 'picker') { const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonP.visible ? kartonDari ?? undefined : undefined)[0]; return kartonP.visible ? (p ? 'E = taruh karton di palet ini' : 'Bawa karton ke palet tujuan') : p ? 'E = ambil 1 karton' : 'Dekati palet (≤ 1,8 m tinggi)'; }
-      if (m === 'checker') return paletDepan(0.9, 2.6, { ...sp, level: 0 })[0] ? 'E = scan & cek palet' : 'Dekati palet untuk dicek';
+      if (m === 'picker') {
+        if (kartonP.visible) { const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined).sort((x, y) => Number(y.id === ORDER) - Number(x.id === ORDER))[0]; return p ? `E = taruh karton di ${p.id === ORDER ? 'palet order' : 'palet ini'}` : 'Bawa karton ke palet order (penanda biru)'; }
+        return paletDepan(0.8, 1.8, { ...sp, level: 0 }, ORDER)[0] ? 'E = ambil 1 karton dari palet ini' : 'Jalan ke pick face (palet rak level 1) — ikuti penanda biru';
+      }
+      if (m === 'checker') return paletDepan(0.9, 2.6, { ...sp, level: 0 }).filter(x => x.id !== ORDER)[0] ? 'E = scan & cek palet' : 'Dekati palet untuk dicek (penanda biru)';
       if (m === 'admin') return dokP.visible ? (dekatMeja() ? 'E = input & konfirmasi dokumen' : 'Bawa dokumen ke meja admin (dekat staging)') : dekatDock() ? 'E = terima dokumen dari sopir' : 'Jalan ke pintu dock untuk menerima dokumen';
       return '';
     };
@@ -601,9 +674,26 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         if (b) { if (dGerak > 0.0005) { const e = sp.bawa ? b.bawa : b.jalan; e.s += dt; e.m += dGerak; } else b.diam += dt; }
       }
       sp.petunjuk = petunjukP(sp);
+      if (sp.pesan && jamP > pesanSampai) sp.pesan = '';
+      // penanda target
+      const tg = sp.mode !== 'bebas' && !aksiP ? cariTarget(sp) : null;
+      sp.target = tg ? { ...tg, jarak: Math.hypot(tg.x - posPemain.x, tg.z - posPemain.z) } : null;
+      penanda.visible = !!tg && sp.target!.jarak > 1.6;
+      if (tg) { penanda.position.set(tg.x, 0, tg.z); const tx = `${tg.label} · ${sp.target!.jarak.toFixed(0)} m`; if (lblT.element.textContent !== tx) lblT.element.textContent = tx; cincinT.scale.setScalar(1 + 0.15 * Math.sin(jamP * 4)); }
+      // tanda hijau: objek yang akan dikenai aksi E saat ini
+      const sasaran = !aksiP && sp.petunjuk.startsWith('E = ') ? sasaranE(sp) : null;
+      tandaJangkau.visible = !!sasaran; if (sasaran) tandaJangkau.position.set(sasaran.x, sasaran.y + 0.03, sasaran.z);
+      // badan pemain & hand pallet: ditarik (operator di depan, garpu di belakang) atau didorong
+      const kendaraanAktif = sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt';
+      badanPemain(!kendaraanAktif);
       const kd = kendaraanP.get(sp.mode);
+      if (sp.mode === 'hpt' && kd) {
+        wadahK.rotation.y = sp.tarik ? Math.PI : 0;
+        kd.op.rotation.y = sp.tarik ? Math.PI : 0; kd.op.position.x = sp.tarik ? POSISI_OPERATOR.hpt.x - 0.3 : POSISI_OPERATOR.hpt.x;
+        kd.an?.main(dGerak > 0.0005 ? 'jalan' : 'berdiri');
+      }
       if (kd?.garpu) { kd.garpu.position.y = garpuP; if (kd.garpu.userData.angkatSaja) kd.garpu.visible = garpuP > 0.3; }
-      if (bawaP) { const a = arahP(); bawaPemain = { pos: v(posPemain.x + a.x * 1.0, posPemain.z + a.z * 1.0, Math.max(0.02, garpuP + 0.02)), rot: pemain.rotation.y + Math.PI / 2, sku: bawaP.sku, lpn: bawaP.lpn }; }
+      if (bawaP) { const a = arahP(); bawaPemain = { pos: v(posPemain.x + a.x * (sp.mode === 'hpt' ? 0.45 : 1.0), posPemain.z + a.z * (sp.mode === 'hpt' ? 0.45 : 1.0), Math.max(0.02, garpuP + 0.02)), rot: rotGarpu() + Math.PI / 2, sku: bawaP.sku, lpn: bawaP.lpn }; }
       else bawaPemain = null;
     };
     let bawaPemain: { pos: V; rot: number; sku: string; lpn: string | null } | null = null;
@@ -735,6 +825,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
           menujuRumah(a, dtGame, KEC_JALAN);
         }
       }
+      for (const [id, an] of hptAnim) { const m = mhe.get(id); if (!m) continue; const gerak = m.sebelum ? m.sebelum.distanceTo(m.obj.position) > 0.002 : false; (m.sebelum ??= new THREE.Vector3()).copy(m.obj.position); an.main(gerak && k.jalan ? 'jalan' : 'berdiri'); }
       for (const m of mhe.values()) {
         if (pakaiMhe.has(m.obj.uuid)) continue;
         if (m.op) m.op.visible = false; if (m.garpu) { m.garpu.position.y = 0.05; if (m.garpu.userData.angkatSaja) m.garpu.visible = false; }
@@ -754,6 +845,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         a2.push({ id: p.id, jenis: 'pekerja', x: a.obj.position.x, z: a.obj.position.z, rot: a.obj.rotation.y, sibuk: !!tg || !!a.patroli, bawa, kemampuan: p.kemampuan ?? kategoriOrang(p.role), tugas: tg?.jenis });
       }
       for (const [id, m] of mhe) { const s = mheSibuk.get(id); a2.push({ id, jenis: 'mhe', x: m.obj.position.x, z: m.obj.position.z, rot: m.obj.rotation.y, sibuk: !!s || !!d.mhe.find(x => x.id === id)?.sibuk, bawa: s?.bawa ?? null, mhe: d.mhe.find(x => x.id === id)?.jenis, tugas: s?.tugas }); }
+      if (k.jelajah && k.pemain) a2.push({ id: 'pemain', jenis: 'pemain', x: posPemain.x, z: posPemain.z, rot: rotGarpu(), sibuk: !!aksiP, bawa: bawaP ? 'palet' : kartonP.visible ? 'karton' : null, mhe: k.pemain.mode });
       k.aktor2d = a2;
       perbaruiTruk();
       perbaruiPin();
