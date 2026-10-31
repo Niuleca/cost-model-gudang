@@ -275,3 +275,36 @@ export function pasangOperator(kendaraan: THREE.Group, jenis: JenisKendaraan, wa
   });
   return op;
 }
+
+// ---------- IK lengan: kedua tangan memegang barang (tidak ada klip "membawa" di model) — dijalankan tiap frame setelah mixer
+function putarTulang(b: THREE.Object3D, dari: THREE.Vector3, ke: THREE.Vector3) {
+  if (dari.lengthSq() < 1e-8 || ke.lengthSq() < 1e-8 || !b.parent) return;
+  const qBaru = new THREE.Quaternion().setFromUnitVectors(dari.clone().normalize(), ke.clone().normalize()).multiply(b.getWorldQuaternion(new THREE.Quaternion()));
+  b.quaternion.copy(b.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(qBaru));
+  b.updateWorldMatrix(false, true);
+}
+/** Tangan `sisi` ke titik dunia `target`; siku condong ke arah `kutub` (vektor dunia). */
+export function ikLengan(akar: THREE.Object3D, sisi: 'Left' | 'Right', target: THREE.Vector3, kutub: THREE.Vector3) {
+  const lengan = akar.getObjectByName(`${sisi}Arm`), bawah = akar.getObjectByName(`${sisi}ForeArm`), tangan = akar.getObjectByName(`${sisi}Hand`);
+  if (!lengan || !bawah || !tangan) return;
+  lengan.updateWorldMatrix(true, true);
+  const S = lengan.getWorldPosition(new THREE.Vector3()), E = bawah.getWorldPosition(new THREE.Vector3()), H = tangan.getWorldPosition(new THREE.Vector3());
+  const l1 = S.distanceTo(E), l2 = E.distanceTo(H); if (l1 < 1e-4 || l2 < 1e-4) return;
+  const ke = target.clone().sub(S); const d = Math.max(Math.abs(l1 - l2) + 1e-3, Math.min(ke.length(), (l1 + l2) * 0.995)); const arah = ke.normalize();
+  const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const pol = kutub.clone().sub(arah.clone().multiplyScalar(kutub.dot(arah))); if (pol.lengthSq() < 1e-6) pol.set(0, -1, 0); pol.normalize();
+  const sikuBaru = S.clone().addScaledVector(arah, a).addScaledVector(pol, h);
+  putarTulang(lengan, E.clone().sub(S), sikuBaru.clone().sub(S));
+  const E2 = bawah.getWorldPosition(new THREE.Vector3()), H2 = tangan.getWorldPosition(new THREE.Vector3());
+  putarTulang(bawah, H2.clone().sub(E2), S.clone().addScaledVector(arah, d).sub(E2));
+}
+/** Pose membawa karton di depan dada: karton (anak `orang`) di lokal (x, y, 0); tangan memegang kedua sisinya. */
+export function pegangKarton(orang: THREE.Object3D, karton: THREE.Object3D) {
+  const akar = orang.children.find(c => c.name === 'meshy'); if (!akar) return;
+  orang.updateWorldMatrix(true, false);
+  const w = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(orang.matrixWorld);
+  const dir = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).transformDirection(orang.matrixWorld);
+  const k = karton.position;
+  ikLengan(akar, 'Left', w(k.x - 0.02, k.y - 0.02, -0.23), dir(-0.4, -1, -0.8));
+  ikLengan(akar, 'Right', w(k.x - 0.02, k.y - 0.02, 0.23), dir(-0.4, -1, 0.8));
+}

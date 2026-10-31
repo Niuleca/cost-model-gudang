@@ -41,9 +41,10 @@ export const MODE_PEMAIN: Record<ModePemain, { label: string; ikon: string; ket:
 
 /** Waktu elemen standar (detik) untuk aksi di tempat — asumsi umum, dipakai bersama waktu jalan yang diukur. */
 export const ELEMEN = {
-  posisi: 4, masukAngkat: 5, letakMundur: 5,
-  naik: { cbt: 0.45, reach: 0.5 }, naikBeban: { cbt: 0.38, reach: 0.42 }, turun: { cbt: 0.5, reach: 0.55 },
-  hptAmbil: 9, hptTaruh: 6, kartonAmbil: 5, kartonTaruh: 4, kartonJangkau: 1.5, scan: 10, dokTerima: 20, dokInput: 45,
+  // waktu riil umum: luruskan garpu 2,5 dtk, masuk & angkat 3 dtk, letak & mundur 3 dtk; kecepatan angkat/turun mast sesuai spesifikasi forklift 2,5 t / reach 1,6 t
+  posisi: 2.5, masukAngkat: 3, letakMundur: 3,
+  naik: { cbt: 0.55, reach: 0.5 }, naikBeban: { cbt: 0.45, reach: 0.4 }, turun: { cbt: 0.5, reach: 0.55 },
+  hptAmbil: 6, hptTaruh: 4, kartonAmbil: 4, kartonTaruh: 3, kartonJangkau: 1.5, scan: 8, dokTerima: 20, dokInput: 45,
 };
 /** Allowance personal, fatigue & delay untuk waktu standar dari hasil studi. */
 export const PFD = 0.15;

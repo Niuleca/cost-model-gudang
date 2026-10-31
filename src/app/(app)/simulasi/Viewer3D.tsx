@@ -28,6 +28,34 @@ export function label(teks: string, kelas = 'lbl') {
   const d = document.createElement('div'); d.className = `sim3d-${kelas}`; d.textContent = teks;
   return new CSS2DObject(d);
 }
+/** Tekstur prosedural (canvas, sekali buat & di-cache): upright berlubang & lantai beton — ringan, tanpa unduhan. */
+const cacheProsedural = new Map<string, THREE.CanvasTexture>();
+export function teksProsedural(k: 'upright' | 'beton', ulangX = 1, ulangY = 1) {
+  let t = cacheProsedural.get(k);
+  if (!t && typeof document !== 'undefined') {
+    const c = document.createElement('canvas'); const x = c.getContext('2d')!;
+    if (k === 'upright') {
+      c.width = 64; c.height = 128;
+      const gr = x.createLinearGradient(0, 0, 64, 0); gr.addColorStop(0, '#1b4ea8'); gr.addColorStop(0.5, '#2a66cc'); gr.addColorStop(1, '#173f8a');
+      x.fillStyle = gr; x.fillRect(0, 0, 64, 128);
+      x.fillStyle = '#0b1f45';
+      for (let y = 6; y < 128; y += 16) { x.beginPath(); x.roundRect(27, y, 10, 7, 3); x.fill(); x.fillRect(30, y + 7, 4, 3); }   // lubang tetes (teardrop)
+      x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(4, 0, 3, 128);
+    } else {
+      c.width = 512; c.height = 512; x.fillStyle = '#e9edf1'; x.fillRect(0, 0, 512, 512);
+      let sd = 7; const acak = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 90; i++) { const r = 30 + acak() * 90; const g2 = x.createRadialGradient(acak() * 512, acak() * 512, 0, 0, 0, 0); void g2;
+        x.fillStyle = `rgba(${acak() > 0.5 ? '120,128,138' : '255,255,255'},${0.02 + acak() * 0.035})`; x.beginPath(); x.arc(acak() * 512, acak() * 512, r, 0, Math.PI * 2); x.fill(); }
+      for (let i = 0; i < 9000; i++) { x.fillStyle = `rgba(80,90,100,${acak() * 0.08})`; x.fillRect(acak() * 512, acak() * 512, 1, 1); }
+      x.strokeStyle = 'rgba(120,130,140,.25)'; x.lineWidth = 1; x.strokeRect(0.5, 0.5, 511, 511);   // nat potongan beton
+    }
+    t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+    cacheProsedural.set(k, t);
+  }
+  if (!t) return null;
+  if (ulangX === 1 && ulangY === 1) return t;
+  const u = t.clone(); u.repeat.set(ulangX, ulangY); u.needsUpdate = true; return u;
+}
 export const mat = (c: string, o: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75, metalness: 0.05, ...o });
 
 /** Material 3D dari TapNow AI (tekstur di /public/sim3d/tekstur). Gagal dimuat → tetap warna polos. */
@@ -164,7 +192,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     Object.assign(lr.domElement.style, { position: 'absolute', top: '0', left: '0', pointerEvents: 'none' });
     el.appendChild(lr.domElement);
     const scene = new THREE.Scene(); scene.background = new THREE.Color('#e8eef5'); scene.fog = new THREE.Fog('#e8eef5', 160, 420);
-    const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.35;
+    const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.5;
     const cam = new THREE.PerspectiveCamera(45, el.clientWidth / el.clientHeight, 0.1, 1500);
     const ctl = new OrbitControls(cam, renderer.domElement); ctl.enableDamping = true; ctl.maxPolarAngle = Math.PI * 0.495;
     Object.assign(s, { renderer, lr, scene, cam, ctl });
@@ -226,7 +254,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     // tanah & lantai
     const tanah = new THREE.Mesh(new THREE.PlaneGeometry(L + 160, W + 160), mat(bersih ? '#e6ebf1' : '#b9c0c5', { roughness: 0.95 })); tanah.rotation.x = -Math.PI / 2; tanah.position.set(L / 2 - 20, -0.02, W / 2); tanah.receiveShadow = true; gBangunan.add(tanah);
     const apron = new THREE.Mesh(new THREE.PlaneGeometry(30, W + 10), bersih ? mat('#d9e0e8', { roughness: 0.9 }) : mat('#ffffff', { roughness: 0.9, map: teks('aspal', 30 / 6, (W + 10) / 6) })); apron.rotation.x = -Math.PI / 2; apron.position.set(-15, -0.01, W / 2); apron.receiveShadow = true; gBangunan.add(apron);
-    const lantai = new THREE.Mesh(new THREE.BoxGeometry(L, 0.1, W), bersih ? mat('#f5f7fa', { roughness: 0.35 }) : mat('#ffffff', { roughness: 0.45, metalness: 0.0, map: teks('lantai', L / 6, W / 6) }));
+    const lantai = new THREE.Mesh(new THREE.BoxGeometry(L, 0.1, W), bersih ? mat('#ffffff', { roughness: 0.42, map: teksProsedural('beton', L / 6, W / 6) ?? undefined }) : mat('#ffffff', { roughness: 0.45, metalness: 0.0, map: teks('lantai', L / 6, W / 6) }));
     if (bersih) {
       // halaman truk: garis parkir kuning & garis jalur putus-putus
       const cat = (sx: number, sz: number, x: number, z: number, c = '#facc15') => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.012, sz), mat(c, { roughness: 0.6 })); m.position.set(x, 0.006, z); gBangunan.add(m); };
@@ -316,22 +344,43 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     // ---------- rak (instanced)
     const nTiang = layout.rak.reduce((s2, r2) => s2 + (r2.nBay + 1) * 2, 0);
     const nBeam = layout.rak.reduce((s2, r2) => s2 + r2.nBay * (r2.level - 1) * 2, 0);
-    const tiang = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, layout.tinggiRak, 0.09), mat('#1e56a0', { metalness: 0.5, roughness: 0.45 }), Math.max(1, nTiang));
-    const beam = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.12, 1), mat('#f97316', { metalness: 0.4, roughness: 0.4 }), Math.max(1, nBeam));
-    const tmp = new THREE.Object3D(); let it = 0, ib = 0;
+    const tiang = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, layout.tinggiRak, 0.07), mat('#ffffff', { metalness: 0.35, roughness: 0.5, map: teksProsedural('upright', 1, layout.tinggiRak / 0.4) ?? undefined }), Math.max(1, nTiang));
+    const beam = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.13, 1), mat('#f26a1b', { metalness: 0.3, roughness: 0.42 }), Math.max(1, nBeam));
+    // bracing frame: horizontal + diagonal zig-zag yang mengikat upright depan & belakang (segitiga di sisi frame)
+    const PITCH = 1.0;
+    const nSilang = layout.rak.reduce((s2, r2) => s2 + (r2.nBay + 1) * (Math.ceil((r2.tinggi ?? layout.tinggiRak) / PITCH) + 2), 0);
+    const silang = new THREE.InstancedMesh(new THREE.BoxGeometry(0.035, 1, 0.025), mat('#2a5fc0', { metalness: 0.35, roughness: 0.5 }), Math.max(1, nSilang));
+    const kaki = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.02, 0.14), mat('#334155', { metalness: 0.4, roughness: 0.5 }), Math.max(1, nTiang));
+    const tmp = new THREE.Object3D(); let it = 0, ib = 0, is = 0, ik = 0;
     // baris rak: tiang di tiap batas bay (muka lorong & muka belakang), beam sejajar arah baris; arah 'z' = baris memanjang di Z
     for (const rr of layout.rak) {
       const ly = rr.levelY ?? layout.levelY; const tg = rr.tinggi ?? layout.tinggiRak; const zArah = rr.arah === 'z';
       const titik = (sepanjang: number, melintang: number, y: number) => zArah ? tmp.position.set(rr.x0 + melintang, y, rr.z0 + sepanjang) : tmp.position.set(rr.x0 + sepanjang, y, rr.z0 + melintang);
       for (let b = 0; b <= rr.nBay; b++) for (const dz of [0.05, rr.depth - 0.05]) {
         titik(b * rr.bayW, dz, tg / 2); tmp.scale.set(1, tg / layout.tinggiRak, 1); tmp.rotation.set(0, 0, 0); tmp.updateMatrix(); tiang.setMatrixAt(it++, tmp.matrix);
+        titik(b * rr.bayW, dz, 0.01); tmp.scale.set(1, 1, 1); tmp.updateMatrix(); kaki.setMatrixAt(ik++, tmp.matrix);
+      }
+      // bracing di bidang frame (melintang baris): batang datar bawah & atas + diagonal bolak-balik tiap ±1 m
+      const lebarF = Math.max(0.2, rr.depth - 0.1), nSeg = Math.max(1, Math.ceil((tg - 0.35) / PITCH)), pitch = (tg - 0.35) / nSeg;
+      const panjangD = Math.hypot(lebarF, pitch), sudut = Math.atan2(lebarF, pitch);
+      for (let b = 0; b <= rr.nBay; b++) {
+        const sp = b * rr.bayW;
+        for (const yH of [0.2, tg - 0.15]) {
+          titik(sp, rr.depth / 2, yH); tmp.scale.set(1, lebarF, 1); tmp.rotation.set(zArah ? 0 : Math.PI / 2, 0, zArah ? Math.PI / 2 : 0); tmp.updateMatrix(); silang.setMatrixAt(is++, tmp.matrix);
+        }
+        for (let i = 0; i < nSeg; i++) {
+          const arah = i % 2 ? 1 : -1; titik(sp, rr.depth / 2, 0.2 + (i + 0.5) * pitch); tmp.scale.set(1, panjangD, 1);
+          if (zArah) tmp.rotation.set(0, 0, arah * sudut); else tmp.rotation.set(arah * sudut, 0, 0);
+          tmp.updateMatrix(); silang.setMatrixAt(is++, tmp.matrix);
+        }
       }
       for (let b = 0; b < rr.nBay; b++) for (let l = 1; l < rr.level; l++) for (const dz of [0.05, rr.depth - 0.05]) {
         titik((b + 0.5) * rr.bayW, dz, (ly[l] ?? 0) - 0.06); tmp.scale.set(1, 1, rr.bayW - 0.09); tmp.rotation.set(0, zArah ? 0 : Math.PI / 2, 0); tmp.updateMatrix(); beam.setMatrixAt(ib++, tmp.matrix);
       }
     }
-    tiang.count = it; beam.count = ib; tiang.castShadow = beam.castShadow = true; tiang.receiveShadow = beam.receiveShadow = true;
-    gRak.add(tiang, beam);
+    tiang.count = it; beam.count = ib; silang.count = is; kaki.count = ik;
+    tiang.castShadow = beam.castShadow = true; tiang.receiveShadow = beam.receiveShadow = silang.receiveShadow = true;
+    gRak.add(tiang, beam, silang, kaki);
     // palet: alas kayu + muatan (warna karton bervariasi, stretch film)
     const n = Math.max(1, layout.palet.length);
     const alas = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.14, 1.0), mat('#ffffff', { roughness: 0.9, map: teks('palet') }), n);
