@@ -61,6 +61,15 @@ export function forkliftBersih(jenis: JenisMhe, tinggiMast: number) {
   for (const z of [-0.32, 0.32]) pasang(g, rb(0.1, mast, 0.1, 0.03), baja, panjang * 0.16, mast / 2, z);
   pasang(g, rb(0.1, 0.08, 0.74, 0.03), baja, panjang * 0.16, mast, 0);
   if (jenis === 'reach' || jenis === 'stacker') for (const z of [-0.42, 0.42]) pasang(g, rb(1.0, 0.16, 0.14, 0.04), navy, panjang * 0.32, 0.1, z);
+  // mast dalam (teleskopik): ikut naik bersama garpu saat garpu melewati tinggi mast luar (sampai level atas rak)
+  const tD = jenis === 'reach' ? 3.0 : 2.2;
+  for (let i = 0; i < 4; i++) {   // 4 tahap (quad mast): tiap tahap bertumpang 0,4 m dengan tahap di bawahnya → mast tersambung sampai garpu
+    const dalam = new THREE.Group(); dalam.name = `mastDalam${i}`; dalam.userData.tinggi = tD; dalam.visible = false;
+    const lebar = 0.27 - i * 0.035;
+    for (const z of [-lebar, lebar]) pasang(dalam, rb(0.08, tD, 0.07, 0.02), baja, panjang * 0.19 + 0.02 * (i + 1), tD / 2, z);
+    pasang(dalam, rb(0.08, 0.07, lebar * 2 + 0.08, 0.02), baja, panjang * 0.19 + 0.02 * (i + 1), tD - 0.04, 0);
+    g.add(dalam);
+  }
   // lampu peringatan
   pasang(g, new THREE.SphereGeometry(0.06, 10, 8), matB(WARNA_BERSIH.oranye, { emissive: WARNA_BERSIH.oranye, emissiveIntensity: 0.6 }), -panjang * 0.3, tinggiAtap + 0.07, 0, false);
   roda(g, -panjang * 0.38, lebar / 2 - 0.08, 0.2); roda(g, -panjang * 0.38, -lebar / 2 + 0.08, 0.2);
@@ -185,6 +194,7 @@ export function pakaiModelMeshy(g: THREE.Group, j: JenisModel) {
     g.traverse(o => { if (o.userData.kode && !o.parent?.userData.operator && o.parent?.name !== 'operator') o.visible = false; });
     // garpu kode hanya tampil saat diangkat (garpu model Meshy menempel di lantai)
     const garpu = g.getObjectByName('garpu'); if (garpu) { garpu.userData.angkatSaja = true; garpu.traverse(o => { o.visible = true; }); garpu.visible = false; }
+    for (let i = 0; i < 4; i++) { const dalam = g.getObjectByName(`mastDalam${i}`); if (dalam) { const v0 = dalam.visible; dalam.traverse(o => { o.visible = true; }); dalam.visible = v0; } }
     if (h.berkas === 'truk') {
       // tulisan Leca di kedua sisi bak truk boks
       const t = teksturTruk(); const sp = SPEK[j];
@@ -307,4 +317,36 @@ export function pegangKarton(orang: THREE.Object3D, karton: THREE.Object3D) {
   const k = karton.position;
   ikLengan(akar, 'Left', w(k.x - 0.02, k.y - 0.02, -0.23), dir(-0.4, -1, -0.8));
   ikLengan(akar, 'Right', w(k.x - 0.02, k.y - 0.02, 0.23), dir(-0.4, -1, 0.8));
+}
+
+/** Mast teleskopik & garpu: garpu di tinggi `h` (m), mast dalam naik bila garpu melewati mast luar. */
+export function aturMast(kendaraan: THREE.Object3D, h: number) {
+  const garpu = kendaraan.getObjectByName('garpu'); if (garpu) { garpu.position.y = h; if (garpu.userData.angkatSaja) garpu.visible = h > 0.3; }
+  const st = [0, 1, 2, 3].map(i => kendaraan.getObjectByName(`mastDalam${i}`)).filter(Boolean) as THREE.Object3D[]; if (!st.length) return;
+  const tD = st[0].userData.tinggi as number, puncak = h + 1.25, lebih = Math.max(0, puncak - tD);
+  const n = lebih <= 0.03 ? 0 : Math.min(st.length, Math.ceil(lebih / (tD - 0.4)));
+  st.forEach((m, i) => { const aktif = i < n; m.visible = aktif; if (aktif) m.position.y = lebih * ((i + 1) / n); });
+}
+/** Tangan operator hand pallet memegang tangkai: didorong (dua tangan di depan) atau ditarik (tangan kanan di belakang badan). */
+export function pegangTangkai(op: THREE.Object3D, kendaraan: THREE.Object3D, tarik: boolean) {
+  const akar = op.children.find(c => c.name === 'meshy'); if (!akar) return;
+  kendaraan.updateWorldMatrix(true, false); op.updateWorldMatrix(true, false);
+  const w = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(kendaraan.matrixWorld);
+  const arah = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).transformDirection(op.matrixWorld);
+  if (tarik) {
+    ikLengan(akar, 'Right', w(-1.02, 0.98, 0.06), arah(0.3, -1, 0.6));
+  } else {
+    ikLengan(akar, 'Left', w(-0.86, 1.05, -0.13), arah(-0.3, -1, -0.7));
+    ikLengan(akar, 'Right', w(-0.86, 1.05, 0.13), arah(-0.3, -1, 0.7));
+  }
+}
+/** Operator reach truck berdiri: kedua tangan di tuas kendali di depan badan. */
+export function pegangKendali(op: THREE.Object3D, kendaraan: THREE.Object3D) {
+  const akar = op.children.find(c => c.name === 'meshy'); if (!akar) return;
+  kendaraan.updateWorldMatrix(true, false); op.updateWorldMatrix(true, false);
+  const w = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(kendaraan.matrixWorld);
+  const arah = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).transformDirection(op.matrixWorld);
+  const x = POSISI_OPERATOR.reach.x + 0.36, y = POSISI_OPERATOR.reach.y + 1.0;
+  ikLengan(akar, 'Left', w(x, y, -0.17), arah(-0.3, -1, -0.6));
+  ikLengan(akar, 'Right', w(x, y, 0.17), arah(-0.3, -1, 0.6));
 }

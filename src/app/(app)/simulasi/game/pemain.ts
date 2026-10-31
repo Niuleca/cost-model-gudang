@@ -31,11 +31,11 @@ export const studiAwal = (): StudiPemain => ({ mode: 'bebas', level: 0, minta: 0
 
 export const MODE_PEMAIN: Record<ModePemain, { label: string; ikon: string; ket: string; kec: { kosong: number; bawa: number } }> = {
   bebas: { label: 'Gerak bebas', ikon: '🚶', ket: 'Jalan bebas & amati pekerja lain (Shift = lari).', kec: { kosong: 1.4, bawa: 1.4 } },
-  cbt: { label: 'Forklift CB', ikon: '🚜', ket: 'Counterbalance: ambil palet dari rak / lantai / staging dan taruh di lokasi kosong.', kec: { kosong: 3.0, bawa: 2.5 } },
-  reach: { label: 'Reach truck', ikon: '🏗️', ket: 'Reach truck di lorong rak: putaway & picking palet sampai level atas.', kec: { kosong: 2.5, bawa: 2.0 } },
-  hpt: { label: 'Hand pallet', ikon: '🛒', ket: 'Pindahkan palet di lantai (dock ↔ staging ↔ lantai). T = ganti ditarik / didorong; dorong saat memasukkan garpu ke palet.', kec: { kosong: 1.2, bawa: 0.9 } },
-  checker: { label: 'Checking', ikon: '✅', ket: 'Scan & cek qty / lot / kondisi palet.', kec: { kosong: 1.25, bawa: 1.25 } },
-  picker: { label: 'Picking karton', ikon: '📦', ket: 'Ambil karton dari pick face (palet rak level 1) lalu susun di palet order di staging outbound.', kec: { kosong: 1.25, bawa: 1.1 } },
+  cbt: { label: 'Forklift CB', ikon: '🚜', ket: 'Counterbalance: ambil palet dari rak / lantai / staging dan taruh di slot rak, lantai, atau staging (tumpuk 2).', kec: { kosong: 3.0, bawa: 2.5 } },
+  reach: { label: 'Reach truck', ikon: '🏗️', ket: 'Reach truck: putaway & picking palet sampai level atas, atau taruh di staging.', kec: { kosong: 2.5, bawa: 2.0 } },
+  hpt: { label: 'Hand pallet', ikon: '🛒', ket: 'Pindahkan palet di lantai (dock ↔ staging ↔ lantai). T = ganti ditarik / didorong; dorong saat memasukkan garpu ke palet.', kec: { kosong: 1.4, bawa: 1.1 } },
+  checker: { label: 'Checking', ikon: '✅', ket: 'Scan & cek qty / lot / kondisi palet.', kec: { kosong: 1.4, bawa: 1.4 } },
+  picker: { label: 'Picking karton', ikon: '📦', ket: 'Ambil karton dari pick face (palet rak level 1) lalu susun di palet order di staging outbound.', kec: { kosong: 1.4, bawa: 1.25 } },
   admin: { label: 'Admin', ikon: '🗂️', ket: 'Terima dokumen di dock, lalu input & konfirmasi di meja admin.', kec: { kosong: 1.3, bawa: 1.3 } },
 };
 
@@ -44,7 +44,7 @@ export const ELEMEN = {
   // waktu riil umum: luruskan garpu 2,5 dtk, masuk & angkat 3 dtk, letak & mundur 3 dtk; kecepatan angkat/turun mast sesuai spesifikasi forklift 2,5 t / reach 1,6 t
   posisi: 2.5, masukAngkat: 3, letakMundur: 3,
   naik: { cbt: 0.55, reach: 0.5 }, naikBeban: { cbt: 0.45, reach: 0.4 }, turun: { cbt: 0.5, reach: 0.55 },
-  hptAmbil: 6, hptTaruh: 4, kartonAmbil: 4, kartonTaruh: 3, kartonJangkau: 1.5, scan: 8, dokTerima: 20, dokInput: 45,
+  hptAmbil: 4, hptTaruh: 3, kartonAmbil: 2, kartonTaruh: 1.5, kartonJangkau: 1, scan: 8, dokTerima: 20, dokInput: 45,
 };
 /** Allowance personal, fatigue & delay untuk waktu standar dari hasil studi. */
 export const PFD = 0.15;

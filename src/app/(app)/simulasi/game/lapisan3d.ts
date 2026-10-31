@@ -7,7 +7,7 @@ import { ARMADA, bertugas, jalankanSampai, jenisTrukDari, type Dunia, type Jenis
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
 import { kategoriOrang } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, type PasangLapisan } from '../Viewer3D';
-import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pasangOperator, pegangKarton, pinBersih, POSISI_OPERATOR, trukBersih, WARNA_BERSIH, type Animator, type JenisKendaraan } from '../model3d';
+import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pasangOperator, pegangKarton, pegangTangkai, pegangKendali, aturMast, pinBersih, POSISI_OPERATOR, trukBersih, WARNA_BERSIH, type Animator, type JenisKendaraan } from '../model3d';
 import { WARNA_ORANG } from '../warna';
 import { ELEMEN, LABEL_AKSI, MODE_PEMAIN, studiAwal, type ModePemain, type SiklusStudi, type StudiPemain } from './pemain';
 
@@ -184,6 +184,22 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const pindahP = new Map<string, { x: number; y: number; z: number; rot: number; lokAsal: string; lokTaruh: string | null }>();
     let angkatP: string | null = null; let verPemain = 0;
     const kartonDiambilP = new Map<string, number>();   // karton yang diambil pemain (latihan picking) → isi palet tergambar berkurang
+    // palet yang sedang di-picking pemain: karton digambar satu per satu (berkurang 1 tiap ambil)
+    const stokTerbuka = new Map<string, { im: THREE.InstancedMesh; g: THREE.Group; x: number; y: number; z: number; lokAsal: string; perLapis: number; tinggiK: number }>();
+    const gStokP = new THREE.Group(); grup.add(gStokP);
+    const bukaStok = (p: { id: string; x: number; y: number; z: number }) => {
+      let st = stokTerbuka.get(p.id); if (st) return st;
+      const l = d.lpn.get(p.id)!; const kpp = d.sku.get(l.sku)?.kartonPerPalet ?? l.karton;
+      const kolom = 3, baris = 3, perLapis = kolom * baris, lapis = Math.ceil(kpp / perLapis);
+      const tinggiK = Math.max(0.15, Math.min(0.34, (tinggiPalet - 0.16) / lapis));
+      const g = new THREE.Group(); g.position.set(p.x, p.y, p.z); gStokP.add(g);
+      const alasS = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.14, 1.0), bersih ? mat(WARNA_BERSIH.kayu, { roughness: 0.8 }) : mat('#b7791f')); alasS.position.y = 0.07; g.add(alasS);
+      const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.38, tinggiK - 0.012, 0.31), bersih ? mat(WARNA_BERSIH.karton) : mat('#c8a26b', { map: teks('muatan') }), kpp);
+      const o = new THREE.Object3D();
+      for (let i = 0; i < kpp; i++) { const lp = Math.floor(i / perLapis), j = i % perLapis; o.position.set(-0.4 + (j % kolom) * 0.4, 0.14 + lp * tinggiK + tinggiK / 2, -0.33 + Math.floor(j / kolom) * 0.33); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }
+      im.count = Math.max(0, l.karton - (kartonDiambilP.get(p.id) ?? 0)); im.castShadow = true; g.add(im);
+      st = { im, g, x: p.x, y: p.y, z: p.z, lokAsal: l.lokasi, perLapis, tinggiK }; stokTerbuka.set(p.id, st); return st;
+    };
     const isiPalet = (id: string) => { const l = d.lpn.get(id)!; const kpp = d.sku.get(l.sku)?.kartonPerPalet ?? l.karton; return Math.max(0, l.karton - (kartonDiambilP.get(id) ?? 0)) / Math.max(1, kpp); };
     /** Palet yang tergambar (untuk dicari pemain): id LPN, posisi dasar, tinggi, lokasi. */
     let instPalet: { id: string; x: number; y: number; z: number; h: number; lok: string | null }[] = [];
@@ -198,7 +214,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       // palet pindahan pemain: dibatalkan bila sistem sudah memindahkan LPN itu
       for (const [id, o] of pindahP) { const l = d.lpn.get(id); if (!l || l.lokasi !== o.lokAsal) lepasPindah(id); }
       if (angkatP && !d.lpn.has(angkatP)) angkatP = null;
-      const lewati = (id: string) => sembunyi.has(id) || id === angkatP || pindahP.has(id);
+      for (const [id, st] of stokTerbuka) { const l = d.lpn.get(id); if (!l || l.lokasi !== st.lokAsal || pindahP.has(id) || id === angkatP) { gStokP.remove(st.g); stokTerbuka.delete(id); } }
+      const lewati = (id: string) => sembunyi.has(id) || id === angkatP || pindahP.has(id) || stokTerbuka.has(id);
+      for (const [id, st] of stokTerbuka) instPalet.push({ id, x: st.x, y: st.y, z: st.z, h: 0.14 + Math.ceil(st.im.count / st.perLapis) * st.tinggiK, lok: d.lpn.get(id)?.lokasi ?? null });
       // palet di lantai (block stack) & staging bertumpuk: diletakkan dari bawah menurut tinggi nyata palet di bawahnya,
       // jadi tidak ada palet melayang saat palet bawah sudah diambil atau isinya tinggal sebagian
       const tumpuk: { x: number; y: number; z: number; sku: string; isi: number; id: string; urut: number }[] = [];
@@ -515,7 +533,13 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
           .sort((a, b) => Math.abs(a.y - ty) - Math.abs(b.y - ty) || Math.hypot(a.x - f.x, a.z - f.z) - Math.hypot(b.x - f.x, b.z - f.z))[0];
         if (lok) return { x: lok.x, y: lok.y, z: lok.z, lok: lok.id, rot: lok.tipe === 'rak' ? Math.PI / 2 : 0, ket: lok.tipe === 'rak' ? `rak level ${levelDari(lok.y) + 1}` : 'lokasi lantai' };
       }
-      if (sp.level === 0 && bebas(f.x, f.z) && !instPalet.some(p => p.y < 0.1 && Math.hypot(p.x - f.x, p.z - f.z) < 1.0)) return { x: f.x, y: 0, z: f.z, lok: null, rot: rotGarpu() + Math.PI / 2, ket: 'lantai' };
+      // lantai / staging: tempat kosong di depan garpu, atau ditumpuk di atas palet lantai (maks 2 tingkat, bukan hand pallet)
+      if (bebas(f.x, f.z) && !instPalet.some(p => p.y < 0.1 && Math.hypot(p.x - f.x, p.z - f.z) < 1.0)) return { x: f.x, y: 0, z: f.z, lok: null, rot: rotGarpu() + Math.PI / 2, ket: 'lantai / staging' };
+      if (!lantaiSaja) {
+        const bawah = instPalet.filter(p => p.y < 0.1 && !(p.lok && d.lokasi.get(p.lok)?.tipe === 'rak') && Math.hypot(p.x - f.x, p.z - f.z) < 0.8)
+          .find(p => !instPalet.some(q => q.y > 0.1 && Math.hypot(q.x - p.x, q.z - p.z) < 0.3));
+        if (bawah) return { x: bawah.x, y: bawah.y + bawah.h + 0.02, z: bawah.z, lok: null, rot: rotGarpu() + Math.PI / 2, ket: 'tumpukan staging (tingkat 2)' };
+      }
       return null;
     };
     const levelDari = (y: number) => L.levelY.reduce((b, ly, i) => (Math.abs(ly - y) < Math.abs(L.levelY[b] - y) ? i : b), 0);
@@ -614,7 +638,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
           const jangkau = p.y > 1.0 || p.y + p.h > 1.6 ? ELEMEN.kartonJangkau : 0;
           aksiP = { nama: 'karton_ambil', mulai: jamP, durasi: ELEMEN.kartonAmbil + jangkau, selesai: () => {
             kartonP.visible = true; sp.bawa = 'karton'; kartonDari = p.id; tinggiSiklus = p.y;
-            kartonDiambilP.set(p.id, (kartonDiambilP.get(p.id) ?? 0) + 1); verPemain++;   // isi palet sumber berkurang
+            kartonDiambilP.set(p.id, (kartonDiambilP.get(p.id) ?? 0) + 1);
+            const st = bukaStok(p); st.im.count = Math.max(0, sisaKarton(p.id)); verPemain++;   // karton di palet berkurang 1
           } };
         } else {
           const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined).sort((a, b) => Number(b.id === ORDER) - Number(a.id === ORDER))[0];
@@ -701,7 +726,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         kd.op.rotation.y = sp.tarik ? Math.PI : 0; kd.op.position.x = sp.tarik ? POSISI_OPERATOR.hpt.x - 0.3 : POSISI_OPERATOR.hpt.x;
         kd.an?.main(dGerak > 0.0005 ? 'jalan' : 'berdiri');
       }
-      if (kd?.garpu) { kd.garpu.position.y = garpuP; if (kd.garpu.userData.angkatSaja) kd.garpu.visible = garpuP > 0.3; }
+      if (kd) aturMast(kd.g, garpuP);
       if (bawaP) { const a = arahP(); bawaPemain = { pos: v(posPemain.x + a.x * (sp.mode === 'hpt' ? 0.45 : 1.0), posPemain.z + a.z * (sp.mode === 'hpt' ? 0.45 : 1.0), Math.max(0.02, garpuP + 0.02)), rot: rotGarpu() + Math.PI / 2, sku: bawaP.sku, lpn: bawaP.lpn }; }
       else bawaPemain = null;
     };
@@ -710,7 +735,6 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     let kamPegang = false, kamLepas = -99, jamKam = 0;
     const kamMulai = () => { kamPegang = true; }, kamSelesai = () => { kamPegang = false; kamLepas = jamKam; };
     kontrolKamera.addEventListener('start', kamMulai); kontrolKamera.addEventListener('end', kamSelesai);
-    let yawKam = 0;   // 0 = kamera di sisi −X karakter (memandang ke dalam gudang)
     /** Garis kamera→karakter bebas rak (di bawah puncak rak) & dinding. */
     const garisBebas = (yaw: number, hd: number, cy: number, ty: number) => {
       const dx = -Math.cos(yaw), dz = Math.sin(yaw);
@@ -721,25 +745,30 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       return true;
     };
+    const beda = (a: number, b: number) => { let x = a - b; while (x > Math.PI) x -= 2 * Math.PI; while (x < -Math.PI) x += 2 * Math.PI; return x; };
+    /** Kamera gaya game survival: selalu di belakang-atas karakter mengikuti arah hadapnya; tarik mouse untuk melihat sekitar,
+     *  kembali sendiri 3 dtk setelah dilepas; mendekat otomatis bila terhalang rak / dinding. */
     const kamFollow = (dt: number, langsung: boolean) => {
-      jamKam += dt; if (kamPegang || (!langsung && jamKam - kamLepas < 3)) return;
+      jamKam += dt;
       const sp = kontrol.current.pemain; const besar = !!sp && (sp.mode === 'cbt' || sp.mode === 'reach');
-      const ty = besar ? 1.6 : 1.2;
-      // 1) normal: di atas-belakang; 2) dekat rak: rendah di dalam lorong mengikuti arah lorong; 3) cadangan: tinggi di atas rak
-      const pilihan: [number, number][] = [[besar ? 11 : 8.5, besar ? 0.78 : 0.86], [besar ? 7.5 : 6, 0.42]];
-      const arahCoba = [yawKam, 0, Math.PI, Math.PI / 2, -Math.PI / 2, Math.PI / 4, -Math.PI / 4, (3 * Math.PI) / 4, (-3 * Math.PI) / 4];
-      let hasil: { yaw: number; hd: number; cy: number } | null = null;
-      for (const [jarak, sudut] of pilihan) {
-        const hd = Math.cos(sudut) * jarak, cy = ty + Math.sin(sudut) * jarak;
-        for (const yw of arahCoba) if (garisBebas(yw, hd, cy, ty)) { hasil = { yaw: yw, hd, cy }; break; }
-        if (hasil) break;
-      }
-      if (!hasil) hasil = { yaw: yawKam, hd: 6, cy: L.tinggiRak + 6 };
-      yawKam = hasil.yaw;
-      const ingin = v(posPemain.x - Math.cos(hasil.yaw) * hasil.hd, posPemain.z + Math.sin(hasil.yaw) * hasil.hd, hasil.cy);
+      const ty = besar ? 1.8 : 1.5, jarakI = besar ? 7.5 : 5.2, tinggiI = besar ? 3.4 : 2.4;
       const tgt = v(posPemain.x, posPemain.z, ty);
-      const f = langsung ? 1 : 1 - Math.exp(-dt * 2.5);
-      kamera.position.lerp(ingin, f); kontrolKamera.target.lerp(tgt, f);
+      if (!langsung && (kamPegang || jamKam - kamLepas < 3)) {   // sedang/baru melihat sekitar: hanya ikut bergeser, tapi tetap tidak menembus rak
+        const o2 = kamera.position.clone().sub(kontrolKamera.target);
+        for (let kk = 1; kk >= 0.15; kk -= 0.05) {
+          const c = kontrolKamera.target.clone().addScaledVector(o2, kk);
+          if (c.y > L.tinggiRak + 0.4 || bebas(c.x, c.z)) { if (kk < 1) kamera.position.copy(c); break; }
+        }
+        return;
+      }
+      const off = kamera.position.clone().sub(kontrolKamera.target);
+      let yaw = Math.atan2(off.z, -off.x); const h = pemain.rotation.y;
+      yaw = langsung ? h : yaw + beda(h, yaw) * (1 - Math.exp(-dt * 5));
+      let hd = jarakI * 0.2;
+      for (let kk = 1; kk >= 0.2; kk -= 0.1) if (garisBebas(yaw, jarakI * kk, ty + tinggiI, ty)) { hd = jarakI * kk; break; }
+      const cy = ty + tinggiI * (hd < jarakI * 0.6 ? 1.35 : 1);
+      const ingin = v(posPemain.x - Math.cos(yaw) * hd, posPemain.z + Math.sin(yaw) * hd, cy);
+      kamera.position.lerp(ingin, langsung ? 1 : 1 - Math.exp(-dt * 10)); kontrolKamera.target.copy(tgt);
     };
     // ---------- tabrakan: palet lantai & aktor lain (lingkaran)
     const halangan: { x: number; z: number; r: number }[] = [];
@@ -798,25 +827,27 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       if (sp.mode !== modeLalu) gantiMode(sp, modeLalu);
       const naikKendaraan = sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt';
-      const gx = (t.kanan ? 1 : 0) - (t.kiri ? 1 : 0), gz = (t.maju ? 1 : 0) - (t.mundur ? 1 : 0);
-      const lama = posPemain.clone();
+      // kendali gaya game survival: W/S maju-mundur searah hadap, A/D belok; kamera tetap di belakang karakter
+      const putar = (t.kiri ? 1 : 0) - (t.kanan ? 1 : 0), majuK = (t.maju ? 1 : 0) - (t.mundur ? 1 : 0);
+      const lama = posPemain.clone(); const dtc = Math.min(0.1, dt);
       const mk = MODE_PEMAIN[sp.mode]; const kec = sp.mode === 'bebas' && t.lari ? 4.5 : sp.bawa ? mk.kec.bawa : mk.kec.kosong;
-      if ((gx || gz) && !aksiP) {
-        maju.subVectors(kontrolKamera.target, kamera.position); maju.y = 0; maju.normalize();
-        kanan.set(-maju.z, 0, maju.x);
-        langkahV.copy(maju).multiplyScalar(gz).addScaledVector(kanan, gx).normalize().multiplyScalar(kec * Math.min(0.1, dt));
-        const nx = posPemain.x + langkahV.x, nz = posPemain.z + langkahV.z;
-        const ux = langkahV.x / Math.max(1e-6, langkahV.length()), uz = langkahV.z / Math.max(1e-6, langkahV.length());
-        // tidak menembus: rak/fasilitas (bebas), palet di lantai, pekerja & MHE lain; palet yang dibawa ikut dicek
-        const fx = Math.cos(rotGarpu()), fz = -Math.sin(rotGarpu());
-        const lolos = (x: number, z: number) => bebas(x, z) && (!naikKendaraan || bebas(x + ux * 0.9, z + uz * 0.9))
-          && !tabrak(x, z, naikKendaraan && sp.mode !== 'hpt' ? 0.75 : 0.32)
-          && (!naikKendaraan || sp.mode === 'hpt' || !tabrak(x - fx * 0.9, z - fz * 0.9, 0.55))
-          && (!bawaP || (!tabrak(x + fx * (sp.mode === 'hpt' ? 0.45 : 1.0), z + fz * (sp.mode === 'hpt' ? 0.45 : 1.0), 0.55) && bebas(x + fx * (sp.mode === 'hpt' ? 0.45 : 1.0), z + fz * (sp.mode === 'hpt' ? 0.45 : 1.0))));
-        if (lolos(nx, posPemain.z)) posPemain.x = nx;
-        if (lolos(posPemain.x, nz)) posPemain.z = nz;
-        pemain.rotation.y = Math.atan2(-langkahV.z, langkahV.x);
+      if (!aksiP) {
+        if (putar) pemain.rotation.y += putar * (naikKendaraan && sp.mode !== 'hpt' ? 1.5 : 2.8) * dtc;
+        if (majuK) {
+          const ux = Math.cos(pemain.rotation.y) * majuK, uz = -Math.sin(pemain.rotation.y) * majuK;
+          const lj = kec * (majuK < 0 ? 0.6 : 1) * dtc;
+          const nx = posPemain.x + ux * lj, nz = posPemain.z + uz * lj;
+          // tidak menembus: rak/fasilitas (bebas), palet di lantai, pekerja & MHE lain; palet yang dibawa ikut dicek
+          const fx = Math.cos(rotGarpu()), fz = -Math.sin(rotGarpu()), dp = sp.mode === 'hpt' ? 0.45 : 1.0;
+          const lolos = (x: number, z: number) => bebas(x, z) && (!naikKendaraan || bebas(x + ux * 0.9, z + uz * 0.9))
+            && !tabrak(x, z, naikKendaraan && sp.mode !== 'hpt' ? 0.75 : 0.32)
+            && (!naikKendaraan || sp.mode === 'hpt' || !tabrak(x - fx * 0.9, z - fz * 0.9, 0.55))
+            && (!bawaP || (!tabrak(x + fx * dp, z + fz * dp, 0.55) && bebas(x + fx * dp, z + fz * dp)));
+          if (lolos(nx, posPemain.z)) posPemain.x = nx;
+          if (lolos(posPemain.x, nz)) posPemain.z = nz;
+        }
       }
+      const gx = putar, gz = majuK;
       const geser = posPemain.clone().sub(lama);
       pemain.position.set(posPemain.x, 0, posPemain.z);
       kamera.position.add(geser); kontrolKamera.target.add(geser);
@@ -915,7 +946,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
             pakaiMhe.add(m2.obj.uuid); a.obj.visible = false; a.naik = tg.mhe;
             gerakkan(m2, baru); a.pos.copy(baru);
             if (m2.op) m2.op.visible = true;
-            const hg = angkatGarpu(a.rencana, f); if (m2.garpu) { m2.garpu.position.y = hg; if (m2.garpu.userData.angkatSaja) m2.garpu.visible = hg > 0.3; }
+            const hg = angkatGarpu(a.rencana, f); aturMast(m2.obj, hg);
             if (a.rencana.bawaPalet && bawa) {
               const sku = tg.lpn ? d.lpn.get(tg.lpn)?.sku ?? '' : tg.barisAsn?.sku ?? '';
               const rot = m2.obj.rotation.y;
@@ -931,7 +962,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
           // operator tetap di atas MHE sampai MHE kembali ke parkir, lalu turun
           const m2 = mhe.get(a.naik)!; const dipakaiLain = d.mhe.find(x => x.id === a.naik)?.sibuk;
           if (dipakaiLain || m2.pos.distanceTo(m2.rumah) < 0.05) { a.naik = undefined; a.pos.copy(m2.rumah).add(v(0, 1.3)); a.obj.position.copy(a.pos); a.obj.visible = tampak; }
-          else { a.obj.visible = false; menujuRumah(m2, dtGame, KEC_MHE); pakaiMhe.add(m2.obj.uuid); if (m2.op) m2.op.visible = true; if (m2.garpu) { m2.garpu.position.y = 0.05; if (m2.garpu.userData.angkatSaja) m2.garpu.visible = false; } }
+          else { a.obj.visible = false; menujuRumah(m2, dtGame, KEC_MHE); pakaiMhe.add(m2.obj.uuid); if (m2.op) m2.op.visible = true; aturMast(m2.obj, 0.05); }
         } else {
           a.obj.visible = tampak; if (a.karton) a.karton.visible = false;
           menujuRumah(a, dtGame, KEC_JALAN);
@@ -940,7 +971,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       for (const [id, an] of hptAnim) { const m = mhe.get(id); if (!m) continue; const gerak = m.sebelum ? m.sebelum.distanceTo(m.obj.position) > 0.002 : false; (m.sebelum ??= new THREE.Vector3()).copy(m.obj.position); an.main(gerak && k.jalan ? 'jalan' : 'berdiri'); }
       for (const m of mhe.values()) {
         if (pakaiMhe.has(m.obj.uuid)) continue;
-        if (m.op) m.op.visible = false; if (m.garpu) { m.garpu.position.y = 0.05; if (m.garpu.userData.angkatSaja) m.garpu.visible = false; }
+        if (m.op) m.op.visible = false; aturMast(m.obj, 0.05);
         menujuRumah(m, dtGame, KEC_MHE);
       }
       gambarPalet(dibawa);
@@ -973,6 +1004,11 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       const dtAnim = k.jalan ? Math.min(0.1, dt) * Math.min(3, Math.max(1, Math.log10(k.kecepatan + 1))) : dt * 0.6;
       for (const an of animator) an.mixer.update(dtAnim);
       for (const a of orang.values()) if (a.karton?.visible && a.obj.visible) pegangKarton(a.obj, a.karton);
+      const kdH = kendaraanP.get('hpt'); const spH = kontrol.current.pemain;
+      if (kontrol.current.jelajah && spH?.mode === 'hpt' && kdH) pegangTangkai(kdH.op, kdH.g, !!spH.tarik);
+      for (const id of hptAnim.keys()) { const m = mhe.get(id); if (m?.op?.visible) pegangTangkai(m.op, m.obj, false); }
+      for (const [id, m] of mhe) if (m.op?.visible && d.mhe.find(x => x.id === id)?.jenis !== 'hpt' && d.mhe.find(x => x.id === id)?.jenis !== 'forklift') pegangKendali(m.op, m.obj);
+      const kdR = kendaraanP.get('reach'); if (kontrol.current.jelajah && spH?.mode === 'reach' && kdR) pegangKendali(kdR.op, kdR.g);
     };
 
     // ---------- pin penanda objek terpilih

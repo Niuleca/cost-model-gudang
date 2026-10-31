@@ -281,7 +281,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
               <button type="button" className="aksi" onPointerDown={e => { e.preventDefault(); sp.minta++; }} aria-label="Aksi (E)">E</button>
               <button type="button" className="ghost lari" onPointerDown={e => { e.preventDefault(); tekan('lari', true); }} onPointerUp={() => tekan('lari', false)} onPointerLeave={() => tekan('lari', false)}>Lari</button>
             </div>
-            <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'WASD / panah = jalan · Shift = lari · seret layar = putar kamera · scroll = zoom' : `WASD = gerak · E = ${sp.petunjuk.startsWith('E = ') ? sp.petunjuk.slice(4) : 'aksi'}${sp.mode === 'cbt' || sp.mode === 'reach' ? ' · R / F = level garpu' : ''}`}</p>
+            <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'W/S = maju/mundur · A/D = belok · Shift = lari · seret layar = lihat sekitar (kembali 3 dtk)' : `W/S = maju/mundur · A/D = belok · E = ${sp.petunjuk.startsWith('E = ') ? sp.petunjuk.slice(4) : 'aksi'}${sp.mode === 'cbt' || sp.mode === 'reach' ? ' · R / F = level garpu' : ''}`}</p>
           </>
         )}
         {panel && !jelajah && <PanelOrder d={dunia} o={order} pilih={p => setPilih(p)} />}
