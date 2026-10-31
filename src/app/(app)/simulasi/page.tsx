@@ -222,6 +222,7 @@ export default function DesainGudang() {
   useEffect(() => {
     const f = (ev: KeyboardEvent) => {
       const tg = ev.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return;
+      if (langkah !== 'layout') return;   // tab simulasi: tombol dipakai kendali game (E / R / F / WASD)
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return; }
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y') { ev.preventDefault(); redo(); return; }
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'd') { ev.preventDefault(); gandakan(); return; }

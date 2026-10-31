@@ -474,6 +474,15 @@ tr.kat-link:hover td { background: var(--res); }
 .gm-amati-grid b { font-size: 14px; }
 .gm-amati-grid span { color: #64748b; font-size: 11px; }
 .gm-amati-grid > div.buruk { background: #fef2f2; } .gm-amati-grid > div.buruk b { color: var(--bad); }
+.gm-mode-pemain { display: flex; flex-wrap: wrap; gap: 4px; }
+.gm-mode-pemain button { padding: 3px 7px; font-size: 11.5px; border-radius: 999px; }
+.gm-kerja { display: grid; gap: 6px; border-top: 1px solid #eef2f7; padding-top: 6px; }
+.gm-kerja-aksi { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gm-kerja-aksi > button { font-weight: 700; }
+.gm-level { display: inline-flex; align-items: center; gap: 4px; }
+.gm-level button { padding: 1px 8px; }
+.gm-kerja-petunjuk { background: #eff6ff; color: #1e40af; border-radius: 6px; padding: 5px 7px; }
+.gm-dpad .aksi { grid-column: 1; grid-row: 3; font-weight: 800; background: #2563eb; color: #fff; }
 .gm-catat-tip { margin: 0; background: #fffbeb; border-radius: 6px; padding: 5px 7px; }
 .gm-amati .gm-judul { display: flex; align-items: center; gap: 6px; }
 .gm-amati-nama { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -502,6 +511,7 @@ tr.kat-link:hover td { background: var(--res); }
 @media (max-width: 900px) {
   .gm-amati { position: static; width: auto; max-height: none; margin-top: 8px; }
   .gm-petunjuk { display: none; }
+  .gm-dpad { position: fixed; left: 12px; bottom: 12px; z-index: 30; }
   .gm-flag-list { grid-template-columns: 1fr; }
 }
 .sim2d-tarik { display: grid; gap: 4px; }
