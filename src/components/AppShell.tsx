@@ -17,6 +17,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/', label: 'Ringkasan', roles: TIM_TENDER },
     { href: '/status', label: 'Status Project', roles: TIM_TENDER },
     { href: '/heatmap', label: 'Heatmap penyelesaian, backlog & waiting', roles: TIM_TENDER },
+    { href: '/lg', label: 'LG · Tren bisnis & target pasar', roles: TIM_TENDER, pisah: true },
   ] },
   { id: 'tender', label: 'Tender', item: [
     { href: '/tender/baru', label: 'New Tender', roles: TIM_TENDER },
@@ -99,7 +100,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className={`dd${buka === id ? ' open' : ''}`} onMouseEnter={() => masuk(id)} onMouseLeave={keluarMenu}>
         <button className={`ddbtn${on ? ' on' : ''}`} aria-haspopup="true" aria-expanded={buka === id} onClick={() => {
           if (tutupTimer.current) clearTimeout(tutupTimer.current);
-          if (id === 'dashboard') { setBuka(null); router.push('/beranda'); return; }
           // Desktop: klik selalu membuka (tidak menutup menu yang baru terbuka oleh hover); layar sentuh: buka/tutup
           setBuka(hover() ? id : buka === id ? null : id);
         }}>
