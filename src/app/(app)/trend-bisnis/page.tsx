@@ -19,11 +19,13 @@ interface Customer {
   skor: number | null; sumber_nama: string | null; sumber_url: string | null; status: string; catatan: string | null; oleh_claude: boolean;
   ditemukan: string; updated_at: string;
   portal_vendor?: string | null; email_pengadaan?: string | null; email_jenis?: string | null; email_cek?: string | null;
-  email_dicek?: string | null; sumber_resmi?: boolean | null;
+  email_dicek?: string | null; sumber_resmi?: boolean | null; email_corsec?: string | null;
 }
 // Jalur kontak: pengadaan (portal vendor / procurement) > sales-umum > corsec-IR (cadangan)
-const jalur = (c: Customer) => c.portal_vendor || c.email_pengadaan ? 'pengadaan' : !c.email ? (c.telepon ? 'telepon' : 'kosong')
-  : c.email_jenis === 'Corsec / IR' ? 'corsec' : 'sales';
+const jalur = (c: Customer) => c.portal_vendor || c.email_pengadaan ? 'pengadaan'
+  : c.email && c.email_jenis !== 'Corsec / IR' && !['Domain tanpa MX', 'Usang'].includes(c.email_cek ?? '') ? 'sales'
+  : c.email_corsec || c.email_jenis === 'Corsec / IR' ? 'corsec' : c.telepon ? 'telepon' : 'kosong';
+const URUT_JALUR: Record<string, number> = { pengadaan: 0, sales: 1, telepon: 2, corsec: 3, kosong: 4 };
 const warnaCek: Record<string, string> = { Terverifikasi: 'ok', 'MX aktif': 'info', 'Domain tanpa MX': 'bad', Usang: 'bad', 'Belum dicek': 'warn' };
 interface Jalan { tanggal: string; ringkasan: string | null; n_sumber: number | null; n_tren: number | null; n_customer_baru: number | null; created_at: string }
 
@@ -32,8 +34,8 @@ const warnaStatus: Record<string, string> = { Baru: 'info', Dihubungi: 'warn', P
 const warnaLog: Record<string, string> = { Tinggi: 'ok', Sedang: 'warn', Rendah: 'info' };
 const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
 const csv = (rows: Customer[]) => {
-  const k = ['Nama', 'Sektor', 'Komoditas', 'Peran', 'Kota', 'Provinsi', 'Alamat', 'Website', 'Portal vendor / pengadaan', 'Email pengadaan', 'Email', 'Jenis email', 'Cek email', 'Telepon', 'HS code', 'Skor', 'Status', 'Alasan', 'Catatan', 'Sumber', 'URL sumber', 'Sumber = situs resmi', 'Ditemukan'];
-  const b = rows.map(r => [r.nama, r.sektor, r.komoditas, r.peran, r.kota, r.provinsi, r.alamat, r.website, r.portal_vendor, r.email_pengadaan, r.email, r.email_jenis, r.email_cek, r.telepon, r.hs_code, r.skor, r.status, r.alasan, r.catatan, r.sumber_nama, r.sumber_url, r.sumber_resmi ? 'ya' : 'tidak', r.ditemukan]);
+  const k = ['Nama', 'Sektor', 'Komoditas', 'Peran', 'Kota', 'Provinsi', 'Alamat', 'Website', 'Portal vendor / pengadaan', 'Email pengadaan', 'Email', 'Jenis email', 'Cek email', 'Email corsec/IR (cadangan)', 'Telepon', 'HS code', 'Skor', 'Status', 'Alasan', 'Catatan', 'Sumber', 'URL sumber', 'Sumber = situs resmi', 'Ditemukan'];
+  const b = rows.map(r => [r.nama, r.sektor, r.komoditas, r.peran, r.kota, r.provinsi, r.alamat, r.website, r.portal_vendor, r.email_pengadaan, r.email, r.email_jenis, r.email_cek, r.email_corsec, r.telepon, r.hs_code, r.skor, r.status, r.alasan, r.catatan, r.sumber_nama, r.sumber_url, r.sumber_resmi ? 'ya' : 'tidak', r.ditemukan]);
   return [k, ...b].map(x => x.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
 };
 
@@ -85,7 +87,9 @@ export default function TrendBisnisPage() {
 
   const sektorList = useMemo(() => Array.from(new Set(cust.map(c => c.sektor).filter(Boolean))) as string[], [cust]);
   const tampilC = useMemo(() => cust.filter(c => (!fSektor || c.sektor === fSektor) && (!fStatus || c.status === fStatus) && (!fJalur || jalur(c) === fJalur)
-    && (!q || `${c.nama} ${c.komoditas ?? ''} ${c.kota ?? ''} ${c.provinsi ?? ''} ${c.email ?? ''} ${c.email_pengadaan ?? ''}`.toLowerCase().includes(q.toLowerCase()))), [cust, q, fSektor, fStatus, fJalur]);
+    && (!q || `${c.nama} ${c.komoditas ?? ''} ${c.kota ?? ''} ${c.provinsi ?? ''} ${c.email ?? ''} ${c.email_pengadaan ?? ''}`.toLowerCase().includes(q.toLowerCase())))
+    // kontak paling berguna di atas: jalur pengadaan → email sales/umum → telepon → corsec saja → kosong; lalu skor
+    .map((c, i) => ({ c, i, r: URUT_JALUR[jalur(c)] ?? 9 })).sort((a, b) => a.r - b.r || a.i - b.i).map(x => x.c), [cust, q, fSektor, fStatus, fJalur]);
   const nJalur = useMemo(() => cust.reduce<Record<string, number>>((a, c) => { const j = jalur(c); a[j] = (a[j] ?? 0) + 1; return a; }, {}), [cust]);
 
   async function ubahStatus(c: Customer, status: string) {
@@ -160,7 +164,7 @@ export default function TrendBisnisPage() {
         <select aria-label="Sektor" value={fSektor} onChange={e => setFSektor(e.target.value)} style={{ maxWidth: 260 }}><option value="">Semua sektor</option>{sektorList.map(s => <option key={s}>{s}</option>)}</select>
         <select aria-label="Status" value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ maxWidth: 160 }}><option value="">Semua status</option>{STATUS_C.map(s => <option key={s}>{s}</option>)}</select>
         <select aria-label="Jalur kontak" value={fJalur} onChange={e => setFJalur(e.target.value)} style={{ maxWidth: 240 }}><option value="">Semua jalur kontak</option>
-          {([['pengadaan', 'Ada jalur pengadaan / vendor'], ['sales', 'Email sales / umum'], ['corsec', 'Hanya corsec / IR'], ['telepon', 'Hanya telepon'], ['kosong', 'Belum ada kontak']] as const).map(([v, l]) => <option key={v} value={v}>{l} ({nJalur[v] ?? 0})</option>)}</select>
+          {([['pengadaan', 'Ada jalur pengadaan / vendor'], ['sales', 'Email sales / umum'], ['telepon', 'Hanya telepon'], ['corsec', 'Hanya corsec / IR (cadangan)'], ['kosong', 'Belum ada kontak']] as const).map(([v, l]) => <option key={v} value={v}>{l} ({nJalur[v] ?? 0})</option>)}</select>
         <span className="small muted">{tampilC.length} perusahaan · baru hari ini {cust.filter(c => c.ditemukan === new Date().toLocaleDateString('en-CA')).length}</span><span style={{ flex: 1 }} />
         <button className="ghost" onClick={unduh} disabled={!tampilC.length}>Unduh CSV</button>
         <button onClick={() => setEdit({ id: '', nama: '', sektor: fSektor || null, komoditas: null, peran: 'Produsen', kota: null, provinsi: null, alamat: null, website: null, email: null, telepon: null, hs_code: null, alasan: null, skor: null, sumber_nama: null, sumber_url: null, status: 'Baru', catatan: null, oleh_claude: false, ditemukan: '', updated_at: '' })}>+ Tambah</button>
@@ -179,7 +183,8 @@ export default function TrendBisnisPage() {
               {c.email_jenis && <span className={`pill ${c.email_jenis === 'Corsec / IR' ? 'warn' : 'info'}`} title={c.email_jenis === 'Corsec / IR' ? 'Email sekretaris perusahaan / investor — bukan bagian pembelian; pakai sebagai cadangan' : undefined}>{c.email_jenis}</span>}
               {c.email_cek && <span className={`pill ${warnaCek[c.email_cek] ?? 'info'}`} title={c.email_cek === 'Terverifikasi' ? 'Email tertulis di situs resmi perusahaan & domain punya server email' : c.email_cek === 'MX aktif' ? 'Domain punya server email aktif; alamat belum dicocokkan di situs resmi' : undefined}>{c.email_cek}</span>}</div>}
             {c.telepon && <div><a href={`tel:${c.telepon.replace(/[^\d+]/g, '')}`}>{c.telepon}</a></div>}
-            {c.alamat && <div className="muted">{c.alamat}</div>}{!c.email && !c.telepon && !c.portal_vendor && !c.email_pengadaan && <span className="muted">—</span>}</td>
+            {c.alamat && <div className="muted">{c.alamat}</div>}{!c.email && !c.telepon && !c.portal_vendor && !c.email_pengadaan && <span className="muted">—</span>}
+            {c.email_corsec && <div className="muted" style={{ fontSize: 11, marginTop: 2 }} title="Sekretaris perusahaan / investor relation — bukan bagian pembelian">Cadangan (corsec/IR): {c.email_corsec}</div>}</td>
           <td className="small">{c.alasan ?? '—'}{c.catatan && <div className="muted">Catatan: {c.catatan}</div>}</td>
           <td className="num">{c.skor ?? '—'}</td>
           <td><select aria-label={`Status ${c.nama}`} value={c.status} onChange={e => ubahStatus(c, e.target.value)} className={`pill ${warnaStatus[c.status] ?? 'info'}`} style={{ width: 'auto' }}>{STATUS_C.map(s => <option key={s}>{s}</option>)}</select></td>
