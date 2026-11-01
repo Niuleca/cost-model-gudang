@@ -15,6 +15,8 @@ export interface Sku {
   umurHari: number;            // umur simpan sejak produksi (untuk FEFO)
   kelas: 'A' | 'B' | 'C';
   bobot: number;               // porsi permintaan
+  /** dari tab Produk tender: level rak tertinggi yang boleh (1 = lantai/beam bawah), zona area, berat per palet */
+  levelMaks?: number; zona?: string; beratPaletKg?: number; uom?: string;
 }
 
 export interface Lokasi {
@@ -22,6 +24,8 @@ export interface Lokasi {
   tipe: 'rak' | 'lantai' | 'staging_in' | 'staging_out' | 'rusak';
   kapasitas: number;           // palet
   x: number; z: number; y: number;
+  /** level rak (1 = lantai / beam terbawah) & zona area (zonasi produk) */
+  level?: number; zona?: string;
   lpn: string[];
   dipesan: number;             // slot yang sudah dipesan tugas putaway
 }
@@ -59,6 +63,10 @@ export interface Truk {
   sisaTugas: number;
   berangkat?: number;
   masukDock?: number;                     // waktu mulai sandar di dock
+  /** fase di dock: sandar (manuver mundur, buka segel, serah surat jalan) → kerja (bongkar / muat) → dokumen (segel, tanda tangan, keluar) */
+  fase?: 'sandar' | 'kerja' | 'dokumen';
+  faseSampai?: number;                    // akhir fase sandar / dokumen (detik game)
+  luarSampai?: number;                    // bongkar/muat oleh pihak luar (sopir/TKBM vendor) berjalan berurutan per truk
 }
 
 export interface BarisOrder { sku: string; karton: number; teralokasi: number; terpick: number }
@@ -165,7 +173,7 @@ export interface Dunia {
   stat: StatSim;
 }
 
-export interface EventSim { t: number; seq: number; jenis: 'truk_tiba' | 'tugas_selesai' | 'shift' | 'order_baru' | 'akhir_hari' | 'awal_hari' | 'bayar'; ref?: string }
+export interface EventSim { t: number; seq: number; jenis: 'truk_tiba' | 'truk_siap' | 'truk_berangkat' | 'tugas_selesai' | 'shift' | 'order_baru' | 'akhir_hari' | 'awal_hari' | 'bayar'; ref?: string }
 export interface AntrianEvent { push: (e: EventSim) => void; pop: () => EventSim | undefined; peek: () => EventSim | undefined; size: () => number }
 
 export interface StatSim {

@@ -1,7 +1,7 @@
 'use client';
 // Leca Game · panel mengambang di atas tampilan 3D: info objek terpilih, pelacakan order, daftar dock/MHE/truk.
 import { useState } from 'react';
-import { ARMADA, HARI, JAM, type Dunia, type JenisTugas, type Order } from '@/lib/game';
+import { ARMADA, HARI, JAM, faseTrukTeks, type Dunia, type JenisTugas, type Order } from '@/lib/game';
 import type { Pilihan } from './lapisan3d';
 
 export const LABEL_TUGAS: Record<JenisTugas, string> = {
@@ -194,12 +194,13 @@ export function PanelArmada({ d, pilih }: { d: Dunia; pilih: (p: Pilihan) => voi
         {tab === 'dock' && d.dock.map(dk => {
           const tr = dk.truk ? d.truk.get(dk.truk) : undefined;
           const tot = tr ? (tr.arus === 'inbound' ? tr.palet.length : tr.order.length) : 0;
-          const sel = tr ? (tr.arus === 'inbound' ? tr.palet.length - Math.max(0, tr.sisaTugas) : tr.order.filter(o => d.order.get(o)?.status === 'terkirim').length) : 0;
+          const sel = !tr || tr.fase === 'sandar' ? 0 : tr.arus === 'inbound' ? tr.palet.length - Math.max(0, tr.sisaTugas) : tr.order.filter(o => d.order.get(o)?.status === 'terkirim').length;
+          const fase = !tr ? 'Tersedia' : tr.fase === 'sandar' ? 'Sandar' : tr.fase === 'dokumen' ? (faseTrukTeks(d, tr) === 'keluar' ? 'Keluar' : 'Dokumen') : tr.arus === 'inbound' ? 'Bongkar' : 'Muat';
           return (
             <button type="button" key={dk.id} className="gm-baris" disabled={!tr} onClick={() => tr && pilih({ jenis: 'truk', id: tr.id })}>
               <span className="nama"><b>{dk.arus === 'inbound' ? 'IN' : 'OUT'} {dk.id.slice(2)}</b><small>{dk.arus}</small></span>
               <span className="isi">{tr ? <><i className="titik" />{tr.id}</> : <span className="muted">Kosong</span>}</span>
-              <span className={`gm-pill ${tr ? 'jalan' : 'info'}`}>{tr ? (tr.arus === 'inbound' ? 'Bongkar' : 'Muat') : 'Tersedia'}</span>
+              <span className={`gm-pill ${tr ? 'jalan' : 'info'}`} title={tr ? faseTrukTeks(d, tr) : undefined}>{fase}</span>
               <span className="gm-bar">{tr && <><i style={{ width: `${tot ? (sel / tot) * 100 : 0}%` }} /><small>{sel}/{tot}</small></>}</span>
             </button>
           );

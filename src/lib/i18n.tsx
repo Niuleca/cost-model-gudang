@@ -35,6 +35,7 @@ const K: Kamus = {
   // Tab tender
   'Key assumption': ['Key assumptions', '주요 가정', '主要前提'],
   'Volume': ['Volume', '물량', '物量'],
+  'Produk': ['Products', '제품', '製品'],
   'Aktivitas & manpower': ['Activities & manpower', '작업 및 인력', '作業と人員'],
   'Gudang, space & MHE': ['Warehouse, space & MHE', '창고·공간·하역장비', '倉庫・スペース・MHE'],
   'Interest cost': ['Interest cost', '이자 비용', '支払利息'],

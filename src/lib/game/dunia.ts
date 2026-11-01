@@ -131,10 +131,28 @@ function urutLokasi(d: Dunia) {
   }
   return u;
 }
-/** Lokasi rak/lantai kosong terdekat dari staging inbound. */
-function cariLokasiKosong(d: Dunia, mulai = 0) {
-  const u = urutLokasi(d);
-  for (let i = mulai; i < u.length; i++) if (u[i].lpn.length + u[i].dipesan < u[i].kapasitas) return u[i];
+/** Per zona: level tertinggi yang dicadangkan untuk SKU berat di zona itu (level maks terendah, 0 = tidak ada). */
+const LINDUNG = new WeakMap<Dunia, Map<string, number>>();
+function levelDilindungi(d: Dunia) {
+  let m = LINDUNG.get(d);
+  if (!m) { m = new Map(); for (const s of d.sku.values()) if (s.zona && s.levelMaks) m.set(s.zona, Math.max(m.get(s.zona) ?? 0, s.levelMaks)); LINDUNG.set(d, m); }
+  return m;
+}
+/** Lokasi rak/lantai kosong terdekat dari staging inbound. Bila SKU diketahui: hanya level ≤ level maks SKU
+ *  (barang berat di level bawah), utamakan zona SKU; zona lain dipakai bila zona sendiri penuh. */
+function cariLokasiKosong(d: Dunia, skuId?: string) {
+  const u = urutLokasi(d); const s = skuId ? d.sku.get(skuId) : undefined;
+  const muat = (l: Lokasi) => l.lpn.length + l.dipesan < l.kapasitas;
+  const levelOk = (l: Lokasi) => !s?.levelMaks || (l.level ?? 1) <= s.levelMaks;
+  if (s?.zona) {
+    for (const l of u) if (l.zona === s.zona && levelOk(l) && muat(l)) return l;
+    // zona sendiri penuh: pakai zona lain, tetapi sisakan level bawah yang dicadangkan untuk SKU berat di zona itu
+    const lindung = levelDilindungi(d);
+    for (const l of u) if (l.zona !== s.zona && levelOk(l) && muat(l) && (l.level ?? 1) > Math.min(lindung.get(l.zona ?? '') ?? 0, s.levelMaks ?? 99)) return l;
+  }
+  for (const l of u) if (levelOk(l) && muat(l)) return l;
+  if (s?.levelMaks && !d.hariIni.kejadian.some(k => k.startsWith(`Posisi level ≤ ${s.levelMaks}`)))
+    d.hariIni.kejadian.push(`Posisi level ≤ ${s.levelMaks} penuh — palet ${s.kode} (${Math.round(s.beratPaletKg ?? 0)} kg) menunggu di staging, tidak boleh ke level atas.`);
   return null;
 }
 
@@ -146,11 +164,9 @@ function lotBaru(d: Dunia, skuId: string, umurHariIni: number) {
 
 function stokAwal(d: Dunia) {
   const skus = d.sk.sku; const bobot = skus.map(s => s.bobot);
-  const u = urutLokasi(d); let k = 0;
   for (let i = 0; i < d.sk.stokAwal; i++) {
-    while (k < u.length && u[k].lpn.length >= u[k].kapasitas) k++;
-    const lok = u[k]; if (!lok) { d.sk.asumsi.push(`Stok awal dipotong: rak penuh setelah ${i} palet.`); break; }
     const s = skus[pilihBerbobot(d.rng, bobot)];
+    const lok = cariLokasiKosong(d, s.id); if (!lok) { if (cariLokasiKosong(d)) continue; d.sk.asumsi.push(`Stok awal dipotong: rak penuh setelah ${i} palet.`); break; }
     const { lot, expiry } = lotBaru(d, s.id, 5 + Math.floor(d.rng() * 60));
     const l = lpnBaru(d, s.id, lot, expiry, s.kartonPerPalet, lok.id, 'disimpan');
     l.terima = -Math.floor(d.rng() * 30) * HARI;
@@ -165,8 +181,14 @@ function tugasBaru(d: Dunia, jenis: JenisTugas, qty: number, prioritas: number, 
   if (d.sk.prod[jenis].luar) {
     // di luar lingkup tender: langsung jalan tanpa pekerja/MHE gudang
     let siap = true;
-    if (jenis === 'putaway') { const lok = cariLokasiKosong(d); if (lok) { lok.dipesan++; t.ke = lok.id; } else siap = false; }
-    if (siap) { t.status = 'jalan'; t.mulai = d.t; t.durasi = durasi(d, t); t.selesai = d.t + t.durasi; jadwal(d, t.selesai, 'tugas_selesai', t.id); return t; }
+    if (jenis === 'putaway') { const lok = cariLokasiKosong(d, d.lpn.get(t.lpn ?? '')?.sku); if (lok) { lok.dipesan++; t.ke = lok.id; } else siap = false; }
+    if (siap) {
+      // bongkar/muat pihak luar: satu regu per truk → palet dikerjakan berurutan, bukan serentak
+      const tr = t.truk ? d.truk.get(t.truk) : undefined;
+      const mulai = tr ? Math.max(d.t, tr.luarSampai ?? 0) : d.t;
+      t.status = 'jalan'; t.mulai = mulai; t.durasi = durasi(d, t); t.selesai = mulai + t.durasi; if (tr) tr.luarSampai = t.selesai;
+      jadwal(d, t.selesai, 'tugas_selesai', t.id); return t;
+    }
   }
   d.menunggu.add(t.id); antre.get(jenis)!.push(t);
   return t;
@@ -224,7 +246,7 @@ function jadwalkan(d: Dunia) {
     }
     if (pk < 0) { buntu.add(tg.jenis); continue; }
     if (tg.jenis === 'putaway') {
-      const lok = cariLokasiKosong(d); if (!lok) { buntu.add(tg.jenis); continue; }
+      const lok = cariLokasiKosong(d, d.lpn.get(tg.lpn ?? '')?.sku); if (!lok) { buntu.add(tg.jenis); continue; }
       lok.dipesan++; tg.ke = lok.id;
     }
     antre.get(tg.jenis)!.pop();
@@ -238,11 +260,20 @@ function jadwalkan(d: Dunia) {
 }
 
 // ---------- truk & dock
+/** Waktu tetap per truk di dock (menit game): sandar & buka segel / surat jalan sebelum kerja, lalu dokumen & segel sebelum keluar. */
+export const WAKTU_DOCK = { sandarMenit: 8, dokumenMenit: 10 };
 function dockkan(d: Dunia, tr: Truk) {
   const dk = d.dock.find(x => x.arus === tr.arus && !x.truk);
   if (!dk) { tr.status = 'antre'; d.antreDock[tr.arus].push(tr.id); return; }
   dk.truk = tr.id; tr.dock = dk.id; tr.status = 'di_dock'; tr.masukDock = d.t;
   const tunggu = Math.max(0, d.t - tr.tiba) / JAM; const st = d.stat.tungguTruk; st.n++; st.jam += tunggu; st.maks = Math.max(st.maks, tunggu);
+  // manuver mundur ke dock, ganjal roda, buka pintu/segel, serah surat jalan — baru setelah itu bongkar / muat
+  tr.fase = 'sandar'; tr.faseSampai = d.t + WAKTU_DOCK.sandarMenit * 60;
+  jadwal(d, tr.faseSampai, 'truk_siap', tr.id);
+}
+function trukSiap(d: Dunia, tr: Truk) {
+  if (tr.status !== 'di_dock' || tr.fase !== 'sandar') return;
+  tr.fase = 'kerja'; tr.faseSampai = undefined;
   if (tr.arus === 'inbound') {
     const pr = d.t + 4 * JAM;
     tugasBaru(d, 'admin_in', 1, pr, { truk: tr.id });
@@ -253,8 +284,15 @@ function dockkan(d: Dunia, tr: Truk) {
     cekBerangkat(d, tr);
   }
 }
+/** Bongkar/muat selesai → dokumen (segel, tanda tangan SJ/BAST) → truk keluar & dock dipakai truk berikutnya. */
 function lepasDock(d: Dunia, tr: Truk) {
-  tr.status = 'berangkat'; tr.berangkat = d.t;
+  if (tr.fase === 'dokumen' || tr.status !== 'di_dock') return;
+  tr.fase = 'dokumen'; tr.faseSampai = d.t + WAKTU_DOCK.dokumenMenit * 60;
+  jadwal(d, tr.faseSampai, 'truk_berangkat', tr.id);
+}
+function trukBerangkat(d: Dunia, tr: Truk) {
+  if (tr.status !== 'di_dock') return;
+  tr.status = 'berangkat'; tr.berangkat = d.t; tr.fase = undefined;
   const dk = d.dock.find(x => x.id === tr.dock); if (dk) dk.truk = null;
   const next = d.antreDock[tr.arus].shift(); if (next) dockkan(d, d.truk.get(next)!);
 }
@@ -290,13 +328,13 @@ function alokasi(d: Dunia, o: Order) {
 }
 function siapMuat(d: Dunia, o: Order) {
   const tr = o.truk ? d.truk.get(o.truk) : undefined;
-  if (!tr || tr.status !== 'di_dock' || o.status !== 'di_staging') return;
+  if (!tr || tr.status !== 'di_dock' || tr.fase === 'sandar' || o.status !== 'di_staging') return;
   o.status = 'dimuat'; (o.jejak ??= {}).dimuat = d.t;
   tugasBaru(d, 'muat', Math.max(1, Math.ceil(o.paletEq - 1e-9)), o.batas, { order: o.id, truk: tr.id });
   tr.sisaTugas++;
 }
 function cekBerangkat(d: Dunia, tr: Truk) {
-  if (tr.status !== 'di_dock' || tr.arus !== 'outbound') return;
+  if (tr.status !== 'di_dock' || tr.fase === 'sandar' || tr.arus !== 'outbound') return;
   const os = tr.order.map(x => d.order.get(x)!).filter(o => o.status !== 'batal');
   if (os.length && os.every(o => o.status === 'terkirim')) lepasDock(d, tr);
   if (!os.length) lepasDock(d, tr);
@@ -362,15 +400,22 @@ function orderBaru(d: Dunia, shift: number) {
     if (o.status !== 'batal') { baru.push(o); tugasBaru(d, 'admin_out', 1, batas, { order: o.id }); }
   }
   // kelompokkan ke truk outbound (kapasitas palet per truk)
-  let tr: Truk | null = null, isi = 0;
+  let tr: Truk | null = null, isi = 0; const trukBaru: Truk[] = [];
   for (const o of baru) {
     if (!tr || isi + o.paletEq > P.paletPerTruk) {
-      const tiba = Math.max(d.t + JAM, batas - P.trukOutJamSebelum * JAM);
-      tr = { id: id(d, 'TO'), arus: 'outbound', rencanaTiba: tiba, tiba, dock: null, status: 'dijadwalkan', palet: [], order: [], sisaTugas: 0 };
-      d.truk.set(tr.id, tr); jadwal(d, tiba, 'truk_tiba', tr.id); isi = 0;
+      tr = { id: id(d, 'TO'), arus: 'outbound', rencanaTiba: 0, tiba: 0, dock: null, status: 'dijadwalkan', palet: [], order: [], sisaTugas: 0 };
+      d.truk.set(tr.id, tr); trukBaru.push(tr); isi = 0;
     }
     tr.order.push(o.id); o.truk = tr.id; isi += o.paletEq; tr.jenis = jenisTrukDari(Math.ceil(isi - 1e-9));
   }
+  // kedatangan bergiliran: truk pertama ±2 jam setelah order masuk (waktu pick & staging), yang terakhir
+  // paling lambat batas kirim − waktu di dock, disebar rata — tidak menumpuk di dock pada jam yang sama
+  const awal = Math.max(d.t + JAM, Math.min(d.t + 2 * JAM, batas - P.trukOutJamSebelum * JAM));
+  const akhir = Math.max(awal, batas - 1.5 * JAM);
+  trukBaru.forEach((x, k) => {
+    x.tiba = x.rencanaTiba = Math.round(trukBaru.length > 1 ? awal + ((akhir - awal) * k) / (trukBaru.length - 1) : Math.max(awal, batas - P.trukOutJamSebelum * JAM));
+    jadwal(d, x.tiba, 'truk_tiba', x.id);
+  });
 }
 
 function tugasSelesai(d: Dunia, tg: Tugas) {
@@ -482,6 +527,8 @@ function proses(d: Dunia, e: EventSim) {
     case 'order_baru': orderBaru(d, Number(e.ref ?? 0)); break;
     case 'bayar': bayar(d); break;
     case 'truk_tiba': dockkan(d, d.truk.get(e.ref!)!); break;
+    case 'truk_siap': trukSiap(d, d.truk.get(e.ref!)!); break;
+    case 'truk_berangkat': trukBerangkat(d, d.truk.get(e.ref!)!); break;
     case 'tugas_selesai': tugasSelesai(d, d.tugas.get(e.ref!)!); break;
     case 'shift': break;
   }

@@ -5,6 +5,8 @@ import type { HasilTender } from '../engine/index';
 import type { TenderRow } from '../tender';
 import { kategoriOrang, jenisMhe, susunLayout, type LayoutGudang } from '../simulasi3d/layout';
 import { buatRng } from './dasar';
+import { ATURAN_BERAT_DEFAULT, hitungProduk, produkEfektif } from '../produk';
+import { hitungLevelRak, lengkapiSpaceExcel } from '../engine/space';
 import type { JenisTugas, Kemampuan, Lokasi, Produktivitas, Skenario, Sku } from './tipe';
 
 /** Role khusus arus dari namanya: "Inbound Admin" → in, "Outbound Checker" → out, selain itu umum. */
@@ -80,17 +82,41 @@ export function skenarioDariTender(t: TenderRow, h: HasilTender, o: OpsiSkenario
   const hariKerja = hk >= 7 ? [0, 1, 2, 3, 4, 5, 6] : hk === 6 ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
   asumsi.push(`Shift pertama mulai 07.00, ${nShift} shift × ${jamKerja} jam, ${hk} hari kerja/minggu.`);
 
-  // ---- SKU (sintetis — tender tidak menyimpan master SKU)
+  // ---- SKU: dari tab Produk tender (master SKU) bila sudah diisi; selain itu 20 SKU contoh
   const kpp = kartonPerPaletDari(vOut ?? vSt ?? vIn);
-  const kelas: { k: Sku['kelas']; n: number; porsi: number }[] = [{ k: 'A', n: 4, porsi: 0.6 }, { k: 'B', n: 6, porsi: 0.3 }, { k: 'C', n: 10, porsi: 0.1 }];
   const sku: Sku[] = []; let no = 0;
-  for (const c of kelas) for (let i = 0; i < c.n; i++) {
-    no++;
-    const exp = rng() < 0.5;
-    sku.push({ id: `SKU${String(no).padStart(2, '0')}`, kode: `${c.k}-${String(no).padStart(3, '0')}`, nama: `Produk ${c.k}${i + 1}`,
-      kartonPerPalet: kpp, kontrol: exp ? 'expiry' : 'none', umurHari: exp ? 180 + Math.floor(rng() * 540) : 0, kelas: c.k, bobot: c.porsi / c.n });
+  const aturan = t.asumsi.aturanBerat ?? ATURAN_BERAT_DEFAULT;
+  const levelRak = Math.max(1, hitungLevelRak(lengkapiSpaceExcel(t.asumsi.space?.excel).rak).level || 1);
+  const produk = produkEfektif(t.asumsi.produk, vols, t.asumsi.profilVolume);
+  const produkNyata = (t.asumsi.produk ?? []).filter(x => !x.otomatis && Number(x.upp) > 0).length > 0;
+  if (produkNyata) {
+    const xs = produk.filter(x => Number(x.upp) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak) }));
+    const totPal = xs.reduce((a, r) => a + Math.max(r.h.palet, 1), 0);
+    // kelas ABC dari porsi palet (kumulatif 60 / 90 %)
+    let kum = 0;
+    for (const { x, h } of [...xs].sort((a, b) => b.h.palet - a.h.palet)) {
+      no++; const porsi = Math.max(h.palet, 1) / totPal; kum += porsi;
+      const exp = rng() < 0.5;
+      sku.push({ id: `SKU${String(no).padStart(3, '0')}`, kode: x.kode || `SKU-${no}`, nama: x.nama || x.kode || `Produk ${no}`, kartonPerPalet: Math.max(1, Math.round(Number(x.upp))),
+        kontrol: exp ? 'expiry' : 'none', umurHari: exp ? 180 + Math.floor(rng() * 540) : 0, kelas: kum <= 0.6 + 1e-9 || no === 1 ? 'A' : kum <= 0.9 + 1e-9 ? 'B' : 'C', bobot: porsi,
+        levelMaks: h.levelMaks < levelRak ? h.levelMaks : undefined, zona: x.zona?.trim() || undefined, beratPaletKg: h.beratPaletKg, uom: x.uom });
+    }
+    const berat = sku.filter(s => s.levelMaks);
+    asumsi.push(`${sku.length} SKU dari tab Produk tender (UPP = isi per palet; porsi permintaan = porsi palet stok).${berat.length ? ` ${berat.length} SKU berat dibatasi level rak: ${berat.slice(0, 4).map(s => `${s.kode} ≤ L${s.levelMaks}`).join(', ')}${berat.length > 4 ? ', …' : ''}.` : ''}`);
+  } else {
+    const kelas: { k: Sku['kelas']; n: number; porsi: number }[] = [{ k: 'A', n: 4, porsi: 0.6 }, { k: 'B', n: 6, porsi: 0.3 }, { k: 'C', n: 10, porsi: 0.1 }];
+    // aturan berat dari baris otomatis (key assumption) tetap berlaku untuk SKU contoh
+    const hAuto = produk[0] ? hitungProduk(produk[0], aturan, levelRak) : null;
+    const lvAuto = hAuto && hAuto.levelMaks < levelRak ? hAuto.levelMaks : undefined;
+    for (const c of kelas) for (let i = 0; i < c.n; i++) {
+      no++;
+      const exp = rng() < 0.5;
+      sku.push({ id: `SKU${String(no).padStart(2, '0')}`, kode: `${c.k}-${String(no).padStart(3, '0')}`, nama: `Produk ${c.k}${i + 1}`,
+        kartonPerPalet: kpp, kontrol: exp ? 'expiry' : 'none', umurHari: exp ? 180 + Math.floor(rng() * 540) : 0, kelas: c.k, bobot: c.porsi / c.n,
+        levelMaks: lvAuto, beratPaletKg: hAuto?.beratPaletKg });
+    }
+    asumsi.push(`20 SKU contoh (A 4 / B 6 / C 10; porsi permintaan 60/30/10%), ${kpp} karton per palet${kpp === 40 ? ' (default, konversi tender tidak diisi)' : ' dari konversi volume tender'}. Isi tab Produk tender untuk memakai SKU sebenarnya.${lvAuto ? ` Berat ±${Math.round(hAuto!.beratPaletKg)} kg/palet → maks level ${lvAuto}.` : ''}`);
   }
-  asumsi.push(`20 SKU contoh (A 4 / B 6 / C 10; porsi permintaan 60/30/10%), ${kpp} karton per palet${kpp === 40 ? ' (default, konversi tender tidak diisi)' : ' dari konversi volume tender'}.`);
 
   // ---- Lokasi dari layout 3D
   const lokasi: Lokasi[] = [];
@@ -106,6 +132,32 @@ export function skenarioDariTender(t: TenderRow, h: HasilTender, o: OpsiSkenario
   lokasi.push({ id: 'STG-OUT', kode: 'STAGING-OUT', tipe: 'staging_out', kapasitas: 1e6, x: (so.x0 + so.x1) / 2, z: (so.z0 + so.z1) / 2, y: 0, lpn: [], dipesan: 0 });
   lokasi.push({ id: 'RUSAK', kode: 'KARANTINA', tipe: 'rusak', kapasitas: 1e6, x: si.x0, z: si.z0, y: 0, lpn: [], dipesan: 0 });
   const nPosisi = i;
+  // level rak: urutan ketinggian posisi (lantai & beam terbawah = level 1)
+  const tinggi = Array.from(new Set(lokasi.filter(l => l.tipe === 'rak').map(l => Math.round(l.y * 10) / 10))).sort((a, b) => a - b);
+  for (const l of lokasi) if (l.tipe === 'rak' || l.tipe === 'lantai') l.level = l.tipe === 'lantai' ? 1 : tinggi.indexOf(Math.round(l.y * 10) / 10) + 1;
+  // zonasi: kolom posisi (x, z — semua level) dibagi berurutan dari depan ke belakang sesuai porsi palet per zona;
+  // zona produk berat (level maks rendah) didahulukan supaya dekat dock
+  const zonaSku = new Map<string, { bobot: number; lv: number }>();
+  for (const s of sku) if (s.zona) { const z = zonaSku.get(s.zona) ?? { bobot: 0, lv: 99 }; z.bobot += s.bobot; z.lv = Math.min(z.lv, s.levelMaks ?? 99); zonaSku.set(s.zona, z); }
+  if (zonaSku.size) {
+    const kolom = new Map<string, typeof lokasi>();
+    for (const l of lokasi) if (l.tipe === 'rak' || l.tipe === 'lantai') { const k = `${Math.round(l.x * 2)}|${Math.round(l.z * 2)}`; (kolom.get(k) ?? kolom.set(k, []).get(k)!).push(l); }
+    const kol = [...kolom.values()].sort((a, b) => a[0].x - b[0].x || a[0].z - b[0].z);
+    const zs = [...zonaSku.entries()].sort((a, b) => a[1].lv - b[1].lv || a[0].localeCompare(b[0]));
+    // kebutuhan kolom: zona yang hanya boleh level ≤ L memerlukan (level rak ÷ L) kali lebih banyak kolom per palet
+    const nLv = Math.max(1, tinggi.length);
+    for (const [, z] of zs) z.bobot = z.bobot * (nLv / Math.max(1, Math.min(z.lv, nLv)));
+    const totB = zs.reduce((a, [, z]) => a + z.bobot, 0) || 1;
+    const totPos = kol.reduce((a, c) => a + c.length, 0);
+    let k = 0, acc = 0;
+    for (const [nama, z] of zs) {
+      const target = acc + (z.bobot / totB) * totPos; let isi = 0;
+      while (k < kol.length && (acc + isi < target - 1e-9 || isi === 0)) { for (const l of kol[k]) l.zona = nama; isi += kol[k].length; k++; }
+      acc += isi;
+    }
+    for (; k < kol.length; k++) for (const l of kol[k]) l.zona = zs[zs.length - 1][0];
+    asumsi.push(`Zonasi area (porsi kolom rak, dari dock ke belakang): ${zs.map(([n, z]) => `${n} ${Math.round((z.bobot / totB) * 100)}%`).join(' · ')}. Zona produk berat diperbesar karena hanya memakai level bawah.`);
+  }
   if (!nPosisi) asumsi.push('Layout tidak punya posisi simpan — isi sheet Space tender lebih dulu.');
 
   // ---- Pekerja dari manpower tender (biaya per orang = biaya bulan ÷ headcount)

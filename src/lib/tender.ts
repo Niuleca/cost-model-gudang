@@ -58,6 +58,9 @@ export interface Asumsi {
   metodeManpower?: 'excel' | 'shift';
   processDesign?: ProcessDesignInput;
   profilVolume?: import('@/lib/profilVolume').ProfilVolume;
+  /** Master produk / SKU (tab Produk). undefined = belum pernah diisi → 1 baris otomatis dari key assumption. */
+  produk?: import('@/lib/produk').ProdukTender[];
+  aturanBerat?: import('@/lib/produk').AturanBerat;
   biayaOrangManual?: Record<string, number>;
   rincianBiayaMp?: Record<string, import('@/lib/engine/biayaMp').InputBiayaRole>;
   paramBiayaMp?: Partial<import('@/lib/engine/biayaMp').ParamBiayaMp>;

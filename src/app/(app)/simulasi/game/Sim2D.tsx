@@ -3,7 +3,7 @@
 // bar isi, antrean truk, bar lampu lalu lintas (staging / dock), MHE & pekerja bergerak, dan peta alur (flow) opsional.
 // Membaca keadaan Dunia + posisi aktor yang ditulis lapisan 3D tiap frame (kontrol.aktor2d), jadi 2D & 3D selalu sinkron.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ARMADA, jenisTrukDari, type Dunia } from '@/lib/game';
+import { ARMADA, faseTrukTeks, jenisTrukDari, posisiTrukDock, type Dunia } from '@/lib/game';
 import type { LayoutGudang } from '@/lib/simulasi3d/layout';
 import { WARNA_ORANG } from '../warna';
 import type { Aktor2D, KontrolGame, Pilihan } from './lapisan3d';
@@ -37,6 +37,12 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
   const opsiRef = useRef(opsi); opsiRef.current = opsi;
   const pilihRef = useRef(pilih); pilihRef.current = pilih;
 
+  // warna per zona produk (urut nama zona)
+  const zonaWarna = useMemo(() => {
+    const W = ['#2563eb', '#16a34a', '#d97706', '#9333ea', '#dc2626', '#0891b2', '#65a30d', '#db2777', '#4b5563'];
+    const zs = Array.from(new Set([...d.lokasi.values()].map(l => l.zona).filter(Boolean) as string[])).sort();
+    return new Map(zs.map((z, i) => [z, W[i % W.length]]));
+  }, [d]);
   // ---------- data statis per dunia / layout
   const statis = useMemo(() => {
     // slot simpan dikelompokkan per titik tampak atas (level ditumpuk)
@@ -157,6 +163,11 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
         g.fillStyle = `rgba(180, 120, 40, ${0.25 + 0.65 * r})`;
         g.fillRect(X(gr.x - gr.w / 2), Y(gr.z - gr.d / 2), gr.w * s, gr.d * s);
       }
+      // zonasi produk (tab Produk tender): garis tepi slot berwarna zona
+      if (zonaWarna.size) { g.lineWidth = Math.max(1.2, 0.12 * s); for (const gr of statis.grup) {
+        const z = d.lokasi.get(gr.ids[0])?.zona; const w = z ? zonaWarna.get(z) : undefined; if (!w) continue;
+        g.strokeStyle = w; g.strokeRect(X(gr.x - gr.w / 2), Y(gr.z - gr.d / 2), gr.w * s, gr.d * s);
+      } }
       // label zona simpan
       if (o.label) for (const z of L.zona) if ((z.jenis === 'spr' || z.jenis === 'ddr' || z.jenis === 'block' || z.jenis === 'floor') && (z.x1 - z.x0) * s > 60 && z.z1 - z.z0 > 3) teks(z.label, (z.x0 + z.x1) / 2, z.z0 - 0.0 + Math.min(1.2, (z.z1 - z.z0) / 2), fs(0.9, 10, 13), '#1e3a8a');
       // palet staging + bar lampu lalu lintas
@@ -205,7 +216,12 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
         if (pilihRef.current?.jenis === 'truk' && pilihRef.current.id === id) { g.strokeStyle = '#f97316'; g.lineWidth = 3; g.strokeRect(X(k.x0) - 3, Y(k.z0) - 3, (k.x1 - k.x0) * s + 6, (k.z1 - k.z0) * s + 6); }
         if (o.label && s > 5 && !vertikal) teks(`${ARMADA[jenis].nama} ${tr.arus === 'inbound' ? `${tr.palet.length} plt` : `${tr.order.length} order`}`, k.x0 + (k.x1 - k.x0) / 2 + 0.9, z + lebar / 2 + 0.7, fs(0.65, 8, 11), warna);
       };
-      for (const dk of d.dock) if (dk.truk) gambarTruk(dk.truk, -0.5, statis.zDock.get(dk.id) ?? 0, false);
+      for (const dk of d.dock) if (dk.truk) {
+        const tr = d.truk.get(dk.truk); const z = statis.zDock.get(dk.id) ?? 0;
+        gambarTruk(dk.truk, -0.5 - posisiTrukDock(d, tr), z, false);
+        const f = faseTrukTeks(d, tr);
+        if (f && s > 3) teks(f, -0.5 - posisiTrukDock(d, tr) - 6, z - 1.9, fs(0.6, 8, 11), tr?.arus === 'inbound' ? '#1e3a8a' : '#065f46');
+      }
       d.antreDock.inbound.slice(0, 10).forEach((id, i) => gambarTruk(id, -26 + i * 3.1, -1.2, true));
       d.antreDock.outbound.slice(0, 10).forEach((id, i) => gambarTruk(id, -26 + i * 3.1, L.W + 10.8, true));
       if (d.antreDock.inbound.length) teks(`Antre inbound: ${d.antreDock.inbound.length} truk`, -27.5, -10.4, fs(0.75, 9, 12), '#1e3a8a', 'left');
@@ -343,6 +359,7 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
         <span><i className="org" style={{ background: WARNA_ORANG.operator }} />operator</span><span><i className="org" style={{ background: WARNA_ORANG.checker }} />checker</span><span><i className="org" style={{ background: WARNA_ORANG.picker }} />picker</span><span><i className="org" style={{ background: WARNA_ORANG.tkbm }} />TKBM</span><span><i className="org" style={{ background: WARNA_ORANG.admin }} />admin</span><span><i className="org" style={{ background: WARNA_ORANG.supervisor }} />supervisor</span><span><i className="org" style={{ background: WARNA_ORANG.security }} />security</span>{kontrol.current.jelajah && <span><i className="org" style={{ background: '#0ea5e9' }} />Anda · <i className="org" style={{ background: 'transparent', border: '2px solid #0ea5e9' }} />target</span>}
         <span><i className="lampu" style={{ background: '#16a34a' }} /><i className="lampu" style={{ background: '#f59e0b' }} /><i className="lampu" style={{ background: '#dc2626' }} />isi staging &lt;60 · &lt;85 · ≥85%</span>
         <span><i className="slot" />rak terisi (makin gelap = makin penuh)</span>
+        {[...zonaWarna].map(([z, w]) => <span key={z}><i className="slot" style={{ background: 'transparent', border: `2px solid ${w}` }} />zona {z}</span>)}
       </div>
       <button type="button" className="ghost gm-2d-pas" onClick={() => { diatur.current = false; pasLayar(); }}>Pas layar · {skala.toFixed(1)} px/m</button>
     </div>

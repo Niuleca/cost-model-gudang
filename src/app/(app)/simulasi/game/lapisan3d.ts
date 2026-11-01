@@ -3,7 +3,7 @@
 // (durasi tugas = productivity, dibagi fase: jalan ke ambil → ambil → bawa → taruh).
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { ARMADA, bertugas, jalankanSampai, jenisTrukDari, type Dunia, type JenisTruk, type JenisTugas, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
+import { ARMADA, bertugas, faseTrukTeks, jalankanSampai, jenisTrukDari, posisiTrukDock, type Dunia, type JenisTruk, type JenisTugas, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
 import { kategoriOrang } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, type PasangLapisan } from '../Viewer3D';
@@ -275,15 +275,17 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const ketTruk = (id: string) => {
       const tr = d.truk.get(id); if (!tr) return id;
       const j = tr.jenis ? `${ARMADA[tr.jenis].nama} · ` : '';
-      if (tr.arus === 'inbound') return `${j}${tr.id} · ${tr.palet.length} plt${tr.sisaTugas > 0 ? ` · sisa ${tr.sisaTugas}` : ''}`;
-      return `${j}${tr.id} · ${tr.order.length} order`;
+      const f = faseTrukTeks(d, tr);
+      if (tr.arus === 'inbound') return `${j}${tr.id} · ${tr.palet.length} plt${f && f !== 'antre' ? ` · ${f}` : ''}`;
+      return `${j}${tr.id} · ${tr.order.length} order${f && f !== 'antre' ? ` · ${f}` : ''}`;
     };
     const perbaruiTruk = () => {
       for (const dk of d.dock) {
         const o = trukDock.get(dk.id)!; const p = dockPos.get(dk.id)!;
         if (dk.truk !== o.truk) { o.truk = dk.truk; o.mulai = detikNyata; }
         o.g.visible = !!dk.truk; o.g.userData.pilih = dk.truk ? { jenis: 'truk', id: dk.truk } : null;
-        if (dk.truk) { aturJenis(o, dk.truk); const f = Math.min(1, (detikNyata - o.mulai) / 1.2); o.g.position.set(-0.4 - (1 - f) * (1 - f) * 25, 0, p.z); isiTeks(o, ketTruk(dk.truk)); }
+        // mundur masuk selama fase sandar, diam saat bongkar/muat, jalan keluar di akhir fase dokumen (waktu game)
+        if (dk.truk) { aturJenis(o, dk.truk); o.g.position.set(-0.4 - posisiTrukDock(d, d.truk.get(dk.truk)), 0, p.z); isiTeks(o, ketTruk(dk.truk)); }
       }
       for (const arus of ['inbound', 'outbound'] as const) {
         const ids = d.antreDock[arus]; const pool = antre[arus];
