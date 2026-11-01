@@ -1,4 +1,4 @@
--- LG (Dashboard): ranking harian sektor / komoditas yang sedang naik di Indonesia (target pasar) + daftar calon customer.
+-- Update trend bisnis (Dashboard; tabel lg_*): ranking harian sektor / komoditas yang sedang naik di Indonesia (target pasar) + daftar calon customer.
 -- Diisi otomatis oleh Claude (scheduled task harian dari sumber publik: BPS, ekspor-impor, investasi, laporan & berita dunia)
 -- dan dilengkapi manual oleh akun (status follow-up, catatan). Kontak customer hanya kontak resmi perusahaan yang dipublikasikan.
 create table if not exists public.lg_tren (
