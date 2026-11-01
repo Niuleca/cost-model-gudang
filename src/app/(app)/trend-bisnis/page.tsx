@@ -44,11 +44,23 @@ export default function TrendBisnisPage() {
   const [buka, setBuka] = useState<string | null>(null);
   const [q, setQ] = useState(''); const [fSektor, setFSektor] = useState(''); const [fStatus, setFStatus] = useState('');
   const [edit, setEdit] = useState<Customer | null>(null);
+  const [batas, setBatas] = useState(200);
+  useEffect(() => { setBatas(200); }, [q, fSektor, fStatus]);
 
   async function muat() {
+    // customer bertambah ±100 per hari → ambil bertahap per 1.000 baris (batas satu permintaan Supabase)
+    const semuaCustomer = async () => {
+      const out: Customer[] = [];
+      for (let dari = 0; dari < 50000; dari += 1000) {
+        const r = await sb.from('lg_customer').select('*').order('skor', { ascending: false, nullsFirst: false }).order('nama').order('id').range(dari, dari + 999);
+        if (r.error) return { data: null, error: r.error };
+        out.push(...((r.data ?? []) as Customer[])); if ((r.data ?? []).length < 1000) break;
+      }
+      return { data: out, error: null };
+    };
     const [t, c, j] = await Promise.all([
-      sb.from('lg_tren').select('tanggal').order('tanggal', { ascending: false }).limit(400),
-      sb.from('lg_customer').select('*').order('skor', { ascending: false, nullsFirst: false }).order('nama').limit(2000),
+      sb.from('lg_tren').select('tanggal').eq('peringkat', 1).order('tanggal', { ascending: false }).limit(1000),
+      semuaCustomer(),
       sb.from('lg_jalan').select('*').order('created_at', { ascending: false }).limit(1),
     ]);
     const e = t.error ?? c.error;
@@ -140,13 +152,13 @@ export default function TrendBisnisPage() {
         <input aria-label="Cari" placeholder="Cari perusahaan, komoditas, kota, email…" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 300 }} />
         <select aria-label="Sektor" value={fSektor} onChange={e => setFSektor(e.target.value)} style={{ maxWidth: 260 }}><option value="">Semua sektor</option>{sektorList.map(s => <option key={s}>{s}</option>)}</select>
         <select aria-label="Status" value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ maxWidth: 160 }}><option value="">Semua status</option>{STATUS_C.map(s => <option key={s}>{s}</option>)}</select>
-        <span className="small muted">{tampilC.length} perusahaan</span><span style={{ flex: 1 }} />
+        <span className="small muted">{tampilC.length} perusahaan · baru hari ini {cust.filter(c => c.ditemukan === new Date().toLocaleDateString('en-CA')).length}</span><span style={{ flex: 1 }} />
         <button className="ghost" onClick={unduh} disabled={!tampilC.length}>Unduh CSV</button>
         <button onClick={() => setEdit({ id: '', nama: '', sektor: fSektor || null, komoditas: null, peran: 'Produsen', kota: null, provinsi: null, alamat: null, website: null, email: null, telepon: null, hs_code: null, alasan: null, skor: null, sumber_nama: null, sumber_url: null, status: 'Baru', catatan: null, oleh_claude: false, ditemukan: '', updated_at: '' })}>+ Tambah</button>
       </div>
       <div className="tablewrap"><table>
         <thead><tr><th>Perusahaan</th><th>Sektor · peran</th><th>Kontak resmi</th><th>Kenapa calon customer</th><th className="num">Skor</th><th>Status</th><th>Sumber</th><th /></tr></thead>
-        <tbody>{tampilC.map(c => <tr key={c.id}>
+        <tbody>{tampilC.slice(0, batas).map(c => <tr key={c.id}>
           <td><b>{c.nama}</b><div className="small muted">{[c.kota, c.provinsi].filter(Boolean).join(', ')}</div>{c.website && <div className="small"><a href={c.website} target="_blank" rel="noreferrer">{host(c.website)}</a></div>}</td>
           <td className="small">{c.sektor ?? '—'}<div className="muted">{[c.peran, c.komoditas, c.hs_code && `HS ${c.hs_code}`].filter(Boolean).join(' · ')}</div></td>
           <td className="small">{c.email ? c.email.split(/[,;]\s*/).map(e => <div key={e}><a href={`mailto:${e}`}>{e}</a></div>) : null}{c.telepon && <div><a href={`tel:${c.telepon.replace(/[^\d+]/g, '')}`}>{c.telepon}</a></div>}
@@ -157,7 +169,8 @@ export default function TrendBisnisPage() {
           <td className="small">{c.oleh_claude ? <span className="pill info">Claude</span> : 'Manual'}{c.sumber_url && <div><a href={c.sumber_url} target="_blank" rel="noreferrer">{c.sumber_nama || host(c.sumber_url)}</a></div>}<div className="muted">{tanggal(c.ditemukan)}</div></td>
           <td><button className="ghost" onClick={() => setEdit(c)}>Edit</button></td>
         </tr>)}
-        {!tampilC.length && !belumAda && <tr><td colSpan={8} className="muted">Belum ada calon customer untuk filter ini.</td></tr>}</tbody>
+        {!tampilC.length && !belumAda && <tr><td colSpan={8} className="muted">Belum ada calon customer untuk filter ini.</td></tr>}
+        {tampilC.length > batas && <tr><td colSpan={8}><button className="ghost" onClick={() => setBatas(b => b + 200)}>Tampilkan {Math.min(200, tampilC.length - batas)} lagi ({tampilC.length - batas} tersisa)</button></td></tr>}</tbody>
       </table></div>
       <p className="small muted">Kontak yang disimpan hanya kontak resmi perusahaan yang dipublikasikan (website perusahaan, keterbukaan informasi emiten, direktori eksportir/importir) — bukan email atau nomor pribadi. Cek link sumber sebelum menghubungi.</p>
     </div>}
