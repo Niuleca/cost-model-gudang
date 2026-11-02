@@ -57,8 +57,11 @@ export interface SpekBlok {
   lorong: number;        // lebar lorong berikutnya (m)
   jarakDinding: number;  // jarak bebas ke tepi area / dinding (m)
   celahPalet: number;    // celah antar palet sepanjang baris (m)
+  /** gangway (lorong lintang memotong baris, sepanjang arah melintang): di awal, di tengah × n, di akhir baris (m) */
+  gangwayAwal?: number; gangwayTengah?: number; nGangway?: number; gangwayAkhir?: number;
 }
-export const BLOK_DEFAULT: SpekBlok = { arah: 'x', paletP: 1.2, paletL: 1.1, paletT: 1.5, deep: 5, barisPerBlok: 2, barisTepi: 1, celahBaris: 0.5, lorongAwal: 4, lorong: 3.5, jarakDinding: 0.3, celahPalet: 0.1 };
+export const BLOK_DEFAULT: SpekBlok = { arah: 'x', paletP: 1.2, paletL: 1.1, paletT: 1.5, deep: 5, barisPerBlok: 2, barisTepi: 1, celahBaris: 0.5, lorongAwal: 4, lorong: 3.5, jarakDinding: 0.3, celahPalet: 0.1,
+  gangwayAwal: 0, gangwayTengah: 3.5, nGangway: 0, gangwayAkhir: 0 };
 export interface Komponen {
   id: string; jenis: JenisKomp; label: string;
   x: number; z: number; w: number; d: number;   // kiri-atas (x, z) + ukuran sumbu X (w) & Z (d)
@@ -103,6 +106,9 @@ export const kapasitasRak = (k: Komponen) => (k.rak ? nBay(k) * k.rak.ppl * k.ra
 export interface BarisBlok { x: number; z: number; w: number; d: number; nPalet: number; deep: number; hadap: 1 | -1 | 0 }
 export interface UraiBlok {
   baris: BarisBlok[]; lorong: { x: number; z: number; w: number; d: number; lebar: number }[];
+  gangway: { x: number; z: number; w: number; d: number; lebar: number }[];
+  /** nBaris = jumlah garis baris melintang; nPaletBaris = palet sepanjang satu garis baris (semua segmen) */
+  nBaris: number; segmen: number[]; urutanPanjang: { jenis: 'dinding' | 'palet' | 'gangway' | 'sisa'; m: number; n?: number }[];
   tapak: number; nPaletBaris: number; urutan: { jenis: 'dinding' | 'baris' | 'celah' | 'lorong' | 'sisa'; m: number; n?: number }[]; sisa: number;
 }
 /** Bentuk baris & lorong block stack dari pola (lihat SpekBlok). */
@@ -111,8 +117,23 @@ export function uraiBlok(k: Komponen): UraiBlok {
   const ax = b.arah === 'x';
   const A0 = ax ? k.x : k.z, B0 = ax ? k.z : k.x, PA = ax ? k.w : k.d, PB = ax ? k.d : k.w;
   const jd = Math.max(0, b.jarakDinding), pL = Math.max(0.1, b.paletL), pP = Math.max(0.1, b.paletP), cp = Math.max(0, b.celahPalet);
-  const panjang = PA - 2 * jd;
-  const nPalet = panjang > 0 ? Math.max(0, Math.floor((panjang + cp) / (pL + cp) + 1e-6)) : 0;
+  // sepanjang baris: jarak dinding | gangway awal | segmen palet | gangway tengah | segmen … | gangway akhir | jarak dinding
+  const gA = Math.max(0, b.gangwayAwal ?? 0), gT = Math.max(0, b.gangwayTengah ?? 0), nG = Math.max(0, Math.round(b.nGangway ?? 0)), gZ = Math.max(0, b.gangwayAkhir ?? 0);
+  const panjangSeg = (PA - 2 * jd - gA - gZ - nG * gT) / (nG + 1);
+  const nSeg = panjangSeg > 0 ? Math.max(0, Math.floor((panjangSeg + cp) / (pL + cp) + 1e-6)) : 0;
+  const segmen = Array.from({ length: nG + 1 }, () => nSeg);
+  const nPalet = nSeg * (nG + 1);
+  const lebarSeg = Math.max(0, nSeg * pL + Math.max(0, nSeg - 1) * cp);
+  const mulaiSeg = segmen.map((_, i) => A0 + jd + gA + i * (panjangSeg + gT));
+  const urutanPanjang: UraiBlok['urutanPanjang'] = [{ jenis: 'dinding', m: jd }];
+  if (gA > 0) urutanPanjang.push({ jenis: 'gangway', m: gA });
+  segmen.forEach((n, i) => {
+    if (i > 0) urutanPanjang.push({ jenis: 'gangway', m: gT });
+    urutanPanjang.push({ jenis: 'palet', m: r2(lebarSeg), n });
+    if (panjangSeg - lebarSeg > 0.05) urutanPanjang.push({ jenis: 'sisa', m: r2(panjangSeg - lebarSeg) });
+  });
+  if (gZ > 0) urutanPanjang.push({ jenis: 'gangway', m: gZ });
+  urutanPanjang.push({ jenis: 'dinding', m: jd });
   const deep = Math.max(1, Math.round(b.deep)), perBlok = Math.max(1, Math.round(b.barisPerBlok)), tepi = Math.max(1, Math.round(b.barisTepi));
   const dBaris = deep * pP;
   const dBlok = (n: number) => n * dBaris + Math.max(0, n - 1) * b.celahBaris;
@@ -132,7 +153,8 @@ export function uraiBlok(k: Komponen): UraiBlok {
   }
   const baris: BarisBlok[] = []; const lorong: UraiBlok['lorong'] = []; const urutan: UraiBlok['urutan'] = [{ jenis: 'dinding', m: jd }];
   let pos = B0 + jd;
-  const kotak = (b0: number, tebal: number) => (ax ? { x: A0 + jd, z: b0, w: Math.max(0, nPalet * pL + Math.max(0, nPalet - 1) * cp), d: tebal } : { x: b0, z: A0 + jd, w: tebal, d: Math.max(0, nPalet * pL + Math.max(0, nPalet - 1) * cp) });
+  const panjangPenuh = segmen.length ? mulaiSeg[mulaiSeg.length - 1] + lebarSeg - (A0 + jd) : 0;
+  const kotak = (b0: number, tebal: number, a0 = A0 + jd, pj = panjangPenuh) => (ax ? { x: a0, z: b0, w: Math.max(0, pj), d: tebal } : { x: b0, z: a0, w: tebal, d: Math.max(0, pj) });
   blok.forEach((n, i) => {
     if (i > 0) { const lb = lebarLorong(i - 1); lorong.push({ ...kotak(pos, lb), lebar: lb }); urutan.push({ jenis: 'lorong', m: lb }); pos += lb; }
     for (let r = 0; r < n; r++) {
@@ -140,14 +162,23 @@ export function uraiBlok(k: Komponen): UraiBlok {
       // muka baris: menghadap lorong terdekat (baris pertama blok → lorong sebelumnya, baris terakhir → lorong sesudahnya)
       const adaSebelum = i > 0, adaSesudah = i < blok.length - 1;
       const hadap: 1 | -1 | 0 = r === n - 1 && adaSesudah ? 1 : r === 0 && adaSebelum ? -1 : 0;
-      baris.push({ ...kotak(pos, dBaris), nPalet, deep, hadap });
+      if (nSeg > 0) segmen.forEach((n, sg) => baris.push({ ...kotak(pos, dBaris, mulaiSeg[sg], lebarSeg), nPalet: n, deep, hadap }));
       urutan.push({ jenis: 'baris', m: dBaris, n: 1 });
       pos += dBaris;
     }
   });
   const sisa = Math.max(0, B0 + PB - jd - pos);
   if (blok.length) { if (sisa > 0.005) urutan.push({ jenis: 'sisa', m: r2(sisa) }); urutan.push({ jenis: 'dinding', m: jd }); }
-  return { baris, lorong, tapak: baris.length * nPalet * deep, nPaletBaris: nPalet, urutan, sisa };
+  // gangway: memotong semua baris, selebar area melintang (di dalam jarak dinding)
+  const gangway: UraiBlok['gangway'] = [];
+  const pasang = (a0: number, lb: number) => { if (lb > 0) gangway.push({ ...(ax ? { x: a0, z: B0 + jd, w: lb, d: Math.max(0, PB - 2 * jd) } : { x: B0 + jd, z: a0, w: Math.max(0, PB - 2 * jd), d: lb }), lebar: lb }); };
+  if (blok.length) {
+    pasang(A0 + jd, gA);
+    for (let i = 1; i < segmen.length; i++) pasang(mulaiSeg[i] - gT, gT);
+    pasang(A0 + PA - jd - gZ, gZ);
+  }
+  const nBaris = blok.reduce((a, n) => a + n, 0);
+  return { baris, lorong, gangway, nBaris: nSeg > 0 ? nBaris : 0, segmen, urutanPanjang, tapak: baris.reduce((a, r) => a + r.nPalet * r.deep, 0), nPaletBaris: nPalet, urutan, sisa };
 }
 export const tapakBlok = (k: Komponen) => (k.blok ? uraiBlok(k).tapak : Math.max(0, Math.floor(k.w / 1.3 + 1e-6)) * Math.max(0, Math.floor(k.d / 1.1 + 1e-6)));
 
@@ -550,7 +581,7 @@ export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang
         const sepanjang = a * (b.paletL + b.celahPalet) + b.paletL / 2, dalam = (q + 0.5) * b.paletP;
         slot.push(ax ? { x: r.x + sepanjang, y: u * b.paletT, z: r.z + dalam, jenis: 'block', rot: true } : { x: r.x + dalam, y: u * b.paletT, z: r.z + sepanjang, jenis: 'block' });
       }
-      zona.push({ id: k.id, jenis: 'block', label: k.label, ...box, ket: `${u0.baris.length} baris × ${u0.nPaletBaris} palet × ${b.deep} deep × ${tumpuk} tumpuk = ${u0.tapak * tumpuk} posisi` });
+      zona.push({ id: k.id, jenis: 'block', label: k.label, ...box, ket: `${u0.nBaris} baris × ${u0.nPaletBaris} palet × ${b.deep} deep × ${tumpuk} tumpuk = ${u0.tapak * tumpuk} posisi` });
     } else if (k.jenis === 'block') {
       const tumpuk = Math.max(1, k.tumpuk ?? 1);
       const nx = Math.floor(k.w / 1.3 + 1e-6), nz = Math.floor(k.d / 1.1 + 1e-6);

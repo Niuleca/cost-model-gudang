@@ -670,13 +670,25 @@ export default function DesainGudang() {
                       <Angka l="Lorong berikutnya" u="m" step={0.1} v={b.lorong} set={x => set({ lorong: Math.max(0.5, x) })} />
                       <Angka l="Celah antar baris (back-to-back)" u="m" step={0.05} v={b.celahBaris} set={x => set({ celahBaris: Math.max(0, x) })} />
                       <Angka l="Celah antar palet sepanjang baris" u="m" step={0.05} v={b.celahPalet} set={x => set({ celahPalet: Math.max(0, x) })} />
+                    </div>
+                    <div className="small muted" style={{ margin: '6px 0 2px' }}>Gangway (lorong lintang yang memotong baris)</div>
+                    <div className="grid2" style={{ gap: 6 }}>
+                      <Angka l="Gangway awal" u="m" step={0.1} v={b.gangwayAwal ?? 0} set={x => set({ gangwayAwal: Math.max(0, x) })} />
+                      <Angka l="Gangway akhir" u="m" step={0.1} v={b.gangwayAkhir ?? 0} set={x => set({ gangwayAkhir: Math.max(0, x) })} />
+                      <Angka l="Jumlah gangway tengah" step={1} min={0} v={b.nGangway ?? 0} set={x => set({ nGangway: Math.max(0, Math.round(x)) })} />
+                      <Angka l="Lebar gangway tengah" u="m" step={0.1} v={b.gangwayTengah ?? 3.5} set={x => set({ gangwayTengah: Math.max(0.5, x) })} />
+                    </div>
+                    <div className="grid2" style={{ gap: 6 }}>
                       <label className="f">Arah baris<select value={b.arah} onChange={e => set({ arah: e.target.value as 'x' | 'z' })}><option value="x">Depan → belakang (X)</option><option value="z">Kiri → kanan (Z)</option></select></label>
                     </div>
                     {ub && <>
                       <div className="small" style={{ margin: '4px 0', lineHeight: 1.6 }}><span className="muted">Pola melintang: </span>
                         {ub.urutan.map((u, i) => <span key={i} style={{ whiteSpace: 'nowrap', marginRight: 4, color: u.jenis === 'lorong' ? '#a16207' : u.jenis === 'baris' ? '#b45309' : u.jenis === 'sisa' ? 'var(--warn)' : 'var(--muted)' }}>
                           {u.jenis === 'dinding' ? `|${angka(u.m * 1000)} mm` : u.jenis === 'baris' ? `[palet ×${b.deep} = ${angka(u.m, 2)} m]` : u.jenis === 'celah' ? `·${angka(u.m, 2)}·` : u.jenis === 'lorong' ? `═ ${angka(u.m, 2)} m ═` : `(sisa ${angka(u.m, 2)} m)`}</span>)}</div>
-                      <p className="small" style={{ margin: 0 }}><b>{ub.baris.length} baris × {ub.nPaletBaris} palet × {b.deep} deep = {angka(ub.tapak)} tapak × {tumpuk} tumpuk = {angka(ub.tapak * tumpuk)} posisi</b> · tinggi {angka(tumpuk * b.paletT, 2)} m{tumpuk * b.paletT > edit.gedung.sideMm / 1000 && <span style={{ color: 'var(--bad)' }}> &gt; side height</span>}</p>
+                      <div className="small" style={{ margin: '0 0 4px', lineHeight: 1.6 }}><span className="muted">Pola sepanjang baris: </span>
+                        {ub.urutanPanjang.map((u, i) => <span key={i} style={{ whiteSpace: 'nowrap', marginRight: 4, color: u.jenis === 'gangway' ? '#854d0e' : u.jenis === 'palet' ? '#b45309' : u.jenis === 'sisa' ? 'var(--warn)' : 'var(--muted)' }}>
+                          {u.jenis === 'dinding' ? `|${angka(u.m * 1000)} mm` : u.jenis === 'palet' ? `[${u.n} palet = ${angka(u.m, 2)} m]` : u.jenis === 'gangway' ? `▒ gangway ${angka(u.m, 2)} m ▒` : `(sisa ${angka(u.m, 2)} m)`}</span>)}</div>
+                      <p className="small" style={{ margin: 0 }}><b>{ub.nBaris} baris × {ub.nPaletBaris} palet × {b.deep} deep = {angka(ub.tapak)} tapak × {tumpuk} tumpuk = {angka(ub.tapak * tumpuk)} posisi</b> · tinggi {angka(tumpuk * b.paletT, 2)} m{tumpuk * b.paletT > edit.gedung.sideMm / 1000 && <span style={{ color: 'var(--bad)' }}> &gt; side height</span>}</p>
                       {ub.baris.length === 0 && <p className="small" style={{ margin: 0, color: 'var(--bad)' }}>Area terlalu kecil untuk 1 baris ({angka(b.deep * b.paletP, 2)} m + jarak dinding). Perbesar area atau kurangi row deep.</p>}
                       {ub.sisa > Math.min(b.lorong, b.deep * b.paletP) && <p className="small muted" style={{ margin: 0 }}>Sisa {angka(ub.sisa, 2)} m melintang — perlebar area agar muat lorong + baris berikutnya, atau kecilkan area.</p>}
                     </>}

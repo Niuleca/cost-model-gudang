@@ -235,6 +235,12 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         el.push(<text key={`blt${i}`} x={cx} y={cz} fontSize={fs * 0.7} textAnchor="middle" dominantBaseline="middle" fill="#a16207" transform={ax ? undefined : `rotate(-90 ${cx} ${cz})`}
           style={{ pointerEvents: 'none' }}>lorong {l.lebar.toLocaleString('id-ID')} m</text>);
       });
+      ub.gangway.forEach((g0, i) => {
+        el.push(<rect key={`bg${i}`} x={g0.x} y={g0.z} width={g0.w} height={g0.d} fill="url(#arsir)" fillOpacity={0.9} stroke="#ca8a04" strokeWidth={fs * 0.04} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />);
+        const cx = g0.x + g0.w / 2, cz = g0.z + g0.d / 2;
+        el.push(<text key={`bgt${i}`} x={cx} y={cz} fontSize={fs * 0.7} textAnchor="middle" dominantBaseline="middle" fill="#854d0e" transform={ax ? `rotate(-90 ${cx} ${cz})` : undefined}
+          style={{ paintOrder: 'stroke', stroke: '#fffbeb', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>gangway {g0.lebar.toLocaleString('id-ID')} m</text>);
+      });
       ub.baris.forEach((r, i) => {
         el.push(<rect key={`br${i}`} x={r.x} y={r.z} width={r.w} height={r.d} fill="#fde68a" stroke="#b45309" strokeWidth={fs * 0.05} />);
         const step = b.paletL + b.celahPalet;
@@ -257,7 +263,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     }
     if (k.jenis === 'dock') el.push(<path key="p" d={`M ${k.x + k.w} ${k.z + k.d / 2} l ${fs * 0.9} ${-fs * 0.5} l 0 ${fs} z`} fill={k.arus === 'outbound' ? '#059669' : '#2563eb'} />);
     const ra = k.area ? ringkasArea(k, edit) : null;
-    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? (k.blok ? (() => { const ub = uraiBlok(k); return `${k.label} · ${ub.baris.length} baris × ${ub.nPaletBaris} plt × ${k.blok.deep} deep × ${k.tumpuk ?? 1} tumpuk = ${(ub.tapak * (k.tumpuk ?? 1)).toLocaleString('id-ID')} posisi`; })() : `${k.label} · tumpuk ${k.tumpuk ?? 1}`) : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.label;
+    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? (k.blok ? (() => { const ub = uraiBlok(k); return `${k.label} · ${ub.nBaris} baris × ${ub.nPaletBaris} plt × ${k.blok.deep} deep × ${k.tumpuk ?? 1} tumpuk = ${(ub.tapak * (k.tumpuk ?? 1)).toLocaleString('id-ID')} posisi`; })() : `${k.label} · tumpuk ${k.tumpuk ?? 1}`) : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.label;
     const muat = Math.max(k.w, k.d) > label.length * fs * 0.45 || dipilih;
     if (muat && k.jenis !== 'kolom') {
       const tegak = k.d > k.w * 1.6 && k.jenis !== 'dock' && !k.area && !k.blok;
