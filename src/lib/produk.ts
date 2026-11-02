@@ -29,7 +29,16 @@ export interface ProdukTender {
   levelMaks?: number | null;   // override manual level rak maksimal
   tumpukMaks?: number | null;  // khusus lantai: maksimal tumpuk palet
   otomatis?: boolean;          // baris dari key assumption — ikut berubah selama belum diedit
+  dimEstimasi?: boolean;       // P×L×T diperkirakan dari CBM per case (belum diukur)
   catatan?: string;
+}
+
+/** Perkiraan dimensi karton dari CBM (rasio umum P : L : T ≈ 1,6 : 1,2 : 1), dibulatkan 0,5 cm. */
+export function estimasiDimensi(cbm: number) {
+  if (!(cbm > 0)) return { p: 0, l: 0, t: 0 };
+  const t = Math.cbrt((cbm * 1e6) / (1.6 * 1.2));
+  const r = (x: number) => Math.round(x * 2) / 2;
+  return { p: r(1.6 * t), l: r(1.2 * t), t: r(t) };
 }
 
 /** Batas berat per palet → level rak tertinggi yang diizinkan (level 1 = lantai / beam terbawah). */
@@ -83,7 +92,9 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
   let caraSimpan: CaraSimpan = x.simpan && x.simpan !== 'otomatis' ? x.simpan : hanyaLantai ? 'floor' : 'spr';
   if (x.simpan && x.simpan !== 'otomatis' && ['spr', 'ddr'].includes(x.simpan) && hanyaLantai) peringatan.push('Dipilih rak, tetapi berat per palet melebihi kapasitas beam.');
   if (x.simpan === 'otomatis' || !x.simpan) caraSimpan = hanyaLantai ? 'floor' : 'spr';
-  if (bukaanMm && tinggiMuatanMm > bukaanMm && ['spr', 'ddr'].includes(caraSimpan)) peringatan.push(`Tinggi muatan ${Math.round(tinggiMuatanMm)} mm > tinggi produk di rak ${Math.round(bukaanMm)} mm (Space) — kurangi UPP / layer atau naikkan bukaan rak.`);
+  // bukaan di Space = tinggi produk saja (palet kayu dihitung terpisah)
+  const tinggiProdukMm = tinggiMuatanMm > 0 ? tinggiMuatanMm - PALET_CM.tinggiKayu * 10 : 0;
+  if (bukaanMm && tinggiProdukMm > bukaanMm + 0.5 && ['spr', 'ddr'].includes(caraSimpan)) peringatan.push(`Tinggi produk di palet ${Math.round(tinggiProdukMm)} mm > tinggi produk di rak ${Math.round(bukaanMm)} mm (Space) — kurangi UPP / layer atau naikkan bukaan rak.`);
   if (upp > 0 && perLayer > 0 && upp % perLayer && layer > 1) peringatan.push(`UPP ${upp} tidak pas kelipatan ${perLayer}/layer — layer teratas tidak penuh.`);
   if (dimOk && cbmPalet > 2.2) peringatan.push(`CBM muatan ${cbmPalet.toFixed(2)} m³/palet tidak wajar untuk palet 1,2 × 1,0 m — cek UPP / dimensi.`);
   if (!upp && n(x.qty) > 0) peringatan.push('UPP belum diisi — jumlah palet tidak bisa dihitung.');
@@ -91,7 +102,7 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
 }
 
 /** Satu baris produk otomatis dari Key assumption: Volume (UoM & konversi) + Parameter muatan (berat/CBM per case & per palet). */
-export function produkOtomatis(volumes: VolumeInput[], profil: ProfilVolume | undefined): ProdukTender | null {
+export function produkOtomatis(volumes: VolumeInput[], profil: ProfilVolume | undefined, nama?: string): ProdukTender | null {
   const pr = { ...PARAM_DEFAULT, ...(profil?.param ?? {}) };
   const vSt = volumes.find(v => v.arus === 'storage'), vOut = volumes.find(v => v.arus === 'outbound'), vIn = volumes.find(v => v.arus === 'inbound');
   const v = vSt ?? vOut ?? vIn;
@@ -107,15 +118,19 @@ export function produkOtomatis(volumes: VolumeInput[], profil: ProfilVolume | un
   const isiPcs = isCase(uom) || isCase(k?.uom1 ?? '') ? n(k?.per2) || null : null;
   const beratKg = isCase(uom) || !isPalet(v.uom) ? pr.kgPerCase : upp > 0 ? (pr.tonPerPalet * 1000) / upp : pr.kgPerCase;
   const cbm = isCase(uom) || !isPalet(v.uom) ? pr.cbmPerCase : upp > 0 ? pr.cbmPerPalet / upp : pr.cbmPerCase;
-  return { id: 'auto-1', kode: 'AUTO-01', nama: 'Produk utama (dari Key assumption)', uom, p: 0, l: 0, t: 0, cbm: Math.round(cbm * 1e5) / 1e5,
-    beratKg: Math.round(beratKg * 100) / 100, upp: Math.round(upp), qty: Math.round(qty), isiPcs, kategori: 'Umum', zona: 'A', simpan: 'otomatis', otomatis: true };
+  const dim = estimasiDimensi(cbm);
+  const kgPalet = upp * beratKg;
+  const selisih = pr.tonPerPalet > 0 && kgPalet > 0 && Math.abs(kgPalet - pr.tonPerPalet * 1000) / (pr.tonPerPalet * 1000) > 0.2
+    ? `Berat per palet di Parameter muatan ${Math.round(pr.tonPerPalet * 1000)} kg ≠ UPP ${Math.round(upp)} × ${beratKg} kg = ${Math.round(kgPalet)} kg — periksa salah satunya.` : undefined;
+  return { id: 'auto-1', kode: 'AUTO-01', nama: nama ? `Produk utama — ${nama}` : 'Produk utama (dari Key assumption)', uom, ...dim, dimEstimasi: dim.p > 0, cbm: Math.round(cbm * 1e5) / 1e5,
+    beratKg: Math.round(beratKg * 100) / 100, upp: Math.round(upp), qty: Math.round(qty), isiPcs, kategori: 'Umum', zona: 'A', simpan: 'otomatis', otomatis: true, catatan: selisih };
 }
 
 /** Daftar produk efektif: belum pernah diisi → baris otomatis; baris otomatis disegarkan dari key assumption. */
-export function produkEfektif(daftar: ProdukTender[] | undefined, volumes: VolumeInput[], profil: ProfilVolume | undefined): ProdukTender[] {
-  const auto = produkOtomatis(volumes, profil);
+export function produkEfektif(daftar: ProdukTender[] | undefined, volumes: VolumeInput[], profil: ProfilVolume | undefined, nama?: string): ProdukTender[] {
+  const auto = produkOtomatis(volumes, profil, nama);
   if (!daftar) return auto ? [auto] : [];
-  return daftar.map(x => (x.otomatis && auto ? { ...auto, id: x.id, kode: x.kode, nama: x.nama, kategori: x.kategori, zona: x.zona, simpan: x.simpan, levelMaks: x.levelMaks, catatan: x.catatan, otomatis: true } : x));
+  return daftar.map(x => (x.otomatis && auto ? { ...auto, id: x.id, kode: x.kode, nama: x.nama, kategori: x.kategori, zona: x.zona, simpan: x.simpan, levelMaks: x.levelMaks, otomatis: true } : x));
 }
 
 /** Zonasi otomatis: kelompokkan produk menurut kategori & kelas berat; zona diberi huruf A, B, C … */
@@ -162,4 +177,101 @@ export function dariTempel(teks: string): ProdukTender[] {
       beratKg: angka(berat), upp: Math.round(angka(upp)), qty: Math.round(angka(qty)), kategori: kategori || 'Umum', zona: zona || undefined, simpan: 'otomatis' });
   }
   return out;
+}
+
+
+/** Produk manual (bukan baris otomatis) sudah ada → produk menjadi sumber data tender. */
+export const adaProdukNyata = (daftar: ProdukTender[] | undefined) => (daftar ?? []).some(x => !x.otomatis && Number(x.upp) > 0 && Number(x.qty) > 0);
+
+export interface TurunanProduk {
+  palet: number; qty: number; kgPerUnit: number; cbmPerUnit: number; upp: number; isiPcs: number | null;
+  kgPerPalet: number; cbmPerPalet: number; tinggiMaksMm: number; porsiLantai: number;
+}
+/** Rata-rata tertimbang dari daftar produk: berat & CBM per unit (tertimbang qty), per palet (tertimbang palet), UPP = qty ÷ palet. */
+export function turunanProduk(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99): TurunanProduk | null {
+  const xs = daftar.filter(x => Number(x.upp) > 0 && Number(x.qty) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak) }));
+  if (!xs.length) return null;
+  const qty = xs.reduce((a, r) => a + Number(r.x.qty), 0), palet = xs.reduce((a, r) => a + r.h.palet, 0);
+  if (!(qty > 0) || !(palet > 0)) return null;
+  const kgPerUnit = xs.reduce((a, r) => a + Number(r.x.qty) * Number(r.x.beratKg || 0), 0) / qty;
+  const cbmPerUnit = xs.reduce((a, r) => a + Number(r.x.qty) * r.h.cbmUnit, 0) / qty;
+  const kgPerPalet = xs.reduce((a, r) => a + r.h.palet * r.h.beratPaletKg, 0) / palet;
+  const cbmPerPalet = xs.reduce((a, r) => a + r.h.palet * r.h.cbmPalet, 0) / palet;
+  const pcs = xs.filter(r => Number(r.x.isiPcs) > 0);
+  const isiPcs = pcs.length ? pcs.reduce((a, r) => a + Number(r.x.qty) * Number(r.x.isiPcs), 0) / pcs.reduce((a, r) => a + Number(r.x.qty), 0) : null;
+  const rak = xs.filter(r => r.h.caraSimpan === 'spr' || r.h.caraSimpan === 'ddr');
+  const tinggiMaksMm = rak.reduce((a, r) => Math.max(a, r.h.tinggiMuatanMm), 0);
+  const porsiLantai = xs.reduce((a, r) => a + (r.h.hanyaLantai || r.h.caraSimpan === 'floor' || r.h.caraSimpan === 'block' ? r.h.palet : 0), 0) / palet;
+  return { palet, qty, kgPerUnit, cbmPerUnit, upp: qty / palet, isiPcs, kgPerPalet, cbmPerPalet, tinggiMaksMm, porsiLantai };
+}
+
+const r3 = (x: number) => Math.round(x * 1000) / 1000;
+export interface PerubahanTender { bagian: string; item: string; dari: string; ke: string }
+/**
+ * Terapkan data produk ke asumsi tender (Volume, Parameter muatan, Space). Dipanggil setiap daftar produk berubah
+ * selama "produk jadi sumber data" aktif dan ada produk manual. Mengembalikan patch asumsi + daftar perubahan.
+ */
+export function terapkanProduk<A extends { volumes: VolumeInput[]; profilVolume?: ProfilVolume; space: object }>(
+  a: A, daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99,
+): { patch: Partial<A>; perubahan: PerubahanTender[] } {
+  const d = turunanProduk(daftar, aturan, levelRak);
+  if (!d) return { patch: {}, perubahan: [] };
+  const per: PerubahanTender[] = [];
+  const f = (x: number, n = 2) => (Math.round(x * 10 ** n) / 10 ** n).toLocaleString('id-ID');
+  // Parameter muatan
+  const p0 = { ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}) };
+  const p1 = { ...p0, kgPerCase: Math.round(d.kgPerUnit * 100) / 100, cbmPerCase: d.cbmPerUnit > 0 ? Math.round(d.cbmPerUnit * 1e5) / 1e5 : p0.cbmPerCase,
+    tonPerPalet: r3(d.kgPerPalet / 1000), cbmPerPalet: d.cbmPerPalet > 0 ? Math.round(d.cbmPerPalet * 100) / 100 : p0.cbmPerPalet };
+  if (Math.abs(p1.kgPerCase - p0.kgPerCase) > 0.005) per.push({ bagian: 'Volume · Parameter muatan', item: 'Berat per case/unit', dari: `${f(p0.kgPerCase)} kg`, ke: `${f(p1.kgPerCase)} kg` });
+  if (Math.abs(p1.cbmPerCase - p0.cbmPerCase) > 1e-5) per.push({ bagian: 'Volume · Parameter muatan', item: 'Volume per case/unit', dari: `${f(p0.cbmPerCase, 4)} CBM`, ke: `${f(p1.cbmPerCase, 4)} CBM` });
+  if (Math.abs(p1.tonPerPalet - p0.tonPerPalet) > 0.0005) per.push({ bagian: 'Volume · Parameter muatan', item: 'Berat per palet', dari: `${f(p0.tonPerPalet * 1000, 0)} kg`, ke: `${f(p1.tonPerPalet * 1000, 0)} kg` });
+  if (Math.abs(p1.cbmPerPalet - p0.cbmPerPalet) > 0.005) per.push({ bagian: 'Volume · Parameter muatan', item: 'Volume per palet', dari: `${f(p0.cbmPerPalet)} CBM`, ke: `${f(p1.cbmPerPalet)} CBM` });
+  const profilVolume = { inbound: [], outbound: [], ...(a.profilVolume ?? {}), param: p1 } as ProfilVolume;
+  // Volume: isi per palet (UPP rata-rata) & stok storage (palet)
+  const upp = Math.round(d.upp);
+  const volumes = a.volumes.map(v => {
+    const k = v.konversi ?? { uom1: 'case', per1: 0, uom2: 'pcs', per2: 0 };
+    let k1 = { ...k };
+    if (isCase(v.uom)) k1 = { ...k1, paletIsi: upp };
+    else if (isPalet(v.uom)) k1 = { ...k1, uom1: isCase(k.uom1) || !k.uom1 ? (k.uom1 || 'case') : k.uom1, per1: upp };
+    if (d.isiPcs) k1 = { ...k1, per2: Math.round(d.isiPcs * 100) / 100 };
+    const lama = isCase(v.uom) ? k.paletIsi : k.per1;
+    const baru = isCase(v.uom) ? k1.paletIsi : k1.per1;
+    if ((isCase(v.uom) || isPalet(v.uom)) && Number(lama || 0) !== Number(baru || 0)) per.push({ bagian: 'Volume', item: `Isi per palet (${v.arus})`, dari: `${f(Number(lama || 0), 0)} ${isCase(v.uom) ? v.uom : k.uom1 || 'case'}`, ke: `${f(Number(baru || 0), 0)}` });
+    let v1: VolumeInput = { ...v, konversi: k1 };
+    if (v.arus === 'storage' && isPalet(v.uom)) {
+      const pal = Math.round(d.palet);
+      if (Number(v.peakBulan) !== pal) {
+        per.push({ bagian: 'Volume', item: 'Stok storage (peak)', dari: `${f(Number(v.peakBulan), 0)} palet`, ke: `${f(pal, 0)} palet` });
+        v1 = { ...v1, peakBulan: pal, rataRataBulan: Number(v.rataRataBulan) === Number(v.peakBulan) || !(Number(v.rataRataBulan) > 0) ? pal : v.rataRataBulan,
+          komitmenBulan: Number(v.komitmenBulan) === Number(v.peakBulan) || !(Number(v.komitmenBulan) > 0) ? pal : v.komitmenBulan };
+      }
+    }
+    return v1;
+  });
+  // Space: tinggi produk di rak (bukaan) & porsi pallet floor untuk palet yang melebihi beam
+  const sx = ((a.space as { excel?: unknown }).excel ?? {}) as Record<string, unknown> & { rak?: Record<string, number>; porsi?: Record<string, number> };
+  let excel: Record<string, unknown> | undefined;
+  if (sx && typeof sx === 'object') {
+    const rak = { ...(sx.rak ?? {}) } as Record<string, number>;
+    const tinggi = d.tinggiMaksMm > 0 ? Math.ceil((d.tinggiMaksMm - PALET_CM.tinggiKayu * 10) / 50 - 1e-9) * 50 : 0;   // tanpa tebal palet kayu
+    excel = { ...sx };
+    if (tinggi > 0 && tinggi !== Number(rak.productMm ?? 1250)) {
+      per.push({ bagian: 'Gudang, space & MHE', item: 'Tinggi produk di rak (bukaan level)', dari: `${f(Number(rak.productMm ?? 1250), 0)} mm`, ke: `${f(tinggi, 0)} mm` });
+      excel.rak = { ...rak, productMm: tinggi };
+    }
+    const pr0 = sx.porsi as Record<string, number> | undefined;
+    if (pr0 && d.porsiLantai > 0) {
+      const lantai = Math.round(d.porsiLantai * 1000) / 1000;
+      const floor0 = Number(pr0.floor ?? 0) + Number(pr0.block ?? 0);
+      if (lantai > floor0 + 0.0005) {
+        const sisa = Math.max(0, 1 - lantai - Number(pr0.block ?? 0));
+        const rakTot = Number(pr0.spr ?? 0) + Number(pr0.ddr ?? 0) || 1;
+        excel.porsi = { ...pr0, floor: lantai, spr: Math.round((Number(pr0.spr ?? 0) / rakTot) * sisa * 1000) / 1000, ddr: Math.round((Number(pr0.ddr ?? 0) / rakTot) * sisa * 1000) / 1000 };
+        per.push({ bagian: 'Gudang, space & MHE', item: 'Porsi pallet floor (palet > kapasitas beam)', dari: `${f(floor0 * 100, 1)}%`, ke: `${f(lantai * 100, 1)}%` });
+      }
+    }
+  }
+  const patch = { profilVolume, volumes, ...(excel ? { space: { ...a.space, excel } } : {}) } as unknown as Partial<A>;
+  return { patch, perubahan: per };
 }

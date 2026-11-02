@@ -30,6 +30,8 @@ import ListrikTender from './ListrikTender';
 import ProcessDesignPanel from './ProcessDesignPanel';
 import SpacePanel from './SpacePanel';
 import ProdukPanel from './ProdukPanel';
+import { ATURAN_BERAT_DEFAULT, adaProdukNyata, hitungProduk, produkEfektif, terapkanProduk, type AturanBerat, type PerubahanTender, type ProdukTender } from '@/lib/produk';
+import { hitungLevelRak } from '@/lib/engine/space';
 import MhePanel from './MhePanel';
 import BiayaSpacePanel from './BiayaSpacePanel';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from '@/lib/engine/space';
@@ -190,6 +192,20 @@ export default function TenderPage() {
 
   const setKol = <K extends keyof TenderRow>(k: K, v: TenderRow[K]) => { catat(); setT(x => x && ({ ...x, [k]: v })); setKotor(true); };
   const setA = (patch: Partial<Asumsi>) => { catat(); setT(x => x && ({ ...x, asumsi: { ...x.asumsi, ...patch } })); setKotor(true); };
+  // Produk = sumber data tender: setiap perubahan produk / aturan berat langsung diterapkan ke Volume, Parameter muatan & Space
+  const [dampakProduk, setDampakProduk] = useState<PerubahanTender[]>([]);
+  const ubahProduk = (produk: ProdukTender[] | undefined, aturanBerat: AturanBerat | undefined = t?.asumsi.aturanBerat, aktifkan = false) => {
+    if (!t) return;
+    const a0 = t.asumsi; const sinkron = aktifkan || a0.produkSinkron !== false;
+    if (sinkron && adaProdukNyata(produk)) {
+      // baris otomatis dibekukan dulu supaya tidak ikut berubah oleh parameter yang baru diterapkan
+      const tetap = (produk ?? []).map(x => (x.otomatis ? { ...x, otomatis: false } : x));
+      const levelRak = Math.max(1, hitungLevelRak(lengkapiSpaceExcel(a0.space.excel).rak).level || 1);
+      const { patch, perubahan } = terapkanProduk(a0, tetap, aturanBerat ?? ATURAN_BERAT_DEFAULT, levelRak);
+      setA({ produk: tetap, aturanBerat, produkSinkron: true, ...(patch as Partial<Asumsi>) });
+      if (perubahan.length) setDampakProduk(d => { const m = new Map(d.map(x => [`${x.bagian}|${x.item}`, x])); for (const x of perubahan) { const k = `${x.bagian}|${x.item}`; const lama = m.get(k); m.set(k, lama ? { ...x, dari: lama.dari } : x); } return Array.from(m.values()); });
+    } else setA({ produk, aturanBerat, ...(aktifkan ? { produkSinkron: true } : {}) });
+  };
 
   async function simpan(extra: Partial<TenderRow> = {}) {
     if (!t) return false;
@@ -202,13 +218,42 @@ export default function TenderPage() {
     return true;
   }
 
+  // Simpan otomatis 2,5 detik setelah perubahan terakhir + peringatan bila halaman ditutup sebelum tersimpan
+  const [simpanOto, setSimpanOto] = useState(false);
+  useEffect(() => {
+    if (!kotor || !t || !profile || !bisaEdit) return;
+    const id = setTimeout(async () => { setSimpanOto(true); await simpan(); setSimpanOto(false); }, 2500);
+    return () => clearTimeout(id);
+  }, [kotor, t]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const f = (e: BeforeUnloadEvent) => { if (kotorAkhir.current) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', f);
+    return () => window.removeEventListener('beforeunload', f);
+  }, []);
+
   async function hitung(pindahTab = true) {
     if (!t) return;
     setPesan('Menghitung…');
     const { master, catatan } = await muatMaster(sb, t);
     const h = hitungTender(keInput(t), master);
     for (const c of catatan) h.redFlags.push({ level: 'peringatan', kode: 'MASTER_DATA', pesan: c });
+    for (const pesan of cekProduk()) h.redFlags.push({ level: 'peringatan', kode: 'PRODUK', pesan });
     setHasil(h); setCatatanMaster(catatan); if (pindahTab) setTab('Hasil'); setPesan(pindahTab ? null : 'Dihitung ulang — hasil terbaru ada di tab Hasil.'); if (!pindahTab) setTimeout(() => setPesan(null), 3000);
+  }
+
+  /** Peringatan dari tab Produk: palet berat vs posisi level 1 / lantai, total palet vs posisi simpan. */
+  function cekProduk(): string[] {
+    if (!t || !adaProdukNyata(t.asumsi.produk)) return [];
+    const sx = lengkapiSpaceExcel(t.asumsi.space.excel); const lvR = Math.max(1, hitungLevelRak(sx.rak).level || 1);
+    const at = t.asumsi.aturanBerat ?? ATURAN_BERAT_DEFAULT;
+    const hs = produkEfektif(t.asumsi.produk, t.asumsi.volumes, t.asumsi.profilVolume).map(x => ({ x, h: hitungProduk(x, at, lvR, sx.rak.productMm) }));
+    const out: string[] = [];
+    const sH = spaceH; if (!sH) return out;
+    const posL1 = sH.sd.bay * sH.sd.paletPerLevel + sH.dd.bay * sH.dd.paletPerLevel * (sH.dd.deep ?? 2) + Math.ceil(sH.floor.ppReq) + sH.block.tapak;
+    const pL1 = hs.reduce((s, r) => s + (r.h.levelMaks <= 1 ? r.h.palet : 0), 0);
+    if (pL1 > posL1) out.push(`Produk: ${pL1} palet berat hanya boleh di level 1 / lantai, posisi level 1 hanya ${posL1} — tambah porsi pallet floor / block stack atau bay rak.`);
+    for (const r of hs) for (const w of r.h.peringatan) if (/beam|Tinggi muatan/.test(w)) out.push(`Produk ${r.x.kode}: ${w}`);
+    return out.slice(0, 8);
   }
 
   async function simpanHasil() {
@@ -290,7 +335,7 @@ export default function TenderPage() {
         <button className="ghost" onClick={undo} disabled={!riwayat.current.lalu.length} title="Undo (Ctrl+Z)" aria-label="Undo">↶ {tr('Undo')}</button>
         <button className="ghost" onClick={redo} disabled={!riwayat.current.depan.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷ {tr('Redo')}</button>
       </>}
-      {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor}>{tr(kotor ? 'Simpan input' : 'Tersimpan')}</button>}
+      {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor} title="Perubahan juga disimpan otomatis 2,5 detik setelah berhenti mengetik">{simpanOto ? 'Menyimpan…' : tr(kotor ? 'Simpan input' : 'Tersimpan')}</button>}
       <button onClick={() => hitung(false)}>{tr('Hitung')}</button>
     </div>);
 
@@ -494,7 +539,9 @@ export default function TenderPage() {
         onChange={profilVolume => setA({ profilVolume })} />}
 
       {tab === 'Produk' && <ProdukPanel produk={a.produk} aturan={a.aturanBerat} volumes={volEf} profil={a.profilVolume} spaceExcel={a.space.excel} spaceH={spaceH}
-        onChange={produk => setA({ produk })} onAturan={aturanBerat => setA({ aturanBerat })} />}
+        namaCustomer={t.customer} sinkron={a.produkSinkron !== false} dampak={dampakProduk}
+        onChange={produk => ubahProduk(produk)} onAturan={aturanBerat => ubahProduk(a.produk, aturanBerat)}
+        onSinkron={v => { if (v) ubahProduk(a.produk, a.aturanBerat, true); else setA({ produkSinkron: false }); }} />}
 
       {tab === 'Aktivitas & manpower' && (<>
         {<>

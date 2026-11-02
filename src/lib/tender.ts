@@ -61,6 +61,8 @@ export interface Asumsi {
   /** Master produk / SKU (tab Produk). undefined = belum pernah diisi → 1 baris otomatis dari key assumption. */
   produk?: import('@/lib/produk').ProdukTender[];
   aturanBerat?: import('@/lib/produk').AturanBerat;
+  /** false = data produk tidak mengubah Volume / Parameter muatan / Space (default: ikut) */
+  produkSinkron?: boolean;
   biayaOrangManual?: Record<string, number>;
   rincianBiayaMp?: Record<string, import('@/lib/engine/biayaMp').InputBiayaRole>;
   paramBiayaMp?: Partial<import('@/lib/engine/biayaMp').ParamBiayaMp>;
