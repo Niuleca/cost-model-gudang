@@ -2,7 +2,7 @@
 // Editor denah 2D (SVG): tampak atas, X = panjang gudang (dock di kiri), Z = lebar gudang (ke bawah).
 // Pilih, geser (drag), ubah ukuran (handle), ukur jarak, garis ukur otomatis ke rintangan / dinding, latar denah gambar / DXF.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { BLOK_DEFAULT, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { BLOK_DEFAULT, aturSisiGate, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 
 export type Mode = 'pilih' | 'blok' | 'ukur' | 'geser';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
@@ -11,7 +11,18 @@ export const WARNA_KOMP: Record<string, { isi: string; garis: string }> = {
   spr: { isi: '#dbe7f7', garis: '#1e56a0' }, areaRak: { isi: '#f1f6fd', garis: '#1e56a0' }, ddr: { isi: '#cbd8ee', garis: '#173f78' }, block: { isi: '#f3e3c8', garis: '#a16207' },
   stagingIn: { isi: '#dbeafe', garis: '#2563eb' }, stagingOut: { isi: '#d1fae5', garis: '#059669' }, fasilitas: { isi: '#ede9fe', garis: '#6d28d9' },
   dock: { isi: '#1f2937', garis: '#111827' }, kolom: { isi: '#475569', garis: '#1e293b' }, jalur: { isi: '#fef3c7', garis: '#d97706' }, zona: { isi: '#e0f2fe', garis: '#0284c7' },
+  gate: { isi: '#facc15', garis: '#a16207' }, platform: { isi: '#d6d3d1', garis: '#57534e' },
 };
+type SisiG = 'depan' | 'belakang' | 'kiri' | 'kanan';
+/** Gate diseret: menempel ke dinding terdekat dari kursor, posisi sepanjang dinding mengikuti kursor. */
+function seretGate(k: Komponen, px: number, pz: number, g: { L: number; W: number }, snap: (v: number) => number): Komponen {
+  const jarak: [SisiG, number][] = [['depan', Math.abs(px)], ['belakang', Math.abs(px - g.L)], ['kiri', Math.abs(pz)], ['kanan', Math.abs(pz - g.W)]];
+  const sisi = jarak.sort((a, b) => a[1] - b[1])[0][0];
+  const lebar = (k.sisi ?? 'depan') === 'depan' || k.sisi === 'belakang' ? k.d : k.w;
+  const sejajarZ = sisi === 'depan' || sisi === 'belakang';
+  const pos = snap((sejajarZ ? pz : px) - lebar / 2);
+  return aturSisiGate({ ...k, sisi, ...(sejajarZ ? { z: pos, d: lebar } : { x: pos, w: lebar }) }, sisi, g);
+}
 const f1 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('id-ID');
 
 type Seret =
@@ -139,6 +150,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       if (s.jenis === 'geser') {
         let x = snap(s.x0 + p.x - s.ax), z = snap(s.z0 + p.z - s.az);
         if (k.jenis === 'dock') x = 0;
+        if (k.jenis === 'gate') return seretGate(k, p.x, p.z, ed.gedung, snap);
         ({ x, z } = tempel(k, x, z));
         return { ...k, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100 };
       }
@@ -152,6 +164,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         else { const nd = Math.max(bw, Math.round(d / bw) * bw); if (s.h.includes('n')) z = k0.z + k0.d - nd; d = nd; w = k0.w; x = k0.x; }
       }
       const r = (v: number) => Math.round(v * 100) / 100;
+      if (k0.jenis === 'gate') { const sz = (k0.sisi ?? 'depan') === 'depan' || k0.sisi === 'belakang'; return aturSisiGate({ ...k, ...(sz ? { z: r(z), d: r(Math.max(0.5, d)) } : { x: r(x), w: r(Math.max(0.5, w)) }) }, k0.sisi ?? 'depan', ed.gedung); }
       return { ...k, x: r(x), z: r(z), w: r(Math.max(0.2, w)), d: r(Math.max(0.2, d)) };
     }) }));
   }
@@ -261,9 +274,20 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         }
       });
     }
+    if (k.jenis === 'gate') {
+      const sz = (k.sisi ?? 'depan') === 'depan' || k.sisi === 'belakang';
+      for (let i = 0; i < 6; i++) el.push(sz ? <line key={`gh${i}`} x1={k.x} y1={k.z + (i + 0.5) * k.d / 6} x2={k.x + k.w} y2={k.z + (i + 0.5) * k.d / 6} stroke="#111827" strokeWidth={fs * 0.06} />
+        : <line key={`gh${i}`} x1={k.x + (i + 0.5) * k.w / 6} y1={k.z} x2={k.x + (i + 0.5) * k.w / 6} y2={k.z + k.d} stroke="#111827" strokeWidth={fs * 0.06} />);
+    }
+    if (k.jenis === 'platform') {
+      const t = fs * 0.12;
+      el.push(<line key="pt" x1={k.x + t} y1={k.z} x2={k.x + t} y2={k.z + k.d} stroke="#facc15" strokeWidth={t * 2} />);
+      for (let i = 0; i < Math.min(60, k.palet ?? 0); i++) { const kol = Math.max(1, Math.floor((k.w - 0.6) / 1.3)); const a = i % kol, b2 = Math.floor(i / kol); const z0 = k.z + 0.4 + b2 * 1.15; if (z0 + 1 > k.z + k.d) break;
+        el.push(<rect key={`pp${i}`} x={k.x + k.w - 0.3 - (a + 1) * 1.3} y={z0} width={1.2} height={1} fill="#d4a373" stroke="#92400e" strokeWidth={fs * 0.03} />); }
+    }
     if (k.jenis === 'dock') el.push(<path key="p" d={`M ${k.x + k.w} ${k.z + k.d / 2} l ${fs * 0.9} ${-fs * 0.5} l 0 ${fs} z`} fill={k.arus === 'outbound' ? '#059669' : '#2563eb'} />);
     const ra = k.area ? ringkasArea(k, edit) : null;
-    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? (k.blok ? (() => { const ub = uraiBlok(k); return `${k.label} · ${ub.nBaris} baris × ${ub.nPaletBaris} plt × ${k.blok.deep} deep × ${k.tumpuk ?? 1} tumpuk = ${(ub.tapak * (k.tumpuk ?? 1)).toLocaleString('id-ID')} posisi`; })() : `${k.label} · tumpuk ${k.tumpuk ?? 1}`) : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.label;
+    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? (k.blok ? (() => { const ub = uraiBlok(k); return `${k.label} · ${ub.nBaris} baris × ${ub.nPaletBaris} plt × ${k.blok.deep} deep × ${k.tumpuk ?? 1} tumpuk = ${(ub.tapak * (k.tumpuk ?? 1)).toLocaleString('id-ID')} posisi`; })() : `${k.label} · tumpuk ${k.tumpuk ?? 1}`) : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.jenis === 'gate' ? `${k.label} ${f1((k.sisi ?? 'depan') === 'depan' || k.sisi === 'belakang' ? k.d : k.w)} m` : k.jenis === 'platform' ? `${k.label} ${f1(k.d)} × ${f1(k.w)} m · ${f1(k.tinggi)} m` : k.label;
     const muat = Math.max(k.w, k.d) > label.length * fs * 0.45 || dipilih;
     if (muat && k.jenis !== 'kolom') {
       const tegak = k.d > k.w * 1.6 && k.jenis !== 'dock' && !k.area && !k.blok;
@@ -280,7 +304,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       style={{ cursor: `${h}-resize` }} onPointerDown={e => { e.stopPropagation(); turun(e, k.id, h); }} />);
   };
 
-  const jb = terpilih && terpilih.jenis !== 'dock' ? jarakBebas(edit, terpilih) : null;
+  const jb = terpilih && !['dock', 'gate', 'platform'].includes(terpilih.jenis) ? jarakBebas(edit, terpilih) : null;
   return (
     <svg ref={svg} className="sim2d-svg" viewBox={`${view.x} ${view.z} ${view.w} ${tinggiView}`} preserveAspectRatio="xMinYMin meet"
       onPointerDown={e => turun(e)} onPointerMove={gerak} onPointerUp={naik} onPointerLeave={() => setKursor(null)} onWheel={roda}
@@ -307,12 +331,33 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       )}
       {edit.komponen.filter(k => k.jenis === 'areaRak').map(gambarKomp)}
       {edit.komponen.filter(k => k.jenis === 'jalur' || k.jenis === 'zona').map(gambarKomp)}
-      {edit.komponen.filter(k => k.jenis !== 'jalur' && k.jenis !== 'zona' && k.jenis !== 'areaRak').map(gambarKomp)}
+      {edit.komponen.filter(k => !['jalur', 'zona', 'areaRak', 'gate'].includes(k.jenis)).map(gambarKomp)}
+      {edit.komponen.filter(k => k.jenis === 'gate').map(gambarKomp)}
       {/* dinding */}
       <rect x={0} y={0} width={g.L} height={g.W} fill="none" stroke="#0f172a" strokeWidth={fs * 0.22} style={{ pointerEvents: 'none' }} />
       {/* dimensi gedung */}
       {garisUkur(0, -fs * 1.6, g.L, -fs * 1.6, `${f1(g.L)} m`, '#334155', 'dimL')}
       {garisUkur(g.L + fs * 1.4, 0, g.L + fs * 1.4, g.W, `${f1(g.W)} m`, '#334155', 'dimW')}
+      {/* grid pilar: as & rantai dimensi as-ke-as per bentang */}
+      {(() => {
+        const kol = edit.komponen.filter(k => k.jenis === 'kolom'); if (kol.length < 2) return null;
+        const unik = (a: number[]) => a.map(v => Math.round(v * 100) / 100).sort((p, q) => p - q).filter((v, i, arr) => i === 0 || v - arr[i - 1] > 0.05);
+        // as pilar tepi yang menempel dinding dianggap di garis dinding (as grid = as dinding)
+        const asX = (k: Komponen) => (k.x <= 0.05 ? 0 : k.x + k.w >= g.L - 0.05 ? g.L : k.x + k.w / 2), asZ = (k: Komponen) => (k.z <= 0.05 ? 0 : k.z + k.d >= g.W - 0.05 ? g.W : k.z + k.d / 2);
+        const xs = unik(kol.map(asX)), zs = unik(kol.map(asZ));
+        if (xs.length > 80 || zs.length > 80) return null;
+        const yX = -fs * 3.4, xZ = g.L + fs * 3.2; const el: JSX.Element[] = [];
+        xs.forEach((x, i) => el.push(<line key={`ax${i}`} x1={x} y1={yX} x2={x} y2={g.W} stroke="#94a3b8" strokeWidth={fs * 0.03} strokeDasharray={`${fs * 0.5} ${fs * 0.3}`} style={{ pointerEvents: 'none' }} />));
+        zs.forEach((z, i) => el.push(<line key={`az${i}`} x1={0} y1={z} x2={xZ} y2={z} stroke="#94a3b8" strokeWidth={fs * 0.03} strokeDasharray={`${fs * 0.5} ${fs * 0.3}`} style={{ pointerEvents: 'none' }} />));
+        xs.slice(1).forEach((x, i) => el.push(garisUkur(xs[i], yX, x, yX, f1(x - xs[i]), '#0f766e', `bx${i}`)));
+        zs.slice(1).forEach((z, i) => el.push(garisUkur(xZ, zs[i], xZ, z, f1(z - zs[i]), '#0f766e', `bz${i}`)));
+        // sisa ke dinding (bukan bentang pilar) — abu-abu
+        if (xs[0] > 0.05) el.push(garisUkur(0, yX, xs[0], yX, f1(xs[0]), '#94a3b8', 'bx0s'));
+        if (g.L - xs[xs.length - 1] > 0.05) el.push(garisUkur(xs[xs.length - 1], yX, g.L, yX, f1(g.L - xs[xs.length - 1]), '#94a3b8', 'bx1s'));
+        if (zs[0] > 0.05) el.push(garisUkur(xZ, 0, xZ, zs[0], f1(zs[0]), '#94a3b8', 'bz0s'));
+        if (g.W - zs[zs.length - 1] > 0.05) el.push(garisUkur(xZ, zs[zs.length - 1], xZ, g.W, f1(g.W - zs[zs.length - 1]), '#94a3b8', 'bz1s'));
+        return <g>{el}</g>;
+      })()}
       {/* ukuran tersimpan */}
       {edit.ukur.map(u => garisUkur(u.ax, u.az, u.bx, u.bz, `${f1(Math.hypot(u.bx - u.ax, u.bz - u.az))} m`, '#be123c', u.id))}
       {/* kotak seleksi blok: biru = masuk penuh (seret ke kanan), hijau putus-putus = tersentuh (seret ke kiri) */}

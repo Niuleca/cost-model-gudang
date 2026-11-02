@@ -6,7 +6,7 @@ import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { ARMADA, bertugas, faseTrukTeks, jalankanSampai, jenisTrukDari, posisiTrukDock, type Dunia, type JenisTruk, type JenisTugas, type Kemampuan, type Lpn, type Tugas } from '@/lib/game';
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
 import { kategoriOrang } from '@/lib/simulasi3d/layout';
-import { label, mat, modelMhe, modelOrang, modelTruk, teks, type PasangLapisan } from '../Viewer3D';
+import { label, mat, modelMhe, modelOrang, modelTruk, teks, xSandar, type PasangLapisan } from '../Viewer3D';
 import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pasangOperator, pegangKarton, pegangTangkai, pegangKendali, aturMast, pinBersih, POSISI_OPERATOR, trukBersih, WARNA_BERSIH, type Animator, type JenisKendaraan } from '../model3d';
 import { WARNA_ORANG } from '../warna';
 import { ELEMEN, LABEL_AKSI, MODE_PEMAIN, studiAwal, type ModePemain, type SiklusStudi, type StudiPemain } from './pemain';
@@ -119,7 +119,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     for (const dk of d.dock) {
       const arr = dk.arus === 'inbound' ? dIn : dOut; const i = Number(dk.id.slice(2)) - 1;
       const z = arr[i % Math.max(1, arr.length)]?.z ?? (dk.arus === 'inbound' ? L.stagingIn.z0 + 3 : L.stagingOut.z1 - 3);
-      dockPos.set(dk.id, v(1.6, z));
+      dockPos.set(dk.id, v(xSandar(L, z) + 1.6, z));
     }
     const kantor = L.fasilitas.find(f => /office|kantor|admin|control/i.test(f.nama)) ?? L.fasilitas[0];
     const titikKantor = kantor ? v((kantor.x0 + kantor.x1) / 2, (kantor.z0 + kantor.z1) / 2) : v(L.stagingIn.x1 + 2, 1.5);
@@ -285,13 +285,13 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         if (dk.truk !== o.truk) { o.truk = dk.truk; o.mulai = detikNyata; }
         o.g.visible = !!dk.truk; o.g.userData.pilih = dk.truk ? { jenis: 'truk', id: dk.truk } : null;
         // mundur masuk selama fase sandar, diam saat bongkar/muat, jalan keluar di akhir fase dokumen (waktu game)
-        if (dk.truk) { aturJenis(o, dk.truk); o.g.position.set(-0.4 - posisiTrukDock(d, d.truk.get(dk.truk)), 0, p.z); isiTeks(o, ketTruk(dk.truk)); }
+        if (dk.truk) { aturJenis(o, dk.truk); o.g.position.set(xSandar(L, p.z) - 0.4 - posisiTrukDock(d, d.truk.get(dk.truk)), -(L.tinggiDock ?? 1.2), p.z); isiTeks(o, ketTruk(dk.truk)); }
       }
       for (const arus of ['inbound', 'outbound'] as const) {
         const ids = d.antreDock[arus]; const pool = antre[arus];
         pool.forEach((o, i) => {
           const id = ids[i]; o.g.visible = !!id; o.g.userData.pilih = id ? { jenis: 'truk', id } : null;
-          if (id) { aturJenis(o, id); o.g.rotation.y = Math.PI / 2; o.g.position.set(-24 - (i % 4) * 4, 0, arus === 'inbound' ? -24 - Math.floor(i / 4) * 19 : L.W + 18 + Math.floor(i / 4) * 12); isiTeks(o, `antre · ${ketTruk(id)}`); }
+          if (id) { aturJenis(o, id); o.g.rotation.y = Math.PI / 2; o.g.position.set(Math.min(0, xSandar(L, arus === 'inbound' ? 0 : L.W)) - 24 - (i % 4) * 4, -(L.tinggiDock ?? 1.2), arus === 'inbound' ? -24 - Math.floor(i / 4) * 19 : L.W + 18 + Math.floor(i / 4) * 12); isiTeks(o, `antre · ${ketTruk(id)}`); }
         });
       }
     };

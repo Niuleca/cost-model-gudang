@@ -125,8 +125,13 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
       g.fillStyle = '#dfe3e8'; g.fillRect(X(-28), Y(-11), 28 * s, (L.W + 22) * s);
       g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(1, 0.12 * s); g.setLineDash([0.8 * s, 0.6 * s]);
       g.beginPath(); g.moveTo(X(-17), Y(-10)); g.lineTo(X(-17), Y(L.W + 10)); g.stroke(); g.setLineDash([]);
+      // loading dock platform (beton) & gate
+      for (const p of L.platform ?? []) { g.fillStyle = '#d6d3d1'; g.strokeStyle = '#57534e'; g.lineWidth = 1; g.fillRect(X(p.x0), Y(p.z0), (p.x1 - p.x0) * s, (p.z1 - p.z0) * s); g.strokeRect(X(p.x0), Y(p.z0), (p.x1 - p.x0) * s, (p.z1 - p.z0) * s);
+        g.fillStyle = '#facc15'; if (p.x1 <= 0.05) g.fillRect(X(p.x0), Y(p.z0), 0.25 * s, (p.z1 - p.z0) * s); }
       // lantai gudang
       g.fillStyle = '#ffffff'; g.fillRect(X(0), Y(0), L.L * s, L.W * s);
+      for (const gt of L.gate ?? []) { const sz = gt.sisi === 'depan' || gt.sisi === 'belakang'; const t = gt.sisi === 'depan' ? 0 : gt.sisi === 'belakang' ? L.L : gt.sisi === 'kiri' ? 0 : L.W;
+        g.fillStyle = '#facc15'; if (sz) g.fillRect(X(t - 0.3), Y(gt.pos), 0.6 * s, gt.lebar * s); else g.fillRect(X(gt.pos), Y(t - 0.3), gt.lebar * s, 0.6 * s); }
       // zona
       for (const z of L.zona) {
         if (z.jenis === 'spr' || z.jenis === 'ddr') continue;
@@ -218,9 +223,10 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
       };
       for (const dk of d.dock) if (dk.truk) {
         const tr = d.truk.get(dk.truk); const z = statis.zDock.get(dk.id) ?? 0;
-        gambarTruk(dk.truk, -0.5 - posisiTrukDock(d, tr), z, false);
+        const xs = Math.min(0, ...(L.platform ?? []).filter(p => p.x1 <= 0.05 && z >= p.z0 - 0.5 && z <= p.z1 + 0.5).map(p => p.x0));
+        gambarTruk(dk.truk, xs - 0.5 - posisiTrukDock(d, tr), z, false);
         const f = faseTrukTeks(d, tr);
-        if (f && s > 3) teks(f, -0.5 - posisiTrukDock(d, tr) - 6, z - 1.9, fs(0.6, 8, 11), tr?.arus === 'inbound' ? '#1e3a8a' : '#065f46');
+        if (f && s > 3) teks(f, xs - 0.5 - posisiTrukDock(d, tr) - 6, z - 1.9, fs(0.6, 8, 11), tr?.arus === 'inbound' ? '#1e3a8a' : '#065f46');
       }
       d.antreDock.inbound.slice(0, 10).forEach((id, i) => gambarTruk(id, -26 + i * 3.1, -1.2, true));
       d.antreDock.outbound.slice(0, 10).forEach((id, i) => gambarTruk(id, -26 + i * 3.1, L.W + 10.8, true));

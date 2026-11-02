@@ -12,7 +12,7 @@ import { IT_SHEET_DEFAULT } from '@/lib/it';
 import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import { paramAwal, susunLayout, type LayoutGudang, type ParamSim } from '@/lib/simulasi3d/layout';
 import { dariOtomatis, tarikRak, keLayoutGudang, komponenBaru, levelDariTinggi, nBay, pasanganRak, putar, ringkas, tinggiRak, uid, kapasitasRak, tapakBlok, dimRak,
-  DEFAULT_RAK, BLOK_DEFAULT, uraiBlok, type SpekBlok, celahArea, gabungJadiArea, pecahArea, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
+  DEFAULT_RAK, BLOK_DEFAULT, uraiBlok, aturSisiGate, posisiBentang, posisiGate, type SpekBlok, celahArea, gabungJadiArea, pecahArea, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
 import { bacaDxf } from '@/lib/simulasi3d/dxf';
 import { labelStatus } from '@/lib/status';
 import { dataTanpaProject, GEDUNG_BARU, ID_PRIBADI, layoutKosong, type SpekGedungBaru } from '@/lib/simulasi3d/tanpaProject';
@@ -34,7 +34,7 @@ const PALET: { jenis: JenisKomp | 'pasSpr' | 'pasDdr' | 'areaAdaptif' | 'ramp'; 
   { jenis: 'areaAdaptif', label: 'Area rak otomatis 2 · adaptif (hindari kolom, dinding, office, ramp)' },
   { jenis: 'spr', label: 'Rak SPR (1 baris)' }, { jenis: 'pasSpr', label: 'Rak SPR back-to-back' }, { jenis: 'ddr', label: 'Rak DDR (1 baris)' }, { jenis: 'pasDdr', label: 'Rak DDR back-to-back' },
   { jenis: 'block', label: 'Block stack' }, { jenis: 'stagingIn', label: 'Staging inbound' }, { jenis: 'stagingOut', label: 'Staging outbound' },
-  { jenis: 'dock', label: 'Dock' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'kolom', label: 'Kolom' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
+  { jenis: 'dock', label: 'Dock' }, { jenis: 'gate', label: 'Gate / pintu (depan, belakang, samping)' }, { jenis: 'platform', label: 'Loading dock (platform beton)' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'kolom', label: 'Kolom' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
 ];
 
 /** Isian angka di panel properti. */
@@ -70,7 +70,9 @@ export default function DesainGudang() {
   const [pesan, setPesan] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
-  const [lapis, setLapis] = useState({ n: 2, jarak: 0, arah: 'z' as 'x' | 'z' });
+  const [lapis, setLapis] = useState({ n: 2, jarak: 0, arah: 'z' as 'x' | 'z', asKeAs: false });
+  const [gridPilar, setGridPilar] = useState({ x: '6', z: '6', ukuran: 0.5, ganti: true });
+  const [sebarGate, setSebarGate] = useState({ n: 3, jarak: 0 });
   const [jarakDinding, setJarakDinding] = useState(0.5);
   const [langkah, setLangkah] = useState<'layout' | 'simulasi'>('layout');
   const [gaya3d, setGaya3d] = useState<'leca' | 'skematik'>('leca');
@@ -211,11 +213,38 @@ export default function DesainGudang() {
     setPesan(`${n} komponen dihapus · Ctrl+Z untuk membatalkan`);
   }
   const geserBanyak = (dx: number, dz: number) => { const set = new Set(multi); aksi(e => ({ ...e, komponen: e.komponen.map(k => (set.has(k.id) ? { ...k, x: k.jenis === 'dock' ? k.x : r2(k.x + dx), z: r2(k.z + dz) } : k)) })); };
-  function gandakan(n = 1, jarak = 0, arah: 'x' | 'z' = 'z') {
+  /** asKeAs = jarak diukur pusat-ke-pusat (as ke as, mis. pilar 6 m → 6, 12, 18 dari pilar pertama); selain itu jarak = celah antar tepi. */
+  function gandakan(n = 1, jarak = 0, arah: 'x' | 'z' = 'z', asKeAs = false) {
     if (!terpilih) return;
     const salin: Komponen[] = [];
-    for (let i = 1; i <= n; i++) salin.push({ ...terpilih, id: uid(), x: r2(terpilih.x + (arah === 'x' ? i * (terpilih.w + jarak) : n === 1 ? 1 : 0)), z: r2(terpilih.z + (arah === 'z' ? i * (terpilih.d + jarak) : n === 1 ? 1 : 0)), rak: terpilih.rak ? { ...terpilih.rak } : undefined, area: terpilih.area ? { ...terpilih.area, rak: { ...terpilih.area.rak } } : undefined });
+    const lx = asKeAs ? jarak : terpilih.w + jarak, lz = asKeAs ? jarak : terpilih.d + jarak;
+    for (let i = 1; i <= n; i++) salin.push({ ...terpilih, id: uid(), x: r2(terpilih.x + (arah === 'x' ? i * lx : n === 1 ? 1 : 0)), z: r2(terpilih.z + (arah === 'z' ? i * lz : n === 1 ? 1 : 0)), rak: terpilih.rak ? { ...terpilih.rak } : undefined, area: terpilih.area ? { ...terpilih.area, rak: { ...terpilih.area.rak } } : undefined });
     aksi(e => ({ ...e, komponen: [...e.komponen, ...salin] })); setPilih(salin[salin.length - 1].id);
+  }
+
+  /** Grid pilar dari daftar bentang as-ke-as (6 = 6 m berulang; "6; 6; 8" = per bentang). */
+  function buatGridPilar() {
+    if (!edit || !data) return;
+    const { L, W } = edit.gedung; const s = Math.max(0.2, gridPilar.ukuran);
+    const xs = posisiBentang(gridPilar.x, L), zs = posisiBentang(gridPilar.z, W);
+    if (!xs.length || !zs.length) { setPesan('Isi bentang pilar dulu, mis. 6 atau 6; 6; 8 (m, as ke as).'); return; }
+    const [tpl] = komponenBaru('kolom', data.p, { x: 0, z: 0 }, edit.tinggiPalet);
+    const baru: Komponen[] = [];
+    xs.forEach((x, i) => zs.forEach((z, j) => baru.push({ ...tpl, id: uid(), label: `Pilar ${String.fromCharCode(65 + (j % 26))}${i + 1}`, w: s, d: s,
+      x: r2(Math.max(0, Math.min(L - s, x - s / 2))), z: r2(Math.max(0, Math.min(W - s, z - s / 2))), tinggi: edit.gedung.sideMm / 1000 })));
+    aksi(e => ({ ...e, komponen: [...(gridPilar.ganti ? e.komponen.filter(k => k.jenis !== 'kolom') : e.komponen), ...baru] }));
+    const bt = (a: number[]) => a.slice(1).map((v, i) => r2(v - a[i])).join(' · ');
+    setPesan(`${baru.length} pilar dibuat (${xs.length} × ${zs.length}). Bentang X as-ke-as: ${bt(xs)} m · Z: ${bt(zs)} m.`);
+  }
+  /** Sebar N gate di dinding yang sama dengan gate terpilih (jarak 0 = merata; > 0 = as ke as dari gate ini). */
+  function buatSebarGate() {
+    if (!edit || !terpilih || terpilih.jenis !== 'gate') return;
+    const g = edit.gedung; const pg = posisiGate(terpilih, g); const sz = pg.sisi === 'depan' || pg.sisi === 'belakang'; const batas = sz ? g.W : g.L;
+    const n = Math.max(1, Math.round(sebarGate.n)); const lb = pg.lebar;
+    const pusat = sebarGate.jarak > 0 ? Array.from({ length: n }, (_, i) => pg.pos + lb / 2 + i * sebarGate.jarak) : Array.from({ length: n }, (_, i) => (i + 0.5) * batas / n);
+    const baru = pusat.filter(c => c + lb / 2 <= batas + 1e-6).map((c, i) => aturSisiGate({ ...terpilih, id: uid(), label: `Gate ${pg.sisi[0].toUpperCase()}${i + 1}`, ...(sz ? { z: c - lb / 2 } : { x: c - lb / 2 }) }, pg.sisi, g));
+    aksi(e => ({ ...e, komponen: [...e.komponen.filter(k => !(k.jenis === 'gate' && (k.sisi ?? 'depan') === pg.sisi)), ...baru] })); setPilih(baru[0]?.id ?? null);
+    setPesan(`${baru.length} gate di dinding ${pg.sisi}, lebar ${angka(lb, 1)} m${sebarGate.jarak > 0 ? `, as ke as ${angka(sebarGate.jarak, 1)} m` : ', dibagi merata'}.`);
   }
 
   // ---------- keyboard
@@ -459,8 +488,22 @@ export default function DesainGudang() {
               <Angka l="Panjang (X)" u="m" v={edit.gedung.L} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, L: Math.max(5, x) } }))} />
               <Angka l="Lebar (Z)" u="m" v={edit.gedung.W} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, W: Math.max(5, x) } }))} />
               <Angka l="Side height" u="mm" step={100} v={edit.gedung.sideMm} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, sideMm: Math.max(2000, x) } }))} />
-              <Angka l="Center height" u="mm" step={100} v={edit.gedung.centerMm} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, centerMm: Math.max(2000, x) } }))} />
+              <Angka l="Center height (puncak)" u="mm" step={100} v={edit.gedung.centerMm} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, centerMm: Math.max(2000, x) } }))} />
+              <Angka l="Tinggi lantai / dock" u="m" step={0.05} v={edit.gedung.tinggiDockM ?? 1.2} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, tinggiDockM: Math.max(0, Math.min(2, x)) } }))} />
+              <p className="small muted" style={{ margin: 0, alignSelf: 'end' }}>Atap pelana: side {angka(edit.gedung.sideMm / 1000, 1)} m di dinding kiri/kanan, naik ke {angka(Math.max(edit.gedung.sideMm, edit.gedung.centerMm) / 1000, 1)} m di tengah lebar.</p>
             </div>
+            <details className="sim2d-detail">
+              <summary className="eyebrow">Grid pilar (as ke as)</summary>
+              <div className="grid2" style={{ gap: 6 }}>
+                <label className="f">Bentang X (m)<input value={gridPilar.x} onChange={e => setGridPilar(g => ({ ...g, x: e.target.value }))} placeholder="6 atau 6; 6; 8" /></label>
+                <label className="f">Bentang Z (m)<input value={gridPilar.z} onChange={e => setGridPilar(g => ({ ...g, z: e.target.value }))} placeholder="6 atau 6; 6; 8" /></label>
+                <Angka l="Ukuran pilar" u="m" step={0.05} v={gridPilar.ukuran} set={x => setGridPilar(g => ({ ...g, ukuran: Math.max(0.2, x) }))} />
+                <label className="f small" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 'auto' }} checked={gridPilar.ganti} onChange={e => setGridPilar(g => ({ ...g, ganti: e.target.checked }))} />Ganti kolom lama</label>
+              </div>
+              {(() => { const xs = posisiBentang(gridPilar.x, edit.gedung.L), zs = posisiBentang(gridPilar.z, edit.gedung.W);
+                return <p className="small muted" style={{ margin: '4px 0' }}>Jarak diukur <b>as ke as tiap bentang</b>: pilar 1 → 2 = 6 m, pilar 2 → 3 = 6 m (posisi kumulatif 0, 6, 12, …). X: {xs.slice(0, 8).map(v => angka(v, 1)).join(', ')}{xs.length > 8 ? ', …' : ''} ({xs.length} as) · Z: {zs.slice(0, 8).map(v => angka(v, 1)).join(', ')}{zs.length > 8 ? ', …' : ''} ({zs.length} as)</p>; })()}
+              <button type="button" style={{ width: '100%' }} onClick={buatGridPilar}>Buat grid pilar</button>
+            </details>
             <label className="f">Okupansi rak {edit.okupansi == null ? '(sesuai stok desain)' : `${Math.round(edit.okupansi * 100)}%`}
               <div className="row" style={{ flexWrap: 'nowrap' }}>
                 <input type="range" min={0} max={100} value={Math.round(rk.okupansi * 100)} onChange={e => ubah(x => ({ ...x, okupansi: Number(e.target.value) / 100 }))} />
@@ -699,6 +742,41 @@ export default function DesainGudang() {
                   <Angka l="Tumpuk" step={1} min={1} v={terpilih.tumpuk ?? 1} set={x => ubahK(k => ({ ...k, tumpuk: Math.max(1, Math.round(x)) }))} />
                   <label className="f">Arus<select value={terpilih.jenis} onChange={e => ubahK(k => ({ ...k, jenis: e.target.value as JenisKomp }))}><option value="stagingIn">Inbound</option><option value="stagingOut">Outbound</option></select></label>
                 </div>)}
+                {terpilih.jenis === 'gate' && (() => { const pg = posisiGate(terpilih, edit.gedung); const sz = pg.sisi === 'depan' || pg.sisi === 'belakang'; const batas = sz ? edit.gedung.W : edit.gedung.L;
+                  const setPos = (v: number) => ubahK(k => aturSisiGate({ ...k, ...(sz ? { z: v } : { x: v }) }, pg.sisi, edit.gedung));
+                  const setLebar = (v: number) => ubahK(k => aturSisiGate({ ...k, ...(sz ? { d: Math.max(1, v) } : { w: Math.max(1, v) }) }, pg.sisi, edit.gedung));
+                  return <>
+                    <div className="grid2" style={{ gap: 6 }}>
+                      <label className="f">Dinding<select value={pg.sisi} onChange={e => ubahK(k => aturSisiGate(k, e.target.value as typeof pg.sisi, edit.gedung))}>
+                        <option value="depan">Depan (sisi dock)</option><option value="belakang">Belakang</option><option value="kiri">Samping kiri</option><option value="kanan">Samping kanan</option></select></label>
+                      <Angka l={`Posisi dari ujung (0–${angka(batas - pg.lebar, 1)})`} u="m" step={0.5} v={r2(pg.pos)} set={setPos} />
+                      <Angka l="Lebar pintu" u="m" step={0.1} v={pg.lebar} set={setLebar} />
+                      <Angka l="Tinggi pintu" u="m" step={0.1} v={terpilih.tinggi} set={x => ubahK(k => ({ ...k, tinggi: Math.max(2, x) }))} />
+                    </div>
+                    <div className="sim2d-lapis">
+                      <span className="small">Jumlah gate di dinding ini</span>
+                      <input type="number" min={1} max={40} value={sebarGate.n} onChange={e => setSebarGate(g => ({ ...g, n: Math.max(1, Math.min(40, Number(e.target.value) || 1)) }))} />
+                      <span className="small">as ke as</span>
+                      <input type="number" step={0.5} min={0} value={sebarGate.jarak} onChange={e => setSebarGate(g => ({ ...g, jarak: Math.max(0, Number(e.target.value) || 0) }))} />
+                      <span className="small">m (0 = merata)</span>
+                      <button className="ghost" onClick={buatSebarGate}>Terapkan</button>
+                    </div>
+                    <p className="small muted" style={{ margin: 0 }}>Seret gate di denah — menempel ke dinding terdekat. Gate lama di dinding yang sama diganti saat menerapkan jumlah.</p>
+                  </>; })()}
+                {terpilih.jenis === 'platform' && (<>
+                  <div className="grid2" style={{ gap: 6 }}>
+                    <Angka l="Panjang (sepanjang dinding)" u="m" step={0.5} v={terpilih.d} set={x => ubahK(k => ({ ...k, d: Math.max(2, x) }))} />
+                    <Angka l="Lebar (menjorok keluar)" u="m" step={0.1} v={terpilih.w} set={x => ubahK(k => { const w = Math.max(1, x); return { ...k, w, x: k.x < 0 ? r2(-w) : k.x }; })} />
+                    <Angka l="Tinggi platform" u="m" step={0.05} v={terpilih.tinggi} set={x => ubahK(k => ({ ...k, tinggi: Math.max(0.3, Math.min(2, x)) }))} />
+                    <Angka l="Palet di atas dock" step={1} min={0} v={terpilih.palet ?? 0} set={x => ubahK(k => ({ ...k, palet: Math.max(0, Math.round(x)) }))} />
+                  </div>
+                  <div className="row">
+                    <button className="ghost" onClick={() => ubahK(k => ({ ...k, x: r2(-k.w) }))}>Tempel dinding depan</button>
+                    <button className="ghost" onClick={() => ubahK(k => ({ ...k, x: r2(edit.gedung.L) }))}>Tempel dinding belakang</button>
+                    <button className="ghost" onClick={() => ubahK(k => ({ ...k, z: 0, d: edit.gedung.W }))}>Sepanjang dinding</button>
+                  </div>
+                  <p className="small muted" style={{ margin: 0 }}>Platform beton di luar dinding, setinggi bak truk ({angka(edit.gedung.tinggiDockM ?? 1.2, 2)} m) — palet diturunkan dari truk ke platform lalu masuk gudang lewat gate / dock.</p>
+                </>)}
                 {terpilih.jenis === 'dock' && (<label className="f">Arus<select value={terpilih.arus ?? 'inbound'} onChange={e => ubahK(k => ({ ...k, arus: e.target.value as 'inbound' | 'outbound' }))}><option value="inbound">Inbound</option><option value="outbound">Outbound</option></select></label>)}
                 {['fasilitas', 'kolom', 'dock'].includes(terpilih.jenis) && <Angka l="Tinggi" u="m" step={0.1} v={terpilih.tinggi} set={x => ubahK(k => ({ ...k, tinggi: Math.max(0.1, x) }))} />}
                 {terpilih.jenis === 'zona' && <label className="f">Warna<input type="color" value={terpilih.warna ?? '#0ea5e9'} onChange={e => ubahK(k => ({ ...k, warna: e.target.value }))} /></label>}
@@ -717,8 +795,11 @@ export default function DesainGudang() {
                   <input type="number" step={0.1} value={lapis.jarak} onChange={e => setLapis(l => ({ ...l, jarak: Number(e.target.value) || 0 }))} />
                   <span className="small">m ke</span>
                   <select value={lapis.arah} onChange={e => setLapis(l => ({ ...l, arah: e.target.value as 'x' | 'z' }))}><option value="z">kanan (Z)</option><option value="x">belakang (X)</option></select>
-                  <button className="ghost" onClick={() => gandakan(lapis.n, lapis.jarak, lapis.arah)}>Buat</button>
+                  <select value={(lapis.asKeAs || terpilih.jenis === 'kolom') ? 'as' : 'celah'} onChange={e => setLapis(l => ({ ...l, asKeAs: e.target.value === 'as' }))} disabled={terpilih.jenis === 'kolom'}>
+                    <option value="as">as ke as (pusat–pusat)</option><option value="celah">celah antar tepi</option></select>
+                  <button className="ghost" onClick={() => gandakan(lapis.n, lapis.jarak, lapis.arah, lapis.asKeAs || terpilih.jenis === 'kolom')}>Buat</button>
                 </div>
+                {(lapis.asKeAs || terpilih.jenis === 'kolom') && lapis.jarak > 0 && <p className="small muted" style={{ margin: 0 }}>As ke as {angka(lapis.jarak, 1)} m: salinan ke-1 di {angka(lapis.jarak, 1)} m, ke-2 di {angka(lapis.jarak * 2, 1)} m dari as awal — jarak tiap bentang tetap {angka(lapis.jarak, 1)} m.</p>}
                 <p className="small muted" style={{ margin: 0 }}>Garis oranye di denah = jarak bebas ke rintangan / dinding terdekat. Untuk lorong rak, isi jarak = lebar lorong (mis. 2 × corridor).</p>
               </>
             ) : multi.length > 1 ? null : <p className="small muted">Klik komponen di denah untuk mengedit posisi, ukuran, tinggi, dan spesifikasinya. Untuk menghapus banyak sekaligus: mode <b>Seleksi blok</b> (atau Shift + seret), lalu Delete.</p>}

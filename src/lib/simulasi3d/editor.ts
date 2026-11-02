@@ -3,7 +3,8 @@
 // Satuan meter. X = panjang gudang (0 = dinding dock), Z = lebar gudang (kiri → kanan).
 import type { BarisRak, Dock, Fasilitas, LayoutGudang, Lorong, Palet, ParamSim, Zona, JenisZona } from './layout';
 
-export type JenisKomp = 'spr' | 'ddr' | 'areaRak' | 'block' | 'stagingIn' | 'stagingOut' | 'fasilitas' | 'dock' | 'kolom' | 'jalur' | 'zona';
+export type JenisKomp = 'spr' | 'ddr' | 'areaRak' | 'block' | 'stagingIn' | 'stagingOut' | 'fasilitas' | 'dock' | 'kolom' | 'jalur' | 'zona' | 'gate' | 'platform';
+export type SisiDinding = 'depan' | 'belakang' | 'kiri' | 'kanan';
 export interface SpekRak {
   arah: 'x' | 'z';          // arah baris memanjang (bay berjejer di sumbu ini)
   hadap: 1 | -1;            // sisi muka lorong (+1 = ke arah sumbu tegak lurus yang lebih besar)
@@ -74,6 +75,7 @@ export interface Komponen {
   blok?: SpekBlok;                              // block stack berpola (baris, row deep, lorong)
   palet?: number;                               // staging: palet per sequence
   arus?: 'inbound' | 'outbound';                // dock
+  sisi?: SisiDinding;                           // gate: dinding tempat pintu (depan = dinding dock x = 0)
 }
 export interface Ukur { id: string; ax: number; az: number; bx: number; bz: number }
 export interface LatarDenah {
@@ -85,7 +87,7 @@ export interface LatarDenah {
 }
 export interface LayoutEdit {
   versi: 1;
-  gedung: { L: number; W: number; sideMm: number; centerMm: number };
+  gedung: { L: number; W: number; sideMm: number; centerMm: number; tinggiDockM?: number };
   komponen: Komponen[];
   ukur: Ukur[];
   latar?: LatarDenah | null;
@@ -94,6 +96,31 @@ export interface LayoutEdit {
   tinggiPalet: number;                           // m (palet + produk)
 }
 
+/** Gate menempel dinding: posisi sepanjang dinding (m dari ujung kiri / depan) & lebar. */
+export function posisiGate(k: Komponen, g: { L: number; W: number }) {
+  const sisi = k.sisi ?? 'depan'; const sejajarZ = sisi === 'depan' || sisi === 'belakang';
+  const lebar = sejajarZ ? k.d : k.w; const pos = sejajarZ ? k.z : k.x;
+  const batas = sejajarZ ? g.W : g.L;
+  const p0 = Math.max(0, Math.min(batas - lebar, pos));
+  const t = 0.6;   // tebal simbol gate di denah (menumpang di garis dinding)
+  return { sisi, pos: p0, lebar, tinggi: k.tinggi || 5, kotak: sisi === 'depan' ? { x: -t / 2, z: p0, w: t, d: lebar } : sisi === 'belakang' ? { x: g.L - t / 2, z: p0, w: t, d: lebar }
+    : sisi === 'kiri' ? { x: p0, z: -t / 2, w: lebar, d: t } : { x: p0, z: g.W - t / 2, w: lebar, d: t } };
+}
+/** Pindahkan gate ke dinding lain (lebar & posisi dipertahankan). */
+export function aturSisiGate(k: Komponen, sisi: SisiDinding, g: { L: number; W: number }): Komponen {
+  const { pos, lebar } = posisiGate(k, g);
+  const sejajarZ = sisi === 'depan' || sisi === 'belakang';
+  const b = posisiGate({ ...k, sisi, ...(sejajarZ ? { z: pos, d: lebar } : { x: pos, w: lebar }) }, g).kotak;
+  return { ...k, sisi, x: r2(b.x), z: r2(b.z), w: r2(b.w), d: r2(b.d) };
+}
+/** Pilar grid: daftar bentang as-ke-as ("6" = 6 m berulang sampai ujung; "6; 6; 8" = per bentang) → posisi as kumulatif. */
+export function posisiBentang(teks: string, panjang: number, awal = 0) {
+  const xs = teks.split(/[;\s]+/).map(t => Number(t.replace(',', '.'))).filter(n => n > 0.5);
+  if (!xs.length) return [] as number[];
+  const pos = [awal]; let i = 0;
+  while (pos.length < 500) { const n = xs.length === 1 ? xs[0] : xs[i]; if (n == null) break; const nx = pos[pos.length - 1] + n; if (nx > panjang + 1e-6) break; pos.push(nx); i++; }
+  return pos.map(r2);
+}
 export const uid = () => Math.random().toString(36).slice(2, 10);
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -428,6 +455,8 @@ export function komponenBaru(jenis: JenisKomp, p: ParamSim, pusat: { x: number; 
     case 'fasilitas': return [{ ...dasar, jenis, label: 'Office', w: 6, d: 5, tinggi: 3 }];
     case 'dock': return [{ ...dasar, x: 0, jenis, label: 'Dock', w: 0.3, d: 3.2, tinggi: 4.2, arus: 'inbound' }];
     case 'kolom': return [{ ...dasar, jenis, label: 'Kolom', w: 0.4, d: 0.4, tinggi: p.sideMm / 1000 }];
+    case 'gate': return [{ ...dasar, x: -0.3, jenis, label: 'Gate', w: 0.6, d: 4, tinggi: 5, sisi: 'depan' }];
+    case 'platform': return [{ ...dasar, x: -4, jenis, label: 'Loading dock', w: 4, d: 20, tinggi: 1.2, palet: 8 }];
     case 'jalur': return [{ ...dasar, jenis, label: 'Jalur', w: 10, d: 3.5, tinggi: 0 }];
     default: return [{ ...dasar, jenis: 'zona', label: 'Zona', w: 6, d: 6, tinggi: 0, warna: '#0ea5e9' }];
   }
@@ -527,7 +556,7 @@ export function ringkas(e0: LayoutEdit): Ringkasan {
   const sideM = g.sideMm / 1000;
   for (const k of e0.komponen) if (k.area && uraiArea(k, e0).length === 0) peringatan.push({ level: 'peringatan', pesan: `${k.label}: area terlalu kecil untuk 1 baris rak.`, id: k.id });
   for (const k of ks) {
-    if (k.x < -EPS || k.z < -EPS || k.x + k.w > g.L + EPS || k.z + k.d > g.W + EPS) peringatan.push({ level: 'kritis', pesan: `${k.label} keluar dari batas gedung.`, id: k.induk ?? k.id });
+    if (k.jenis !== 'gate' && k.jenis !== 'platform' && (k.x < -EPS || k.z < -EPS || k.x + k.w > g.L + EPS || k.z + k.d > g.W + EPS)) peringatan.push({ level: 'kritis', pesan: `${k.label} keluar dari batas gedung.`, id: k.induk ?? k.id });
     if (k.rak && tinggiRak(k.rak) > sideM + 1e-6) peringatan.push({ level: 'kritis', pesan: `${k.label}: tinggi rak ${r2(tinggiRak(k.rak))} m melebihi side height ${r2(sideM)} m.`, id: k.induk ?? k.id });
     if (k.rak) {
       const jb = jarakBebas(e, k);
@@ -553,6 +582,7 @@ export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang
   const g = e.gedung; const ks = uraiKomponen(e.komponen, e); const rk = ringkas(e);
   const zona: Zona[] = []; const rak: BarisRak[] = []; const palet: Palet[] = []; const lorong: Lorong[] = []; const dock: Dock[] = []; const fasilitas: Fasilitas[] = [];
   const kolom: { x: number; z: number; w: number; d: number; tinggi: number }[] = [];
+  const gate: NonNullable<LayoutGudang['gate']> = []; const platform: NonNullable<LayoutGudang['platform']> = [];
   const tp = e.tinggiPalet || 1.4;
   const slot: Palet[] = [];
   let maxTinggi = 0;
@@ -598,6 +628,8 @@ export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang
     } else if (k.jenis === 'fasilitas') { fasilitas.push({ nama: k.label, x0: k.x, x1: k.x + k.w, z0: k.z, z1: k.z + k.d, tinggi: k.tinggi }); }
     else if (k.jenis === 'dock') dock.push({ z: k.z + k.d / 2, arus: k.arus ?? 'inbound' });
     else if (k.jenis === 'kolom') kolom.push({ x: k.x, z: k.z, w: k.w, d: k.d, tinggi: k.tinggi || g.sideMm / 1000 });
+    else if (k.jenis === 'gate') { const pg = posisiGate(k, g); gate.push({ sisi: pg.sisi, pos: pg.pos, lebar: pg.lebar, tinggi: pg.tinggi }); }
+    else if (k.jenis === 'platform') platform.push({ x0: k.x, x1: k.x + k.w, z0: k.z, z1: k.z + k.d, tinggi: k.tinggi || (g.tinggiDockM ?? 1.2), palet: k.palet ?? 0, label: k.label });
     else zona.push({ id: k.id, jenis: k.jenis === 'jalur' ? 'jalur' : 'custom', label: k.label, ...box, ket: `${r2(k.w)} × ${r2(k.d)} m`, warna: k.warna });
   }
   const rnd = acak(7); for (let i = slot.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [slot[i], slot[j]] = [slot[j], slot[i]]; }
@@ -610,6 +642,6 @@ export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang
     { label: 'Okupansi', nilai: `${Math.round(rk.okupansi * 100)}%` },
   ];
   return { ...dasar, L: g.L, W: g.W, H: g.sideMm / 1000, puncak: Math.max(g.sideMm, g.centerMm) / 1000, luasLayout: g.L * g.W,
-    zona, rak, palet, lorong, dock, fasilitas, kolom, tinggiPalet: tp, tinggiRak: Math.max(maxTinggi, 1), stagingIn, stagingOut,
+    zona, rak, palet, lorong, dock, fasilitas, kolom, gate, platform, tinggiDock: g.tinggiDockM ?? 1.2, tinggiPalet: tp, tinggiRak: Math.max(maxTinggi, 1), stagingIn, stagingOut,
     ringkas: ringkasan, asumsi: rk.peringatan.map(p => p.pesan) };
 }
