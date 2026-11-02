@@ -679,14 +679,14 @@ export default function DesainGudang() {
                       <Angka l="Lebar gangway tengah" u="m" step={0.1} v={b.gangwayTengah ?? 3.5} set={x => set({ gangwayTengah: Math.max(0.5, x) })} />
                     </div>
                     <div className="grid2" style={{ gap: 6 }}>
-                      <label className="f">Arah baris<select value={b.arah} onChange={e => set({ arah: e.target.value as 'x' | 'z' })}><option value="x">Depan → belakang (X)</option><option value="z">Kiri → kanan (Z)</option></select></label>
+                      <label className="f" style={{ gridColumn: "1 / -1" }}>Arah baris<select value={b.arah} onChange={e => set({ arah: e.target.value as 'x' | 'z' })}><option value="x">Depan → belakang (X)</option><option value="z">Kiri → kanan (Z)</option></select></label>
                     </div>
                     {ub && <>
                       <div className="small" style={{ margin: '4px 0', lineHeight: 1.6 }}><span className="muted">Pola melintang: </span>
-                        {ub.urutan.map((u, i) => <span key={i} style={{ whiteSpace: 'nowrap', marginRight: 4, color: u.jenis === 'lorong' ? '#a16207' : u.jenis === 'baris' ? '#b45309' : u.jenis === 'sisa' ? 'var(--warn)' : 'var(--muted)' }}>
+                        {ub.urutan.map((u, i) => <span key={i} style={{ display: 'inline-block', whiteSpace: 'nowrap', marginRight: 4, color: u.jenis === 'lorong' ? '#a16207' : u.jenis === 'baris' ? '#b45309' : u.jenis === 'sisa' ? 'var(--warn)' : 'var(--muted)' }}>
                           {u.jenis === 'dinding' ? `|${angka(u.m * 1000)} mm` : u.jenis === 'baris' ? `[palet ×${b.deep} = ${angka(u.m, 2)} m]` : u.jenis === 'celah' ? `·${angka(u.m, 2)}·` : u.jenis === 'lorong' ? `═ ${angka(u.m, 2)} m ═` : `(sisa ${angka(u.m, 2)} m)`}</span>)}</div>
                       <div className="small" style={{ margin: '0 0 4px', lineHeight: 1.6 }}><span className="muted">Pola sepanjang baris: </span>
-                        {ub.urutanPanjang.map((u, i) => <span key={i} style={{ whiteSpace: 'nowrap', marginRight: 4, color: u.jenis === 'gangway' ? '#854d0e' : u.jenis === 'palet' ? '#b45309' : u.jenis === 'sisa' ? 'var(--warn)' : 'var(--muted)' }}>
+                        {ub.urutanPanjang.map((u, i) => <span key={i} style={{ display: 'inline-block', whiteSpace: 'nowrap', marginRight: 4, color: u.jenis === 'gangway' ? '#854d0e' : u.jenis === 'palet' ? '#b45309' : u.jenis === 'sisa' ? 'var(--warn)' : 'var(--muted)' }}>
                           {u.jenis === 'dinding' ? `|${angka(u.m * 1000)} mm` : u.jenis === 'palet' ? `[${u.n} palet = ${angka(u.m, 2)} m]` : u.jenis === 'gangway' ? `▒ gangway ${angka(u.m, 2)} m ▒` : `(sisa ${angka(u.m, 2)} m)`}</span>)}</div>
                       <p className="small" style={{ margin: 0 }}><b>{ub.nBaris} baris × {ub.nPaletBaris} palet × {b.deep} deep = {angka(ub.tapak)} tapak × {tumpuk} tumpuk = {angka(ub.tapak * tumpuk)} posisi</b> · tinggi {angka(tumpuk * b.paletT, 2)} m{tumpuk * b.paletT > edit.gedung.sideMm / 1000 && <span style={{ color: 'var(--bad)' }}> &gt; side height</span>}</p>
                       {ub.baris.length === 0 && <p className="small" style={{ margin: 0, color: 'var(--bad)' }}>Area terlalu kecil untuk 1 baris ({angka(b.deep * b.paletP, 2)} m + jarak dinding). Perbesar area atau kurangi row deep.</p>}

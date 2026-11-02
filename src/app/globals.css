@@ -342,6 +342,14 @@ tr.kat-link:hover td { background: var(--res); }
 .sim2d-panel3d .sim3d-wadah { height: 100%; min-height: 0; }
 .sim2d-svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
 .sim2d-kanan input, .sim2d-kiri input, .sim2d-kanan select, .sim2d-kiri select { padding: 5px 7px; font-size: 13px; }
+/* panel samping editor: isian pas lebar panel (tanpa geser horizontal), 2 kolom rapat */
+.sim2d-kanan, .sim2d-kiri { overflow-x: hidden; grid-template-columns: minmax(0, 1fr); }
+.sim2d-kanan > *, .sim2d-kiri > * { min-width: 0; }
+.sim2d-kanan input, .sim2d-kiri input:not([type=checkbox]):not([type=radio]), .sim2d-kanan select, .sim2d-kiri select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.sim2d-kanan .grid2, .sim2d-kanan .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; align-items: end; }
+.sim2d-kanan label.f { min-width: 0; font-size: 11.5px; line-height: 1.25; }
+.sim2d-kanan .row { flex-wrap: wrap; }
+.sim2d-kanan input[type=checkbox] { width: auto; }
 .sim2d-lapis { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .sim2d-lapis input { width: 58px; } .sim2d-lapis select { width: auto; }
 .sim2d-multi { display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; margin-bottom: 6px; border-bottom: 1px solid var(--line, #e2e8f0); }
