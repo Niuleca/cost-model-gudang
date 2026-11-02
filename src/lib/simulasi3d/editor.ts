@@ -39,6 +39,26 @@ export interface SpekArea {
   bebasRintangan?: number;         // adaptif: jarak bebas rak ke office / ramp / staging / rintangan lain (m)
   bebasDinding?: number;           // adaptif: jarak bebas rak ke dinding (m)
 }
+/**
+ * Pola block stack (tumpuk palet di lantai): baris palet memanjang di sumbu `arah`; melintang dari dinding ke dinding:
+ * jarak dinding | blok tepi (barisTepi) | lorong pertama | blok (barisPerBlok, dirapatkan celahBaris) | lorong | … | blok tepi | jarak dinding.
+ * 1 baris = palet berjejer sepanjang area × `deep` palet ke dalam (row deep), ditumpuk `tumpuk` (di Komponen).
+ */
+export interface SpekBlok {
+  arah: 'x' | 'z';
+  paletP: number;        // panjang palet (m) — searah kedalaman baris (row deep)
+  paletL: number;        // lebar palet (m) — searah baris (palet berjejer)
+  paletT: number;        // tinggi palet + muatan (m)
+  deep: number;          // palet ke dalam per baris
+  barisPerBlok: number;  // baris yang dirapatkan per blok di antara dua lorong (2 = back-to-back)
+  barisTepi: number;     // baris di blok yang menempel dinding
+  celahBaris: number;    // celah antar baris dalam satu blok (m)
+  lorongAwal: number;    // lebar lorong pertama (m)
+  lorong: number;        // lebar lorong berikutnya (m)
+  jarakDinding: number;  // jarak bebas ke tepi area / dinding (m)
+  celahPalet: number;    // celah antar palet sepanjang baris (m)
+}
+export const BLOK_DEFAULT: SpekBlok = { arah: 'x', paletP: 1.2, paletL: 1.1, paletT: 1.5, deep: 5, barisPerBlok: 2, barisTepi: 1, celahBaris: 0.5, lorongAwal: 4, lorong: 3.5, jarakDinding: 0.3, celahPalet: 0.1 };
 export interface Komponen {
   id: string; jenis: JenisKomp; label: string;
   x: number; z: number; w: number; d: number;   // kiri-atas (x, z) + ukuran sumbu X (w) & Z (d)
@@ -48,6 +68,7 @@ export interface Komponen {
   area?: SpekArea;
   induk?: string;                               // baris rak hasil urai area → id area
   tumpuk?: number;                              // block / staging
+  blok?: SpekBlok;                              // block stack berpola (baris, row deep, lorong)
   palet?: number;                               // staging: palet per sequence
   arus?: 'inbound' | 'outbound';                // dock
 }
@@ -79,7 +100,56 @@ export const levelDariTinggi = (r: SpekRak, tinggiM: number) => Math.max(1, 1 + 
 export const dimRak = (k: Komponen) => (k.rak?.arah === 'z' ? { panjang: k.d, dalam: k.w } : { panjang: k.w, dalam: k.d });
 export const nBay = (k: Komponen) => (k.rak ? Math.max(0, Math.floor(dimRak(k).panjang / k.rak.bayW + 1e-6)) : 0);
 export const kapasitasRak = (k: Komponen) => (k.rak ? nBay(k) * k.rak.ppl * k.rak.deep * k.rak.level : 0);
-export const tapakBlok = (k: Komponen) => Math.max(0, Math.floor(k.w / 1.3 + 1e-6)) * Math.max(0, Math.floor(k.d / 1.1 + 1e-6));
+export interface BarisBlok { x: number; z: number; w: number; d: number; nPalet: number; deep: number; hadap: 1 | -1 | 0 }
+export interface UraiBlok {
+  baris: BarisBlok[]; lorong: { x: number; z: number; w: number; d: number; lebar: number }[];
+  tapak: number; nPaletBaris: number; urutan: { jenis: 'dinding' | 'baris' | 'celah' | 'lorong' | 'sisa'; m: number; n?: number }[]; sisa: number;
+}
+/** Bentuk baris & lorong block stack dari pola (lihat SpekBlok). */
+export function uraiBlok(k: Komponen): UraiBlok {
+  const b = { ...BLOK_DEFAULT, ...(k.blok ?? {}) };
+  const ax = b.arah === 'x';
+  const A0 = ax ? k.x : k.z, B0 = ax ? k.z : k.x, PA = ax ? k.w : k.d, PB = ax ? k.d : k.w;
+  const jd = Math.max(0, b.jarakDinding), pL = Math.max(0.1, b.paletL), pP = Math.max(0.1, b.paletP), cp = Math.max(0, b.celahPalet);
+  const panjang = PA - 2 * jd;
+  const nPalet = panjang > 0 ? Math.max(0, Math.floor((panjang + cp) / (pL + cp) + 1e-6)) : 0;
+  const deep = Math.max(1, Math.round(b.deep)), perBlok = Math.max(1, Math.round(b.barisPerBlok)), tepi = Math.max(1, Math.round(b.barisTepi));
+  const dBaris = deep * pP;
+  const dBlok = (n: number) => n * dBaris + Math.max(0, n - 1) * b.celahBaris;
+  const lebarLorong = (i: number) => (i === 0 ? b.lorongAwal : b.lorong);
+  const tersedia = PB - 2 * jd;
+  // susunan blok melintang: [tepi] (lorong [perBlok])* lorong [tepi]; bila tidak muat, kurangi
+  let blok: number[] = [];
+  const total = (bs: number[]) => bs.reduce((s, n, i) => s + dBlok(n) + (i > 0 ? lebarLorong(i - 1) : 0), 0);
+  if (dBlok(tepi) <= tersedia + 1e-6) {
+    blok = [tepi];
+    for (;;) {
+      // tambah blok tengah selama masih ada ruang untuk blok tepi penutup; sisanya diisi blok sebanyak-banyaknya baris yang muat
+      if (total([...blok, perBlok, tepi]) <= tersedia + 1e-6) { blok.push(perBlok); continue; }
+      for (let n = Math.max(perBlok, tepi); n >= 1; n--) if (total([...blok, n]) <= tersedia + 1e-6) { blok.push(n); break; }
+      break;
+    }
+  }
+  const baris: BarisBlok[] = []; const lorong: UraiBlok['lorong'] = []; const urutan: UraiBlok['urutan'] = [{ jenis: 'dinding', m: jd }];
+  let pos = B0 + jd;
+  const kotak = (b0: number, tebal: number) => (ax ? { x: A0 + jd, z: b0, w: Math.max(0, nPalet * pL + Math.max(0, nPalet - 1) * cp), d: tebal } : { x: b0, z: A0 + jd, w: tebal, d: Math.max(0, nPalet * pL + Math.max(0, nPalet - 1) * cp) });
+  blok.forEach((n, i) => {
+    if (i > 0) { const lb = lebarLorong(i - 1); lorong.push({ ...kotak(pos, lb), lebar: lb }); urutan.push({ jenis: 'lorong', m: lb }); pos += lb; }
+    for (let r = 0; r < n; r++) {
+      if (r > 0) { urutan.push({ jenis: 'celah', m: b.celahBaris }); pos += b.celahBaris; }
+      // muka baris: menghadap lorong terdekat (baris pertama blok → lorong sebelumnya, baris terakhir → lorong sesudahnya)
+      const adaSebelum = i > 0, adaSesudah = i < blok.length - 1;
+      const hadap: 1 | -1 | 0 = r === n - 1 && adaSesudah ? 1 : r === 0 && adaSebelum ? -1 : 0;
+      baris.push({ ...kotak(pos, dBaris), nPalet, deep, hadap });
+      urutan.push({ jenis: 'baris', m: dBaris, n: 1 });
+      pos += dBaris;
+    }
+  });
+  const sisa = Math.max(0, B0 + PB - jd - pos);
+  if (blok.length) { if (sisa > 0.005) urutan.push({ jenis: 'sisa', m: r2(sisa) }); urutan.push({ jenis: 'dinding', m: jd }); }
+  return { baris, lorong, tapak: baris.length * nPalet * deep, nPaletBaris: nPalet, urutan, sisa };
+}
+export const tapakBlok = (k: Komponen) => (k.blok ? uraiBlok(k).tapak : Math.max(0, Math.floor(k.w / 1.3 + 1e-6)) * Math.max(0, Math.floor(k.d / 1.1 + 1e-6)));
 
 export const DEFAULT_RAK = (p: ParamSim, ddr: boolean): SpekRak => {
   const d = ddr ? p.ddr : p.spr;
@@ -318,7 +388,10 @@ export function komponenBaru(jenis: JenisKomp, p: ParamSim, pusat: { x: number; 
       return [{ ...dasar, jenis, label: 'Area rak SPR', w: 30, d: 20, tinggi: r2(tinggiRak(s)),
         area: { rak: s, jenisRak: 'spr', konfigurasi: 'b2b', mulai: 'rak', dalam: p.spr.depth, b2b: 0.3, crossAwal: 3, crossTengah: 3, nTengah: 0, crossAkhir: 3 } }];
     }
-    case 'block': return [{ ...dasar, jenis, label: 'Block stack', w: 7.8, d: 6.6, tumpuk: Math.max(1, Math.round(p.blockTumpuk)), tinggi: r2(Math.max(1, Math.round(p.blockTumpuk)) * tinggiPalet) }];
+    case 'block': {
+      const tumpuk = Math.max(1, Math.round(p.blockTumpuk) || 2); void tinggiPalet;
+      return [{ ...dasar, jenis, label: 'Block stack', w: 24, d: 23.4, tumpuk, tinggi: r2(tumpuk * BLOK_DEFAULT.paletT), blok: { ...BLOK_DEFAULT } }];
+    }
     case 'stagingIn': return [{ ...dasar, jenis, label: 'Staging inbound', w: 8, d: 8, palet: 20, tumpuk: 1, tinggi: 0 }];
     case 'stagingOut': return [{ ...dasar, jenis, label: 'Staging outbound', w: 8, d: 8, palet: 20, tumpuk: 1, tinggi: 0 }];
     case 'fasilitas': return [{ ...dasar, jenis, label: 'Office', w: 6, d: 5, tinggi: 3 }];
@@ -470,6 +543,14 @@ export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang
       const L2 = s.lebarLorong / 2;
       if (s.arah === 'x') { const zc = s.hadap === 1 ? k.z + k.d + L2 : k.z - L2; lorong.push({ x0: k.x - 1.5, z0: zc, x1: k.x + k.w, z1: zc, zona: k.jenis as 'spr' }); }
       else { const xc = s.hadap === 1 ? k.x + k.w + L2 : k.x - L2; lorong.push({ x0: xc, z0: k.z - 1.5, x1: xc, z1: k.z + k.d, zona: k.jenis as 'spr' }); }
+    } else if (k.jenis === 'block' && k.blok) {
+      const tumpuk = Math.max(1, k.tumpuk ?? 1); const b = { ...BLOK_DEFAULT, ...k.blok }; const u0 = uraiBlok(k);
+      const ax = b.arah === 'x';
+      for (const r of u0.baris) for (let a = 0; a < r.nPalet; a++) for (let q = 0; q < r.deep; q++) for (let u = 0; u < tumpuk; u++) {
+        const sepanjang = a * (b.paletL + b.celahPalet) + b.paletL / 2, dalam = (q + 0.5) * b.paletP;
+        slot.push(ax ? { x: r.x + sepanjang, y: u * b.paletT, z: r.z + dalam, jenis: 'block', rot: true } : { x: r.x + dalam, y: u * b.paletT, z: r.z + sepanjang, jenis: 'block' });
+      }
+      zona.push({ id: k.id, jenis: 'block', label: k.label, ...box, ket: `${u0.baris.length} baris × ${u0.nPaletBaris} palet × ${b.deep} deep × ${tumpuk} tumpuk = ${u0.tapak * tumpuk} posisi` });
     } else if (k.jenis === 'block') {
       const tumpuk = Math.max(1, k.tumpuk ?? 1);
       const nx = Math.floor(k.w / 1.3 + 1e-6), nz = Math.floor(k.d / 1.1 + 1e-6);

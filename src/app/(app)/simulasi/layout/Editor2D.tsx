@@ -2,7 +2,7 @@
 // Editor denah 2D (SVG): tampak atas, X = panjang gudang (dock di kiri), Z = lebar gudang (ke bawah).
 // Pilih, geser (drag), ubah ukuran (handle), ukur jarak, garis ukur otomatis ke rintangan / dinding, latar denah gambar / DXF.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { BLOK_DEFAULT, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 
 export type Mode = 'pilih' | 'blok' | 'ukur' | 'geser';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
@@ -226,13 +226,42 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         el.push(...gambarRak(r, sub.garis, r.id));
       }
     }
+    if (k.jenis === 'block' && k.blok) {
+      // baris palet (row deep) + garis antar palet + lorong forklift berlabel lebarnya
+      const b = { ...BLOK_DEFAULT, ...k.blok }; const ub = uraiBlok(k); const ax = b.arah === 'x';
+      ub.lorong.forEach((l, i) => {
+        el.push(<rect key={`bl${i}`} x={l.x} y={l.z} width={l.w} height={l.d} fill="#fef9c3" fillOpacity={0.7} stroke="none" />);
+        const cx = l.x + l.w / 2, cz = l.z + l.d / 2;
+        el.push(<text key={`blt${i}`} x={cx} y={cz} fontSize={fs * 0.7} textAnchor="middle" dominantBaseline="middle" fill="#a16207" transform={ax ? undefined : `rotate(-90 ${cx} ${cz})`}
+          style={{ pointerEvents: 'none' }}>lorong {l.lebar.toLocaleString('id-ID')} m</text>);
+      });
+      ub.baris.forEach((r, i) => {
+        el.push(<rect key={`br${i}`} x={r.x} y={r.z} width={r.w} height={r.d} fill="#fde68a" stroke="#b45309" strokeWidth={fs * 0.05} />);
+        const step = b.paletL + b.celahPalet;
+        if (r.nPalet <= 400) for (let a = 1; a < r.nPalet; a++) {
+          const p0 = (ax ? r.x : r.z) + a * step - b.celahPalet / 2;
+          el.push(ax ? <line key={`bp${i}-${a}`} x1={p0} y1={r.z} x2={p0} y2={r.z + r.d} stroke="#b45309" strokeWidth={fs * 0.025} strokeOpacity={0.6} />
+            : <line key={`bp${i}-${a}`} x1={r.x} y1={p0} x2={r.x + r.w} y2={p0} stroke="#b45309" strokeWidth={fs * 0.025} strokeOpacity={0.6} />);
+        }
+        for (let q = 1; q < r.deep; q++) {
+          const d0 = (ax ? r.z : r.x) + q * b.paletP;
+          el.push(ax ? <line key={`bd${i}-${q}`} x1={r.x} y1={d0} x2={r.x + r.w} y2={d0} stroke="#b45309" strokeWidth={fs * 0.02} strokeOpacity={0.35} />
+            : <line key={`bd${i}-${q}`} x1={d0} y1={r.z} x2={d0} y2={r.z + r.d} stroke="#b45309" strokeWidth={fs * 0.02} strokeOpacity={0.35} />);
+        }
+        // muka baris (sisi lorong): garis oranye tebal
+        if (r.hadap) {
+          const m = ax ? (r.hadap === 1 ? [r.x, r.z + r.d, r.x + r.w, r.z + r.d] : [r.x, r.z, r.x + r.w, r.z]) : (r.hadap === 1 ? [r.x + r.w, r.z, r.x + r.w, r.z + r.d] : [r.x, r.z, r.x, r.z + r.d]);
+          el.push(<line key={`bm${i}`} x1={m[0]} y1={m[1]} x2={m[2]} y2={m[3]} stroke="#f97316" strokeWidth={fs * 0.15} />);
+        }
+      });
+    }
     if (k.jenis === 'dock') el.push(<path key="p" d={`M ${k.x + k.w} ${k.z + k.d / 2} l ${fs * 0.9} ${-fs * 0.5} l 0 ${fs} z`} fill={k.arus === 'outbound' ? '#059669' : '#2563eb'} />);
     const ra = k.area ? ringkasArea(k, edit) : null;
-    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? `${k.label} · tumpuk ${k.tumpuk ?? 1}` : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.label;
+    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? (k.blok ? (() => { const ub = uraiBlok(k); return `${k.label} · ${ub.baris.length} baris × ${ub.nPaletBaris} plt × ${k.blok.deep} deep × ${k.tumpuk ?? 1} tumpuk = ${(ub.tapak * (k.tumpuk ?? 1)).toLocaleString('id-ID')} posisi`; })() : `${k.label} · tumpuk ${k.tumpuk ?? 1}`) : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.label;
     const muat = Math.max(k.w, k.d) > label.length * fs * 0.45 || dipilih;
     if (muat && k.jenis !== 'kolom') {
-      const tegak = k.d > k.w * 1.6 && k.jenis !== 'dock' && !k.area;
-      const cx = k.jenis === 'dock' ? k.x - fs * 0.4 : k.x + k.w / 2, cz = k.area ? k.z - fs * 0.55 : k.z + k.d / 2;
+      const tegak = k.d > k.w * 1.6 && k.jenis !== 'dock' && !k.area && !k.blok;
+      const cx = k.jenis === 'dock' ? k.x - fs * 0.4 : k.x + k.w / 2, cz = k.area || k.blok ? k.z - fs * 0.55 : k.z + k.d / 2;
       el.push(<text key="t" x={cx} y={cz} fontSize={fs * 0.8} textAnchor={k.jenis === 'dock' ? 'end' : 'middle'} dominantBaseline="middle" fill="#0f172a"
         transform={tegak ? `rotate(-90 ${cx} ${cz})` : undefined} style={{ paintOrder: 'stroke', stroke: '#ffffffcc', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>{label}</text>);
     }

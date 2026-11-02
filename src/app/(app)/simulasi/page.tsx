@@ -12,7 +12,7 @@ import { IT_SHEET_DEFAULT } from '@/lib/it';
 import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import { paramAwal, susunLayout, type LayoutGudang, type ParamSim } from '@/lib/simulasi3d/layout';
 import { dariOtomatis, tarikRak, keLayoutGudang, komponenBaru, levelDariTinggi, nBay, pasanganRak, putar, ringkas, tinggiRak, uid, kapasitasRak, tapakBlok, dimRak,
-  DEFAULT_RAK, celahArea, gabungJadiArea, pecahArea, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
+  DEFAULT_RAK, BLOK_DEFAULT, uraiBlok, type SpekBlok, celahArea, gabungJadiArea, pecahArea, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
 import { bacaDxf } from '@/lib/simulasi3d/dxf';
 import { labelStatus } from '@/lib/status';
 import { dataTanpaProject, GEDUNG_BARU, ID_PRIBADI, layoutKosong, type SpekGedungBaru } from '@/lib/simulasi3d/tanpaProject';
@@ -647,10 +647,41 @@ export default function DesainGudang() {
                     </div>
                     <p className="small muted" style={{ margin: 0 }}>{nBay(terpilih)} bay × {s.ppl} palet × {s.deep} deep × {s.level} level = <b>{angka(kapasitasRak(terpilih))} posisi</b> · tinggi {angka(tinggiRak(s), 2)} m</p>
                   </>); })()}
-                {terpilih.jenis === 'block' && (<div className="grid2" style={{ gap: 6 }}>
-                  <Angka l="Tumpuk" step={1} min={1} v={terpilih.tumpuk ?? 1} set={x => ubahK(k => ({ ...k, tumpuk: Math.max(1, Math.round(x)), tinggi: r2(Math.max(1, Math.round(x)) * edit.tinggiPalet) }))} />
-                  <div className="f small"><span className="muted">Kapasitas</span><b>{tapakBlok(terpilih)} tapak × {terpilih.tumpuk ?? 1} = {tapakBlok(terpilih) * (terpilih.tumpuk ?? 1)}</b></div>
-                </div>)}
+                {terpilih.jenis === 'block' && (() => {
+                  const b: SpekBlok = { ...BLOK_DEFAULT, paletT: edit.tinggiPalet || BLOK_DEFAULT.paletT, ...(terpilih.blok ?? {}) };
+                  const tumpuk = terpilih.tumpuk ?? 1;
+                  const set = (p: Partial<SpekBlok>, tp?: number) => ubahK(k => { const nb = { ...b, ...p }; const t2 = Math.max(1, Math.round(tp ?? k.tumpuk ?? 1)); return { ...k, blok: nb, tumpuk: t2, tinggi: r2(t2 * nb.paletT) }; });
+                  const ub = terpilih.blok ? uraiBlok(terpilih) : null;
+                  return <>
+                    {!terpilih.blok && <p className="small" style={{ margin: 0, color: 'var(--warn)' }}>Block stack lama (kapasitas dari luas saja: {tapakBlok(terpilih)} tapak × {tumpuk}). Ubah salah satu isian di bawah atau tekan <button type="button" className="ghost" onClick={() => set({})}>Terapkan pola</button></p>}
+                    <div className="small muted" style={{ margin: '2px 0' }}>Dimensi palet (m)</div>
+                    <div className="grid2" style={{ gap: 6 }}>
+                      <Angka l="Panjang" u="m" step={0.05} v={b.paletP} set={x => set({ paletP: Math.max(0.3, x) })} />
+                      <Angka l="Lebar" u="m" step={0.05} v={b.paletL} set={x => set({ paletL: Math.max(0.3, x) })} />
+                      <Angka l="Tinggi + muatan" u="m" step={0.05} v={b.paletT} set={x => set({ paletT: Math.max(0.2, x) })} />
+                    </div>
+                    <div className="grid2" style={{ gap: 6 }}>
+                      <Angka l="Stacking (tumpuk)" step={1} min={1} v={tumpuk} set={x => set({}, x)} />
+                      <Angka l="1 row deep (palet ke dalam)" step={1} min={1} v={b.deep} set={x => set({ deep: Math.max(1, Math.round(x)) })} />
+                      <Angka l="Baris per blok (2 / 5)" step={1} min={1} v={b.barisPerBlok} set={x => set({ barisPerBlok: Math.max(1, Math.round(x)) })} />
+                      <Angka l="Baris di tepi dinding" step={1} min={1} v={b.barisTepi} set={x => set({ barisTepi: Math.max(1, Math.round(x)) })} />
+                      <Angka l="Jarak ke dinding" u="mm" step={50} v={Math.round(b.jarakDinding * 1000)} set={x => set({ jarakDinding: Math.max(0, x) / 1000 })} />
+                      <Angka l="Lorong pertama" u="m" step={0.1} v={b.lorongAwal} set={x => set({ lorongAwal: Math.max(0.5, x) })} />
+                      <Angka l="Lorong berikutnya" u="m" step={0.1} v={b.lorong} set={x => set({ lorong: Math.max(0.5, x) })} />
+                      <Angka l="Celah antar baris (back-to-back)" u="m" step={0.05} v={b.celahBaris} set={x => set({ celahBaris: Math.max(0, x) })} />
+                      <Angka l="Celah antar palet sepanjang baris" u="m" step={0.05} v={b.celahPalet} set={x => set({ celahPalet: Math.max(0, x) })} />
+                      <label className="f">Arah baris<select value={b.arah} onChange={e => set({ arah: e.target.value as 'x' | 'z' })}><option value="x">Depan → belakang (X)</option><option value="z">Kiri → kanan (Z)</option></select></label>
+                    </div>
+                    {ub && <>
+                      <div className="small" style={{ margin: '4px 0', lineHeight: 1.6 }}><span className="muted">Pola melintang: </span>
+                        {ub.urutan.map((u, i) => <span key={i} style={{ whiteSpace: 'nowrap', marginRight: 4, color: u.jenis === 'lorong' ? '#a16207' : u.jenis === 'baris' ? '#b45309' : u.jenis === 'sisa' ? 'var(--warn)' : 'var(--muted)' }}>
+                          {u.jenis === 'dinding' ? `|${angka(u.m * 1000)} mm` : u.jenis === 'baris' ? `[palet ×${b.deep} = ${angka(u.m, 2)} m]` : u.jenis === 'celah' ? `·${angka(u.m, 2)}·` : u.jenis === 'lorong' ? `═ ${angka(u.m, 2)} m ═` : `(sisa ${angka(u.m, 2)} m)`}</span>)}</div>
+                      <p className="small" style={{ margin: 0 }}><b>{ub.baris.length} baris × {ub.nPaletBaris} palet × {b.deep} deep = {angka(ub.tapak)} tapak × {tumpuk} tumpuk = {angka(ub.tapak * tumpuk)} posisi</b> · tinggi {angka(tumpuk * b.paletT, 2)} m{tumpuk * b.paletT > edit.gedung.sideMm / 1000 && <span style={{ color: 'var(--bad)' }}> &gt; side height</span>}</p>
+                      {ub.baris.length === 0 && <p className="small" style={{ margin: 0, color: 'var(--bad)' }}>Area terlalu kecil untuk 1 baris ({angka(b.deep * b.paletP, 2)} m + jarak dinding). Perbesar area atau kurangi row deep.</p>}
+                      {ub.sisa > Math.min(b.lorong, b.deep * b.paletP) && <p className="small muted" style={{ margin: 0 }}>Sisa {angka(ub.sisa, 2)} m melintang — perlebar area agar muat lorong + baris berikutnya, atau kecilkan area.</p>}
+                    </>}
+                  </>;
+                })()}
                 {(terpilih.jenis === 'stagingIn' || terpilih.jenis === 'stagingOut') && (<div className="grid2" style={{ gap: 6 }}>
                   <Angka l="Palet / sequence" step={1} min={0} v={terpilih.palet ?? 0} set={x => ubahK(k => ({ ...k, palet: Math.max(0, Math.round(x)) }))} />
                   <Angka l="Tumpuk" step={1} min={1} v={terpilih.tumpuk ?? 1} set={x => ubahK(k => ({ ...k, tumpuk: Math.max(1, Math.round(x)) }))} />
