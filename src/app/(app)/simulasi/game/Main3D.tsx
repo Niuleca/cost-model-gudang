@@ -43,7 +43,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
   const [tampilan, setTampilan] = useState<TampilSim>(tampilAwal);
   const [opsi2d, setOpsi2d] = useState<Opsi2D>({ alur: false, okupansi: true, label: true });
   const kontrol = useRef<KontrolGame>({ jalan: false, kecepatan: 60, batas: hariMaks * HARI - 1, pilih: null,
-    jelajah: false, tombol: { maju: false, mundur: false, kiri: false, kanan: false, lari: false, putarKiri: false, putarKanan: false }, amatan: null, statGerak: {} });
+    jelajah: false, tombol: { maju: false, mundur: false, kiri: false, kanan: false, lari: false, putarKiri: false, putarKanan: false, kamAtas: false, kamBawah: false }, amatan: null, statGerak: {} });
   if (typeof window !== 'undefined' && (window as unknown as { __LECA_DEBUG?: unknown }).__LECA_DEBUG) (window as unknown as { __LECA_DEBUG: unknown }).__LECA_DEBUG = kontrol.current;   // hook uji otomatis
   const [jelajah, setJelajahS] = useState(false);
   const [tabBawah, setTabBawah] = useState<TabBawah>('flag');
@@ -256,7 +256,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
                 </div>
               )}
               {sp.mode === 'bebas' && (<>
-              {!am ? <p className="small muted" style={{ margin: 0 }}>Jalan (W/A/S/D) mendekati pekerja atau MHE di staging, lorong rak, atau dock.</p> : (
+              {!am ? <p className="small muted" style={{ margin: 0 }}>Jalan (W/S, putar A/D) mendekati pekerja atau MHE di staging, lorong rak, atau dock.</p> : (
                 <>
                   <div className="gm-amati-nama"><b>{am.nama}</b>{am.role && am.jenis === 'pekerja' && <span className="small muted">{am.role}</span>}</div>
                   {!am.tugas ? <p className="small" style={{ margin: 0 }}><span className="gm-pill info">{am.ket ? 'Patroli' : 'Siaga'}</span> {am.ket ?? 'menunggu tugas berikutnya di area kerjanya.'}</p> : (() => {
@@ -308,14 +308,14 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
               </>)}
             </div>
             <div className="gm-dpad" aria-label="Kendali karakter">
-              {([['putarKiri', '⟲', 'putar-kiri', 'Putar kiri (Q / ←)'], ['maju', '▲', 'atas', 'Maju (W / ↑)'], ['putarKanan', '⟳', 'putar-kanan', 'Putar kanan (E / →)'], ['kiri', '◀', 'kiri', 'Geser kiri (A)'], ['kanan', '▶', 'kanan', 'Geser kanan (D)'], ['mundur', '▼', 'bawah', 'Mundur (S)']] as const).map(([t, ikon, kls, lbl]) => (
+              {([['kamAtas', '⤒', 'putar-kiri', 'Kamera ke atas (Q)'], ['maju', '▲', 'atas', 'Maju (W / ↑)'], ['kamBawah', '⤓', 'putar-kanan', 'Kamera ke bawah (E)'], ['putarKiri', '⟲', 'kiri', 'Putar kiri (D / ←)'], ['putarKanan', '⟳', 'kanan', 'Putar kanan (A / →)'], ['mundur', '▼', 'bawah', 'Mundur (S / ↓)']] as const).map(([t, ikon, kls, lbl]) => (
                 <button key={t} type="button" className={`ghost ${kls}`} aria-label={lbl} title={lbl}
                   onPointerDown={e => { e.preventDefault(); tekan(t, true); }} onPointerUp={() => tekan(t, false)} onPointerLeave={() => tekan(t, false)} onPointerCancel={() => tekan(t, false)}>{ikon}</button>
               ))}
               <button type="button" className="aksi" onPointerDown={e => { e.preventDefault(); sp.minta++; }} aria-label="Aksi (Spasi)">Aksi</button>
               <button type="button" className="ghost lari" onPointerDown={e => { e.preventDefault(); tekan('lari', true); }} onPointerUp={() => tekan('lari', false)} onPointerLeave={() => tekan('lari', false)}>Lari</button>
             </div>
-            <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'W/S atau ↑/↓ = maju/mundur · Q/E atau ←/→ = putar kiri/kanan · A/D = geser · Shift = lari · seret layar = lihat sekitar' : `W/S atau ↑/↓ = maju/mundur · Q/E atau ←/→ = putar${sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt' ? ' (A/D juga belok)' : ' · A/D = geser'} · Spasi = ${sp.petunjuk.startsWith('Spasi = ') ? sp.petunjuk.slice(8) : 'aksi'}${sp.mode === 'cbt' || sp.mode === 'reach' ? ' · R / F = level garpu' : ''}`}</p>
+            <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'W/S = maju/mundur · A = putar kanan · D = putar kiri · Q/E = kamera atas/bawah · Shift = lari · seret layar = lihat sekitar' : `W/S = maju/mundur · A = putar kanan · D = putar kiri · Q/E = kamera atas/bawah · Spasi = ${sp.petunjuk.startsWith('Spasi = ') ? sp.petunjuk.slice(8) : 'aksi'}${sp.mode === 'cbt' || sp.mode === 'reach' ? ' · R / F = level garpu' : ''}`}</p>
           </>
         )}
         {panel && !jelajah && <PanelOrder d={dunia} o={order} pilih={p => setPilih(p)} />}

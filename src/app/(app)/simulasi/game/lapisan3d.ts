@@ -24,7 +24,7 @@ export interface StatGerak { n: number; kecTotal: number; kecMaks: number; jarak
 export interface Aktor2D { id: string; jenis: 'mhe' | 'pekerja' | 'pemain'; x: number; z: number; rot: number; sibuk: boolean; bawa: 'palet' | 'karton' | null; kemampuan?: string; mhe?: string; tugas?: JenisTugas }
 export interface KontrolGame {
   jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null;
-  jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean; putarKiri?: boolean; putarKanan?: boolean };
+  jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean; putarKiri?: boolean; putarKanan?: boolean; kamAtas?: boolean; kamBawah?: boolean };
   amatan: Amatan | null; statGerak: Partial<Record<JenisTugas, StatGerak>>;
   aktor2d?: Aktor2D[];
   /** mode kerja pemain (motion study) */
@@ -442,8 +442,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const keyTombol = (e: KeyboardEvent, nilai: boolean) => {
       const k2 = kontrol.current; if (!k2.jelajah) return;
       const tg = e.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return;
-      // W/S & panah atas/bawah maju-mundur; panah kiri/kanan & Q/E putar (belok) kiri-kanan; A/D geser samping (kendaraan: belok); Shift lari
-      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'kiri', arrowleft: 'putarKiri', d: 'kanan', arrowright: 'putarKanan', shift: 'lari', q: 'putarKiri', e: 'putarKanan' };
+      // W/S & ↑/↓ maju-mundur · A = putar kanan, D = putar kiri (permintaan pengguna) · ←/→ putar kiri/kanan
+      // Q = kamera mendongak ke atas, E = kamera menunduk ke bawah · Shift lari
+      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'putarKanan', arrowleft: 'putarKiri', d: 'putarKiri', arrowright: 'putarKanan', shift: 'lari', q: 'kamAtas', e: 'kamBawah' };
       // fokus tertinggal di tombol / dropdown panel → panah tidak boleh mengubah pilihan dropdown; lepas fokus supaya game menerima
       if (tg && tg.tagName === 'BUTTON' && e.key.startsWith('Arrow')) tg.blur();
       const kunci = e.key.toLowerCase();
@@ -758,10 +759,18 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const beda = (a: number, b: number) => { let x = a - b; while (x > Math.PI) x -= 2 * Math.PI; while (x < -Math.PI) x += 2 * Math.PI; return x; };
     /** Kamera gaya game survival: selalu di belakang-atas karakter mengikuti arah hadapnya; tarik mouse untuk melihat sekitar,
      *  kembali sendiri 3 dtk setelah dilepas; mendekat otomatis bila terhalang rak / dinding. */
+    let kamPitch = 0;   // sudut kamera tambahan (rad): − = mendongak ke atas (Q), + = menunduk ke bawah (E)
     const kamFollow = (dt: number, langsung: boolean) => {
       jamKam += dt;
       const sp = kontrol.current.pemain; const besar = !!sp && (sp.mode === 'cbt' || sp.mode === 'reach');
-      const ty = besar ? 1.8 : 1.5, jarakI = besar ? 7.5 : 5.2, tinggiI = besar ? 3.4 : 2.4;
+      const tb = kontrol.current.tombol;
+      if (tb.kamAtas) kamPitch -= 1.1 * Math.min(0.1, dt); if (tb.kamBawah) kamPitch += 1.1 * Math.min(0.1, dt);
+      const ty0 = besar ? 1.8 : 1.5, jarak0 = besar ? 7.5 : 5.2, tinggi0 = besar ? 3.4 : 2.4;
+      // elevasi kamera di belakang karakter: default ±25°, Q turun sampai −8° (melihat ke atas rak), E naik sampai 80° (hampir dari atas)
+      const r0 = Math.hypot(jarak0, tinggi0), el0 = Math.atan2(tinggi0, jarak0);
+      kamPitch = Math.max(-el0 - 0.14, Math.min(1.4 - el0, kamPitch)); const el = el0 + kamPitch;
+      const jarakI = r0 * Math.cos(el), tinggiI = Math.max(0.3 - ty0, r0 * Math.sin(el));
+      const ty = ty0 + (kamPitch < 0 ? Math.min(L.tinggiRak, -kamPitch * 9) : 0);   // mendongak: titik pandang naik ke level rak atas
       const tgt = v(posPemain.x, posPemain.z, ty);
       // melihat sekitar: selama mouse ditahan, atau 3 dtk setelah dilepas selama karakter belum bergerak
       if (!langsung && (kamPegang || (jamKam - kamLepas < 3 && kamGerak < kamLepas))) {   // sedang/baru melihat sekitar: hanya ikut bergeser, tapi tetap tidak menembus rak
@@ -776,8 +785,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       let yaw = Math.atan2(off.z, -off.x); const h = pemain.rotation.y;
       yaw = langsung ? h : yaw + beda(h, yaw) * (1 - Math.exp(-dt * 8));
       let hd = jarakI * 0.2;
-      for (let kk = 1; kk >= 0.2; kk -= 0.1) if (garisBebas(yaw, jarakI * kk, ty + tinggiI, ty)) { hd = jarakI * kk; break; }
-      const cy = ty + tinggiI * (hd < jarakI * 0.6 ? 1.35 : 1);
+      for (let kk = 1; kk >= 0.2; kk -= 0.1) if (garisBebas(yaw, jarakI * kk, ty0 + tinggiI, ty)) { hd = jarakI * kk; break; }
+      const cy = Math.max(0.3, ty0 + tinggiI * (hd < jarakI * 0.6 && kamPitch >= 0 ? 1.35 : 1));
       const ingin = v(posPemain.x - Math.cos(yaw) * hd, posPemain.z + Math.sin(yaw) * hd, cy);
       kamera.position.lerp(ingin, langsung ? 1 : 1 - Math.exp(-dt * 10)); kontrolKamera.target.copy(tgt);
     };
@@ -847,7 +856,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       if (sp.mode !== modeLalu) gantiMode(sp, modeLalu);
       const naikKendaraan = sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt';
-      // kendali: W/S maju-mundur searah hadap, Q/E putar kiri-kanan, A/D geser samping (kendaraan: A/D ikut belok);
+      // kendali: W/S maju-mundur searah hadap, A/D & ←/→ putar, Q/E kamera atas/bawah;
       // kamera tetap di belakang karakter mengikuti arah hadap
       const kendaraanBesar = sp.mode === 'cbt' || sp.mode === 'reach';
       const putar = Math.max(-1, Math.min(1, (t.putarKiri ? 1 : 0) - (t.putarKanan ? 1 : 0) + (naikKendaraan ? (t.kiri ? 1 : 0) - (t.kanan ? 1 : 0) : 0)));
@@ -890,7 +899,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
             if (!jalan) break;
           }
         }
-        if (majuK || geserS || putar) kamGerak = jamKam;   // bergerak → kamera kembali mengikuti arah hadap
+        if (majuK || geserS || putar || t.kamAtas || t.kamBawah) kamGerak = jamKam;   // bergerak → kamera kembali mengikuti arah hadap
       }
       const gx = putar || geserS, gz = majuK;
       const geser = posPemain.clone().sub(lama);
