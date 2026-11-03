@@ -308,6 +308,33 @@ export function ikLengan(akar: THREE.Object3D, sisi: 'Left' | 'Right', target: T
   const E2 = bawah.getWorldPosition(new THREE.Vector3()), H2 = tangan.getWorldPosition(new THREE.Vector3());
   putarTulang(bawah, H2.clone().sub(E2), S.clone().addScaledVector(arah, d).sub(E2));
 }
+/** Rantai 3 tulang (pangkal → tengah → ujung) diarahkan supaya ujung sampai ke `target`; sendi tengah condong ke `kutub`. */
+function ikRantai(akar: THREE.Object3D, nama: [string, string, string], target: THREE.Vector3, kutub: THREE.Vector3) {
+  const [a, b, c] = nama.map(n => akar.getObjectByName(n)); if (!a || !b || !c) return;
+  a.updateWorldMatrix(true, true);
+  const S = a.getWorldPosition(new THREE.Vector3()), E = b.getWorldPosition(new THREE.Vector3()), H = c.getWorldPosition(new THREE.Vector3());
+  const l1 = S.distanceTo(E), l2 = E.distanceTo(H); if (l1 < 1e-4 || l2 < 1e-4) return;
+  const ke = target.clone().sub(S); const d = Math.max(Math.abs(l1 - l2) + 1e-3, Math.min(ke.length(), (l1 + l2) * 0.995)); const arah = ke.normalize();
+  const t = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - t * t));
+  const pol = kutub.clone().sub(arah.clone().multiplyScalar(kutub.dot(arah))); if (pol.lengthSq() < 1e-6) pol.set(1, 0, 0); pol.normalize();
+  const tengah = S.clone().addScaledVector(arah, t).addScaledVector(pol, h);
+  putarTulang(a, E.clone().sub(S), tengah.clone().sub(S));
+  const E2 = b.getWorldPosition(new THREE.Vector3()), H2 = c.getWorldPosition(new THREE.Vector3());
+  putarTulang(b, H2.clone().sub(E2), S.clone().addScaledVector(arah, d).sub(E2));
+}
+/** Pose melompat (tidak ada klip lompat di model): lutut ditekuk & kaki terangkat, kedua lengan terangkat ke depan-atas.
+ *  `f` 0 = berdiri … 1 = lutut terlipat penuh di puncak lompatan. Dijalankan tiap frame setelah mixer. */
+export function poseLompat(orang: THREE.Object3D, f: number) {
+  const akar = orang.children.find(c => c.name === 'meshy'); if (!akar || f <= 0.001) return;
+  orang.updateWorldMatrix(true, false);
+  const w = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(orang.matrixWorld);
+  const dir = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).transformDirection(orang.matrixWorld);
+  const k = Math.min(1, f);
+  for (const [sisi, z] of [['Left', -0.11], ['Right', 0.11]] as const) {
+    ikRantai(akar, [`${sisi}UpLeg`, `${sisi}Leg`, `${sisi}Foot`], w(-0.12 * k + (sisi === 'Left' ? 0.06 : -0.04) * k, 0.1 + 0.38 * k, z), dir(1, 0.2, 0));   // lutut ke depan
+    ikRantai(akar, [`${sisi}Arm`, `${sisi}ForeArm`, `${sisi}Hand`], w(0.18 + 0.12 * k, 1.05 + 0.55 * k, z * 2.6), dir(-0.2, -1, z * 4));
+  }
+}
 /** Pose membawa karton di depan dada: karton (anak `orang`) di lokal (x, y, 0); tangan memegang kedua sisinya. */
 export function pegangKarton(orang: THREE.Object3D, karton: THREE.Object3D) {
   const akar = orang.children.find(c => c.name === 'meshy'); if (!akar) return;

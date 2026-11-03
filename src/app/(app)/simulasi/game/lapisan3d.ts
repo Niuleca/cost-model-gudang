@@ -7,7 +7,7 @@ import { ARMADA, bertugas, faseTrukTeks, jalankanSampai, jenisTrukDari, posisiTr
 import type { LayoutGudang, Lorong } from '@/lib/simulasi3d/layout';
 import { kategoriOrang } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, xSandar, type PasangLapisan } from '../Viewer3D';
-import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pasangOperator, pegangKarton, pegangTangkai, pegangKendali, aturMast, pinBersih, POSISI_OPERATOR, trukBersih, WARNA_BERSIH, type Animator, type JenisKendaraan } from '../model3d';
+import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pasangOperator, pegangKarton, pegangTangkai, pegangKendali, aturMast, pinBersih, poseLompat, POSISI_OPERATOR, trukBersih, WARNA_BERSIH, type Animator, type JenisKendaraan } from '../model3d';
 import { WARNA_ORANG } from '../warna';
 import { areaMhe, gridStaging as gridTapak } from './areaMhe';
 import { ELEMEN, LABEL_AKSI, MODE_PEMAIN, studiAwal, type ModePemain, type SiklusStudi, type StudiPemain } from './pemain';
@@ -958,10 +958,12 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       // halaman di luar gedung lebih rendah setinggi dock (lantai gudang & platform loading dock di y = 0)
       const yBaru = yPijak(posPemain.x, posPemain.z); geser.y = yBaru - (pemain.position.y - lompatY);
       // lompat: hanya saat jalan kaki (bukan di atas forklift / reach / hand pallet) & sedang menapak
-      if (mintaLompat) { mintaLompat = false; if (!naikKendaraan && !aksiP && lompatY <= 0) lompatV = 4.2; }
+      if (mintaLompat) { mintaLompat = false; if (!naikKendaraan && !aksiP && lompatY <= 0) lompatV = 4.6; }   // puncak ±1,1 m, ±0,95 dtk di udara
       if (lompatY > 0 || lompatV > 0) { lompatV -= 9.8 * dtc; lompatY = Math.max(0, lompatY + lompatV * dtc); if (lompatY === 0) lompatV = 0; }
       if (naikKendaraan) { lompatY = 0; lompatV = 0; }
       pemain.position.set(posPemain.x, yBaru + lompatY, posPemain.z);
+      sp.lompat = lompatY;
+      tandaPemain.position.y = 0.03 - lompatY; tandaPemain.scale.setScalar(1 - Math.min(0.35, lompatY * 0.3));   // cincin tetap di lantai (bayangan), mengecil saat tinggi
       kamera.position.add(geser); kontrolKamera.target.add(geser);
       kamFollow(dt, false);
       const dGerak = Math.hypot(geser.x, geser.z);
@@ -969,6 +971,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       sp.posisi = { x: posPemain.x, z: posPemain.z };
       animPemain?.main(naikKendaraan ? 'duduk' : aksiP ? 'kerja' : gx || gz ? (t.lari && sp.mode === 'bebas' ? 'lari' : 'jalan') : 'diam');
       animPemain?.mixer.update(Math.min(0.1, dt));
+      if (lompatY > 0.005 && !naikKendaraan) poseLompat(pemain, Math.min(1, lompatY / 0.35 + 0.35));   // lutut terlipat & lengan terangkat saat di udara
       if (kartonP.visible && !(sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt')) pegangKarton(pemain, kartonP);
       kerjaPemain(sp, Math.min(0.1, dt), dGerak);
       // observasi: pekerja / MHE terdekat dalam 8 m

@@ -26,6 +26,7 @@ export interface StudiPemain {
   target?: { x: number; z: number; label: string; jarak: number } | null;
   pesan?: string;                        // umpan balik saat E tidak bisa dijalankan
   tarik?: boolean;                       // hand pallet: ditarik (true) / didorong
+  lompat?: number;                       // tinggi lompatan saat ini (m), 0 = menapak
 }
 export const studiAwal = (): StudiPemain => ({ mode: 'bebas', level: 0, minta: 0, aksi: null, bawa: null, petunjuk: '', siklus: [], berjalan: null, kecepatan: 0 });
 
