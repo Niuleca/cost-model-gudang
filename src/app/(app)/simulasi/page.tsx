@@ -212,7 +212,15 @@ export default function DesainGudang() {
     aksi(e => ({ ...e, komponen: e.komponen.filter(k => !set.has(k.id)) })); setPilih(null);
     setPesan(`${n} komponen dihapus · Ctrl+Z untuk membatalkan`);
   }
-  const geserBanyak = (dx: number, dz: number) => { const set = new Set(multi); aksi(e => ({ ...e, komponen: e.komponen.map(k => (set.has(k.id) ? { ...k, x: k.jenis === 'dock' ? k.x : r2(k.x + dx), z: r2(k.z + dz) } : k)) })); };
+  /** Geser dengan panah: dock & gate menempel dinding → panah kiri/kanan (dan atas/bawah) menggeser sepanjang dinding; lainnya bebas X/Z. */
+  const geserPanah = (k: Komponen, dx: number, dz: number): Komponen => {
+    if (!edit) return k;
+    if (k.jenis === 'dock') return { ...k, z: r2(Math.max(0, Math.min(edit.gedung.W - k.d, k.z + dx + dz))) };
+    if (k.jenis === 'gate') { const sisi = k.sisi ?? 'depan'; const sz = sisi === 'depan' || sisi === 'belakang'; const t = dx + dz;
+      return aturSisiGate({ ...k, ...(sz ? { z: r2(k.z + t) } : { x: r2(k.x + t) }) }, sisi, edit.gedung); }
+    return { ...k, x: r2(k.x + dx), z: r2(k.z + dz) };
+  };
+  const geserBanyak = (dx: number, dz: number) => { const set = new Set(multi); aksi(e => ({ ...e, komponen: e.komponen.map(k => (set.has(k.id) ? geserPanah(k, dx, dz) : k)) })); };
   /** asKeAs = jarak diukur pusat-ke-pusat (as ke as, mis. pilar 6 m → 6, 12, 18 dari pilar pertama); selain itu jarak = celah antar tepi. */
   function gandakan(n = 1, jarak = 0, arah: 'x' | 'z' = 'z', asKeAs = false) {
     if (!terpilih) return;
@@ -269,7 +277,7 @@ export default function DesainGudang() {
       if (ev.key.toLowerCase() === 'r') { ubahK(putar); return; }
       const lang = ev.shiftKey ? 1 : grid || 0.1;
       const d = ({ ArrowLeft: [-lang, 0], ArrowRight: [lang, 0], ArrowUp: [0, -lang], ArrowDown: [0, lang] } as Record<string, number[]>)[ev.key];
-      if (d) { ev.preventDefault(); ubahK(k => ({ ...k, x: r2(k.x + d[0]), z: r2(k.z + d[1]) })); }
+      if (d) { ev.preventDefault(); ubahK(k => geserPanah(k, d[0], d[1])); }
     };
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
   }); // eslint-disable-line react-hooks/exhaustive-deps
@@ -534,7 +542,7 @@ export default function DesainGudang() {
             <div className="eyebrow">Ekspor</div>
             <div className="row"><button className="ghost" onClick={unduhPng}>PNG denah</button><button className="ghost" onClick={unduhPdf}>PDF A3</button>
               <button className="ghost" onClick={() => { const u = api3.current?.screenshot(); if (u) { const a = document.createElement('a'); a.href = u; a.download = `${namaFile()}_3D.png`; a.click(); } }} disabled={tampil === '2d'}>PNG 3D</button></div>
-            <p className="small muted">Pintasan: Seleksi blok / Shift + seret = pilih banyak (seret ke kanan = yang masuk penuh, ke kiri = yang tersentuh) · Shift/Ctrl + klik tambah/buang · Ctrl+A pilih semua · Delete hapus · R putar · Ctrl+D gandakan · panah geser (Shift = 1 m) · Ctrl+Z / Ctrl+Y · scroll zoom · seret area kosong = pan.</p>
+            <p className="small muted">Pintasan: Seleksi blok / Shift + seret = pilih banyak (seret ke kanan = yang masuk penuh, ke kiri = yang tersentuh) · Shift/Ctrl + klik tambah/buang · Ctrl+A pilih semua · Delete hapus · R putar · Ctrl+D gandakan · panah geser (Shift = 1 m; dock & gate bergeser sepanjang dinding) · Ctrl+Z / Ctrl+Y · scroll zoom · seret area kosong = pan.</p>
           </div>
 
           {/* ---------- tengah: kanvas */}

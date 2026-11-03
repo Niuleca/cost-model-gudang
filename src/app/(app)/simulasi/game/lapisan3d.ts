@@ -434,11 +434,18 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       if (x > -0.25) return L.dock.some(dk => Math.abs(z - dk.z) < 1.5);   // dinding depan: hanya lewat pintu dock
       return true;
     };
+    const yPijak = (x: number, z: number) => {
+      if (x >= 0 && x <= L.L && z >= 0 && z <= L.W) return 0;
+      if ((L.platform ?? []).some(p => x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1)) return 0;
+      return -(L.tinggiDock ?? 1.2);
+    };
     const keyTombol = (e: KeyboardEvent, nilai: boolean) => {
       const k2 = kontrol.current; if (!k2.jelajah) return;
       const tg = e.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return;
-      // W/S maju-mundur, Q/E putar kiri-kanan, A/D geser kiri-kanan (kendaraan: belok), Shift lari
-      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'kiri', arrowleft: 'kiri', d: 'kanan', arrowright: 'kanan', shift: 'lari', q: 'putarKiri', e: 'putarKanan' };
+      // W/S & panah atas/bawah maju-mundur; panah kiri/kanan & Q/E putar (belok) kiri-kanan; A/D geser samping (kendaraan: belok); Shift lari
+      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'kiri', arrowleft: 'putarKiri', d: 'kanan', arrowright: 'putarKanan', shift: 'lari', q: 'putarKiri', e: 'putarKanan' };
+      // fokus tertinggal di tombol / dropdown panel → panah tidak boleh mengubah pilihan dropdown; lepas fokus supaya game menerima
+      if (tg && tg.tagName === 'BUTTON' && e.key.startsWith('Arrow')) tg.blur();
       const kunci = e.key.toLowerCase();
       if (nilai && !e.repeat && k2.pemain) {
         // tombol sekali tekan mode kerja: Spasi / Enter = aksi, R / F = naik / turun level garpu
@@ -887,7 +894,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       }
       const gx = putar || geserS, gz = majuK;
       const geser = posPemain.clone().sub(lama);
-      pemain.position.set(posPemain.x, 0, posPemain.z);
+      // halaman di luar gedung lebih rendah setinggi dock (lantai gudang & platform loading dock di y = 0)
+      const yBaru = yPijak(posPemain.x, posPemain.z); geser.y = yBaru - pemain.position.y;
+      pemain.position.set(posPemain.x, yBaru, posPemain.z);
       kamera.position.add(geser); kontrolKamera.target.add(geser);
       kamFollow(dt, false);
       const dGerak = Math.hypot(geser.x, geser.z);
