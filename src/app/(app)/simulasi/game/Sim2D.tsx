@@ -15,14 +15,7 @@ type Kotak = { x0: number; x1: number; z0: number; z1: number };
 interface GrupSlot { x: number; z: number; ids: string[]; kap: number; w: number; d: number }
 
 export interface Opsi2D { alur: boolean; okupansi: boolean; label: boolean }
-/** Grid tapak palet di area staging (sama dengan susunan palet di 3D): kolom 1,3 m, baris 1,2 m. */
-export function gridStaging(a: Kotak) {
-  const xs: number[] = [], zs: number[] = [];
-  for (let x = a.x1 - 0.9; x >= a.x0 + 3.2; x -= 1.3) xs.push(x);
-  for (let z = a.z0 + 0.9; z <= a.z1 - 0.9; z += 1.2) zs.push(z);
-  if (!xs.length) xs.push((a.x0 + a.x1) / 2); if (!zs.length) zs.push((a.z0 + a.z1) / 2);
-  return { xs, zs, kap: xs.length * zs.length };
-}
+import { areaMhe, gridStaging } from './areaMhe';
 
 export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, opsi }: {
   dunia: Dunia; layout: LayoutGudang; kontrol: { current: KontrolGame }; pilih: Pilihan | null; onPilih: (p: Pilihan | null) => void; opsi: Opsi2D;
@@ -65,7 +58,7 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
     // area simpan untuk peta alur: zona rak / block
     const area = L.zona.filter(z => z.jenis === 'spr' || z.jenis === 'ddr' || z.jenis === 'block' || z.jenis === 'floor');
     const stgIn = [...d.lokasi.values()].find(l => l.tipe === 'staging_in')!, stgOut = [...d.lokasi.values()].find(l => l.tipe === 'staging_out')!;
-    return { grup: [...grup.values()], zDock, area, stgIn, stgOut };
+    return { grup: [...grup.values()], zDock, area, stgIn, stgOut, areaM: areaMhe(L, d.mhe.map(m => m.jenis)) };
   }, [d, L]);
 
   // ---------- peta alur (dihitung ulang paling sering tiap 1 detik)
@@ -177,10 +170,10 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
       if (o.label) for (const z of L.zona) if ((z.jenis === 'spr' || z.jenis === 'ddr' || z.jenis === 'block' || z.jenis === 'floor') && (z.x1 - z.x0) * s > 60 && z.z1 - z.z0 > 3) teks(z.label, (z.x0 + z.x1) / 2, z.z0 - 0.0 + Math.min(1.2, (z.z1 - z.z0) / 2), fs(0.9, 10, 13), '#1e3a8a');
       // palet staging + bar lampu lalu lintas
       for (const [lok, a, nama] of [[statis.stgIn, L.stagingIn, 'Staging inbound'], [statis.stgOut, L.stagingOut, 'Staging outbound']] as const) {
-        const { xs, zs, kap: nTapak } = gridStaging(a);
+        const { pos, kap: nTapak } = gridStaging(a, [statis.areaM]);
         for (let i = 0; i < Math.min(lok.lpn.length, nTapak); i++) {
           const tum = Math.floor(lok.lpn.length / nTapak) + (i < lok.lpn.length % nTapak ? 1 : 0);
-          const x = xs[i % xs.length], z = zs[Math.floor(i / xs.length)];
+          const { x, z } = pos[i];
           g.fillStyle = tum > 1 ? '#92400e' : '#c08a4a'; g.fillRect(X(x - 0.5), Y(z - 0.45), s, 0.9 * s);
         }
         const r = lok.lpn.length / Math.max(1, nTapak);
@@ -189,6 +182,11 @@ export default function Sim2D({ dunia: d, layout: L, kontrol, pilih, onPilih, op
         g.fillStyle = lampu(r); g.fillRect(X(bx), Y(bz), Math.min(1, r) * bw * s, Math.max(3, 0.35 * s));
         if (o.label) teks(`${nama} ${lok.lpn.length}/${nTapak} tapak`, (a.x0 + a.x1) / 2, a.z1 - 0.7, fs(0.8, 9, 12), r >= 0.85 ? '#b91c1c' : '#0f172a');
       }
+      // area MHE (parkir & charging)
+      { const A = statis.areaM; g.fillStyle = 'rgba(253,230,138,.55)'; g.fillRect(X(A.x0), Y(A.z0), (A.x1 - A.x0) * s, (A.z1 - A.z0) * s);
+        g.strokeStyle = '#ca8a04'; g.lineWidth = Math.max(1, 0.1 * s); g.setLineDash([0.5 * s, 0.3 * s]); g.strokeRect(X(A.x0), Y(A.z0), (A.x1 - A.x0) * s, (A.z1 - A.z0) * s); g.setLineDash([]);
+        g.fillStyle = '#475569'; g.fillRect(X(A.panel.x - 0.45), Y(A.panel.z - 0.2), 0.9 * s, 0.4 * s);
+        if (o.label && s > 3) teks('Area MHE', (A.x0 + A.x1) / 2, A.z0 + 0.6, fs(0.7, 8, 11), '#854d0e'); }
       // dinding + pintu dock
       g.strokeStyle = '#0f172a'; g.lineWidth = Math.max(2, 0.25 * s); g.strokeRect(X(0), Y(0), L.L * s, L.W * s);
       let nIn = 0, nOut = 0;

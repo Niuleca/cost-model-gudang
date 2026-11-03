@@ -15,7 +15,7 @@ export interface SiklusBerjalan { mulai: number; jalan: Elemen; bawa: Elemen; ak
 export interface StudiPemain {
   mode: ModePemain;
   level: number;                         // target level garpu (0 = lantai)
-  minta: number;                         // naik 1 tiap tombol aksi (E) ditekan
+  minta: number;                         // naik 1 tiap tombol aksi (R) ditekan
   aksi: { nama: string; f: number; sisa: number } | null;
   bawa: 'palet' | 'karton' | 'dokumen' | null;
   petunjuk: string;
@@ -33,7 +33,7 @@ export const MODE_PEMAIN: Record<ModePemain, { label: string; ikon: string; ket:
   bebas: { label: 'Gerak bebas', ikon: '🚶', ket: 'Jalan bebas & amati pekerja lain (Shift = lari).', kec: { kosong: 1.4, bawa: 1.4 } },
   cbt: { label: 'Forklift CB', ikon: '🚜', ket: 'Counterbalance: ambil palet dari rak / lantai / staging dan taruh di slot rak, lantai, atau staging (tumpuk 2).', kec: { kosong: 3.0, bawa: 2.5 } },
   reach: { label: 'Reach truck', ikon: '🏗️', ket: 'Reach truck: putaway & picking palet sampai level atas, atau taruh di staging.', kec: { kosong: 2.5, bawa: 2.0 } },
-  hpt: { label: 'Hand pallet', ikon: '🛒', ket: 'Pindahkan palet di lantai (dock ↔ staging ↔ lantai). T = ganti ditarik / didorong; dorong saat memasukkan garpu ke palet.', kec: { kosong: 1.4, bawa: 1.1 } },
+  hpt: { label: 'Hand pallet', ikon: '🛒', ket: 'Hanya palet level 1: lantai, staging, atau rak paling bawah. Tumpukan 2 terangkat sekaligus; tumpukan 3 tidak bisa. T = ditarik / didorong.', kec: { kosong: 1.4, bawa: 1.1 } },
   checker: { label: 'Checking', ikon: '✅', ket: 'Scan & cek qty / lot / kondisi palet.', kec: { kosong: 1.4, bawa: 1.4 } },
   picker: { label: 'Picking karton', ikon: '📦', ket: 'Ambil karton dari pick face (palet rak level 1) lalu susun di palet order di staging outbound.', kec: { kosong: 1.4, bawa: 1.25 } },
   admin: { label: 'Admin', ikon: '🗂️', ket: 'Terima dokumen di dock, lalu input & konfirmasi di meja admin.', kec: { kosong: 1.3, bawa: 1.3 } },

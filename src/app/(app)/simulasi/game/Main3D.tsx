@@ -210,12 +210,12 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
                 <div className="gm-kerja">
                   {!amatKecil && <p className="small muted" style={{ margin: 0 }}>{MODE_PEMAIN[sp.mode].ket}</p>}
                   <div className="gm-kerja-aksi">
-                    <button type="button" disabled={!!sp.aksi} onClick={() => { sp.minta++; }}>Spasi · {sp.aksi ? LABEL_AKSI[sp.aksi.nama] ?? sp.aksi.nama : 'Aksi'}</button>
+                    <button type="button" disabled={!!sp.aksi} onClick={() => { sp.minta++; }}>R · {sp.aksi ? LABEL_AKSI[sp.aksi.nama] ?? sp.aksi.nama : 'Aksi'}</button>
                     {sp.mode === 'hpt' && <button type="button" className="ghost" onClick={() => { sp.tarik = !sp.tarik; setVersi(x => x + 1); }} title="T">{sp.tarik ? '↩ Ditarik' : '↪ Didorong'} (T)</button>}
                     {(sp.mode === 'cbt' || sp.mode === 'reach') && <span className="gm-level">
-                      <button type="button" className="ghost" onClick={() => { sp.level = Math.max(0, sp.level - 1); setVersi(x => x + 1); }} title="F">▼</button>
+                      <button type="button" className="ghost" onClick={() => { sp.level = Math.max(0, sp.level - 1); setVersi(x => x + 1); }} title="Turun level garpu (X)">▼</button>
                       <b>Level {sp.level + 1}</b><span className="small muted">{angka(layout.levelY[sp.level] ?? 0, 2)} m</span>
-                      <button type="button" className="ghost" onClick={() => { sp.level = Math.min(layout.levelY.length - 1, sp.level + 1); setVersi(x => x + 1); }} title="R">▲</button>
+                      <button type="button" className="ghost" onClick={() => { sp.level = Math.min(layout.levelY.length - 1, sp.level + 1); setVersi(x => x + 1); }} title="Naik level garpu (Z)">▲</button>
                     </span>}
                   </div>
                   {sp.pesan ? <div className="small gm-kerja-pesan" role="status">⚠ {sp.pesan}</div> : <div className="small gm-kerja-petunjuk">{sp.petunjuk}</div>}
@@ -312,10 +312,11 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
                 <button key={t} type="button" className={`ghost ${kls}`} aria-label={lbl} title={lbl}
                   onPointerDown={e => { e.preventDefault(); tekan(t, true); }} onPointerUp={() => tekan(t, false)} onPointerLeave={() => tekan(t, false)} onPointerCancel={() => tekan(t, false)}>{ikon}</button>
               ))}
-              <button type="button" className="aksi" onPointerDown={e => { e.preventDefault(); sp.minta++; }} aria-label="Aksi (Spasi)">Aksi</button>
+              <button type="button" className="aksi" onPointerDown={e => { e.preventDefault(); sp.minta++; }} aria-label="Aksi (R)" title="Aksi (R)">Aksi</button>
               <button type="button" className="ghost lari" onPointerDown={e => { e.preventDefault(); tekan('lari', true); }} onPointerUp={() => tekan('lari', false)} onPointerLeave={() => tekan('lari', false)}>Lari</button>
             </div>
-            <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'W/S = maju/mundur · A = putar kiri · D = putar kanan · Q/E = kamera atas/bawah · Shift = lari · seret layar = lihat sekitar' : `W/S = maju/mundur · A = putar kiri · D = putar kanan · Q/E = kamera atas/bawah · Spasi = ${sp.petunjuk.startsWith('Spasi = ') ? sp.petunjuk.slice(8) : 'aksi'}${sp.mode === 'cbt' || sp.mode === 'reach' ? ' · R / F = level garpu' : ''}`}</p>
+            <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'W/S = maju/mundur · A/D = putar kiri/kanan · Q/E = kamera atas/bawah · Spasi = lompat · Shift = lari · seret layar = lihat sekitar'
+              : `W/S = maju/mundur · A/D = putar · Q/E = kamera · R = ${sp.petunjuk.startsWith('R = ') ? sp.petunjuk.slice(4) : 'aksi'}${sp.mode === 'cbt' || sp.mode === 'reach' ? ' · Z / X = naik / turun level garpu (1–9 langsung)' : sp.mode === 'hpt' ? ' · T = tarik/dorong' : ' · Spasi = lompat'}`}</p>
           </>
         )}
         {panel && !jelajah && <PanelOrder d={dunia} o={order} pilih={p => setPilih(p)} />}

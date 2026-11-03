@@ -9,6 +9,7 @@ import { kategoriOrang } from '@/lib/simulasi3d/layout';
 import { label, mat, modelMhe, modelOrang, modelTruk, teks, xSandar, type PasangLapisan } from '../Viewer3D';
 import { forkliftBersih, orangBersih, pakaiModelMeshy, pakaiPekerjaMeshy, pasangOperator, pegangKarton, pegangTangkai, pegangKendali, aturMast, pinBersih, POSISI_OPERATOR, trukBersih, WARNA_BERSIH, type Animator, type JenisKendaraan } from '../model3d';
 import { WARNA_ORANG } from '../warna';
+import { areaMhe, gridStaging as gridTapak } from './areaMhe';
 import { ELEMEN, LABEL_AKSI, MODE_PEMAIN, studiAwal, type ModePemain, type SiklusStudi, type StudiPemain } from './pemain';
 
 export type Pilihan = { jenis: 'palet' | 'mhe' | 'pekerja' | 'truk' | 'order'; id: string };
@@ -106,12 +107,11 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const lokasi = [...d.lokasi.values()];
     const lokSimpan = lokasi.filter(l => l.tipe === 'rak' || l.tipe === 'lantai');
     const stgIn = lokasi.find(l => l.tipe === 'staging_in')!, stgOut = lokasi.find(l => l.tipe === 'staging_out')!;
+    // area MHE (parkir & charging): forklift CB, reach truck & hand pallet siaga di sini; tapak staging menghindarinya
+    const areaM = areaMhe(L, d.mhe.map(m => m.jenis));
     const gridStaging = (r: { x0: number; x1: number; z0: number; z1: number }) => {
-      const xs: number[] = [], zs: number[] = [];
-      for (let x = r.x1 - 0.9; x >= r.x0 + 3.2; x -= 1.3) xs.push(x);
-      for (let z = r.z0 + 0.9; z <= r.z1 - 0.9; z += 1.2) zs.push(z);
-      if (!xs.length) xs.push((r.x0 + r.x1) / 2); if (!zs.length) zs.push((r.z0 + r.z1) / 2);
-      return (i: number) => { const n = xs.length * zs.length; const lap = Math.floor(i / n), k = i % n; return v(xs[k % xs.length], zs[Math.floor(k / xs.length)], lap * tinggiPalet); };
+      const { pos } = gridTapak(r, [areaM]);
+      return (i: number) => { const n = pos.length; const lap = Math.floor(i / n), k = i % n; return v(pos[k].x, pos[k].z, lap * tinggiPalet); };
     };
     const slotIn = gridStaging(L.stagingIn), slotOut = gridStaging(L.stagingOut);
     const dockPos = new Map<string, V>();
@@ -182,7 +182,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     let kunciPalet = '';
     // ---------- palet yang dipindah pemain (mode kerja): disembunyikan dari lokasi asal & digambar di posisi baru
     const pindahP = new Map<string, { x: number; y: number; z: number; rot: number; lokAsal: string; lokTaruh: string | null }>();
-    let angkatP: string | null = null; let verPemain = 0;
+    let angkatP: string | null = null, angkatP2: string | null = null; let verPemain = 0;   // angkatP2 = palet atas (hand pallet mengangkat tumpukan 2)
     const kartonDiambilP = new Map<string, number>();   // karton yang diambil pemain (latihan picking) → isi palet tergambar berkurang
     // palet yang sedang di-picking pemain: karton digambar satu per satu (berkurang 1 tiap ambil)
     const stokTerbuka = new Map<string, { im: THREE.InstancedMesh; g: THREE.Group; x: number; y: number; z: number; lokAsal: string; perLapis: number; tinggiK: number }>();
@@ -213,9 +213,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       n = 0; posPalet.clear(); instPalet = [];
       // palet pindahan pemain: dibatalkan bila sistem sudah memindahkan LPN itu
       for (const [id, o] of pindahP) { const l = d.lpn.get(id); if (!l || l.lokasi !== o.lokAsal) lepasPindah(id); }
-      if (angkatP && !d.lpn.has(angkatP)) angkatP = null;
-      for (const [id, st] of stokTerbuka) { const l = d.lpn.get(id); if (!l || l.lokasi !== st.lokAsal || pindahP.has(id) || id === angkatP) { gStokP.remove(st.g); stokTerbuka.delete(id); } }
-      const lewati = (id: string) => sembunyi.has(id) || id === angkatP || pindahP.has(id) || stokTerbuka.has(id);
+      if (angkatP && !d.lpn.has(angkatP)) angkatP = null; if (angkatP2 && !d.lpn.has(angkatP2)) angkatP2 = null;
+      for (const [id, st] of stokTerbuka) { const l = d.lpn.get(id); if (!l || l.lokasi !== st.lokAsal || pindahP.has(id) || id === angkatP || id === angkatP2) { gStokP.remove(st.g); stokTerbuka.delete(id); } }
+      const lewati = (id: string) => sembunyi.has(id) || id === angkatP || id === angkatP2 || pindahP.has(id) || stokTerbuka.has(id);
       for (const [id, st] of stokTerbuka) instPalet.push({ id, x: st.x, y: st.y, z: st.z, h: 0.14 + Math.ceil(st.im.count / st.perLapis) * st.tinggiK, lok: d.lpn.get(id)?.lokasi ?? null });
       // palet di lantai (block stack) & staging bertumpuk: diletakkan dari bawah menurut tinggi nyata palet di bawahnya,
       // jadi tidak ada palet melayang saat palet bawah sudah diambil atau isinya tinggal sebagian
@@ -297,7 +297,23 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     };
 
     // ---------- MHE & pekerja
-    const parkir = (i: number) => v(Math.min(L.stagingIn.x1 + 1.6, L.L - 1), Math.min(L.W - 1, 1.6 + i * 2.6));
+    const parkir = (i: number) => { const sl = areaM.slot[i % areaM.slot.length]; return v(sl.x, sl.z); };
+    // gambar area MHE: lantai berarsir kuning, garis slot, panel listrik / charging di dinding
+    {
+      const gA = new THREE.Group(); gA.name = 'areaMhe'; grup.add(gA);
+      const sx = areaM.x1 - areaM.x0, sz = areaM.z1 - areaM.z0, cx = (areaM.x0 + areaM.x1) / 2, cz = (areaM.z0 + areaM.z1) / 2;
+      const lt = new THREE.Mesh(new THREE.PlaneGeometry(sx, sz), new THREE.MeshStandardMaterial({ color: '#fde68a', transparent: true, opacity: 0.35, roughness: 0.8, depthWrite: false }));
+      lt.rotation.x = -Math.PI / 2; lt.position.set(cx, 0.014, cz); gA.add(lt);
+      const garisK = mat('#eab308', { roughness: 0.6 });
+      const gr = (lx: number, lz: number, x: number, z: number) => { const m = new THREE.Mesh(new THREE.BoxGeometry(lx, 0.012, lz), garisK); m.position.set(x, 0.02, z); gA.add(m); };
+      gr(sx, 0.12, cx, areaM.z0 + 0.06); gr(sx, 0.12, cx, areaM.z1 - 0.06); gr(0.12, sz, areaM.x0 + 0.06, cz); gr(0.12, sz, areaM.x1 - 0.06, cz);
+      const pnl = new THREE.Group(); pnl.position.set(areaM.panel.x, 0, areaM.panel.z); pnl.rotation.y = areaM.panel.rot; gA.add(pnl);
+      const lemari = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.7, 0.35), mat('#cbd5e1', { metalness: 0.4, roughness: 0.45 })); lemari.position.y = 0.95; lemari.castShadow = true; pnl.add(lemari);
+      const pintuP = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.55, 0.02), mat('#e2e8f0', { metalness: 0.3, roughness: 0.4 })); pintuP.position.set(0, 0.95, 0.18); pnl.add(pintuP);
+      for (const [dx, c] of [[-0.2, '#22c55e'], [0, '#facc15'], [0.2, '#ef4444']] as const) { const led = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.2 })); led.position.set(dx, 1.6, 0.2); pnl.add(led); }
+      const kab = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.2, 0.08), mat('#1f2937')); kab.position.set(0.3, 0.6, 0.25); pnl.add(kab);
+      const lb = label(`Area MHE & panel charging${areaM.sumber === 'layout' ? '' : ' (otomatis)'}`, 'mhe'); lb.position.set(cx, 2.4, cz); gA.add(lb);
+    }
     const animator: Animator[] = [];
     const mhe = new Map<string, Aktor>();
     const hptAnim = new Map<string, Animator>();
@@ -312,7 +328,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         : (() => { const o = modelOrang(WARNA_ORANG.operator); o.scale.setScalar(0.85); o.position.set(-0.45, 0.35, 0); g.add(o); return o; })();
       op.visible = false; void animOp;
       const lbl = label(m.nama.replace(/^(.{0,14}).*?(\d+)$/, '$1 $2'), 'mhe'); lbl.position.set(0, 3.1, 0); g.add(lbl);
-      const p = parkir(i); g.position.copy(p); gMhe.add(g);
+      const p = parkir(i); g.position.copy(p); g.rotation.y = areaM.slot[i % areaM.slot.length].rot; gMhe.add(g);
       mhe.set(m.id, { obj: g, pos: p.clone(), rumah: p.clone(), tugas: null, rencana: null, garpu: g.getObjectByName('garpu') ?? undefined, op, lbl });
     });
     const rumahOrang = (k: Kemampuan | null, i: number): V => {
@@ -324,7 +340,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         case 'checker': return v(L.stagingIn.x1 - 1.2, L.stagingIn.z1 - 1 - j(0.2) * 3);
         case 'picker': return v(L.stagingOut.x1 - 1.2, L.stagingOut.z0 + 1 + j(0.3) * 3);
         case 'tkbm': return v(3.2 + j(0.5) * 1.5, (dIn[i % Math.max(1, dIn.length)]?.z ?? 3) + (i % 2 ? 1.8 : -1.8));
-        case 'operator': return v(Math.min(L.stagingIn.x1 + 3, L.L - 1), Math.min(L.W - 1, 1.2 + j(0.7) * 4));
+        case 'operator': return v(Math.min(areaM.x1 + 0.9, L.L - 1), Math.max(0.6, Math.min(L.W - 0.6, (areaM.z0 + areaM.z1) / 2 + (j(0.7) - 0.5) * 2)));   // menunggu di dekat area MHE
         default: return v(L.stagingIn.x1 + 1, L.W / 2 + j(0.9) * 4 - 2);
       }
     };
@@ -439,6 +455,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       if ((L.platform ?? []).some(p => x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1)) return 0;
       return -(L.tinggiDock ?? 1.2);
     };
+    let mintaLompat = false, lompatY = 0, lompatV = 0;   // lompat (Spasi) saat berjalan kaki
     const keyTombol = (e: KeyboardEvent, nilai: boolean) => {
       const k2 = kontrol.current; if (!k2.jelajah) return;
       const tg = e.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return;
@@ -448,11 +465,14 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       // fokus tertinggal di tombol / dropdown panel → panah tidak boleh mengubah pilihan dropdown; lepas fokus supaya game menerima
       if (tg && tg.tagName === 'BUTTON' && e.key.startsWith('Arrow')) tg.blur();
       const kunci = e.key.toLowerCase();
+      if (nilai && (kunci === ' ' || kunci === 'spacebar')) e.preventDefault();   // jangan menggulir halaman
       if (nilai && !e.repeat && k2.pemain) {
-        // tombol sekali tekan mode kerja: Spasi / Enter = aksi, R / F = naik / turun level garpu
-        if (kunci === ' ' || kunci === 'spacebar' || kunci === 'enter') { k2.pemain.minta++; e.preventDefault(); return; }
-        if (kunci === 'r') { k2.pemain.level = Math.min(L.levelY.length - 1, k2.pemain.level + 1); e.preventDefault(); return; }
-        if (kunci === 'f') { k2.pemain.level = Math.max(0, k2.pemain.level - 1); e.preventDefault(); return; }
+        // tombol sekali tekan: R / Enter = aksi, Spasi = lompat (jalan kaki), Z / X = naik / turun level garpu, 1–9 = level langsung
+        if (kunci === 'r' || kunci === 'enter') { k2.pemain.minta++; e.preventDefault(); return; }
+        if (kunci === ' ' || kunci === 'spacebar') { mintaLompat = true; e.preventDefault(); return; }
+        if (kunci === 'z') { k2.pemain.level = Math.min(L.levelY.length - 1, k2.pemain.level + 1); e.preventDefault(); return; }
+        if (kunci === 'x') { k2.pemain.level = Math.max(0, k2.pemain.level - 1); e.preventDefault(); return; }
+        if (/^[1-9]$/.test(kunci) && (k2.pemain.mode === 'cbt' || k2.pemain.mode === 'reach')) { k2.pemain.level = Math.min(L.levelY.length - 1, Number(kunci) - 1); e.preventDefault(); return; }
         if (kunci === 't' && k2.pemain.mode === 'hpt') { k2.pemain.tarik = !k2.pemain.tarik; e.preventDefault(); return; }
       }
       const t2 = peta[kunci]; if (!t2) return;
@@ -479,7 +499,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     for (const [x, z] of [[-0.62, -0.3], [0.62, -0.3], [-0.62, 0.3], [0.62, 0.3]]) { const kaki = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.75, 0.05), mat('#475569')); kaki.position.set(x, 0.375, z); meja.add(kaki); }
     meja.position.set(mejaAdmin.x + 0.9, 0, mejaAdmin.z); meja.visible = false; grup.add(meja);
     let garpuP = 0.15;                       // tinggi garpu pemain (m)
-    let bawaP: { lpn: string; sku: string } | null = null;
+    let bawaP: { lpn: string; sku: string; atas?: { lpn: string; sku: string; h: number } } | null = null;
     let aksiP: { nama: string; mulai: number; durasi: number; garpu?: (f: number) => number; lekat?: number; saatLekat?: () => void; selesai: () => void; lekatSudah?: boolean } | null = null;
     let jamP = 0, mintaLalu = 0, kartonDari: string | null = null, dokumenDari = '';
     const rotGarpu = () => pemain.rotation.y + wadahK.rotation.y;   // arah garpu (hand pallet ditarik → garpu di belakang)
@@ -495,7 +515,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         : (() => { const x = modelOrang('#0ea5e9'); x.scale.setScalar(0.85); x.position.set(-0.45, 0.35, 0); g.add(x); return x; })();
       kendaraanP.set(mode, ob); return ob;
     };
-    const lepasBawaan = () => { if (bawaP) { angkatP = null; bawaP = null; verPemain++; } kartonP.visible = false; dokP.visible = false; kartonDari = null; dokumenDari = ''; };
+    const lepasBawaan = () => { if (bawaP) { angkatP = null; angkatP2 = null; bawaP = null; verPemain++; } kartonP.visible = false; dokP.visible = false; kartonDari = null; dokumenDari = ''; };
     const gantiMode = (sp: StudiPemain, lalu: ModePemain) => {
       void lalu; aksiP = null; sp.aksi = null; lepasBawaan(); sp.bawa = null; sp.berjalan = null; garpuP = 0.15;
       modeLalu = sp.mode;
@@ -539,8 +559,8 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const tujuanTaruh = (jarakDepan: number, sp: StudiPemain, lantaiSaja: boolean) => {
       const f = depanP(jarakDepan); const ty = L.levelY[sp.level] ?? 0;
       const terpakai = new Set([...pindahP.values()].map(o => o.lokTaruh));
-      if (!lantaiSaja) {
-        const lok = lokSimpan.filter(l => !l.lpn.length && !l.dipesan && !terpakai.has(l.id) && Math.hypot(l.x - f.x, l.z - f.z) < 1.15)
+      if (!lantaiSaja || !bawaP?.atas) {
+        const lok = lokSimpan.filter(l => !l.lpn.length && !l.dipesan && !terpakai.has(l.id) && (!lantaiSaja || l.y < 0.1) && Math.hypot(l.x - f.x, l.z - f.z) < 1.15)
           .sort((a, b) => Math.abs(a.y - ty) - Math.abs(b.y - ty) || Math.hypot(a.x - f.x, a.z - f.z) - Math.hypot(b.x - f.x, b.z - f.z))[0];
         if (lok) return { x: lok.x, y: lok.y, z: lok.z, lok: lok.id, rot: lok.tipe === 'rak' ? Math.PI / 2 : 0, ket: lok.tipe === 'rak' ? `rak level ${levelDari(lok.y) + 1}` : 'lokasi lantai' };
       }
@@ -552,6 +572,17 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         if (bawah) return { x: bawah.x, y: bawah.y + bawah.h + 0.02, z: bawah.z, lok: null, rot: rotGarpu() + Math.PI / 2, ket: 'tumpukan staging (tingkat 2)' };
       }
       return null;
+    };
+    /** Tumpukan lantai / staging (bukan rak) di posisi palet p, urut dari bawah. */
+    const tumpukanDi = (p: { x: number; z: number }) => instPalet.filter(q => !(q.lok && d.lokasi.get(q.lok)?.tipe === 'rak') && Math.hypot(q.x - p.x, q.z - p.z) < 0.3).sort((a, b) => a.y - b.y);
+    const diRak = (p: { lok: string | null }) => !!p.lok && d.lokasi.get(p.lok)?.tipe === 'rak';
+    /** Hand pallet: hanya palet level 1 (lantai). Rak → hanya level lantai; tumpukan 2 → terangkat sekaligus; tumpukan ≥ 3 → tidak bisa. */
+    const cekHpt = (p: { x: number; y: number; z: number; lok: string | null }) => {
+      if (p.y > 0.1) return { ok: false, pesan: 'Hand pallet hanya bisa mengambil palet level 1 (di lantai).' };
+      if (diRak(p)) return { ok: true, n: 1 };
+      const t = tumpukanDi(p);
+      if (t.length >= 3) return { ok: false, pesan: `Tumpukan ${t.length} tingkat — hand pallet maksimal mengangkat 2 tingkat sekaligus. Turunkan dulu palet atas dengan forklift.` };
+      return { ok: true, n: t.length, atas: t.length === 2 ? t[1] : undefined };
     };
     const levelDari = (y: number) => L.levelY.reduce((b, ly, i) => (Math.abs(ly - y) < Math.abs(L.levelY[b] - y) ? i : b), 0);
     const dekatDock = () => L.dock.some(dk => Math.abs(posPemain.z - dk.z) < 2.2 && posPemain.x < 3.2);
@@ -577,8 +608,13 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       const ty = L.levelY[sp.level] ?? 0;
       if (m === 'cbt' || m === 'reach' || m === 'hpt') {
         if (!bawaP) {
-          const xs = instPalet.filter(p => (m === 'hpt' ? p.y < 0.1 : Math.abs(p.y - ty) < 0.3) && !(m === 'hpt' && p.lok && d.lokasi.get(p.lok)?.tipe === 'rak'));
-          const t = terdekat(xs.length ? xs : instPalet.filter(p => m !== 'hpt' || p.y < 0.1)); return t ? { x: t.x, z: t.z, label: `Ambil palet${t.y > 0.1 ? ` · tinggi ${t.y.toFixed(1)} m` : ''}` } : null;
+          const xs = m === 'hpt' ? instPalet.filter(p => cekHpt(p).ok) : instPalet.filter(p => Math.abs(p.y - ty) < 0.3);
+          const t = terdekat(xs.length || m === 'hpt' ? xs : instPalet); return t ? { x: t.x, z: t.z, label: `Ambil palet${t.y > 0.1 ? ` · tinggi ${t.y.toFixed(1)} m` : ''}` } : null;
+        }
+        if (m === 'hpt' && !bawaP.atas) {
+          const terpakai = new Set([...pindahP.values()].map(o => o.lokTaruh));
+          const t = terdekat(lokSimpan.filter(l => l.tipe === 'rak' && l.y < 0.1 && !l.lpn.length && !l.dipesan && !terpakai.has(l.id)));
+          if (t && jauh(t) < 25) return { x: t.x, z: t.z, label: 'Taruh di slot rak level 1 (lantai)' };
         }
         if (m !== 'hpt') {
           const terpakai = new Set([...pindahP.values()].map(o => o.lokTaruh));
@@ -618,27 +654,36 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         const jd = m === 'hpt' ? 1.0 : 1.6;
         if (!bawaP) {
           const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0];
-          if (!p) return gagal(sp, m === 'hpt' ? 'Tidak ada palet lantai di depan garpu (≤ 1 m). Ikuti penanda biru.' : `Tidak ada palet di depan garpu pada level ${sp.level + 1}. Hadapkan garpu ke palet (≤ 1 m) atau ganti level (R/F).`);
+          if (!p) return gagal(sp, m === 'hpt' ? (paletDepan(jd, 99, sp)[0] ? 'Hand pallet hanya bisa mengambil palet level 1 (di lantai) — palet di rak atas pakai reach truck / forklift.' : 'Tidak ada palet lantai di depan garpu (≤ 1 m). Ikuti penanda biru.') : `Tidak ada palet di depan garpu pada level ${sp.level + 1}. Hadapkan garpu ke palet (≤ 1 m) atau ganti level (Z/X).`);
+          const ch = m === 'hpt' ? cekHpt(p) : { ok: true as const, atas: undefined };
+          if (!ch.ok) return gagal(sp, ch.pesan ?? 'Tidak bisa diambil.');
+          const atas = ch.atas; const lAtas = atas ? d.lpn.get(atas.id) : undefined;
           const l = d.lpn.get(p.id)!;
           const dariRak = !!p.lok && d.lokasi.get(p.lok)?.tipe === 'rak' && p.y > 0.1;
           const pr = kendaraan ? profilGarpu(garpuP, p.y + 0.05, p.y + 0.15, ELEMEN.posisi, Math.abs(p.y + 0.05 - garpuP) / ELEMEN.naik[m], ELEMEN.masukAngkat, (p.y + 0.15 - 0.15) / ELEMEN.turun[m]) : null;
           aksiP = { nama: 'ambil', mulai: jamP, durasi: pr ? pr.T : ELEMEN.hptAmbil, garpu: pr?.f, lekat: pr ? pr.lekat : 0.7,
-            saatLekat: () => { if (pindahP.has(p.id)) lepasPindah(p.id); angkatP = p.id; bawaP = { lpn: p.id, sku: l.sku }; sp.bawa = 'palet'; verPemain++; kartonDari = dariRak ? 'rak' : 'lantai'; tinggiSiklus = Math.max(tinggiSiklus, p.y); },
+            saatLekat: () => {
+              if (pindahP.has(p.id)) lepasPindah(p.id); angkatP = p.id; bawaP = { lpn: p.id, sku: l.sku }; sp.bawa = 'palet';
+              if (atas && lAtas) { if (pindahP.has(atas.id)) lepasPindah(atas.id); angkatP2 = atas.id; bawaP.atas = { lpn: atas.id, sku: lAtas.sku, h: p.h }; }
+              verPemain++; kartonDari = dariRak ? 'rak' : 'lantai'; tinggiSiklus = Math.max(tinggiSiklus, p.y); },
             selesai: () => { garpuP = m === 'hpt' ? 0.08 : 0.15; } };
         } else {
           const tj = tujuanTaruh(jd, sp, m === 'hpt');
-          if (!tj) return gagal(sp, sp.level > 0 ? `Tidak ada slot kosong level ${sp.level + 1} di depan garpu. Ikuti penanda biru atau ganti level (R/F).` : 'Lantai di depan garpu tidak kosong / di dalam rak. Cari lantai kosong (penanda biru).');
+          if (!tj) return gagal(sp, sp.level > 0 ? `Tidak ada slot kosong level ${sp.level + 1} di depan garpu. Ikuti penanda biru atau ganti level (Z/X).` : bawaP.atas ? 'Membawa tumpukan 2 palet — taruh di lantai kosong (bukan slot rak).' : 'Lantai di depan garpu tidak kosong. Cari lantai kosong atau slot rak level 1 (penanda biru).');
+          const atasB = bawaP.atas; const lokAsalAtas = atasB ? d.lpn.get(atasB.lpn)?.lokasi : undefined;
           const pr = kendaraan ? profilGarpu(garpuP, tj.y + 0.15, tj.y + 0.02, ELEMEN.posisi, Math.abs(tj.y + 0.15 - garpuP) / ELEMEN.naikBeban[m], ELEMEN.letakMundur, (tj.y + 0.02 - 0.15) / ELEMEN.turun[m]) : null;
           const asal = d.lpn.get(bawaP.lpn)!; const lokAsal = asal.lokasi;
           aksiP = { nama: 'taruh', mulai: jamP, durasi: pr ? pr.T : ELEMEN.hptTaruh, garpu: pr?.f, lekat: pr ? pr.lekat : 0.5,
             saatLekat: () => {
-              const id = bawaP!.lpn; angkatP = null; bawaP = null; sp.bawa = null;
+              const id = bawaP!.lpn; angkatP = null; angkatP2 = null; bawaP = null; sp.bawa = null;
               if (tj.lok) { const lk = d.lokasi.get(tj.lok); if (lk) lk.dipesan++; }
-              pindahP.set(id, { x: tj.x, y: tj.y, z: tj.z, rot: tj.rot, lokAsal, lokTaruh: tj.lok }); verPemain++;
+              pindahP.set(id, { x: tj.x, y: tj.y, z: tj.z, rot: tj.rot, lokAsal, lokTaruh: tj.lok });
+              if (atasB && lokAsalAtas) pindahP.set(atasB.lpn, { x: tj.x, y: tj.y + atasB.h + 0.01, z: tj.z, rot: tj.rot, lokAsal: lokAsalAtas, lokTaruh: null });
+              verPemain++;
               tinggiSiklus = Math.max(tinggiSiklus, tj.y);
               const keRak = !!tj.lok && d.lokasi.get(tj.lok)?.tipe === 'rak';
               const jenis: JenisTugas = keRak ? 'putaway' : kartonDari === 'rak' ? 'pick_palet' : 'bongkar';
-              catatTaruh = () => selesaiSiklus(sp, jenis, keRak ? (kartonDari === 'rak' ? `relokasi rak → ${tj.ket}` : `putaway ke ${tj.ket}`) : kartonDari === 'rak' ? 'rak → lantai / staging' : 'pindah palet di lantai', 1, 'palet', tinggiSiklus);
+              catatTaruh = () => selesaiSiklus(sp, jenis, keRak ? (kartonDari === 'rak' ? `relokasi rak → ${tj.ket}` : `putaway ke ${tj.ket}`) : kartonDari === 'rak' ? 'rak → lantai / staging' : atasB ? 'pindah tumpukan 2 palet di lantai' : 'pindah palet di lantai', atasB ? 2 : 1, 'palet', tinggiSiklus);
             },
             // siklus ditutup setelah garpu turun / ditarik keluar (seluruh waktu taruh terhitung)
             selesai: () => { garpuP = m === 'hpt' ? 0.08 : 0.15; catatTaruh?.(); catatTaruh = null; tinggiSiklus = 0; } };
@@ -690,16 +735,20 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       if (aksiP) return `${LABEL_AKSI[aksiP.nama] ?? aksiP.nama}…`;
       if (m === 'cbt' || m === 'reach' || m === 'hpt') {
         const jd = m === 'hpt' ? 1.0 : 1.6;
-        if (!bawaP) { const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0]; return p ? `Spasi = ambil palet (tinggi ${f1(p.y)} m)` : m === 'hpt' ? 'Arahkan garpu ke palet di lantai' : `Arahkan garpu ke palet — target level ${sp.level + 1} (R/F ganti level)`; }
-        const tj = tujuanTaruh(jd, sp, m === 'hpt'); return tj ? `Spasi = taruh di ${tj.ket} (tinggi ${f1(tj.y)} m)` : m === 'hpt' ? 'Cari lantai kosong (penanda biru)' : 'Arahkan garpu ke slot hijau berkedip (≤ 1 m) lalu Spasi — level menyesuaikan otomatis';
+        if (!bawaP) {
+          const p = paletDepan(jd, m === 'hpt' ? 0.1 : 99, sp)[0];
+          if (p && m === 'hpt') { const ch = cekHpt(p); return ch.ok ? `R = ambil ${ch.atas ? 'tumpukan 2 palet sekaligus' : 'palet'}${diRak(p) ? ' (rak level 1)' : ''}` : ch.pesan ?? ''; }
+          return p ? `R = ambil palet (tinggi ${f1(p.y)} m)` : m === 'hpt' ? 'Arahkan garpu ke palet level 1 (lantai / rak paling bawah)' : `Arahkan garpu ke palet — target level ${sp.level + 1} (Z/X ganti level)`;
+        }
+        const tj = tujuanTaruh(jd, sp, m === 'hpt'); return tj ? `R = taruh ${bawaP.atas ? 'tumpukan 2 palet ' : ''}di ${tj.ket} (tinggi ${f1(tj.y)} m)` : m === 'hpt' ? (bawaP.atas ? 'Cari lantai kosong (tumpukan tidak bisa masuk rak)' : 'Cari lantai kosong / slot rak level 1 (penanda biru)') : 'Arahkan garpu ke slot hijau berkedip (≤ 1 m) lalu R — level menyesuaikan otomatis';
       }
       if (m === 'picker') {
-        if (kartonP.visible) { const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined).sort((x, y) => Number(y.id === ORDER) - Number(x.id === ORDER))[0]; return p ? `Spasi = taruh karton di ${p.id === ORDER ? 'palet order' : 'palet ini'}` : 'Bawa karton ke palet order (penanda biru)'; }
+        if (kartonP.visible) { const p = paletDepan(0.8, 1.8, { ...sp, level: 0 }, kartonDari ?? undefined).sort((x, y) => Number(y.id === ORDER) - Number(x.id === ORDER))[0]; return p ? `R = taruh karton di ${p.id === ORDER ? 'palet order' : 'palet ini'}` : 'Bawa karton ke palet order (penanda biru)'; }
         const ps = paletDepan(0.8, 1.8, { ...sp, level: 0 }, ORDER).filter(x => sisaKarton(x.id) > 0)[0];
-        return ps ? `Spasi = ambil 1 karton (sisa ${sisaKarton(ps.id)} karton di palet ini)` : 'Jalan ke pick face (palet rak level 1) — ikuti penanda biru';
+        return ps ? `R = ambil 1 karton (sisa ${sisaKarton(ps.id)} karton di palet ini)` : 'Jalan ke pick face (palet rak level 1) — ikuti penanda biru';
       }
-      if (m === 'checker') return paletDepan(0.9, 2.6, { ...sp, level: 0 }).filter(x => x.id !== ORDER)[0] ? 'Spasi = scan & cek palet' : 'Dekati palet untuk dicek (penanda biru)';
-      if (m === 'admin') return dokP.visible ? (dekatMeja() ? 'Spasi = input & konfirmasi dokumen' : 'Bawa dokumen ke meja admin (dekat staging)') : dekatDock() ? 'Spasi = terima dokumen dari sopir' : 'Jalan ke pintu dock untuk menerima dokumen';
+      if (m === 'checker') return paletDepan(0.9, 2.6, { ...sp, level: 0 }).filter(x => x.id !== ORDER)[0] ? 'R = scan & cek palet' : 'Dekati palet untuk dicek (penanda biru)';
+      if (m === 'admin') return dokP.visible ? (dekatMeja() ? 'R = input & konfirmasi dokumen' : 'Bawa dokumen ke meja admin (dekat staging)') : dekatDock() ? 'R = terima dokumen dari sopir' : 'Jalan ke pintu dock untuk menerima dokumen';
       return '';
     };
     /** Jalankan aksi berjalan, ukur elemen siklus, posisi garpu & palet yang dibawa. */
@@ -726,7 +775,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       penanda.visible = !!tg && sp.target!.jarak > 1.6;
       if (tg) { penanda.position.set(tg.x, 0, tg.z); const tx = `${tg.label} · ${sp.target!.jarak.toFixed(0)} m`; if (lblT.element.textContent !== tx) lblT.element.textContent = tx; cincinT.scale.setScalar(1 + 0.15 * Math.sin(jamP * 4)); }
       // tanda hijau: objek yang akan dikenai aksi E saat ini
-      const sasaran = !aksiP && sp.petunjuk.startsWith('Spasi = ') ? sasaranE(sp) : null;
+      const sasaran = !aksiP && sp.petunjuk.startsWith('R = ') ? sasaranE(sp) : null;
       tandaJangkau.visible = !!sasaran; if (sasaran) tandaJangkau.position.set(sasaran.x, sasaran.y + 0.03, sasaran.z);
       // badan pemain & hand pallet: ditarik (operator di depan, garpu di belakang) atau didorong
       const kendaraanAktif = sp.mode === 'cbt' || sp.mode === 'reach' || sp.mode === 'hpt';
@@ -738,10 +787,13 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
         kd.an?.main(dGerak > 0.0005 ? 'jalan' : 'berdiri');
       }
       if (kd) aturMast(kd.g, garpuP);
+      bawaPemain2 = null;
       if (bawaP) { const a = arahP(); bawaPemain = { pos: v(posPemain.x + a.x * (sp.mode === 'hpt' ? 0.45 : 1.0), posPemain.z + a.z * (sp.mode === 'hpt' ? 0.45 : 1.0), Math.max(0.02, garpuP + 0.02)), rot: rotGarpu() + Math.PI / 2, sku: bawaP.sku, lpn: bawaP.lpn }; }
       else bawaPemain = null;
+      if (bawaP?.atas && bawaPemain) bawaPemain2 = { pos: bawaPemain.pos.clone().add(v(0, 0, bawaP.atas.h + 0.01)), rot: bawaPemain.rot, sku: bawaP.atas.sku, lpn: bawaP.atas.lpn };
     };
     let bawaPemain: { pos: V; rot: number; sku: string; lpn: string | null } | null = null;
+    let bawaPemain2: { pos: V; rot: number; sku: string; lpn: string | null } | null = null;
     // ---------- kamera ikut (gaya survival): di atas-belakang karakter; boleh diputar/zoom, kembali sendiri 3 dtk setelah dilepas
     let kamPegang = false, kamLepas = -99, jamKam = 0, kamGerak = -99;
     const kamMulai = () => { kamPegang = true; }, kamSelesai = () => { kamPegang = false; kamLepas = jamKam; };
@@ -904,8 +956,12 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       const gx = putar || geserS, gz = majuK;
       const geser = posPemain.clone().sub(lama);
       // halaman di luar gedung lebih rendah setinggi dock (lantai gudang & platform loading dock di y = 0)
-      const yBaru = yPijak(posPemain.x, posPemain.z); geser.y = yBaru - pemain.position.y;
-      pemain.position.set(posPemain.x, yBaru, posPemain.z);
+      const yBaru = yPijak(posPemain.x, posPemain.z); geser.y = yBaru - (pemain.position.y - lompatY);
+      // lompat: hanya saat jalan kaki (bukan di atas forklift / reach / hand pallet) & sedang menapak
+      if (mintaLompat) { mintaLompat = false; if (!naikKendaraan && !aksiP && lompatY <= 0) lompatV = 4.2; }
+      if (lompatY > 0 || lompatV > 0) { lompatV -= 9.8 * dtc; lompatY = Math.max(0, lompatY + lompatV * dtc); if (lompatY === 0) lompatV = 0; }
+      if (naikKendaraan) { lompatY = 0; lompatV = 0; }
+      pemain.position.set(posPemain.x, yBaru + lompatY, posPemain.z);
       kamera.position.add(geser); kontrolKamera.target.add(geser);
       kamFollow(dt, false);
       const dGerak = Math.hypot(geser.x, geser.z);
@@ -1022,6 +1078,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       const dibawa: { pos: V; rot: number; sku: string; lpn: string | null }[] = [];
       const pakaiMhe = new Set<string>(); const bawaNanti: (() => void)[] = [];
       if (bawaPemain && kontrol.current.jelajah) dibawa.push(bawaPemain);
+      if (bawaPemain2 && kontrol.current.jelajah) dibawa.push(bawaPemain2);
 
       if (k.jalan) tPatroli += Math.min(0.1, dt) * Math.min(3, Math.max(1, Math.log10(k.kecepatan + 1)));
       for (const p of d.pekerja) {

@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { bertugas, HARI, type Dunia, type JenisTugas } from '@/lib/game';
 import type { LayoutGudang } from '@/lib/simulasi3d/layout';
 import { LABEL_TUGAS } from './panel';
-import { gridStaging } from './Sim2D';
+import { areaMhe, gridStaging } from './areaMhe';
 
 const JAM = 3600;
 const angka = (v: number, k = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: k, minimumFractionDigits: k });
@@ -91,7 +91,8 @@ export default function Analisis({ d, layout }: { d: Dunia; layout: LayoutGudang
     const lok = [...d.lokasi.values()];
     const sIn0 = lok.find(l => l.tipe === 'staging_in')!, sOut0 = lok.find(l => l.tipe === 'staging_out')!;
     // kapasitas staging = tapak palet di area staging layout (lokasi staging di mesin tidak dibatasi)
-    const sIn = { lpn: sIn0.lpn, kapasitas: gridStaging(layout.stagingIn).kap }, sOut = { lpn: sOut0.lpn, kapasitas: gridStaging(layout.stagingOut).kap };
+    const aM = [areaMhe(layout, d.mhe.map(m => m.jenis))];
+    const sIn = { lpn: sIn0.lpn, kapasitas: gridStaging(layout.stagingIn, aM).kap }, sOut = { lpn: sOut0.lpn, kapasitas: gridStaging(layout.stagingOut, aM).kap };
     const pickPalet = selesai.filter(t => t.jenis === 'pick_palet').reduce((p, t) => p + t.qty, 0), pickKarton = selesai.filter(t => t.jenis === 'pick_karton').reduce((p, t) => p + t.qty, 0);
     // --- tenaga kerja & MHE
     const lantai = d.pekerja.filter(p => p.kemampuan);
