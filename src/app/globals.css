@@ -575,3 +575,24 @@ tr.kat-link:hover td { background: var(--res); }
 .sim2d-detail { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .sim2d-detail summary { cursor: pointer; list-style: revert; }
 .sim2d-param { display: grid; gap: 6px; margin-top: 6px; }
+
+/* ---------- Leca Game: ukuran layar (seret tinggi · perbesar · layar penuh) */
+.game-layar.tinggi-atur .sim3d-wadah { height: var(--gm-tinggi); min-height: 0; }
+.game-layar.tinggi-atur.tampil-2d .gm-2d { height: var(--gm-tinggi); min-height: 0; }
+.gm-seret-tinggi { display: flex; align-items: center; justify-content: center; gap: 8px; height: 16px; margin: 2px 0 8px; cursor: ns-resize; touch-action: none; user-select: none; color: #94a3b8; }
+.gm-seret-tinggi span { width: 56px; height: 5px; border-radius: 3px; background: #cbd5e1; }
+.gm-seret-tinggi:hover span { background: #64748b; } .gm-seret-tinggi small { font-size: 11px; }
+.game-main.layar-besar, .game-main.layar-penuh { position: fixed; inset: 0; z-index: 1000; margin: 0; max-width: none; width: 100vw; height: 100vh; height: 100dvh; border-radius: 0; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; background: var(--white, #fff); padding: 8px; }
+.game-main.layar-penuh { position: static; }
+.game-main.layar-besar > :not(.game-bar):not(.game-layar), .game-main.layar-penuh > :not(.game-bar):not(.game-layar) { display: none; }
+.game-main.layar-besar > .game-bar, .game-main.layar-penuh > .game-bar { flex: none; margin-bottom: 6px; }
+.game-main.layar-besar > .game-layar, .game-main.layar-penuh > .game-layar { flex: 1 1 auto; min-height: 0; }
+.game-main.layar-besar .gm-3d, .game-main.layar-penuh .gm-3d { height: 100%; }
+.game-main.layar-besar .game-layar .sim3d-wadah, .game-main.layar-penuh .game-layar .sim3d-wadah { height: 100%; min-height: 0; }
+.game-main.layar-besar .game-layar.tampil-2d .gm-2d, .game-main.layar-penuh .game-layar.tampil-2d .gm-2d { height: 100%; min-height: 0; }
+.game-main.layar-besar .game-layar.tampil-split, .game-main.layar-penuh .game-layar.tampil-split { grid-template-rows: auto minmax(0, 1fr) minmax(0, 2fr); }
+.game-main.layar-besar .game-layar.tampil-split .gm-kpi, .game-main.layar-penuh .game-layar.tampil-split .gm-kpi { grid-row: 1; }
+.game-main.layar-besar .game-layar.tampil-split .gm-2d, .game-main.layar-penuh .game-layar.tampil-split .gm-2d { grid-row: 2; height: 100%; min-height: 0; }
+.game-main.layar-besar .game-layar.tampil-split .gm-3d, .game-main.layar-penuh .game-layar.tampil-split .gm-3d { grid-row: 3; min-height: 0; }
+.game-main.layar-besar .gm-dpad, .game-main.layar-penuh .gm-dpad { position: absolute; }
+.gm-ukuran button { white-space: nowrap; }

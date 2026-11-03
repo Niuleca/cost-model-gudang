@@ -3,7 +3,7 @@
 // panel info objek terpilih, pelacakan order, daftar dock/MHE/truk, productivity yang bisa diubah saat main,
 // mode jelajah (1 karakter + observasi & stopwatch time study), dan red flag.
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import { HARI, hitungRedFlag, jalankanSampai, shiftBerikut, waktuGame, type Dunia, type JenisTugas, type RedFlag } from '@/lib/game';
 import type { LayoutGudang } from '@/lib/simulasi3d/layout';
 import type { Kamera, OpsiViewer, TemaViewer, ViewerApi } from '../Viewer3D';
@@ -59,6 +59,35 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
   const [opsi, setOpsi] = useState<OpsiViewer>({ atap: false, dinding: true, label: false, animasi: true, truk: true, orang: true });
   const [panel, setPanel] = useState(tampilAwal === '3d');
   const api = useRef<ViewerApi>(null);
+  // ---------- ukuran layar: normal (tinggi bisa diseret) · perbesar (memenuhi jendela browser) · layar penuh (Fullscreen API)
+  const kartuRef = useRef<HTMLDivElement>(null), layarRef = useRef<HTMLDivElement>(null);
+  const [besar, setBesar] = useState(false); const [penuh, setPenuh] = useState(false);
+  const [tinggi, setTinggi] = useState<number | null>(() => { try { const v = Number(localStorage.getItem('leca.game.tinggi')); return v >= 300 ? v : null; } catch { return null; } });
+  useEffect(() => {
+    const f = () => setPenuh(document.fullscreenElement === kartuRef.current);
+    document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f);
+  }, []);
+  useEffect(() => {
+    if (!besar) return;
+    const f = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.fullscreenElement) setBesar(false); };
+    const ov = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', f); return () => { window.removeEventListener('keydown', f); document.body.style.overflow = ov; };
+  }, [besar]);
+  const layarPenuh = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (kartuRef.current?.requestFullscreen) await kartuRef.current.requestFullscreen();
+      else setBesar(true);   // browser tanpa Fullscreen API (mis. iPhone): pakai mode perbesar
+    } catch { setBesar(true); }
+  };
+  const seretTinggi = (e: RPointerEvent) => {
+    const el = layarRef.current; if (!el) return; e.preventDefault();
+    const y0 = e.clientY, h0 = el.getBoundingClientRect().height; let h = h0;
+    const gerak = (ev: PointerEvent) => { h = Math.max(320, Math.min(window.innerHeight * 1.6, h0 + ev.clientY - y0)); setTinggi(Math.round(h)); };
+    const lepas = () => { window.removeEventListener('pointermove', gerak); window.removeEventListener('pointerup', lepas); try { localStorage.setItem('leca.game.tinggi', String(Math.round(h))); } catch { /* abaikan */ } };
+    window.addEventListener('pointermove', gerak); window.addEventListener('pointerup', lepas);
+  };
+  const modeLayar = penuh ? ' layar-penuh' : besar ? ' layar-besar' : '';
   const onTickRef = useRef(onTick); onTickRef.current = onTick;
   const setPilih = (p: Pilihan | null) => { kontrol.current.pilih = p; setPilihState(p); };
 
@@ -122,7 +151,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
   const ubahProd = (j: JenisTugas, x: number) => { if (!(x > 0)) return; dunia.sk.prod[j] = { ...dunia.sk.prod[j], prod: x, sumber: 'diubah saat main' }; setVersi(v => v + 1); };
 
   return (
-    <div className="card game-main">
+    <div ref={kartuRef} className={`card game-main${modeLayar}`}>
       <div className="game-bar">
         <div className="game-jam">
           <b><span className={`gm-live${jalan ? ' on' : ''}`} />Hari {w.hari + 1} · {hariId(w.tanggal)} · {w.teks}</b>
@@ -139,11 +168,16 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
             {([['2d', '2D'], ['split', '2D + 3D'], ['3d', '3D']] as [TampilSim, string][]).map(([k, l]) => <button key={k} type="button" className={tampilan === k ? 'on' : ''} onClick={() => { setTampilan(k); if (k === '2d' && jelajah) setJelajah(false); if (k !== '3d') setPanel(false); }}>{l}</button>)}
           </div>
           <button type="button" className={jelajah ? '' : 'ghost'} disabled={tampilan === '2d'} onClick={() => setJelajah(!jelajah)} title="Kendalikan 1 karakter untuk menjelajah gudang dan mengamati pekerjaan">{jelajah ? '✕ Keluar jelajah' : '🧭 Mode jelajah'}</button>
+          <div className="tabs gm-ukuran" role="group" aria-label="Ukuran layar">
+            <button type="button" className={besar && !penuh ? 'on' : ''} onClick={() => setBesar(!besar)} title={besar ? 'Kembali ke ukuran normal (Esc)' : 'Perbesar layar simulasi memenuhi jendela browser'}>{besar && !penuh ? '⤡ Kecilkan' : '⤢ Perbesar'}</button>
+            <button type="button" className={penuh ? 'on' : ''} onClick={layarPenuh} title={penuh ? 'Keluar layar penuh (Esc)' : 'Layar penuh (seluruh monitor)'}>{penuh ? '✕ Keluar layar penuh' : '⛶ Layar penuh'}</button>
+          </div>
           <button type="button" className={`ghost gm-flag-tombol${nKritis ? ' kritis' : ''}`} onClick={() => setTabBawah('flag')}>⚑ {flags.length} red flag{nKritis ? ` · ${nKritis} kritis` : ''}</button>
         </div>
       </div>
 
-      <div className={`game-layar tampil-${tampilan}${panel ? '' : ' tanpa-panel'}`}>
+      <div ref={layarRef} className={`game-layar tampil-${tampilan}${panel ? '' : ' tanpa-panel'}${tinggi && !modeLayar ? ' tinggi-atur' : ''}`}
+        style={tinggi && !modeLayar ? ({ '--gm-tinggi': `${tinggi}px` } as CSSProperties) : undefined}>
         {tampilan !== '3d' && <Sim2D dunia={dunia} layout={layout} kontrol={kontrol} pilih={pilih} onPilih={p => setPilih(p)} opsi={opsi2d} />}
         <div className="gm-3d"><Viewer3D apiRef={api} layout={layout} shift={0} opsi={opsi} kecepatan={{ faktor: 0, siklus: {} }} lapisan={lapisan} tema={tema} /></div>
         <div className="gm-kpi">
@@ -289,6 +323,12 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
         {!jelajah && <button type="button" className="gm-tombol-panel ghost" onClick={() => setPanel(!panel)}>{panel ? 'Sembunyikan panel' : 'Tampilkan panel'}</button>}
       </div>
 
+      {!modeLayar && (
+        <div className="gm-seret-tinggi" onPointerDown={seretTinggi} onDoubleClick={() => { setTinggi(null); try { localStorage.removeItem('leca.game.tinggi'); } catch { /* abaikan */ } }}
+          title="Seret ke bawah/atas untuk memperluas tinggi layar · klik ganda = ukuran awal" role="separator" aria-orientation="horizontal">
+          <span /> <small>seret untuk perluas layar · klik ganda = ukuran awal</small>
+        </div>
+      )}
       <div className="tabs game-tab-bawah" role="tablist">
         {([['flag', `Red flag (${flags.length})`], ['analisis', 'Analisis KPI'], ['tugas', 'Tugas'], ['prod', 'Productivity'], ['kejadian', 'Kejadian'], ['tampilan', 'Tampilan']] as [TabBawah, string][]).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tabBawah === k} className={tabBawah === k ? 'on' : ''} onClick={() => setTabBawah(k)}>{l}</button>
