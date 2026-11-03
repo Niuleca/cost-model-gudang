@@ -442,9 +442,9 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     const keyTombol = (e: KeyboardEvent, nilai: boolean) => {
       const k2 = kontrol.current; if (!k2.jelajah) return;
       const tg = e.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return;
-      // W/S & ↑/↓ maju-mundur · A = putar kanan, D = putar kiri (permintaan pengguna) · ←/→ putar kiri/kanan
+      // W/S & ↑/↓ maju-mundur · A / ← putar kiri, D / → putar kanan
       // Q = kamera mendongak ke atas, E = kamera menunduk ke bawah · Shift lari
-      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'putarKanan', arrowleft: 'putarKiri', d: 'putarKiri', arrowright: 'putarKanan', shift: 'lari', q: 'kamAtas', e: 'kamBawah' };
+      const peta: Record<string, keyof KontrolGame['tombol']> = { w: 'maju', arrowup: 'maju', s: 'mundur', arrowdown: 'mundur', a: 'putarKiri', arrowleft: 'putarKiri', d: 'putarKanan', arrowright: 'putarKanan', shift: 'lari', q: 'kamAtas', e: 'kamBawah' };
       // fokus tertinggal di tombol / dropdown panel → panah tidak boleh mengubah pilihan dropdown; lepas fokus supaya game menerima
       if (tg && tg.tagName === 'BUTTON' && e.key.startsWith('Arrow')) tg.blur();
       const kunci = e.key.toLowerCase();

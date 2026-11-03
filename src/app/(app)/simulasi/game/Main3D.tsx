@@ -308,14 +308,14 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
               </>)}
             </div>
             <div className="gm-dpad" aria-label="Kendali karakter">
-              {([['kamAtas', '⤒', 'putar-kiri', 'Kamera ke atas (Q)'], ['maju', '▲', 'atas', 'Maju (W / ↑)'], ['kamBawah', '⤓', 'putar-kanan', 'Kamera ke bawah (E)'], ['putarKiri', '⟲', 'kiri', 'Putar kiri (D / ←)'], ['putarKanan', '⟳', 'kanan', 'Putar kanan (A / →)'], ['mundur', '▼', 'bawah', 'Mundur (S / ↓)']] as const).map(([t, ikon, kls, lbl]) => (
+              {([['kamAtas', '⤒', 'putar-kiri', 'Kamera ke atas (Q)'], ['maju', '▲', 'atas', 'Maju (W / ↑)'], ['kamBawah', '⤓', 'putar-kanan', 'Kamera ke bawah (E)'], ['putarKiri', '⟲', 'kiri', 'Putar kiri (A / ←)'], ['putarKanan', '⟳', 'kanan', 'Putar kanan (D / →)'], ['mundur', '▼', 'bawah', 'Mundur (S / ↓)']] as const).map(([t, ikon, kls, lbl]) => (
                 <button key={t} type="button" className={`ghost ${kls}`} aria-label={lbl} title={lbl}
                   onPointerDown={e => { e.preventDefault(); tekan(t, true); }} onPointerUp={() => tekan(t, false)} onPointerLeave={() => tekan(t, false)} onPointerCancel={() => tekan(t, false)}>{ikon}</button>
               ))}
               <button type="button" className="aksi" onPointerDown={e => { e.preventDefault(); sp.minta++; }} aria-label="Aksi (Spasi)">Aksi</button>
               <button type="button" className="ghost lari" onPointerDown={e => { e.preventDefault(); tekan('lari', true); }} onPointerUp={() => tekan('lari', false)} onPointerLeave={() => tekan('lari', false)}>Lari</button>
             </div>
-            <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'W/S = maju/mundur · A = putar kanan · D = putar kiri · Q/E = kamera atas/bawah · Shift = lari · seret layar = lihat sekitar' : `W/S = maju/mundur · A = putar kanan · D = putar kiri · Q/E = kamera atas/bawah · Spasi = ${sp.petunjuk.startsWith('Spasi = ') ? sp.petunjuk.slice(8) : 'aksi'}${sp.mode === 'cbt' || sp.mode === 'reach' ? ' · R / F = level garpu' : ''}`}</p>
+            <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'W/S = maju/mundur · A = putar kiri · D = putar kanan · Q/E = kamera atas/bawah · Shift = lari · seret layar = lihat sekitar' : `W/S = maju/mundur · A = putar kiri · D = putar kanan · Q/E = kamera atas/bawah · Spasi = ${sp.petunjuk.startsWith('Spasi = ') ? sp.petunjuk.slice(8) : 'aksi'}${sp.mode === 'cbt' || sp.mode === 'reach' ? ' · R / F = level garpu' : ''}`}</p>
           </>
         )}
         {panel && !jelajah && <PanelOrder d={dunia} o={order} pilih={p => setPilih(p)} />}
