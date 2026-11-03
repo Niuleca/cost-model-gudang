@@ -596,3 +596,4 @@ tr.kat-link:hover td { background: var(--res); }
 .game-main.layar-besar .game-layar.tampil-split .gm-3d, .game-main.layar-penuh .game-layar.tampil-split .gm-3d { grid-row: 3; min-height: 0; }
 .game-main.layar-besar .gm-dpad, .game-main.layar-penuh .gm-dpad { position: absolute; }
 .gm-ukuran button { white-space: nowrap; }
+.gm-dpad .lompat { grid-column: 2; grid-row: 2; font-size: 11px; font-weight: 600; }

@@ -313,6 +313,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
                   onPointerDown={e => { e.preventDefault(); tekan(t, true); }} onPointerUp={() => tekan(t, false)} onPointerLeave={() => tekan(t, false)} onPointerCancel={() => tekan(t, false)}>{ikon}</button>
               ))}
               <button type="button" className="aksi" onPointerDown={e => { e.preventDefault(); sp.minta++; }} aria-label="Aksi (R)" title="Aksi (R)">Aksi</button>
+              <button type="button" className="ghost lompat" onPointerDown={e => { e.preventDefault(); kontrol.current.tombol.lompat = true; }} aria-label="Lompat (Spasi)" title="Lompat (Spasi)">Lompat</button>
               <button type="button" className="ghost lari" onPointerDown={e => { e.preventDefault(); tekan('lari', true); }} onPointerUp={() => tekan('lari', false)} onPointerLeave={() => tekan('lari', false)}>Lari</button>
             </div>
             <p className="gm-petunjuk small">{sp.mode === 'bebas' ? 'W/S = maju/mundur · A/D = putar kiri/kanan · Q/E = kamera atas/bawah · Spasi = lompat · Shift = lari · seret layar = lihat sekitar'

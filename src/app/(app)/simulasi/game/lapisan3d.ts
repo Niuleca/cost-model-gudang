@@ -25,7 +25,7 @@ export interface StatGerak { n: number; kecTotal: number; kecMaks: number; jarak
 export interface Aktor2D { id: string; jenis: 'mhe' | 'pekerja' | 'pemain'; x: number; z: number; rot: number; sibuk: boolean; bawa: 'palet' | 'karton' | null; kemampuan?: string; mhe?: string; tugas?: JenisTugas }
 export interface KontrolGame {
   jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null;
-  jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean; putarKiri?: boolean; putarKanan?: boolean; kamAtas?: boolean; kamBawah?: boolean };
+  jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean; putarKiri?: boolean; putarKanan?: boolean; kamAtas?: boolean; kamBawah?: boolean; lompat?: boolean };
   amatan: Amatan | null; statGerak: Partial<Record<JenisTugas, StatGerak>>;
   aktor2d?: Aktor2D[];
   /** mode kerja pemain (motion study) */
@@ -465,7 +465,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       // fokus tertinggal di tombol / dropdown panel → panah tidak boleh mengubah pilihan dropdown; lepas fokus supaya game menerima
       if (tg && tg.tagName === 'BUTTON' && e.key.startsWith('Arrow')) tg.blur();
       const kunci = e.key.toLowerCase();
-      if (nilai && (kunci === ' ' || kunci === 'spacebar')) e.preventDefault();   // jangan menggulir halaman
+      if (kunci === ' ' || kunci === 'spacebar') { e.preventDefault(); if (tg && tg.tagName === 'BUTTON') tg.blur(); }   // jangan menggulir halaman / menekan tombol yang sedang fokus
       if (nilai && !e.repeat && k2.pemain) {
         // tombol sekali tekan: R / Enter = aksi, Spasi = lompat (jalan kaki), Z / X = naik / turun level garpu, 1–9 = level langsung
         if (kunci === 'r' || kunci === 'enter') { k2.pemain.minta++; e.preventDefault(); return; }
@@ -958,6 +958,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       // halaman di luar gedung lebih rendah setinggi dock (lantai gudang & platform loading dock di y = 0)
       const yBaru = yPijak(posPemain.x, posPemain.z); geser.y = yBaru - (pemain.position.y - lompatY);
       // lompat: hanya saat jalan kaki (bukan di atas forklift / reach / hand pallet) & sedang menapak
+      if (t.lompat) { t.lompat = false; mintaLompat = true; }   // tombol Lompat di layar
       if (mintaLompat) { mintaLompat = false; if (!naikKendaraan && !aksiP && lompatY <= 0) lompatV = 4.6; }   // puncak ±1,1 m, ±0,95 dtk di udara
       if (lompatY > 0 || lompatV > 0) { lompatV -= 9.8 * dtc; lompatY = Math.max(0, lompatY + lompatV * dtc); if (lompatY === 0) lompatV = 0; }
       if (naikKendaraan) { lompatY = 0; lompatV = 0; }
