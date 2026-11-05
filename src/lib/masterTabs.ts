@@ -9,6 +9,22 @@ export const KAT_KANTOR = ['Office', 'ATK', 'Printer', 'Konsumsi', 'Rental Offic
 export const KAT_GUDANG = ['Palet', 'Racking', 'HSE', 'Seragam', 'Pest Control', 'Asuransi', 'Security', 'Cleaning', 'Utilitas', 'Konstruksi', 'Lainnya'];
 const ROLES: AppRole[] = ['procurement','it','engineering','operations','hr','finance','commercial','solution_design','admin'];
 
+// Katalog UOM lintas warehouse & distribution. Kode disimpan konsisten di database.
+export const UOM_MASTER = [
+  'pcs','ea','unit','set','kit','pair','dozen',
+  'pack','inner_pack','box','karton','case','bundle',
+  'bag','sack','big_bag','fibc',
+  'pail','bucket','drum','barrel','jerry_can','ibc',
+  'roll','coil','spool','reel','sheet','bale',
+  'palet','half_pallet','tote','bin','crate',
+  'g','kg','ton','ml','liter','gallon','mm','cm','meter','sqm','cbm',
+  'order','line','shipment','parcel','lokasi','pick',
+];
+export const WEIGHT_CLASSES = [
+  'semua','micro','light','medium','standard','heavy','very_heavy',
+  'extra_heavy','bulk_heavy','jumbo_fibc','industrial_bulk',
+];
+
 export interface Tab {
   id: string; label: string; pemilik: string; table: string; view?: string; idKey?: string;
   kolom: Kolom[]; editorRoles: AppRole[]; approval?: boolean; orderBy?: { col: string; asc?: boolean }[];
@@ -117,14 +133,34 @@ export const TABS: Tab[] = [
       { key: 'urutan', label: 'Urutan', type: 'number', width: 60 },
       { key: 'tanggal_harga', label: 'Tgl harga', type: 'date' }, { key: 'berlaku_sampai', label: 'Berlaku s.d.', type: 'date' }, { key: 'sumber', label: 'Sumber', width: 200 },
     ] },
+  { id: 'product_handling', label: 'Master Produk & Berat', pemilik: 'Operations / Solution Design', table: 'product_handling_master', editorRoles: ['operations', 'solution_design'], approval: true,
+    orderBy: [{ col: 'product_category' }, { col: 'product_name' }], cari: ['product_code', 'product_name', 'product_category', 'uom_code', 'source'],
+    catatan: 'Berat unit menggunakan gross weight per UOM. Net pallet = net unit × qty/pallet. Gross pallet = gross unit × qty/pallet + berat pallet kosong + wrapping/kemasan pallet. Kelas berat dihitung otomatis dari gross weight. Berat pallet belum termasuk bila qty/pallet kosong.',
+    kolom: [
+      { key: 'product_code', label: 'Kode produk', width: 110 }, { key: 'product_name', label: 'Nama produk', width: 200 },
+      { key: 'product_category', label: 'Kategori', type: 'select', options: ['FMCG','Food & Beverage','Chemical','Building Material','Automotive','Electronics','Paper & Packaging','Textile','Agriculture','Industrial Raw Material','E-commerce','Other'] },
+      { key: 'uom_code', label: 'UOM', type: 'select', options: UOM_MASTER },
+      { key: 'unit_net_weight_kg', label: 'Net/unit (kg)', type: 'number' },
+      { key: 'unit_gross_weight_kg', label: 'Gross/unit (kg)', type: 'number' },
+      { key: 'unit_weight_class', label: 'Kelas berat unit', readonly: true },
+      { key: 'qty_per_pallet', label: 'Qty/pallet', type: 'number' },
+      { key: 'pallet_tare_weight_kg', label: 'Tare pallet (kg)', type: 'number' },
+      { key: 'pallet_packaging_weight_kg', label: 'Wrapping (kg)', type: 'number' },
+      { key: 'net_pallet_weight_kg', label: 'Net pallet (kg)', readonly: true },
+      { key: 'gross_pallet_weight_kg', label: 'Gross pallet (kg)', readonly: true },
+      { key: 'pallet_weight_class', label: 'Kelas berat pallet', readonly: true },
+      { key: 'source', label: 'Sumber / referensi', width: 220 }, { key: 'source_date', label: 'Tgl referensi', type: 'date' },
+      { key: 'notes', label: 'Catatan', width: 220 },
+    ] },
   { id: 'produktivitas', label: 'Produktivitas', pemilik: 'Operations', table: 'productivity', editorRoles: ['operations', 'solution_design', 'commercial'], approval: true,
     orderBy: [{ col: 'tahap' }, { col: 'aktivitas' }], cari: ['aktivitas', 'tahap', 'tool', 'role_name', 'uom', 'industri'],
-    catatan: 'Prod/jam = angka yang dipakai cost model (hasil time motion study atau benchmark). Kolom industri = rentang benchmark, mis. "30-40". Detik/UoM = 3.600 ÷ prod/jam (otomatis).',
+    catatan: 'Prod/jam = angka yang dipakai cost model (hasil time motion study atau benchmark). Pilih basis berat unit atau pallet agar benchmark tidak tercampur. Kolom industri = rentang benchmark. Detik/UoM = 3.600 ÷ prod/jam (otomatis).',
     kolom: [
       { key: 'tahap', label: 'Tahap' }, { key: 'aktivitas', label: 'Aktivitas', width: 240 }, { key: 'tool', label: 'Tool', width: 90 },
       { key: 'role_name', label: 'Role' },
-      { key: 'uom', label: 'UoM', type: 'select', options: ['pcs', 'karton', 'ton', 'cbm', 'liter', 'bag', 'pail', 'pack', 'roll', 'palet', 'order', 'line', 'lokasi'] },
-      { key: 'kelas_berat', label: 'Kelas berat', type: 'select', options: ['semua', 'light', 'medium', 'heavy'] },
+      { key: 'uom', label: 'UoM', type: 'select', options: UOM_MASTER },
+      { key: 'basis_berat', label: 'Basis berat', type: 'select', options: ['unit','pallet'] },
+      { key: 'kelas_berat', label: 'Kelas berat', type: 'select', options: WEIGHT_CLASSES },
       { key: 'industri', label: 'Industri' }, { key: 'prod_per_jam', label: 'Prod/jam', type: 'number', width: 80 },
       { key: 'detik_per_uom', label: 'Detik/UoM', type: 'number', readonly: true, width: 70 },
       ...INDUSTRI.slice(0, 6).map(i => ({ key: `benchmark.${i}`, label: `${i} (rentang/jam)`, width: 90 } as Kolom)),
@@ -201,7 +237,7 @@ export const PRICE_PAGES: { slug: string; label: string; judul: string; ids: str
 ];
 
 // ---------- Productivity: satu halaman per UoM ----------
-export const UOM_PROD = ['pcs', 'karton', 'ton', 'cbm', 'liter', 'bag', 'pail', 'pack', 'roll', 'palet', 'order', 'line', 'lokasi'];
+export const UOM_PROD = UOM_MASTER;
 export const PROD_PAGES: { slug: string; label: string; uom: string[] }[] = [
   { slug: 'pcs', label: 'Pcs', uom: ['pcs'] },
   { slug: 'carton', label: 'Case/Carton', uom: ['karton'] },
