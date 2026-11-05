@@ -90,6 +90,21 @@ Keamanan ditegakkan di database (RLS + trigger), bukan hanya di tampilan.
 - Kelas berat pallet dihitung otomatis dari gross pallet weight. Jika quantity per pallet belum diisi, hasil berat pallet tetap kosong.
 - Klasifikasi berat adalah parameter operasional Niuleca, bukan pengganti penilaian risiko ergonomi atau batas SWL dari produsen kemasan/MHE.
 
+| Kelas | Berat gross per unit / pallet |
+|---|---:|
+| Micro | ≤ 1 kg |
+| Light | > 1–5 kg |
+| Medium | > 5–15 kg |
+| Standard | > 15–25 kg |
+| Heavy | > 25–50 kg |
+| Very Heavy | > 50–100 kg |
+| Extra Heavy | > 100–200 kg |
+| Bulk Heavy | > 200–500 kg |
+| Jumbo / FIBC | > 500–1.000 kg |
+| Industrial Bulk | > 1.000 kg |
+
+Contoh: Bag 50 kg masuk kelas Heavy; Bag 100 kg masuk Very Heavy; Bag 200 kg masuk Extra Heavy. Kelas pallet dihitung terpisah dari gross pallet weight. Ambang batas ini adalah klasifikasi awal operasional Niuleca dan dapat disesuaikan melalui validasi HSE serta data Time Motion Study.
+
 ## Logika hitung (ringkas)
 
 - **Hari operasional** = hari kerja kalender − libur nasional & cuti bersama di hari kerja. Volume harian = volume peak ÷ (hari operasional ÷ 12).
