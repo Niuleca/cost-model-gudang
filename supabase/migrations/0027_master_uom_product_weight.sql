@@ -37,7 +37,7 @@ insert into public.uom_catalog (code, label, category, measurement_type, standar
 ('barrel','Barrel','Container','count','BA','Rec21',43),
 ('jerry_can','Jerry Can','Container','count',null,'Internal',44),
 ('ibc','IBC','Container','count',null,'Internal',45),
-('roll','Roll','Roll / Material','count','RO','Rec20',50),
+('roll','Roll','Roll / Material','count','RO','Rec21',50),
 ('coil','Coil','Roll / Material','count',null,'Internal',51),
 ('spool','Spool','Roll / Material','count',null,'Internal',52),
 ('reel','Reel','Roll / Material','count','RL','Rec21',53),
