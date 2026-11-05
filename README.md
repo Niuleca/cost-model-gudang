@@ -42,7 +42,7 @@ Tahap 2 (berikutnya): export Excel berumus (7), import harga & kebutuhan (8), fe
 1. Buat project baru di supabase.com (region **Singapore**).
 2. **SQL Editor → New query**, tempel seluruh isi `supabase/setup_all.sql`, klik **Run**.
    - Sudah pernah menjalankan versi sebelumnya? Cukup jalankan `supabase/migrations/0003_tahap1.sql` lalu `supabase/seed/seed_it.sql`.
-   - Bucket foto gudang `warehouse-photos` dibuat otomatis oleh skrip (cek di **Storage**).\n3. Jalankan isi `supabase/migrations/0027_master_uom_product_weight.sql` di SQL Editor untuk menambahkan katalog UOM dan Product Handling Master (berat unit dan pallet). Jika database sudah berjalan, cukup jalankan migration 0027 satu kali.\n4. Setelah itu lanjutkan konfigurasi Authentication, URL, dan API seperti langkah berikutnya.
+   - Bucket foto gudang `warehouse-photos` dibuat otomatis oleh skrip (cek di **Storage**).\n3. Jalankan isi `supabase/migrations/0027_master_uom_product_weight.sql` di SQL Editor untuk menambahkan katalog UOM dan Product Handling Master (berat unit dan pallet). Jika database sudah berjalan, cukup jalankan migration 0027 satu kali.\n4. **Authentication → URL Configuration**\n   - Site URL: `https://<domain-aplikasi>` (mis. `https://costmodel.esapanghegar.my.id`)\n   - Redirect URLs: `https://<domain-aplikasi>/auth/callback` dan `http://localhost:3000/auth/callback`\n5. **Project Settings → API**: catat `Project URL` dan `anon public key`.
 3. **Authentication → URL Configuration**
    - Site URL: `https://<domain-aplikasi>` (mis. `https://costmodel.esapanghegar.my.id`)
    - Redirect URLs: `https://<domain-aplikasi>/auth/callback` dan `http://localhost:3000/auth/callback`
