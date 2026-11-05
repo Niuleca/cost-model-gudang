@@ -82,7 +82,15 @@ Tahap 2 (berikutnya): export Excel berumus (7), import harga & kebutuhan (8), fe
 
 Keamanan ditegakkan di database (RLS + trigger), bukan hanya di tampilan.
 
-## Master UOM & Product Handling\n\n- Katalog UOM mencakup unit/pcs, packaging, bag/sack/FIBC, container, roll/material, pallet/handling, berat, volume, dimensi, order processing, dan warehouse location.\n- Berat per unit disimpan sebagai net dan gross weight. Kelas berat unit dihitung otomatis dari gross weight.\n- Berat pallet dihitung terpisah: net pallet = net unit × quantity per pallet; gross pallet = gross unit × quantity per pallet + tare pallet + packaging/wrapping pallet.\n- Kelas berat pallet dihitung otomatis dari gross pallet weight. Jika quantity per pallet belum diisi, hasil berat pallet tetap kosong.\n- Klasifikasi berat adalah parameter operasional Niuleca, bukan pengganti penilaian risiko ergonomi atau batas SWL dari produsen kemasan/MHE.\n\n## Logika hitung (ringkas)
+## Master UOM & Product Handling
+
+- Katalog UOM mencakup unit/pcs, packaging, bag/sack/FIBC, container, roll/material, pallet/handling, berat, volume, dimensi, order processing, dan warehouse location.
+- Berat per unit disimpan sebagai net dan gross weight. Kelas berat unit dihitung otomatis dari gross weight.
+- Berat pallet dihitung terpisah: net pallet = net unit × quantity per pallet; gross pallet = gross unit × quantity per pallet + tare pallet + packaging/wrapping pallet.
+- Kelas berat pallet dihitung otomatis dari gross pallet weight. Jika quantity per pallet belum diisi, hasil berat pallet tetap kosong.
+- Klasifikasi berat adalah parameter operasional Niuleca, bukan pengganti penilaian risiko ergonomi atau batas SWL dari produsen kemasan/MHE.
+
+## Logika hitung (ringkas)
 
 - **Hari operasional** = hari kerja kalender − libur nasional & cuti bersama di hari kerja. Volume harian = volume peak ÷ (hari operasional ÷ 12).
 - **Cuti tahunan** tidak mengurangi pembagi volume; masuk sebagai **faktor pengganti** = hari operasional ÷ (hari operasional − cuti).
