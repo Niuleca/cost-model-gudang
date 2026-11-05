@@ -14,6 +14,7 @@ export interface Kolom {
   label: string;
   type?: 'text' | 'number' | 'percent' | 'date' | 'select' | 'bool' | 'textarea';
   options?: string[];
+  optionsFrom?: { table: string; value: string; label: string; activeOnly?: boolean };
   width?: number;
   readonly?: boolean;
 }
@@ -49,6 +50,7 @@ export default function TableEditor(p: Props) {
   const sb = supabaseBrowser();
   const idKey = p.idKey ?? 'id';
   const [rows, setRows] = useState<Row[]>([]);
+  const [dynamicOptions, setDynamicOptions] = useState<Record<string, { value: string; label: string }[]>>({});
   const [draft, setDraft] = useState<Record<string, Row>>({});
   const [baru, setBaru] = useState<Row | null>(null);
   const [q, setQ] = useState('');
@@ -111,6 +113,31 @@ export default function TableEditor(p: Props) {
   }, [p.table, p.view, JSON.stringify(p.filter)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { muat(); }, [muat]);
+
+  // Select options can be sourced from a master table (e.g. active UOM catalog).
+  useEffect(() => {
+    let aktif = true;
+    const cols = p.kolom.filter(k => k.type === 'select' && k.optionsFrom);
+    if (!cols.length) return () => { aktif = false; };
+    Promise.all(cols.map(async k => {
+      const src = k.optionsFrom!;
+      let query = sb.from(src.table).select(`${src.value},${src.label}`);
+      if (src.activeOnly) query = query.eq('active', true);
+      const { data, error } = await query.order(src.label);
+      if (error) return [k.key, null] as const;
+      return [k.key, (data ?? []).map((row: Record<string, unknown>) => ({
+        value: String(row[src.value]), label: String(row[src.label]),
+      }))] as const;
+    })).then(results => {
+      if (!aktif) return;
+      setDynamicOptions(prev => {
+        const next = { ...prev };
+        for (const [key, options] of results) if (options) next[key] = options;
+        return next;
+      });
+    });
+    return () => { aktif = false; };
+  }, [p.kolom, sb]);
 
   const dicari = useMemo(() => {
     if (!q.trim()) return rows;
@@ -244,10 +271,13 @@ export default function TableEditor(p: Props) {
       return String(nilai ?? '—');
     }
     const fid = `${p.table}-${id ?? 'baru'}-${k.key}`;
-    if (k.type === 'select') return (
-      <select id={fid} aria-label={k.label} value={String(nilai ?? '')} onChange={e => set(e.target.value)} style={{ minWidth: k.width ?? 140 }}>
-        <option value="">—</option>{k.options?.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>);
+    if (k.type === 'select') {
+      const options = dynamicOptions[k.key] ?? (k.options ?? []).map(o => ({ value: o, label: o }));
+      return (
+        <select id={fid} aria-label={k.label} value={String(nilai ?? '')} onChange={e => set(e.target.value)} style={{ minWidth: k.width ?? 140 }}>
+          <option value="">—</option>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>);
+    }
     if (k.type === 'bool') return <input id={fid} aria-label={k.label} type="checkbox" checked={!!nilai} onChange={e => set(e.target.checked)} style={{ width: 'auto' }} />;
     if (k.type === 'percent') return (
       <input id={fid} aria-label={k.label} type="number" step="any" value={nilai == null || nilai === '' ? '' : Number(nilai) * 100}
