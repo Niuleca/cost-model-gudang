@@ -17,7 +17,7 @@ insert into public.uom_catalog (code, label, category, measurement_type, standar
 ('pcs','Piece','Unit / Piece','count','H87','Rec20',10),
 ('ea','Each','Unit / Piece','count','C62','Rec20',11),
 ('unit','Unit','Unit / Piece','count','C62','Rec20',12),
-('set','Set','Unit / Piece','count',null,'Internal',13),
+('set','Set','Unit / Piece','count','SET','Rec20',13),
 ('kit','Kit','Unit / Piece','count',null,'Internal',14),
 ('pair','Pair','Unit / Piece','count','PR','Rec20',15),
 ('dozen','Dozen','Unit / Piece','count','DZN','Rec20',16),
