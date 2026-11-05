@@ -31,7 +31,7 @@ Mengikuti use case Esa: master data per departemen → tender → hitung → rat
 | 13 | Implementasi | Semua (departemen update tugasnya) | Checklist standar saat menang, target, progress, terlambat |
 | 1 | Procurement | Procurement | Gudang (foto, Google Maps, harga/bln & per m²), MHE (tipe, tonase), ATK, printer, seragam, konsumsi, palet, pest control |
 | 2 | IT | IT | Katalog format BAP: PUPM, PDPM, OTC, Transaction/Month (slab), Yearly, Mandays, Monthly/Site |
-| 3 | Operations | Operations | Produktivitas per jam, detik per UoM, rentang benchmark per industri |
+| 3 | Operations | Operations | Master UOM, master produk & berat unit/pallet, produktivitas per jam, detik per UoM, rentang benchmark per industri |
 | 4 | HR · UMK | HR | UMK/UMP, jabatan, komponen OS |
 
 Tahap 2 (berikutnya): export Excel berumus (7), import harga & kebutuhan (8), feasibility study & P&L (11), project charter (12).
@@ -42,7 +42,7 @@ Tahap 2 (berikutnya): export Excel berumus (7), import harga & kebutuhan (8), fe
 1. Buat project baru di supabase.com (region **Singapore**).
 2. **SQL Editor → New query**, tempel seluruh isi `supabase/setup_all.sql`, klik **Run**.
    - Sudah pernah menjalankan versi sebelumnya? Cukup jalankan `supabase/migrations/0003_tahap1.sql` lalu `supabase/seed/seed_it.sql`.
-   - Bucket foto gudang `warehouse-photos` dibuat otomatis oleh skrip (cek di **Storage**).
+   - Bucket foto gudang `warehouse-photos` dibuat otomatis oleh skrip (cek di **Storage**).\n3. Jalankan isi `supabase/migrations/0027_master_uom_product_weight.sql` di SQL Editor untuk menambahkan katalog UOM dan Product Handling Master (berat unit dan pallet). Jika database sudah berjalan, cukup jalankan migration 0027 satu kali.\n4. Setelah itu lanjutkan konfigurasi Authentication, URL, dan API seperti langkah berikutnya.
 3. **Authentication → URL Configuration**
    - Site URL: `https://<domain-aplikasi>` (mis. `https://costmodel.esapanghegar.my.id`)
    - Redirect URLs: `https://<domain-aplikasi>/auth/callback` dan `http://localhost:3000/auth/callback`
@@ -81,7 +81,7 @@ Tahap 2 (berikutnya): export Excel berumus (7), import harga & kebutuhan (8), fe
 
 Keamanan ditegakkan di database (RLS + trigger), bukan hanya di tampilan.
 
-## Logika hitung (ringkas)
+## Master UOM & Product Handling\n\n- Katalog UOM mencakup unit/pcs, packaging, bag/sack/FIBC, container, roll/material, pallet/handling, berat, volume, dimensi, order processing, dan warehouse location.\n- Berat per unit disimpan sebagai net dan gross weight. Kelas berat unit dihitung otomatis dari gross weight.\n- Berat pallet dihitung terpisah: net pallet = net unit × quantity per pallet; gross pallet = gross unit × quantity per pallet + tare pallet + packaging/wrapping pallet.\n- Kelas berat pallet dihitung otomatis dari gross pallet weight. Jika quantity per pallet belum diisi, hasil berat pallet tetap kosong.\n- Klasifikasi berat adalah parameter operasional Niuleca, bukan pengganti penilaian risiko ergonomi atau batas SWL dari produsen kemasan/MHE.\n\n## Logika hitung (ringkas)
 
 - **Hari operasional** = hari kerja kalender − libur nasional & cuti bersama di hari kerja. Volume harian = volume peak ÷ (hari operasional ÷ 12).
 - **Cuti tahunan** tidak mengurangi pembagi volume; masuk sebagai **faktor pengganti** = hari operasional ÷ (hari operasional − cuti).
