@@ -84,7 +84,7 @@ Keamanan ditegakkan di database (RLS + trigger), bukan hanya di tampilan.
 
 ## Master UOM & Product Handling
 
-- Katalog UOM mencakup unit/pcs, packaging, bag/sack/FIBC, container, roll/material, pallet/handling, berat, volume, dimensi, order processing, dan warehouse location.
+- Katalog UOM mencakup 51 satuan operasional: unit/pcs, packaging, bag/sack/FIBC, container, roll/material, pallet/handling, berat, volume, dimensi, order processing, dan warehouse location. Kode standar dibedakan antara UN/CEFACT Recommendation 20 (unit pengukuran) dan Recommendation 21 (jenis kemasan); satuan internal diberi penanda Internal.
 - Berat per unit disimpan sebagai net dan gross weight. Kelas berat unit dihitung otomatis dari gross weight.
 - Berat pallet dihitung terpisah: net pallet = net unit × quantity per pallet; gross pallet = gross unit × quantity per pallet + tare pallet + packaging/wrapping pallet.
 - Kelas berat pallet dihitung otomatis dari gross pallet weight. Jika quantity per pallet belum diisi, hasil berat pallet tetap kosong.
