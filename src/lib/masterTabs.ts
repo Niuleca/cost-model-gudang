@@ -149,7 +149,7 @@ export const TABS: Tab[] = [
     kolom: [
       { key: 'product_code', label: 'Kode produk', width: 110 }, { key: 'product_name', label: 'Nama produk', width: 200 },
       { key: 'product_category', label: 'Kategori', type: 'select', options: ['FMCG','Food & Beverage','Chemical','Building Material','Automotive','Electronics','Paper & Packaging','Textile','Agriculture','Industrial Raw Material','E-commerce','Other'] },
-      { key: 'uom_code', label: 'UOM', type: 'select', options: UOM_MASTER },
+      { key: 'uom_code', label: 'UOM', type: 'select', options: UOM_MASTER, optionsFrom: { table: 'uom_catalog', value: 'code', label: 'label', activeOnly: true } },
       { key: 'unit_net_weight_kg', label: 'Net/unit (kg)', type: 'number' },
       { key: 'unit_gross_weight_kg', label: 'Gross/unit (kg)', type: 'number' },
       { key: 'unit_weight_class', label: 'Kelas berat unit', readonly: true },
@@ -168,7 +168,7 @@ export const TABS: Tab[] = [
     kolom: [
       { key: 'tahap', label: 'Tahap' }, { key: 'aktivitas', label: 'Aktivitas', width: 240 }, { key: 'tool', label: 'Tool', width: 90 },
       { key: 'role_name', label: 'Role' },
-      { key: 'uom', label: 'UoM', type: 'select', options: UOM_MASTER },
+      { key: 'uom', label: 'UoM', type: 'select', options: UOM_MASTER, optionsFrom: { table: 'uom_catalog', value: 'code', label: 'label', activeOnly: true } },
       { key: 'basis_berat', label: 'Basis berat', type: 'select', options: ['unit','pallet'] },
       { key: 'kelas_berat', label: 'Kelas berat', type: 'select', options: WEIGHT_CLASSES },
       { key: 'industri', label: 'Industri' }, { key: 'prod_per_jam', label: 'Prod/jam', type: 'number', width: 80 },
