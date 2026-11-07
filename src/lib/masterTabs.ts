@@ -105,7 +105,7 @@ export const TABS: Tab[] = [
     ] },
   { id: 'itkatalog', kelompok: 'kelompok', label: 'Katalog IT', pemilik: 'IT', table: 'it_catalog', editorRoles: ['it', 'solution_design', 'commercial'], approval: true,
     orderBy: [{ col: 'kelompok' }, { col: 'urutan' }, { col: 'item' }], cari: ['kelompok', 'item', 'cost_type', 'deskripsi'],
-    catatan: 'Format BAP KLOG. Basis menentukan cara masuk cost model: Bulanan (PUPM, PDPM, Cost/Month, Monthly/Site), Transaksi (slab per bulan), Tahunan (÷12), Sekali (OTC, OTC/Unit, Cost/Mandays). Harga slab diisi satu baris per slab dengan rentang min–maks.',
+    catatan: 'Format BAP. Basis menentukan cara masuk cost model: Bulanan (PUPM, PDPM, Cost/Month, Monthly/Site), Transaksi (slab per bulan), Tahunan (÷12), Sekali (OTC, OTC/Unit, Cost/Mandays). Harga slab diisi satu baris per slab dengan rentang min–maks.',
     defaults: { basis: 'Bulanan' },
     kolom: [
       { key: 'kelompok', label: 'Kelompok', type: 'select', options: KELOMPOK_IT }, { key: 'item', label: 'Item', width: 220 },

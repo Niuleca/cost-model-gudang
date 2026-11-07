@@ -8,7 +8,7 @@ import { rp } from '@/lib/format';
 
 interface Katalog { id: number; kelompok: string; item: string; deskripsi: string | null; cost_type: string; harga: number; slab_min: number | null; slab_max: number | null; status: string; berlaku_sampai: string | null }
 
-/** Lembar kebutuhan IT per tender, format BAP KLOG: budget vs aktual, per kelompok. */
+/** Lembar kebutuhan IT per tender, format BAP: budget vs aktual, per kelompok. */
 export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { sheet: ItSheet; onChange: (s: ItSheet) => void; kontrakBulan: number; driver?: DriverIt }) {
   const sb = supabaseBrowser();
   const [katalog, setKatalog] = useState<Katalog[]>([]);
@@ -22,7 +22,7 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
       .then(({ data }: { data: unknown }) => setKatalog((data ?? []) as Katalog[]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const opsi = { kontrakBulan, bungaTahun: 0 }; // bunga tidak otomatis — pakai tab Interest cost
+  const opsi = { kontrakBulan, bungaTahun: 0 }; // bunga tidak otomatis — pakai tab Loan & Interest Calculator
   void bunga;
   const r = useMemo(() => ringkasIt(sheet, opsi), [sheet, kontrakBulan, bunga]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (lines: ItLine[]) => onChange({ ...sheet, lines });

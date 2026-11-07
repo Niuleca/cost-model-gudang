@@ -167,7 +167,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       const rows: [string, number, string][] = [
         ['Opex', pj.opex, 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, overhead, dll.'],
         ['Capex', pj.capex, `depresiasi/amortisasi investasi (total investasi ${rp(h.investasi)})`],
-        ['Interest cost', pj.interest, 'bunga pinjaman yang dipilih di tab Interest cost'],
+        ['Interest cost', pj.interest, 'bunga pinjaman yang dipilih di tab Loan & Interest Calculator'],
       ];
       const maks = Math.max(...rows.map(r => r[1]), 1);
       return <div className="card">

@@ -1,4 +1,4 @@
-// Lembar kebutuhan IT per tender (format BAP KLOG) → baris biaya mesin hitung.
+// Lembar kebutuhan IT per tender (format BAP) → baris biaya mesin hitung.
 // Murni TypeScript, tanpa dependensi, supaya bisa diuji dengan node --test.
 import type { CostLineInput, KategoriRisiko } from './engine/types.ts';
 

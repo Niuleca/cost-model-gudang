@@ -63,7 +63,7 @@ for k, l, v, d in params:
 # ---- Parameter keuangan & margin (default, Finance wajib review) ----
 for k, l, v, c in [("bunga_modal_tahun","Cost of capital per tahun",0.10,"Default — Finance review"),
                    ("ap_hari","Hari bayar ke vendor (AP)",30,"Default"),
-                   ("overhead_persen","Overhead korporat",0.03,"Template KLOG memakai 2,7–3%"),
+                   ("overhead_persen","Overhead korporat",0.03,"Template internal memakai 2,7–3%"),
                    ("pph_grossup","Gross-up PPh 23",0.02,"PPh 23 jasa 2%"),
                    ("gp_minimum","Batas GP minimum (red flag)",0.08,"Default — Finance review")]:
     out.append(f"insert into public.finance_params values ({q(k)}, {q(l)}, {v}, {q(c)});")

@@ -92,7 +92,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   // Metode Excel: selective / double deep per bay + staging per sequence + fasilitas → dibulatkan (space rent)
   const sx = hitungSpaceExcel(lengkapiSpaceExcel(s.excel), ppDesain, paletEkuivalen(volArus('inbound')).palet, paletEkuivalen(volArus('outbound')).palet, t.jumlahShift);
   const storageM2 = sx.sd.footprint + sx.dd.footprint + sx.block.footprint + sx.floor.footprint;
-  const totalM2 = sx.spaceRent;
+  const totalM2 = sx.luasDipakai;   // Space Rent hasil kalkulasi, atau P × L dari CAD (Warehouse Planning)
   const space = {
     ppDesain, m2PerPP: bulat(ppDesain > 0 ? storageM2 / ppDesain : 0, 3), storageM2: bulat(storageM2, 1),
     stagingInM2: bulat(sx.inbound.footprint, 1), stagingOutM2: bulat(sx.outbound.footprint, 1),
@@ -101,8 +101,11 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   };
   if (!sx.porsiOk) flags.push({ level: 'kritis', kode: 'PORSI_SPACE', pesan: `Porsi SPR + DDR + block stack + pallet floor = ${(sx.totalPorsi * 100).toFixed(1)}% (harus 100%).` });
   if (!sx.level.ok && sx.posisiRak > 0) flags.push({ level: 'kritis', kode: 'RAK_TERLALU_TINGGI', pesan: `Tinggi rak ${sx.level.tinggi} mm melebihi tinggi sisi gudang ${s.excel?.rak.sideMm ?? '-'} mm.` });
-  if (sx.cadTotal > 0 && Math.abs(totalM2 - sx.cadTotal) / sx.cadTotal > 0.05)
-    flags.push({ level: 'peringatan', kode: 'CAD_GAP', pesan: `Luas hitung ${totalM2} m² berbeda >5% dari CAD ${sx.cadTotal} m².` });
+  const pembandingCad = sx.dimensi.dasar === 'cad' ? sx.spaceRent : sx.cadTotal;
+  if (pembandingCad > 0 && Math.abs(totalM2 - pembandingCad) / pembandingCad > 0.05)
+    flags.push({ level: 'peringatan', kode: 'CAD_GAP', pesan: sx.dimensi.dasar === 'cad'
+      ? `Luas CAD ${Math.round(totalM2)} m² berbeda >5% dari kebutuhan hasil kalkulasi ${sx.spaceRent} m².`
+      : `Luas hitung ${totalM2} m² berbeda >5% dari CAD ${sx.cadTotal} m².` });
 
   // ---- 4. Manpower direct (UC13) — jam per shift dipool per role ----
   const jobs = new Map<string, JobLevel>(m.jobLevels.map(j => [j.roleName, j]));

@@ -15,7 +15,7 @@ const KOLOM_X: KolomExcel[] = [
   { key: 'gmaps_url', label: 'Link Google Maps', width: 260 }, { key: 'latitude', label: 'Latitude', type: 'number' }, { key: 'longitude', label: 'Longitude', type: 'number' },
   { key: 'luas_m2', label: 'Luas (m²)', type: 'number' }, { key: 'harga_sewa_m2_bulan', label: 'Harga sewa per m² per bulan', type: 'number' },
   { key: 'harga_per_bulan', label: 'Harga sewa per bulan (utuh)', type: 'number' }, { key: 'tinggi_bersih_m', label: 'Tinggi bersih (m)', type: 'number' },
-  { key: 'daya_lantai_ton_m2', label: 'Daya lantai (ton/m²)', type: 'number' }, { key: 'jumlah_dock', label: 'Jumlah dock', type: 'number' },
+  { key: 'daya_lantai_ton_m2', label: 'Daya lantai (ton/m²)', type: 'number' }, { key: 'jumlah_dock', label: 'Jumlah dock', type: 'number' }, { key: 'jumlah_gate', label: 'Jumlah gate', type: 'number' },
   { key: 'daya_listrik_kva', label: 'Daya listrik (kVA)', type: 'number' }, { key: 'fasilitas', label: 'Fasilitas / keterangan', width: 360 },
   { key: 'pic_nama', label: 'Nama PIC' }, { key: 'pic_telepon', label: 'No. telepon PIC' }, { key: 'kontak', label: 'Kontak lain' }, { key: 'sumber', label: 'Sumber harga', width: 240 }, { key: 'tanggal_harga', label: 'Tanggal harga', type: 'date' },
   { key: 'berlaku_sampai', label: 'Berlaku sampai', type: 'date' }, { key: 'foto', label: 'Foto (path, pisahkan koma)', type: 'list', width: 260 },
@@ -167,6 +167,7 @@ export default function GudangManager() {
             <label className="f" htmlFor="g-tinggi">Tinggi bersih (m)<input id="g-tinggi" type="number" step="any" value={form.tinggi_bersih_m ?? ''} onChange={e => set('tinggi_bersih_m', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-lantai">Daya dukung lantai (ton/m²)<input id="g-lantai" type="number" step="any" value={form.daya_lantai_ton_m2 ?? ''} onChange={e => set('daya_lantai_ton_m2', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-dock">Jumlah dock<input id="g-dock" type="number" value={form.jumlah_dock ?? ''} onChange={e => set('jumlah_dock', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-gate">Jumlah gate<input id="g-gate" type="number" min={0} value={form.jumlah_gate ?? ''} onChange={e => set('jumlah_gate', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-kva">Daya listrik (kVA)<input id="g-kva" type="number" value={form.daya_listrik_kva ?? ''} onChange={e => set('daya_listrik_kva', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-fas">Fasilitas<input id="g-fas" value={form.fasilitas ?? ''} onChange={e => set('fasilitas', e.target.value)} placeholder="office, toilet, mushola, parkir truk…" /></label>
             <label className="f" htmlFor="g-pic">Nama PIC<input id="g-pic" value={form.pic_nama ?? ''} onChange={e => set('pic_nama', e.target.value || null)} placeholder="mis. Bp. Andi (marketing landlord)" /></label>
@@ -209,7 +210,7 @@ export default function GudangManager() {
               <tr><td>Luas</td><td className="num">{angka(w.luas_m2)} m²</td></tr>
               <tr><td>Sewa per m²/bulan</td><td className="num">{adaHarga(w) ? rp(tarifM2(w)) : <span className="pill warn">harga belum ada</span>}</td></tr>
               <tr><td>Sewa utuh per bulan</td><td className="num">{adaHarga(w) ? rp(sewaBulanPenuh(w)) : '—'}</td></tr>
-              <tr><td>Tinggi bersih · dock</td><td className="num">{w.tinggi_bersih_m != null ? `${w.tinggi_bersih_m} m` : '—'} · {w.jumlah_dock ?? '—'}</td></tr>
+              <tr><td>Tinggi bersih · dock · gate</td><td className="num">{w.tinggi_bersih_m != null ? `${w.tinggi_bersih_m} m` : '—'} · {w.jumlah_dock ?? '—'} · {w.jumlah_gate ?? '—'}</td></tr>
               <tr><td>Harga per</td><td className="num">{tanggal(w.tanggal_harga)}{w.berlaku_sampai ? ` · s.d. ${tanggal(w.berlaku_sampai)}` : ''}</td></tr>
               <tr><td>PIC</td><td className="num">{w.pic_nama ?? ''}</td></tr>
               <tr><td>No. telepon</td><td className="num">{w.pic_telepon ? <a href={`tel:${w.pic_telepon.replace(/[^\d+]/g, '')}`}>{w.pic_telepon}</a> : ''}</td></tr>

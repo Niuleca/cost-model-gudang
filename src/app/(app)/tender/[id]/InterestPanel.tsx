@@ -30,7 +30,7 @@ export default function InterestPanel({ nilai, onChange, hasilLive, kontrakBulan
 
   return (<>
     <div className="card">
-      <h2><T>Interest cost</T> — simulasi pinjaman bank</h2>
+      <h2>Loan & Interest Calculator</h2>
       <p className="small muted">Bunga <b>tidak dihitung otomatis</b> — hanya capex / baris manual yang Anda pilih di sini yang dikenai bunga. Bunga pinjaman dihitung dari pokok × bunga %/thn × tenor,
         lalu dibebankan rata selama kontrak <b>{kontrakBulan} bln</b> sebagai kategori biaya <b>Interest cost</b> — ikut ke total cost, rate card, quotation dan export.</p>
       <div className="grid3">
@@ -101,7 +101,7 @@ export default function InterestPanel({ nilai, onChange, hasilLive, kontrakBulan
         <details className="small muted"><summary>Cara hitung</summary>
           <p><b>Flat:</b> total bunga = pokok × bunga/12 × tenor. <b>Menurun:</b> pokok dicicil rata, total bunga = pokok × bunga/12 × (tenor + 1) ÷ 2.
             Interest cost/bln = total bunga ÷ durasi kontrak ({kontrakBulan} bln). Tenor kosong = durasi kontrak. Alokasi ke storage/handling mengikuti baris sumbernya (baris manual: 40/30/30).
-            Tekan <b>Hitung</b> untuk memperbarui tab Hasil.</p></details>
+            Tekan <b>Hitung</b> untuk memperbarui tab Result.</p></details>
       </div>
     </div>
   </>);

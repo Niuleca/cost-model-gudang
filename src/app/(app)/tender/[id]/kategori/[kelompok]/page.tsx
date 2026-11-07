@@ -78,7 +78,7 @@ export default function KategoriBiayaPage() {
     <div>
       <p className="small muted" style={{ letterSpacing: '.06em', textTransform: 'uppercase' }}>{t.kode ?? ''} · v{t.versi} · Rincian kategori</p>
       <h1 style={{ margin: '2px 0' }}>{kelompok} — {t.customer}</h1>
-      <p className="small muted"><Link href={`/tender/${t.id}?tab=Hasil`}>← Kembali ke tab Hasil</Link>
+      <p className="small muted"><Link href={`/tender/${t.id}?tab=result`}>← Kembali ke tab Result</Link>
         {kategoriLain.length > 0 && <> · Kategori lain: {kategoriLain.map((k, i) => <span key={k}>{i ? ', ' : ''}<Link href={`/tender/${t.id}/kategori/${encodeURIComponent(k)}`}>{k}</Link></span>)}</>}</p>
     </div>
 

@@ -400,7 +400,7 @@
       "catatan": null
      },
      {
-      "deskripsi": "KLOG Email System",
+      "deskripsi": "Email System",
       "qty": 5.0,
       "uom": null,
       "hargaSatuan": 115000,
@@ -852,7 +852,7 @@
       "catatan": "2023-07-26"
      },
      {
-      "deskripsi": "Akses door KLOG",
+      "deskripsi": "Akses door",
       "qty": 2.0,
       "uom": "lumpsum",
       "hargaSatuan": 5000000,
@@ -1547,7 +1547,7 @@
       "catatan": null
      },
      {
-      "deskripsi": "RT Own KLOG",
+      "deskripsi": "RT Own",
       "qty": 2.0,
       "uom": "unit",
       "hargaSatuan": 5347731,
@@ -1627,7 +1627,7 @@
       "catatan": null
      },
      {
-      "deskripsi": "Biaya Fixed Maintenance Unit KLOG",
+      "deskripsi": "Biaya Fixed Maintenance Unit",
       "qty": 2.0,
       "uom": "lumpsum",
       "hargaSatuan": 2950000,
@@ -1635,7 +1635,7 @@
       "catatan": null
      },
      {
-      "deskripsi": "Labor Kontrak Service MHE KLOG",
+      "deskripsi": "Labor Kontrak Service MHE",
       "qty": 2.0,
       "uom": "lumpsum",
       "hargaSatuan": 525000,
@@ -2035,7 +2035,7 @@
       "catatan": null
      },
      {
-      "deskripsi": "KLOG Email System",
+      "deskripsi": "Email System",
       "qty": 2.0,
       "uom": "Unit",
       "hargaSatuan": 115000,
@@ -3224,7 +3224,7 @@
       "catatan": null
      },
      {
-      "deskripsi": "KLOG Email",
+      "deskripsi": "Email",
       "qty": 12.0,
       "uom": "unit",
       "hargaSatuan": 115000,

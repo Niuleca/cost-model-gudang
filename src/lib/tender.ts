@@ -1,3 +1,4 @@
+import { airKeCostLines, type AirInput } from './air';
 import { aktivitasDenganOrderAdmin, stokDariPalet } from '@/lib/profilVolume';
 import { volumeEfektif } from '@/lib/engine/types';
 import { VSM_DEFAULT } from '@/lib/vsmDefault';
@@ -23,11 +24,12 @@ export interface TenderRow {
 export interface GudangTerpilih {
   id: string; nama: string; alamat: string | null; kab_kota: string; provinsi: string; gmaps_url: string | null;
   luas_m2: number; harga_sewa_m2_bulan: number | null; harga_per_bulan: number | null; tinggi_bersih_m: number | null;
-  jumlah_dock: number | null; tipe: string; foto: string[]; sewaUtuh: boolean;
+  jumlah_dock: number | null; jumlah_gate?: number | null; tipe: string; foto: string[]; sewaUtuh: boolean;
 }
 
 // Bagian input yang disimpan di tenders.asumsi
 export interface Asumsi {
+  air?: AirInput;                    // Utilities Management → Water
   porsiMuat?: Partial<PorsiMuat>;   // porsi palletize vs loose per proses
   cutiTahunanHari: number;
   faktorProduktivitas: number;
@@ -122,7 +124,7 @@ export function keInput(t: TenderRow): TenderInput {
       tarifSewaM2Bulan: a.space.tarifManual ? a.space.tarifSewaM2Bulan
         : Math.round(Number(a.gudang.harga_sewa_m2_bulan ?? (a.gudang.harga_per_bulan ?? 0) / Math.max(1, Number(a.gudang.luas_m2)))),
       sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
-    costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT)],
+    costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT), ...airKeCostLines(a.air)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
     listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, rincianBiayaMp: a.rincianBiayaMp ?? {}, paramBiayaMp: a.paramBiayaMp ?? {}, levelGaji: a.levelGaji ?? {}, levelRole: a.levelRole ?? {}, uomRateCard: a.uomRateCard ?? {}, revisiBiaya: a.revisiBiaya ?? {}, interestCost: a.interestCost,
     konversiPalet: { cbmPerPalet: a.profilVolume?.param?.cbmPerPalet ?? 1.5, tonPerPalet: a.profilVolume?.param?.tonPerPalet ?? 0.8 }, eskalasiManpower: { ...ESKALASI_DEFAULT, ...(a.eskalasiManpower ?? {}), mulai: a.eskalasiManpower?.mulai || t.tanggal_go_live?.slice(0, 7) || null },

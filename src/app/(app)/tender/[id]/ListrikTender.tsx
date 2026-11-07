@@ -5,6 +5,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { hitungListrik, type DataListrik } from '@/lib/listrik';
 import type { ListrikInput, TenderInput } from '@/lib/engine/types';
 import { rp, angka } from '@/lib/format';
+import { listrikDefault, type BarisListrik, type DriverListrik } from '@/lib/utilitas';
 
 interface Sim { id: string; nama: string; is_template: boolean; data: DataListrik }
 interface Tarif { golongan: string; tarif_kwh: number }
@@ -12,16 +13,23 @@ interface ItemW { item: string; daya_watt: number | null }
 type Simulasi = NonNullable<TenderInput['listrikSimulasi']>;
 
 /** Listrik di tender: ambil dari simulasi Utilities (Price Inquiry) atau pilih peralatan dari daftar — tidak diketik manual. */
-export default function ListrikTender({ simulasi, listrik, golongan, tarifKwh, tarif, items, onSimulasi, onListrik, onTarif }: {
+export default function ListrikTender({ simulasi, listrik, golongan, tarifKwh, tarif, items, onSimulasi, onListrik, onTarif, driver }: {
   simulasi: Simulasi | null | undefined; listrik: ListrikInput[]; golongan: string; tarifKwh: number; tarif: Tarif[]; items: ItemW[];
   onSimulasi: (s: Simulasi | null) => void; onListrik: (l: ListrikInput[]) => void; onTarif: (golongan: string, tarifKwh: number) => void;
+  driver?: DriverListrik;
 }) {
   const [sims, setSims] = useState<Sim[]>([]);
   useEffect(() => {
     supabaseBrowser().from('electricity_simulations').select('id, nama, is_template, data').order('is_template', { ascending: false }).order('updated_at', { ascending: false })
       .then(({ data }: { data: Sim[] | null }) => setSims(data ?? []));
   }, []);
-  const [mode, setMode] = useState<'simulasi' | 'alat'>(simulasi ? 'simulasi' : listrik.length ? 'alat' : 'simulasi');
+  const [mode, setMode] = useState<'simulasi' | 'alat'>(simulasi ? 'simulasi' : 'alat');
+  const def = useMemo(() => (driver ? listrikDefault(driver) : []), [driver]);
+  // daftar default otomatis saat belum ada isian (tetap bisa diubah / dihapus)
+  useEffect(() => { if (driver && !simulasi && listrik.length === 0 && def.length) onListrik(def); }, [!!driver]); // eslint-disable-line react-hooks/exhaustive-deps
+  // baris default ikut data terbaru (qty & status merah) selama belum diubah manual
+  const sinkronDefault = () => onListrik(listrik.map(l => { const b = l as BarisListrik; const d = b.kunci ? def.find(x => x.kunci === b.kunci) : undefined; return d && !(b as { manual?: boolean }).manual ? { ...d } : l; }));
+  const merah = (listrik as BarisListrik[]).filter(l => l.belumDiketahui).length;
 
   // Daftar peralatan: dari template/simulasi Utilities + item Price Inquiry yang punya daya (watt)
   const katalog = useMemo(() => {
@@ -46,8 +54,8 @@ export default function ListrikTender({ simulasi, listrik, golongan, tarifKwh, t
       <div className="row">
         <label className="f" htmlFor="sumber-listrik" style={{ minWidth: 260 }}>Sumber biaya listrik
           <select id="sumber-listrik" value={mode} onChange={e => { const m = e.target.value as 'simulasi' | 'alat'; setMode(m); if (m === 'alat') onSimulasi(null); }}>
+            <option value="alat">Daftar peralatan (default dari data tender)</option>
             <option value="simulasi">Simulasi Utilities (Price Inquiry)</option>
-            <option value="alat">Pilih peralatan per titik</option>
           </select></label>
       </div>
 
@@ -76,27 +84,36 @@ export default function ListrikTender({ simulasi, listrik, golongan, tarifKwh, t
           <select id="gol" value={golongan} onChange={e => { const g = tarif.find(x => x.golongan === e.target.value); onTarif(e.target.value, Number(g?.tarif_kwh ?? tarifKwh)); }}>
             {tarif.map(x => <option key={x.golongan} value={x.golongan}>{x.golongan} — {rp(x.tarif_kwh, 2)}/kWh</option>)}
           </select></label>
-        <div className="tablewrap"><table>
-          <thead><tr><th>Peralatan</th><th className="num">Watt</th><th className="num">Qty</th><th className="num">Jam/hari</th><th className="num">kWh/hari</th><th></th></tr></thead>
+        {driver && <div className="row" style={{ alignItems: 'center' }}>
+          <button className="ghost" onClick={() => onListrik(def)}>Isi ulang default dari data tender</button>
+          <button className="ghost" onClick={sinkronDefault} disabled={!listrik.some(l => (l as BarisListrik).kunci)}>Perbarui qty default</button>
+          {!listrik.some(l => (l as BarisListrik).kunci) ? <span className="pill warn">Daftar manual — klik "Isi ulang default" untuk memakai daftar dari data tender</span>
+            : merah > 0 ? <span className="pill bad">{merah} item belum diketahui — lengkapi datanya (baris merah)</span> : <span className="pill ok">Semua item punya dasar data</span>}
+        </div>}
+        <div className="tablewrap fit"><table className="tabel-fit">
+          <thead><tr><th>Peralatan</th><th className="num">Watt</th><th className="num">Qty</th><th className="num">Jam/hari</th><th className="num">kWh/bln</th><th>Dasar</th><th></th></tr></thead>
           <tbody>
-            {listrik.length === 0 && <tr><td colSpan={6} className="muted">Belum ada peralatan.</td></tr>}
+            {listrik.length === 0 && <tr><td colSpan={7} className="muted">Belum ada peralatan.</td></tr>}
             {listrik.map((l, i) => {
-              const ubah = (p: Partial<ListrikInput>) => onListrik(listrik.map((x, j) => j === i ? { ...x, ...p } : x));
-              return <tr key={i}>
-                <td style={{ minWidth: 260 }}><select aria-label="Peralatan" value={katalog.some(k => k.nama === l.item) ? l.item : ''} onChange={e => {
+              const b = l as BarisListrik;
+              const ubah = (p: Partial<ListrikInput>) => onListrik(listrik.map((x, j) => j === i ? { ...x, ...p, manual: true, belumDiketahui: undefined } as ListrikInput : x));
+              return <tr key={i} className={b.belumDiketahui ? 'baris-merah' : undefined}>
+                <td>{b.kunci ? <b>{l.item}</b> : <select aria-label="Peralatan" value={katalog.some(k => k.nama === l.item) ? l.item : ''} onChange={e => {
                   const k = katalog.find(x => x.nama === e.target.value); if (k) ubah({ item: k.nama, watt: k.watt, jamPerHari: k.jam || l.jamPerHari });
                 }}>
                   <option value="">{l.item ? `${l.item} (tidak ada di daftar)` : '— pilih peralatan —'}</option>
                   {katalog.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {angka(k.watt)} W</option>)}
-                </select></td>
-                <td className="num">{angka(l.watt)}</td>
-                <td className="num"><input aria-label="Qty" type="number" min={0} value={l.qty} onChange={e => ubah({ qty: Number(e.target.value) })} style={{ width: 80, minWidth: 80 }} /></td>
-                <td className="num"><input aria-label="Jam per hari" type="number" min={0} max={24} value={l.jamPerHari} onChange={e => ubah({ jamPerHari: Number(e.target.value) })} style={{ width: 70, minWidth: 70 }} /></td>
-                <td className="num">{angka(l.watt * l.qty * l.jamPerHari / 1000, 1)}</td>
-                <td><button className="danger" onClick={() => onListrik(listrik.filter((_, j) => j !== i))}>Hapus</button></td>
+                </select>}</td>
+                <td className="num"><input aria-label="Watt" type="number" min={0} value={l.watt} onChange={e => ubah({ watt: Number(e.target.value) })} style={{ width: 76, minWidth: 0 }} /></td>
+                <td className="num"><input aria-label="Qty" type="number" min={0} value={l.qty} onChange={e => ubah({ qty: Number(e.target.value) })} style={{ width: 64, minWidth: 0 }} /></td>
+                <td className="num"><input aria-label="Jam per hari" type="number" min={0} max={24} value={l.jamPerHari} onChange={e => ubah({ jamPerHari: Number(e.target.value) })} style={{ width: 56, minWidth: 0 }} /></td>
+                <td className="num">{angka(l.watt * l.qty * l.jamPerHari * 30 / 1000, 0)}</td>
+                <td className="small">{b.dasar ?? <span className="muted">manual</span>}</td>
+                <td><button className="ghost" aria-label="Hapus" style={{ padding: '0 8px' }} onClick={() => onListrik(listrik.filter((_, j) => j !== i))}>×</button></td>
               </tr>;
             })}
           </tbody></table></div>
+        {listrik.length > 0 && <p className="small"><b>Total ±{angka(listrik.reduce((t, l) => t + l.watt * l.qty * l.jamPerHari * 30 / 1000, 0), 0)} kWh/bln</b> × {rp(tarifKwh, 2)}/kWh = <b>{rp(listrik.reduce((t, l) => t + l.watt * l.qty * l.jamPerHari * 30 / 1000, 0) * tarifKwh)}</b>/bln (estimasi 30 hari, belum termasuk biaya beban)</p>}
         <div className="row"><button className="ghost" disabled={!katalog.length} onClick={() => { const k = katalog[0]; onListrik([...listrik, { item: k.nama, watt: k.watt, qty: 1, jamPerHari: k.jam || 8 }]); }}>+ Tambah peralatan</button>
           <span className="small muted">Daftar peralatan dari kalkulator listrik (Utilities) dan item Price Inquiry yang punya daya watt.</span></div>
       </>}

@@ -87,7 +87,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
 
   function cekKritis(h: HasilTender) {
     const kritis = h.redFlags.filter(f => f.level === 'kritis');
-    if (kritis.length) { setErr(`Masih ada ${kritis.length} red flag kritis. Selesaikan dulu di tab Hasil.`); return false; }
+    if (kritis.length) { setErr(`Masih ada ${kritis.length} red flag kritis. Selesaikan dulu di tab Result.`); return false; }
     setErr(null); return true;
   }
 
@@ -212,7 +212,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
         <h2>Quotation</h2>
         {!draft && <button onClick={mulai} disabled={!hasil || kurangBranding} title={kurangBranding ? 'Unggah logo & TTD di Profil dulu' : undefined}>Buat quotation baru dari hasil tersimpan</button>}
       </div>
-      {!hasil && <p className="muted">Simpan hasil hitung dulu di tab Hasil.</p>}
+      {!hasil && <p className="muted">Simpan hasil hitung dulu di tab Result.</p>}
       {err && <p className="error small" role="alert">{err}</p>}
 
       {draft && (

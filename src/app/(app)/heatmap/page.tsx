@@ -90,7 +90,7 @@ export default function Heatmap() {
   return (
     <>
       <div className="head">
-        <div><div className="eyebrow">Dashboard · Heatmap</div><h1>Penyelesaian, backlog & waiting</h1></div>
+        <div><div className="eyebrow">Dashboard</div><h1>Opportunity Control Tower</h1><p className="small muted">Penyelesaian · backlog · waiting tender</p></div>
         <Link className="btn ghost" href="/status">Buka status project</Link>
       </div>
       {err && <p className="error small" role="alert">{err}</p>}

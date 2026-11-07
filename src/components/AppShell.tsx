@@ -10,22 +10,27 @@ import { PRICE_PAGES, PROD_PAGES } from '@/lib/masterTabs';
 import { BAHASA, useBahasa, type Bahasa } from '@/lib/i18n';
 import { useBrandingSaya } from './BrandingProfil';
 
-type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: boolean };
+type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: boolean; grup?: string; segera?: boolean };
 const MENU: { id: string; label: string; item: Item[] }[] = [
   { id: 'dashboard', label: 'Dashboard', item: [
-    { href: '/beranda', label: 'Beranda · Radar tender', roles: 'semua' },
-    { href: '/', label: 'Ringkasan', roles: TIM_TENDER },
-    { href: '/status', label: 'Status Project', roles: TIM_TENDER },
-    { href: '/heatmap', label: 'Heatmap penyelesaian, backlog & waiting', roles: TIM_TENDER },
-    { href: '/trend-bisnis', label: 'Update trend bisnis', roles: TIM_TENDER, pisah: true },
+    { href: '/beranda', label: 'Logistics Opportunity Radar', roles: 'semua' },
+    { href: '/trend-bisnis', label: 'Business Trend Intelligence', roles: TIM_TENDER },
+    { href: '/', label: 'Summary', roles: TIM_TENDER, pisah: true },
+    { href: '/status', label: 'Project Status', roles: TIM_TENDER },
+    { href: '/heatmap', label: 'Opportunity Control Tower', roles: TIM_TENDER },
   ] },
-  { id: 'tender', label: 'Tender', item: [
-    { href: '/tender/baru', label: 'New Tender', roles: TIM_TENDER },
-    { href: '/tender?grup=draft', label: 'Draft Tender', roles: TIM_TENDER },
-    { href: '/perbandingan', label: 'Comparation Tender', roles: TIM_TENDER },
-    { href: '/riwayat', label: 'Riwayat Tender', roles: TIM_TENDER },
-    { href: '/approval-quotation', label: 'Approval quotation', roles: ['admin', 'manager'] },
-    { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua' },
+  { id: 'tender', label: 'Logistics Tender', item: [
+    { href: '/tender/baru', label: 'New Tender', roles: TIM_TENDER, grup: 'Warehouse Tender' },
+    { href: '/tender?grup=draft', label: 'Draft Tender', roles: TIM_TENDER, grup: 'Warehouse Tender' },
+    { href: '/perbandingan', label: 'Comparation Tender', roles: TIM_TENDER, grup: 'Warehouse Tender' },
+    { href: '/riwayat', label: 'Tender History', roles: TIM_TENDER, grup: 'Warehouse Tender' },
+    { href: '/approval-quotation', label: 'Approval quotation', roles: ['admin', 'manager'], grup: 'Warehouse Tender' },
+    { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua', grup: 'Warehouse Tender' },
+    { href: '/transport', label: 'Transportation Tender', roles: TIM_TENDER, grup: 'Transport & Intermodal', segera: true },
+    { href: '/intermodal', label: 'Intermodal Tender', roles: TIM_TENDER, grup: 'Transport & Intermodal', segera: true },
+    { href: '/pipeline', label: 'Tender Pipeline', roles: TIM_TENDER, grup: 'Monitoring' },
+    { href: '/tracking', label: 'Tender Status & Tracking', roles: TIM_TENDER, grup: 'Monitoring' },
+    { href: '/analytics', label: 'Tender Performance Analytics', roles: TIM_TENDER, grup: 'Monitoring' },
   ] },
   { id: 'simulasi', label: 'Simulasi Warehouse', item: [
     { href: '/simulasi', label: 'Desain gudang 2D ⇄ 3D', roles: 'semua' },
@@ -107,9 +112,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </button>
         {buka === id && (
           <div className={`ddmenu${kanan ? ' kanan' : ''}`} role="menu">
-            {isi.map(i => (
-              <Link key={i.href} role="menuitem" href={i.href} className={`${aktif(i.href) ? 'on' : ''}${i.pisah ? ' pisah' : ''}`}>{t(i.label)}
-                {i.href === '/admin/approval' && nPending > 0 && <span className="pill warn small" style={{ marginLeft: 6 }}>{nPending}</span>}</Link>))}
+            {isi.map((i, k) => (
+              <Fragment key={i.href}>
+                {i.grup && i.grup !== isi[k - 1]?.grup && <div className={`ddgrup${k > 0 ? ' pisah' : ''}`} role="presentation">{t(i.grup)}</div>}
+                {i.segera ? <span role="menuitem" aria-disabled="true" className={`ddsegera${i.grup ? ' bergrup' : ''}`}>{t(i.label)} <span className="pill info small">segera</span></span> : <Link role="menuitem" href={i.href} className={`${aktif(i.href) ? 'on' : ''}${i.pisah ? ' pisah' : ''}${i.grup ? ' bergrup' : ''}`}>{t(i.label)}
+                  {i.href === '/admin/approval' && nPending > 0 && <span className="pill warn small" style={{ marginLeft: 6 }}>{nPending}</span>}</Link>}
+              </Fragment>))}
             {kanan && <button role="menuitem" className="ddkeluar" onClick={keluar}>{t('Keluar')}</button>}
           </div>)}
       </div>);

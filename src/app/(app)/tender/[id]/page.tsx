@@ -27,6 +27,8 @@ import ItPanel from './ItPanel';
 import BiayaLainPanel from './BiayaLainPanel';
 import HapusTender from './HapusTender';
 import ListrikTender from './ListrikTender';
+import AirPanel from './AirPanel';
+import type { DriverListrik } from '@/lib/utilitas';
 import ProcessDesignPanel from './ProcessDesignPanel';
 import SpacePanel from './SpacePanel';
 import ProdukPanel from './ProdukPanel';
@@ -48,7 +50,7 @@ interface Tarif { golongan: string; tarif_kwh: number }
 interface Jab { role_name: string }
 
 const TAB_EXCEL = 'Data project (Excel)' as const;
-const TABS = ['Key assumption', 'Volume', 'Produk', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Export'] as const;
+const TABS = ['Key assumption', 'Volume', 'Produk', 'Value Stream Mapping', 'Warehouse Planning', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Result', 'Quotation', 'Export'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
@@ -164,7 +166,7 @@ export default function TenderPage() {
 
   // Hitung langsung untuk sheet Interest cost (daftar sumber pinjaman + hasil bunga live)
   const hasilInterest = useMemo(() => {
-    if (!t || !masterMp || tab !== 'Interest cost') return null;
+    if (!t || !masterMp || tab !== 'Loan & Interest Calculator') return null;
     try { return hitungTender(keInput(t), masterMp); } catch { return null; }
   }, [t, masterMp, tab]);
 
@@ -238,7 +240,7 @@ export default function TenderPage() {
     const h = hitungTender(keInput(t), master);
     for (const c of catatan) h.redFlags.push({ level: 'peringatan', kode: 'MASTER_DATA', pesan: c });
     for (const pesan of cekProduk()) h.redFlags.push({ level: 'peringatan', kode: 'PRODUK', pesan });
-    setHasil(h); setCatatanMaster(catatan); if (pindahTab) setTab('Hasil'); setPesan(pindahTab ? null : 'Dihitung ulang — hasil terbaru ada di tab Hasil.'); if (!pindahTab) setTimeout(() => setPesan(null), 3000);
+    setHasil(h); setCatatanMaster(catatan); if (pindahTab) setTab('Result'); setPesan(pindahTab ? null : 'Dihitung ulang — hasil terbaru ada di tab Result.'); if (!pindahTab) setTimeout(() => setPesan(null), 3000);
   }
 
   /** Peringatan dari tab Produk: palet berat vs posisi level 1 / lantai, total palet vs posisi simpan. */
@@ -268,14 +270,14 @@ export default function TenderPage() {
 
   // Buka tab Hasil → selalu hitung ulang dari input terbaru (mis. Interest cost, revisi), supaya angka tidak basi
   useEffect(() => {
-    if (tab !== 'Hasil' || !t) return;
+    if (tab !== 'Result' || !t) return;
     hitung(false);
   }, [tab, !!t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Margin diubah di tab Hasil → hitung ulang otomatis (tanpa pindah tab)
   const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}]);
   useEffect(() => {
-    if (!hasil || tab !== 'Hasil') return;
+    if (!hasil || tab !== 'Result') return;
     const id = setTimeout(() => { hitung(false); }, 400);
     return () => clearTimeout(id);
   }, [kunciMargin]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -295,6 +297,24 @@ export default function TenderPage() {
   const pdMhe = pdFull?.mhe ?? [];
   // headcount total untuk konsumsi (galon): hasil Hitung bila ada, kalau tidak dari process design (direct + indirect/tetap)
   const headcountTotal = (hasil?.manpower?.reduce((s, m) => s + m.headcount, 0)) || ((pdFull?.totalMp ?? 0) + (pdFull?.indirect.total ?? 0));
+
+  // Utilities Management → Electrical: driver default peralatan dari tab lain
+  const driverListrik = useMemo<DriverListrik | undefined>(() => {
+    if (!t) return undefined;
+    const x = lengkapiSpaceExcel(t.asumsi.space.excel);
+    const officeM2 = x.fasilitas.filter(f => /office|meeting|control/i.test(f.nama)).reduce((s2, f) => s2 + (Number(f.m2) || 0), 0);
+    const it = t.asumsi.it?.lines ?? [];
+    const q = (re: RegExp) => it.filter(l => re.test(l.item)).reduce((s2, l) => s2 + (Number(l.qty) || 0), 0);
+    const mhe = pdFull?.mhe ?? [];
+    return {
+      luasM2: hasil?.space.totalM2 ?? spaceH?.luasDipakai ?? 0, officeM2, tinggiM: x.rak.sideMm / 1000,
+      shift: t.jumlah_shift || 1, jamPerShift: (t.asumsi.processDesign?.mp?.jamWeekday ?? PD_DEFAULT.mp.jamWeekday) + 1,
+      dock: Number(t.asumsi.gudang?.jumlah_dock) || 0,
+      mheListrik: mhe.length ? mhe.filter(e => /reach|\bRT\b|pallet mover|stacker|electric|listrik/i.test(e.nama)).reduce((s2, e) => s2 + e.resources, 0) : null,
+      pc: q(/PC Desktop|^PC\b/i), laptop: q(/laptop/i), rf: q(/scanner|HHT|\bRF\b|RDT/i), printer: q(/printer/i), cctv: q(/kamera cctv|camera cctv/i), ap: q(/access point|wifi|wi-fi/i),
+      adaIt: it.length > 0,
+    };
+  }, [t, hasil, spaceH, pdFull]);
 
   const [nomorQ, setNomorQ] = useState<string | null>(null);
   if (!t) return <p className="muted">{pesan ?? 'Memuat tender…'}</p>;
@@ -408,7 +428,7 @@ export default function TenderPage() {
         const dipakai = (pr: string) => a.aktivitas.filter(x => x.porsiMuat?.proses === pr);
         return <div className="card">
           <h2><T>Workload palletize vs loose</T></h2>
-          <p className="small muted">Porsi volume yang ditangani <b>palletize</b> vs <b>loose</b> (curah / case) per proses. Aktivitas di tab Aktivitas & manpower yang kolom % volume-nya "Ikut porsi" otomatis memakai angka ini.
+          <p className="small muted">Porsi volume yang ditangani <b>palletize</b> vs <b>loose</b> (curah / case) per proses. Aktivitas di tab Value Stream Mapping yang kolom % volume-nya "Ikut porsi" otomatis memakai angka ini.
             Replenishment dihitung dari volume <b>case picking</b> (outbound × loose picking), lalu dibagi turun palet vs loose case.</p>
           <div className="tablewrap"><table>
             <thead><tr><th>Proses</th><th className="num">Palletize</th><th className="num">Loose</th><th>Keterangan</th><th>Aktivitas yang ikut</th></tr></thead>
@@ -543,7 +563,7 @@ export default function TenderPage() {
         onChange={produk => ubahProduk(produk)} onAturan={aturanBerat => ubahProduk(a.produk, aturanBerat)}
         onSinkron={v => { if (v) ubahProduk(a.produk, a.aturanBerat, true); else setA({ produkSinkron: false }); }} />}
 
-      {tab === 'Aktivitas & manpower' && (<>
+      {tab === 'Value Stream Mapping' && (<>
         {<>
           <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)}
@@ -615,7 +635,7 @@ export default function TenderPage() {
           })()}
         </div>
         <div className="card">
-          <h2><T>Aktivitas (VSM) & manpower</T></h2>
+          <h2>Productivity & Man-Hour</h2>
           <p className="small muted">Pilih aktivitas dari database produktivitas (Operations) atau tambah baris kosong. Semua kolom kuning bisa diubah: task, aktivitas, equipment, alat pendukung, role, produktivitas, UoM, arus, volume, %. Volume/bln kosong = volume peak arus × pengali. <b>Arus</b> = alur barang yang menjadi dasar volume aktivitas: Inbound (barang masuk), Outbound (barang keluar), Storage (stok/penyimpanan), VAS (value added service).</p>
           <div className="notice small" style={{ display: 'grid', gap: 6 }}>
             <div><b>Skema default VSM</b> ({VSM_DEFAULT.length} aktivitas, prosedur gudang standar): unloading curah oleh TKBM / palet dengan forklift CB → admin receiving → checker & tally → staging → admin input putaway → putaway reach truck → cycle count & input inventory → input & replenishment reach truck → admin input picking → picking case (picker) / palet (reach truck) → staging outbound → checker outbound → loading curah (TKBM) / paletan (forklift CB) → admin barang keluar & print handover list → checker serahkan HO ke driver.
@@ -718,7 +738,7 @@ export default function TenderPage() {
         </div>
       </>)}
 
-      {tab === 'Gudang, space & MHE' && (<>
+      {tab === 'Warehouse Planning' && (<>
         <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
           setKol('warehouse_id', g?.id ?? null);
           setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
@@ -732,15 +752,18 @@ export default function TenderPage() {
             posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
             skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
             onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />} />
+      </>)}
+
+      {tab === 'Loan & Interest Calculator' && <InterestPanel nilai={a.interestCost} onChange={interestCost => setA({ interestCost })} hasilLive={hasilInterest} kontrakBulan={t.durasi_kontrak_bulan} />}
+
+      {tab === 'Technology & Equipment' && <>
+        <ProcessDesignPanel bagian="mhe" aktivitas={aktEf} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
         <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })}
           kebutuhan={true
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
             : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />
-      </>)}
-
-      {tab === 'Interest cost' && <InterestPanel nilai={a.interestCost} onChange={interestCost => setA({ interestCost })} hasilLive={hasilInterest} kontrakBulan={t.durasi_kontrak_bulan} />}
-
-      {tab === 'IT' && <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={(() => {
+        <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={(() => {
         const wc = /admin|spv|supervisor|manager|ka gudang|controller|qhse|k3/i, mj = /spv|supervisor|manager|ka gudang/i;
         const rows = [...(pdFull?.mp ?? []).map(r => ({ nama: r.nama, n: r.resources })), ...(pdFull?.indirect.rows ?? []).map(r => ({ nama: r.nama, n: r.qty }))];
         const unit = (re: RegExp) => pdMhe.filter(e => re.test(e.nama)).reduce((x, e) => x + e.resources, 0);
@@ -748,25 +771,34 @@ export default function TenderPage() {
           transaksiBulan: volEf.filter(v => v.arus === 'inbound' || v.arus === 'outbound').reduce((x, v) => x + (Number(v.peakBulan) || 0), 0),
           userKantor: rows.filter(r => wc.test(r.nama)).reduce((x, r) => x + r.n, 0), manajer: rows.filter(r => mj.test(r.nama)).reduce((x, r) => x + r.n, 0),
           unitRf: unit(/^(RF|RDT|HHT|scanner)/i), unitPc: unit(/^(PC|komputer|desktop)/i), unitLaptop: unit(/laptop/i) };
-      })()} />}
+      })()} />
 
-      {tab === 'Biaya lain' && (
         <div className="card">
-          <h2><T>Biaya lain</T></h2>
-          {a.it.lines.length > 0 && <p className="small notice">IT dari tab IT ikut dihitung otomatis: ±{rp(ringkasIt(a.it, { kontrakBulan: t.durasi_kontrak_bulan, bungaTahun: 0 }).totalBulan)}/bln (termasuk depresiasi/amortisasi OTC {rp(ringkasIt(a.it).sekali)}). Jangan diinput dua kali di sini.</p>}
+          <h2>Office, consumable, HSE, services, asuransi & startup</h2>
+          {a.it.lines.length > 0 && <p className="small notice">IT di atas ikut dihitung otomatis: ±{rp(ringkasIt(a.it, { kontrakBulan: t.durasi_kontrak_bulan, bungaTahun: 0 }).totalBulan)}/bln (termasuk depresiasi/amortisasi OTC {rp(ringkasIt(a.it).sekali)}). Jangan diinput dua kali di sini.</p>}
           <p className="small muted">Dipisah per klasifikasi sesuai Price Inquiry; pilihan item di tiap bagian hanya dari kategorinya. Bulanan/sewa = qty × harga per bulan. Beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak + bunga modal.</p>
           <BiayaLainPanel lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan} onChange={costLines => setA({ costLines })}
             startup={a.startupAuto ?? STARTUP_DEFAULT} onStartup={startupAuto => setA({ startupAuto })}
             hasilBaris={hasil?.biaya} onHitung={() => hitung(false)} headcount={headcountTotal} hariKerjaBulan={a.processDesign?.hariKerjaBulan ?? 25} />
 
-          <h2><T>Listrik</T></h2>
+        </div>
+      </>}
+
+      {tab === 'Utilities Management' && (<>
+        <div className="card">
+          <h2>Electrical</h2>
+          <p className="small muted">Daftar default dihitung dari Warehouse Planning (luas, office, tinggi), Value Stream Mapping (shift), dan Technology & Equipment (MHE, IT). Baris <span style={{ color: 'var(--bad)', fontWeight: 600 }}>merah</span> = datanya belum diketahui; qty 0 sampai datanya dilengkapi.</p>
           <ListrikTender simulasi={a.listrikSimulasi} listrik={a.listrik} golongan={a.golonganListrik} tarifKwh={a.tarifListrikKwh} tarif={tarif} items={items}
             onSimulasi={listrikSimulasi => setA({ listrikSimulasi })} onListrik={listrik => setA({ listrik })}
-            onTarif={(golonganListrik, tarifListrikKwh) => setA({ golonganListrik, tarifListrikKwh })} />
+            onTarif={(golonganListrik, tarifListrikKwh) => setA({ golonganListrik, tarifListrikKwh })} driver={driverListrik} />
         </div>
-      )}
+        <div className="card">
+          <h2>Water</h2>
+          <AirPanel air={a.air} headcount={headcountTotal} luasM2={hasil?.space.totalM2 ?? spaceH?.luasDipakai ?? 0} hariKerjaBulan={a.processDesign?.hariKerjaBulan ?? 25} onChange={air => setA({ air })} />
+        </div>
+      </>)}
 
-      {tab === 'Hasil' && <HasilPanel belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
+      {tab === 'Result' && <HasilPanel belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} />}
@@ -774,7 +806,7 @@ export default function TenderPage() {
       </fieldset>
       {tab === 'Export' && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
       {tab === 'Export' && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={namaFileExport(nomorQ, t.kode ?? t.customer)} />}
-      {tab !== 'Hasil' && tab !== 'Quotation' && tab !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
+      {tab !== 'Result' && tab !== 'Quotation' && tab !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
     </>
   );
 }

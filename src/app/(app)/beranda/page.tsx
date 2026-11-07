@@ -12,7 +12,7 @@ interface Radar {
   status: string; link: string | null; pic_nama: string | null; pic_email: string | null; pic_telepon: string | null; catatan: string | null;
   sumber: 'manual' | 'claude'; sumber_url: string | null; terverifikasi: boolean; dibuat_oleh: string | null; diubah_oleh: string | null; updated_at: string;
 }
-const KATEGORI = ['Warehousing', '3PL / Contract Logistics', 'Transport / Distribusi', 'Freight Forwarding', 'Cold Chain', 'Lainnya'];
+const KATEGORI = ['Warehousing', '3PL / Contract Logistics', 'Transport / Distribusi', 'Intermodal / Multimoda', 'Freight Forwarding', 'Cold Chain', 'Lainnya'];
 const PLATFORM = ['Coupa', 'SAP Ariba', 'SPSE / LPSE (pemerintah)', 'e-Proc BUMN', 'e-Proc swasta', 'Website perusahaan', 'LinkedIn', 'Berita / media', 'Undangan langsung / email', 'Lainnya'];
 const STATUS: Record<string, { l: string; c: string }> = {
   rencana: { l: 'Rencana', c: 'info' }, dibuka: { l: 'Dibuka', c: 'ok' }, ditutup: { l: 'Ditutup', c: 'bad' }, dibatalkan: { l: 'Dibatalkan', c: 'bad' }, selesai: { l: 'Selesai', c: 'info' },
@@ -87,8 +87,8 @@ export default function Beranda() {
     </label>);
 
   return (<>
-    <div className="head"><div><div className="eyebrow">Dashboard</div><h1>Beranda · Radar tender gudang</h1>
-      <p className="muted">Jadwal tender gudang / logistik perusahaan di Indonesia. Diperbarui otomatis setiap hari oleh Claude dari sumber publik (portal pengadaan, SPSE/LPSE, e-Proc BUMN, website & berita perusahaan) dan oleh akun tim. Event Coupa / SAP Ariba yang berupa undangan tertutup diisi manual oleh akun yang menerima undangan.</p></div>
+    <div className="head"><div><div className="eyebrow">Dashboard</div><h1>Logistics Opportunity Radar</h1>
+      <p className="muted small">Warehouse · Transportation (land) · Intermodal</p></div>
       <button onClick={() => setEdit(kosong())}>+ Tambah jadwal tender</button></div>
 
     {belumAda && <div className="card"><p className="notice small">Tabel radar belum dibuat di database. Jalankan SQL <b>0021_tender_radar</b> di Supabase SQL Editor, lalu muat ulang halaman ini.</p></div>}
@@ -128,7 +128,6 @@ export default function Beranda() {
           {!tampil.length && !belumAda && <tr><td colSpan={8} className="muted">Belum ada jadwal tender untuk filter ini.</td></tr>}
         </tbody>
       </table></div>
-      <p className="small muted">Data dari Claude berasal dari sumber publik dan bisa kurang lengkap — cek link sumber sebelum menindaklanjuti, lalu centang <b>Terverifikasi</b>. Kontak yang dicantumkan hanya kontak pengadaan resmi yang tertera di pengumuman.</p>
     </div>
 
     {edit && <div className="pv-latar" role="dialog" aria-modal="true" aria-label="Edit jadwal tender" onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>

@@ -52,7 +52,7 @@ export default function StatusProject() {
   return (
     <>
       <div className="head">
-        <div><div className="eyebrow">Menu 14 · Running status</div><h1>Kontrol status project</h1></div>
+        <div><div className="eyebrow">Dashboard</div><h1>Project Status</h1></div>
         <label className="f" htmlFor="bh">Tandai macet jika lebih dari (hari) di status yang sama
           <input id="bh" type="number" min={1} value={batasHari} onChange={e => setBatasHari(Number(e.target.value) || 14)} style={{ maxWidth: 120 }} /></label>
       </div>

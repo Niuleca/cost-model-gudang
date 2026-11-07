@@ -22,7 +22,7 @@ export default function GudangPicker({ provinsi, terpilih, kebutuhanM2, onPilih 
   const pilih = (w: Warehouse, sewaUtuh: boolean) => onPilih({
     id: w.id, nama: w.nama, alamat: w.alamat, kab_kota: w.kab_kota, provinsi: w.provinsi, gmaps_url: gmapsLink(w),
     luas_m2: Number(w.luas_m2), harga_sewa_m2_bulan: w.harga_sewa_m2_bulan, harga_per_bulan: w.harga_per_bulan,
-    tinggi_bersih_m: w.tinggi_bersih_m, jumlah_dock: w.jumlah_dock, tipe: w.tipe, foto: w.foto ?? [], sewaUtuh,
+    tinggi_bersih_m: w.tinggi_bersih_m, jumlah_dock: w.jumlah_dock, jumlah_gate: w.jumlah_gate ?? null, tipe: w.tipe, foto: w.foto ?? [], sewaUtuh,
   }, tarifM2(w));
 
   return (

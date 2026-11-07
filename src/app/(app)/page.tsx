@@ -10,7 +10,7 @@ import { MENANG, KALAH, DROP, PIPELINE, labelStatus, pillStatus } from '@/lib/st
 interface Ov {
   id: string; kode: string | null; customer: string; industri: string | null; provinsi: string; kab_kota: string; status: string;
   created_at: string; tanggal_keputusan: string | null; alasan_hasil: string | null; pendapatan_bulan: number | null; gp_persen: number | null;
-  durasi_kontrak_bulan: number;
+  durasi_kontrak_bulan: number; jenis_tender?: 'warehouse' | 'transportation' | 'intermodal' | null;
 }
 
 const grup = (s: string) => MENANG.includes(s) ? 'menang' : KALAH.includes(s) ? 'kalah' : DROP.includes(s) ? 'drop' : 'pipeline';
@@ -20,15 +20,16 @@ export default function Dashboard() {
   const { profile, loading } = useProfile();
   const [rows, setRows] = useState<Ov[]>([]);
   const [tahun, setTahun] = useState('');
+  const [jenis, setJenis] = useState<'' | 'warehouse' | 'transportation' | 'intermodal'>('');
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    supabaseBrowser().from('tender_overview').select('id, kode, customer, industri, provinsi, kab_kota, status, created_at, tanggal_keputusan, alasan_hasil, pendapatan_bulan, gp_persen, durasi_kontrak_bulan')
+    supabaseBrowser().from('tender_overview').select('id, kode, customer, industri, provinsi, kab_kota, status, created_at, tanggal_keputusan, alasan_hasil, pendapatan_bulan, gp_persen, durasi_kontrak_bulan, jenis_tender')
       .order('created_at', { ascending: false })
       .then(({ data, error }: { data: unknown; error: { message: string } | null }) => { if (error) setErr(error.message); else setRows((data ?? []) as Ov[]); });
   }, []);
 
   const tahunList = useMemo(() => Array.from(new Set(rows.map(r => r.created_at.slice(0, 4)))).sort().reverse(), [rows]);
-  const data = useMemo(() => rows.filter(r => !tahun || r.created_at.startsWith(tahun)), [rows, tahun]);
+  const data = useMemo(() => rows.filter(r => (!tahun || r.created_at.startsWith(tahun)) && (!jenis || (r.jenis_tender ?? 'warehouse') === jenis)), [rows, tahun, jenis]);
 
   const k = useMemo(() => {
     const n = { pipeline: 0, menang: 0, kalah: 0, drop: 0 };
@@ -71,7 +72,9 @@ export default function Dashboard() {
   return (
     <>
       <div className="head">
-        <div><div className="eyebrow">Dashboard</div><h1><T>Ringkasan tender</T></h1></div>
+        <div><div className="eyebrow">Dashboard</div><h1>Summary</h1></div>
+        <div className="tabs" role="tablist" aria-label="Jenis tender">{([['', 'All'], ['warehouse', 'Warehouse Tender'], ['transportation', 'Transportation Tender'], ['intermodal', 'Intermodal Tender']] as const).map(([v, l]) =>
+          <button key={v} role="tab" aria-selected={jenis === v} className={jenis === v ? 'on' : ''} onClick={() => setJenis(v)}>{l}</button>)}</div>
         <label className="f" htmlFor="th"><T>Tahun dibuat</T>
           <select id="th" value={tahun} onChange={e => setTahun(e.target.value)} style={{ minWidth: 140 }}><option value="">Semua</option>{tahunList.map(t => <option key={t}>{t}</option>)}</select></label>
       </div>

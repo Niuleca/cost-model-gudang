@@ -50,7 +50,7 @@ export default function Riwayat() {
   return (
     <>
       <div className="head">
-        <div><div className="eyebrow">Menu 9 · Historis</div><h1>Riwayat pekerjaan</h1></div>
+        <div><div className="eyebrow">Logistics Tender · Warehouse</div><h1>Tender History</h1></div>
         <select aria-label="Filter tender" value={fTender} onChange={e => setFTender(e.target.value)} style={{ maxWidth: 320 }}>
           <option value="">Semua tender</option>{tenders.map(t => <option key={t.id} value={t.id}>{t.kode} · {t.customer}</option>)}</select>
       </div>

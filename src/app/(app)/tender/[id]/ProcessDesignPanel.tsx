@@ -23,7 +23,7 @@ export interface BiayaMpProps {
 
 export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift, biaya }: {
   biaya?: BiayaMpProps;
-  bagian: 'ringkasan' | 'rincian' | 'desain' | 'matriks';
+  bagian: 'ringkasan' | 'rincian' | 'desain' | 'matriks' | 'mhe';
   indirect?: IndirectInput;
   aktivitas: AktivitasInput[]; volumes: VolumeInput[]; pd?: ProcessDesignInput; faktorProduktivitas: number; efisiensi: number;
   jumlahShift: number;
@@ -97,6 +97,11 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
     const b = [...ambilBeban(k)]; while (b.length < 3) b.push(0); b[i] = v / 100; onPd({ ...pd, [k]: b });
   };
 
+  if (bagian === 'mhe') return (
+    <div className="card" style={{ gap: 10 }}>
+      <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={Math.max(h.mhe.length, 1)} />
+      <p className="small muted">FTE alat dari Value Stream Mapping; unit = ROUNDUP(FTE) + spare.</p>
+    </div>);
   if (bagian === 'ringkasan') {
     // Man Power Summary = direct (process design) + indirect (supervisor) + peran tetap, dalam satu tabel
     const ind = h.indirect.rows;
@@ -121,7 +126,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
     const sub = (l: string, fte: string, v: number, tot?: number, ps?: number[]) => <tr className="pd-sub"><td colSpan={2}><b>{l}</b></td><td className="num">{fte}</td>{sIdx.map((si, k) => <td key={si} className="num"><b>{ps?.[k] ?? '–'}</b></td>)}<td className="num"><b>{v}</b></td>{biaya && <><td /><td className="num"><b>{tot ? rp(tot) : '–'}</b></td></>}</tr>;
     return (
       <div className="card" style={{ gap: 10 }}>
-        <div className={`pd-dua${biaya ? " tumpuk" : ""}`}>
+        <div>
           <div style={{ minWidth: 0 }}>
             <h3><T>Man Power Summary</T></h3>
             <div className="tablewrap"><table className={`pd-sum${biaya ? " pd-sum-biaya" : ""}${nS ? " pd-sum-shift" : ""}`}>
@@ -148,7 +153,6 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
               </tbody>
             </table></div>
           </div>
-          <Ringkas judul="MHE Summary" rows={h.mhe} remark="Equipment" tFte={h.totalFteMhe} tRes={h.totalMhe} pad={n} />
         </div>
         {biaya && esk && <div style={{ minWidth: 0 }}>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
@@ -285,12 +289,12 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
                 <tr><td>Efficiency</td><td className="num">{inp(Math.round(efisiensi * 1000) / 10, v => onFaktor({ efisiensi: v / 100 }))}%</td></tr>
                 <tr><td>Operating (alat dipakai bergantian)<div className="small muted">otomatis = jumlah shift aktif</div></td><td className="num"><b>{h.operating}</b></td></tr>
               </tbody></table>
-              <p className="small muted" style={{ marginTop: 6 }}>Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling sesuai matriks rangkap di tab Aktivitas & manpower. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
+              <p className="small muted" style={{ marginTop: 6 }}>Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling sesuai matriks rangkap di tab Value Stream Mapping. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
             </div>
           </div>
         </div>
       </div>
-      <p className="small muted">Matriks multi-skill (siapa boleh merangkap siapa) ada di tab <b>Aktivitas & manpower</b>.</p>
+      <p className="small muted">Matriks multi-skill (siapa boleh merangkap siapa) ada di tab <b>Value Stream Mapping</b>.</p>
     </div>
   );
 }

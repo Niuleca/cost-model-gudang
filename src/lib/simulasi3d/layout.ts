@@ -124,7 +124,7 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
   const asumsi: string[] = [];
   const luasRencana = num(h.space.totalM2);
   const W = Math.max(8, num(p.lebarM, 23));
-  if (!num(t.asumsi.space?.excel?.lebarGudangM, 0) && !o.param?.lebarM) asumsi.push(`Lebar gudang belum diisi di Space ("Desain gudang kiri-kanan") → otomatis ${fmt(W)} m (rasio panjang : lebar ± 1,6 : 1).`);
+  if (!num(t.asumsi.space?.excel?.lebarGudangM, 0) && !o.param?.lebarM) asumsi.push(`Lebar gudang (L) belum diisi di Warehouse Planning → Dimensi gedung → otomatis ${fmt(W)} m (rasio panjang : lebar ± 1,6 : 1).`);
   const lv = hitungLevelRak({ centerMm: p.centerMm, sideMm: p.sideMm, beamMm: p.beamMm, palletMm: p.palletMm, productMm: p.productMm, clearanceMm: p.clearanceMm, levelManual: p.levelManual });
   const level = Math.max(1, lv.level);
   const sideM = p.sideMm / 1000, centerM = Math.max(sideM, p.centerMm / 1000);
@@ -162,7 +162,8 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
 
   let x = D0;
   const jalurUtama = (label: string, lebar: number, ket: string) => { zona.push({ id: `jalur${zona.length}`, jenis: 'jalur', label, x0: x, x1: x + lebar, z0: 0, z1: W, ket }); x += lebar; };
-  jalurUtama('Jalur utama', 3.5, 'cross aisle MHE · mulut lorong rak');
+  const gw = num(t.asumsi.space?.excel?.gangwayM, 3.5);   // Warehouse Planning → gangway (jalur utama)
+  jalurUtama('Jalur utama', gw >= 2 && gw <= 8 ? gw : 3.5, 'cross aisle MHE · mulut lorong rak');
 
   // ---------- 2. Rak SPR & DDR — baris memanjang ke belakang, lorong tegak lurus dock
   const okup = p.okupansi != null ? Math.min(1, Math.max(0, p.okupansi)) : null;

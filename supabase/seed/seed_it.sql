@@ -1,10 +1,10 @@
--- Katalog IT awal, dari contoh BAP KLOG (Nabati Majalengka, BAP-71/02/2019).
+-- Katalog IT awal, dari contoh BAP (Nabati Majalengka, BAP-71/02/2019).
 -- Status draft: harga 2019, perlu dicek ulang & di-approve oleh IT / Solution Design.
--- Rentang slab transaksi WMS belum diisi (isi slab_min / slab_max dari kontrak KLOG).
+-- Rentang slab transaksi WMS belum diisi (isi slab_min / slab_max dari kontrak).
 insert into public.it_catalog (kelompok, item, cost_type, basis, harga, urutan, sumber, tanggal_harga) values
- ('Software - WMS Solution','KLOG WMS SaaS – slab 1','Transaction/Month','Transaksi',3400,1,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
- ('Software - WMS Solution','KLOG WMS SaaS – slab 2','Transaction/Month','Transaksi',2750,2,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
- ('Software - WMS Solution','KLOG WMS SaaS – slab 3','Transaction/Month','Transaksi',2000,3,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
+ ('Software - WMS Solution','WMS SaaS – slab 1','Transaction/Month','Transaksi',3400,1,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
+ ('Software - WMS Solution','WMS SaaS – slab 2','Transaction/Month','Transaksi',2750,2,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
+ ('Software - WMS Solution','WMS SaaS – slab 3','Transaction/Month','Transaksi',2000,3,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
  ('Software - WMS Solution','Office Tools','OTC/Unit','Sekali',950000,4,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
  ('Software - WMS Solution','Antivirus','PUPM','Bulanan',39375,5,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),
  ('Software - WMS Solution','Email','PUPM','Bulanan',115000,6,'BAP-71/02/2019 Nabati Majalengka','2019-02-01'),

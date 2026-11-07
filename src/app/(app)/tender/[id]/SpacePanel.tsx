@@ -138,14 +138,27 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
               </tr>))}
             <tr><td colSpan={3}><button className="ghost" onClick={() => set({ cad: [...x.cad, { nama: x.cad.length ? 'RM' : 'PM', m2: 0 }] })}>+ Luas CAD (pembanding)</button>
               {h.cadTotal > 0 && <span className={`pill ${Math.abs(h.spaceRent - h.cadTotal) / h.cadTotal > 0.05 ? 'warn' : 'ok'}`} style={{ marginLeft: 8 }}>CAD {f0(h.cadTotal)} m² · selisih {angka((h.spaceRent / h.cadTotal - 1) * 100, 1)}%</span>}</td></tr>
-            <Baris l="Gangway" input={inp(x.gangwayM ?? null, v => set({ gangwayM: v ?? undefined }), { kosong: true })} u="m" />
-            <Baris l="Desain gudang (kiri-kanan)" input={inp(x.lebarGudangM ?? null, v => set({ lebarGudangM: v ?? undefined }), { kosong: true })} u="m" />
+            <Judul t="F  Building dimension (P × L × T)" />
+            <tr><td>Dasar luas sewa</td><td colSpan={2}>
+              <div className="tabs" role="tablist" aria-label="Dasar luas sewa" style={{ display: 'inline-flex' }}>
+                {([['spaceRent', 'Space Rent (kalkulasi)'], ['cad', 'Ukuran CAD']] as const).map(([v, l]) =>
+                  <button key={v} type="button" role="tab" aria-selected={(x.dasarLuas ?? 'spaceRent') === v} className={(x.dasarLuas ?? 'spaceRent') === v ? 'on' : ''} onClick={() => set({ dasarLuas: v })}>{l}</button>)}
+              </div></td></tr>
+            {(x.dasarLuas ?? 'spaceRent') === 'cad'
+              ? <Baris l="Panjang (P) — dari CAD" input={inp(x.panjangGudangM ?? null, v => set({ panjangGudangM: v ?? undefined }), { kosong: true })} u="m" />
+              : <Baris l="Panjang (P) = luas ÷ L" v={angka(h.dimensi.panjangM, 1)} u="m (otomatis)" />}
+            <Baris l="Lebar (L) — kiri-kanan" input={inp(x.lebarGudangM ?? null, v => set({ lebarGudangM: v ?? undefined }), { kosong: true, ph: angka(h.dimensi.lebarM, 0) })} u="m" />
+            <Baris l="Tinggi sisi (T)" input={inp(x.rak.sideMm / 1000, v => set({ rak: { ...x.rak, sideMm: Math.round((v ?? 0) * 1000) } }), { w: 70 })} u="m · sama dengan Side height" />
+            <Baris l="Tinggi tengah / puncak" input={inp(x.rak.centerMm / 1000, v => set({ rak: { ...x.rak, centerMm: Math.round((v ?? 0) * 1000) } }), { w: 70 })} u="m · sama dengan Center height" />
+            <Baris l="Gangway (lebar jalur utama MHE)" input={inp(x.gangwayM != null && x.gangwayM <= 8 ? x.gangwayM : null, v => set({ gangwayM: v ?? undefined }), { kosong: true, ph: '3,5' })} u="m · dipakai layout simulasi" />
+            <tr className="sp-hitam"><td>Luas dipakai cost model</td><td className="num">{f0(h.luasDipakai)}</td><td>m² · {h.dimensi.dasar === 'cad' ? `CAD ${angka(h.dimensi.panjangM, 1)} × ${angka(h.dimensi.lebarM, 1)} m` : 'Space Rent'}
+              {h.dimensi.dasar === 'cad' && h.spaceRent > 0 && <span className={`pill ${Math.abs(h.luasDipakai / h.spaceRent - 1) > 0.05 ? 'warn' : 'ok'}`} style={{ marginLeft: 6 }}>vs kalkulasi {f0(h.spaceRent)} m² ({angka((h.luasDipakai / h.spaceRent - 1) * 100, 1)}%)</span>}</td></tr>
           </tbody></table>
         </div>
 
         <div style={{ display: 'grid', gap: 14, alignContent: 'start', minWidth: 0 }}>
           <div className="card" style={{ gap: 8, padding: 12 }}>
-            <h3 style={{ textAlign: 'center' }}>RACKING LEVEL</h3>
+            <h3 style={{ textAlign: 'center' }}>{(x.porsi?.spr ?? 0) + (x.porsi?.ddr ?? 0) > 0 ? ((x.porsi?.block ?? 0) + (x.porsi?.floor ?? 0) > 0 ? 'RACKING LEVEL & BLOCK STACK' : 'RACKING LEVEL') : 'BLOCK STACK / PALLET FLOOR'}</h3>
             <VisualRak x={x} lv={h.level} />
             <table className="sp-tabel sp-kecil"><tbody>
               <tr className="sp-judul"><td>Dimensi</td><td className="num">Number</td><td>UoM</td></tr>
@@ -160,7 +173,7 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
           </div>
 
           <div className="card" style={{ gap: 8, padding: 12 }}>
-            <h3>Komposisi luas · {f0(h.spaceRent)} m²</h3>
+            <h3>Komposisi luas · {f0(h.spaceRent)} m²{h.dimensi.dasar === 'cad' ? ` (dasar sewa CAD ${f0(h.luasDipakai)} m²)` : ''}</h3>
             <div className="sp-bar" role="img" aria-label="Komposisi luas gudang">
               {komp.map(k => <div key={k.l} title={`${k.l}: ${f0(k.v)} m²`} style={{ flexGrow: k.v, background: k.c }} />)}
             </div>
@@ -183,7 +196,13 @@ function VisualRak({ x, lv }: { x: SpaceExcel; lv: ReturnType<typeof import('@/l
   const sk = (dasar - 20) / maxMm;
   const ySide = dasar - x.rak.sideMm * sk, yCenter = dasar - x.rak.centerMm * sk;
   const tengah = (kiri + kanan) / 2;
-  const rakX = [kiri + 40, kiri + 100, tengah + 30, tengah + 90];
+  const adaRak = (x.porsi?.spr ?? 0) + (x.porsi?.ddr ?? 0) > 0, adaBlok = (x.porsi?.block ?? 0) + (x.porsi?.floor ?? 0) > 0;
+  // rak di kolom kiri, block stack di kanan bila campuran; hanya satu jenis → keempat kolom jenis itu
+  const posisi = [kiri + 40, kiri + 100, tengah + 30, tengah + 90];
+  const rakX = adaRak ? (adaBlok ? posisi.slice(0, 2) : posisi) : [];
+  const blokX = adaBlok ? (adaRak ? posisi.slice(2) : posisi) : [];
+  const tumpuk = Math.max(1, (x.porsi?.block ?? 0) > 0 ? x.block?.tumpuk ?? 1 : 1);
+  const tPaletMm = x.rak.palletMm + x.rak.productMm, tBlokMm = tumpuk * tPaletMm;
   const tinggiLevel = (i: number) => (i === 0 ? 0 : lv.level1 + (i - 1) * lv.levelN);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Rak ${lv.level} level, tinggi ${lv.tinggi} mm, tinggi sisi gudang ${x.rak.sideMm} mm`}>
@@ -202,6 +221,20 @@ function VisualRak({ x, lv }: { x: SpaceExcel; lv: ReturnType<typeof import('@/l
             </g>;
           })}
         </g>))}
+      {blokX.map((bx, k) => (
+        <g key={`b${k}`}>
+          {Array.from({ length: tumpuk }, (_, i) => {
+            const y0 = dasar - i * tPaletMm * sk;
+            return <g key={i}>
+              <rect x={bx + 3} y={y0 - x.rak.palletMm * sk} width={38} height={Math.max(1, x.rak.palletMm * sk)} fill="#c8a165" stroke="#8a6a3a" strokeWidth={0.5} />
+              <rect x={bx + 4} y={y0 - (x.rak.palletMm + x.rak.productMm) * sk} width={36} height={Math.max(1, x.rak.productMm * sk)} fill="#e7d3b0" stroke="#b39064" strokeWidth={0.5} />
+            </g>;
+          })}
+        </g>))}
+      {adaBlok && blokX.length > 0 && <>
+        <line x1={blokX[blokX.length - 1] + 56} x2={blokX[blokX.length - 1] + 56} y1={dasar - tBlokMm * sk} y2={dasar} stroke={tBlokMm <= x.rak.sideMm ? 'var(--ok)' : 'var(--bad)'} markerStart="url(#pa)" markerEnd="url(#pa)" />
+        <text x={blokX[blokX.length - 1] + 60} y={dasar - tBlokMm * sk / 2} fontSize="11" fill={tBlokMm <= x.rak.sideMm ? 'var(--ok)' : 'var(--bad)'}>{tumpuk} tumpuk · {angka(tBlokMm / 1000, 1)} m</text>
+      </>}
       {/* dimensi sisi */}
       <line x1={kiri - 30} x2={kiri - 30} y1={ySide} y2={dasar} stroke="var(--ink)" markerStart="url(#pa)" markerEnd="url(#pa)" />
       <text x={kiri - 34} y={(ySide + dasar) / 2} textAnchor="end" fontSize="11" fill="var(--ink)">{angka(x.rak.sideMm / 1000, 1)} m</text>
@@ -209,8 +242,8 @@ function VisualRak({ x, lv }: { x: SpaceExcel; lv: ReturnType<typeof import('@/l
       <line x1={tengah} x2={tengah} y1={yCenter} y2={dasar} stroke="var(--muted)" strokeDasharray="4 3" />
       <text x={tengah + 4} y={yCenter + 14} fontSize="11" fill="var(--ink)">{angka(x.rak.centerMm / 1000, 1)} m</text>
       {/* tinggi rak */}
-      <line x1={rakX[3] + 56} x2={rakX[3] + 56} y1={dasar - lv.tinggi * sk} y2={dasar} stroke={lv.ok ? 'var(--ok)' : 'var(--bad)'} markerStart="url(#pa)" markerEnd="url(#pa)" />
-      <text x={rakX[3] + 60} y={dasar - lv.tinggi * sk / 2} fontSize="11" fill={lv.ok ? 'var(--ok)' : 'var(--bad)'}>{lv.level} lvl · {angka(lv.tinggi / 1000, 1)} m</text>
+      {rakX.length > 0 && <><line x1={rakX[rakX.length - 1] + 56} x2={rakX[rakX.length - 1] + 56} y1={dasar - lv.tinggi * sk} y2={dasar} stroke={lv.ok ? 'var(--ok)' : 'var(--bad)'} markerStart="url(#pa)" markerEnd="url(#pa)" />
+      <text x={rakX[rakX.length - 1] + 60} y={dasar - lv.tinggi * sk / 2} fontSize="11" fill={lv.ok ? 'var(--ok)' : 'var(--bad)'}>{lv.level} lvl · {angka(lv.tinggi / 1000, 1)} m</text></>}
       <defs><marker id="pa" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" /></marker></defs>
     </svg>);
 }

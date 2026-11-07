@@ -5,7 +5,7 @@ import { rp, angka } from '@/lib/format';
 interface Item { id: number; kategori: string; item: string; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; status_efektif: string; mhe_tipe: string | null; kapasitas_ton: number | null; sumber_tenaga: string | null }
 type Mhe = MheInput & { priceItemId?: number };
 
-/** Kebutuhan MHE = equipment dari Aktivitas & manpower (MHE Summary). User cukup memilih item harga per alat. */
+/** Kebutuhan MHE = equipment dari Value Stream Mapping (MHE Summary). User cukup memilih item harga per alat. */
 export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange }: {
   kebutuhan: { nama: string; fte: number | null; unit: number | null }[];   // dari process design / hasil hitung
   mhe: Mhe[]; items: Item[]; metodeExcel: boolean; onChange: (m: Mhe[]) => void;
@@ -25,14 +25,14 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange 
   return (
     <div className="card" style={{ gap: 10 }}>
       <h2>Kebutuhan MHE</h2>
-      <p className="small muted">Daftar alat diambil otomatis dari Aktivitas & manpower (kolom Equipment dan Alat pendukung).
+      <p className="small muted">Daftar alat diambil otomatis dari Value Stream Mapping (kolom Equipment dan Alat pendukung).
         {metodeExcel ? ' Unit = ROUNDUP(FTE alat) + spare, sama dengan MHE Summary.' : ' Unit dihitung saat tombol Hitung (metode per shift).'} Pilih item harga supaya biayanya masuk cost model; alat tanpa item harga tidak dihitung biayanya.</p>
       <div className="tablewrap"><table>
         <thead><tr><th>Equipment (dari aktivitas)</th><th className="num">FTE</th><th className="num">Unit kebutuhan</th><th>Item harga</th><th>Mode</th>
           <th className="num">Harga</th><th className="num">Umur (bln)</th>{!metodeExcel && <th className="num">Ketersediaan %</th>}<th className="num">Spare %</th>
           <th className="num">Total unit</th><th className="num">Biaya/bln</th><th></th></tr></thead>
         <tbody>
-          {baris.length === 0 && <tr><td colSpan={12} className="muted">Belum ada equipment di Aktivitas & manpower.</td></tr>}
+          {baris.length === 0 && <tr><td colSpan={12} className="muted">Belum ada equipment di Value Stream Mapping.</td></tr>}
           {baris.map(b => {
             const m = mhe.find(x => x.tool === b.nama);
             const spare = b.unit && m ? Math.ceil(b.unit * (m.sparePersen || 0) - 1e-9) : 0;

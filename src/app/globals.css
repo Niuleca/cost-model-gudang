@@ -49,6 +49,11 @@ p { margin: 0; }
 .ddmenu a.on { background: var(--g100); font-weight: 600; }
 .ddmenu a.pisah { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 10px; border-radius: 0 0 4px 4px; }
 .ddmenu .ddkeluar { border-top: 1px solid var(--line); border-radius: 0; margin-top: 4px; color: var(--bad); cursor: pointer; }
+.ddmenu .ddgrup { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px 12px 2px; }
+.ddmenu .ddgrup.pisah { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 10px; }
+.ddmenu a.bergrup { padding-left: 20px; }
+.ddmenu .ddsegera { color: var(--muted); padding: 8px 12px; font-size: 14px; cursor: default; }
+.ddmenu .ddsegera.bergrup { padding-left: 20px; }
 .main { padding: 28px max(20px, env(safe-area-inset-right, 0px)) 64px max(16px, env(safe-area-inset-left, 0px)); min-width: 0; display: grid; gap: 20px; align-content: start; max-width: 1360px; width: 100%; margin: 0 auto; }
 @media (max-width: 800px) {
   .topbar { gap: 6px; padding-top: 8px; }
@@ -597,3 +602,29 @@ tr.kat-link:hover td { background: var(--res); }
 .game-main.layar-besar .gm-dpad, .game-main.layar-penuh .gm-dpad { position: absolute; }
 .gm-ukuran button { white-space: nowrap; }
 .gm-dpad .lompat { grid-column: 2; grid-row: 2; font-size: 11px; font-weight: 600; }
+
+/* ---------- UAT: tabel fit tanpa geser horizontal, baris merah = data belum diketahui, grid isian ringkas */
+.tablewrap.fit { overflow-x: visible; }
+table.tabel-fit { table-layout: auto; width: 100%; }
+table.tabel-fit th { white-space: normal; }
+table.tabel-fit td { overflow-wrap: anywhere; }
+table.tabel-fit td input, table.tabel-fit td select { min-width: 0; }
+tr.baris-merah td { background: #fef2f2 !important; color: #991b1b; }
+tr.baris-merah td b { color: #991b1b; }
+.grid-isi { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
+@media (max-width: 720px) { table.tabel-fit thead { display: none; } table.tabel-fit tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 6px 0; border-bottom: 1px solid var(--line); } table.tabel-fit td { border: 0; padding: 2px 6px; } }
+
+/* ---------- Monitoring: papan pipeline & grafik bulanan (tanpa geser horizontal) */
+.pipe-papan { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; align-items: start; }
+.pipe-kolom { background: var(--g100); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 6px; min-width: 0; }
+.pipe-judul { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.pipe-bar { height: 5px; background: var(--g200); border-radius: 3px; overflow: hidden; }
+.pipe-bar i { display: block; height: 100%; background: var(--g700); border-radius: 3px; }
+.pipe-kartu { display: grid; gap: 3px; background: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: 8px; color: inherit; text-decoration: none; min-width: 0; }
+.pipe-kartu:hover { border-color: var(--g400); }
+.bulan-bar { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; align-items: end; }
+.bulan-bar > div { display: grid; justify-items: center; gap: 2px; min-width: 0; }
+.bb-tiang { position: relative; width: 70%; height: 120px; display: flex; align-items: flex-end; }
+.bb-tiang i { position: absolute; bottom: 0; left: 0; right: 0; background: var(--g300); border-radius: 3px 3px 0 0; }
+.bb-tiang i.menang, .lg-kotak.menang { background: var(--ok); }
+.lg-kotak { display: inline-block; width: 10px; height: 10px; background: var(--g300); border-radius: 2px; vertical-align: middle; }

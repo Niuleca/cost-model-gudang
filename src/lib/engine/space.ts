@@ -18,7 +18,10 @@ export interface SpaceExcel {
   fasilitas: { nama: string; m2: number }[];
   pembulatan: number;                     // dibulatkan ke atas kelipatan (m²)
   cad: { nama: string; m2: number }[];    // pembanding layout CAD
-  gangwayM?: number; lebarGudangM?: number;
+  /** Dimensi gedung (Warehouse Planning): dasar luas sewa = hasil kalkulasi Space Rent atau ukuran CAD (P × L).
+   *  gangwayM = lebar jalur utama / cross aisle MHE (dipakai layout simulasi); lebarGudangM = L (kiri-kanan); panjangGudangM = P. */
+  dasarLuas?: 'spaceRent' | 'cad';
+  gangwayM?: number; lebarGudangM?: number; panjangGudangM?: number;
 }
 
 export const SPACE_EXCEL_DEFAULT: SpaceExcel = {
@@ -38,7 +41,7 @@ export const SPACE_EXCEL_DEFAULT: SpaceExcel = {
   ],
   pembulatan: 100,
   cad: [],
-  gangwayM: 18, lebarGudangM: 23,
+  dasarLuas: 'spaceRent', gangwayM: 3.5, lebarGudangM: 23,
 };
 
 export const lengkapiSpaceExcel = (x?: Partial<SpaceExcel> | null): SpaceExcel => ({
@@ -104,6 +107,13 @@ export function hitungSpaceExcel(x: SpaceExcel, ppTotal: number, inboundBulan: n
   const kelipatan = x.pembulatan > 0 ? x.pembulatan : 1;
   const spaceRent = Math.ceil(denganAllowance / kelipatan - 1e-9) * kelipatan;
   const cadTotal = x.cad.reduce((s, c) => s + Number(c.m2 || 0), 0);
-  return { level: lv, ppTotal, porsi: pr, totalPorsi, porsiOk: Math.abs(totalPorsi - 1) < 0.0005, posisiRak: Math.ceil(sd.ppReq + dd.ppReq - 1e-9), sd, dd, block, floor, inbound, outbound, fasilitasM2, subtotal, allowanceM2: denganAllowance - subtotal, spaceRent, cadTotal };
+  // dimensi gedung: CAD → luas = P × L (atau jumlah area CAD bila P/L kosong); Space Rent → L diisi, P = luas / L
+  const Pin = Number(x.panjangGudangM) || 0, Lin = Number(x.lebarGudangM) || 0;
+  const luasCad = x.dasarLuas === 'cad' ? (Pin > 0 && Lin > 0 ? Pin * Lin : cadTotal) : 0;
+  const luasDipakai = x.dasarLuas === 'cad' && luasCad > 0 ? luasCad : spaceRent;
+  const lebarM = Lin > 0 ? Lin : Math.max(15, Math.round(Math.sqrt(Math.max(luasDipakai, 150) / 1.6)));
+  const panjangM = x.dasarLuas === 'cad' && Pin > 0 ? Pin : luasDipakai / lebarM;
+  const dimensi = { dasar: (x.dasarLuas === 'cad' && luasCad > 0 ? 'cad' : 'spaceRent') as 'cad' | 'spaceRent', panjangM, lebarM, sisiM: x.rak.sideMm / 1000, tengahM: x.rak.centerMm / 1000, luasCad };
+  return { luasDipakai, dimensi, level: lv, ppTotal, porsi: pr, totalPorsi, porsiOk: Math.abs(totalPorsi - 1) < 0.0005, posisiRak: Math.ceil(sd.ppReq + dd.ppReq - 1e-9), sd, dd, block, floor, inbound, outbound, fasilitasM2, subtotal, allowanceM2: denganAllowance - subtotal, spaceRent, cadTotal };
 }
 export type HasilSpaceExcel = ReturnType<typeof hitungSpaceExcel>;

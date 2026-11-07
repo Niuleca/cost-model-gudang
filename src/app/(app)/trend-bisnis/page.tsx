@@ -110,7 +110,7 @@ export default function TrendBisnisPage() {
   };
 
   return (<>
-    <div className="head"><div><div className="eyebrow">Dashboard</div><h1>Update trend bisnis</h1>
+    <div className="head"><div><div className="eyebrow">Dashboard</div><h1>Business Trend Intelligence</h1>
       <p className="muted">Sektor yang sedang naik di Indonesia, diranking setiap hari, plus calon customer dengan kontak resmi perusahaan. Diperbarui otomatis oleh Claude setiap pagi dari sumber publik Indonesia & dunia (BPS, data ekspor-impor, BKPM, PMI, laporan industri, media bisnis); setiap angka punya link sumber.</p></div>
       <div className="tabs" role="tablist">{([['tren', 'Ranking tren'], ['customer', `Customer (${cust.length})`]] as const).map(([v, l]) =>
         <button key={v} role="tab" aria-selected={tab === v} className={tab === v ? 'on' : ''} onClick={() => setTab(v)}>{l}</button>)}</div></div>

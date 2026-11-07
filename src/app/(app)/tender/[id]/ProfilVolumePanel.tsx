@@ -170,7 +170,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
               <td className="num"><b>{angka(oa[ar].orderHari)}</b></td><td className="num"><b>{angka(oa[ar].orderBulan)}</b></td>
               <td className="small muted">{ar === 'inbound' ? 'barang masuk + put away' : 'picking + barang keluar'}</td></tr>)}</tbody>
           </table></div>
-          <p className="small muted">Order/bln otomatis menjadi volume aktivitas admin (role Admin, UoM order/line) di tab Aktivitas & manpower bila kolom Volume/bln-nya kosong. Bila ada beberapa aktivitas admin di satu arus, order dibagi rata.</p>
+          <p className="small muted">Order/bln otomatis menjadi volume aktivitas admin (role Admin, UoM order/line) di tab Value Stream Mapping bila kolom Volume/bln-nya kosong. Bila ada beberapa aktivitas admin di satu arus, order dibagi rata.</p>
         </div>;
       })()}
       <details>

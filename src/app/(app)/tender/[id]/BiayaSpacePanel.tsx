@@ -68,7 +68,7 @@ export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, pos
       <table className="sp-tabel sp-kecil"><tbody>
         <tr className="sp-judul"><td colSpan={3}>Sewa gudang {rental ? '' : `· tidak dipakai (skenario ${skenarioAset})`}</td></tr>
         <tr><td>Gudang (database)</td><td colSpan={2}>{gudang ? <><b>{gudang.nama}</b> <span className="small muted">· {gudang.kab_kota} · {angka(Number(gudang.luas_m2))} m²</span></> : <span className="small muted">Belum dipilih — pilih di daftar gudang di atas, atau isi tarif manual</span>}</td></tr>
-        <tr><td>Luas sewa (Space Rent dari sheet Space)</td><td className="num"><b>{angka(spaceRentM2)}</b></td><td>m²</td></tr>
+        <tr><td>Luas sewa (Warehouse Planning)</td><td className="num"><b>{angka(spaceRentM2)}</b></td><td>m²</td></tr>
         {sewaUtuh
           ? <tr><td>Disewa utuh (harga database)</td><td className="num">{rp(sewaUtuhNilai)}</td><td>/bln</td></tr>
           : <tr><td>Tarif sewa {pakaiDb ? <span className="pill ok">database</span> : <span className="pill warn">manual</span>}</td>
