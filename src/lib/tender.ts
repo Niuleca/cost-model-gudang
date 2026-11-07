@@ -30,6 +30,8 @@ export interface GudangTerpilih {
 // Bagian input yang disimpan di tenders.asumsi
 export interface Asumsi {
   air?: AirInput;                    // Utilities Management → Water
+  nilaiStokRp?: number;              // nilai stok rata-rata (dasar premi asuransi)
+  biayaDefaultDiisi?: boolean;       // daftar default biaya lain sudah pernah diisi otomatis
   porsiMuat?: Partial<PorsiMuat>;   // porsi palletize vs loose per proses
   cutiTahunanHari: number;
   faktorProduktivitas: number;

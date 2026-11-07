@@ -34,6 +34,8 @@ export interface ItLine {
   perlakuanSekali?: PerlakuanSekali;
   umurBulan?: number;          // umur ekonomis untuk depresiasi
   catatan?: string;
+  kunci?: string;              // baris dari default otomatis (lib/itDefault)
+  qtyDefault?: number;         // qty hasil hitungan default terakhir; qty = qtyDefault → ikut data tender
 }
 
 export type PerlakuanSekali = 'depresiasi' | 'amortisasi' | 'tagih';
@@ -43,7 +45,7 @@ export const UMUR_IT_DEFAULT = 36;
 export const perlakuanDefault = (kelompok: string): PerlakuanSekali => KELOMPOK_ASET.includes(kelompok) ? 'depresiasi' : 'amortisasi';
 export const perlakuanDari = (l: ItLine): PerlakuanSekali => l.perlakuanSekali ?? perlakuanDefault(l.kelompok);
 
-export interface ItSheet { kursUsd: number; nomorBap?: string; lines: ItLine[] }
+export interface ItSheet { kursUsd: number; nomorBap?: string; lines: ItLine[]; templateDiisi?: boolean }
 export const IT_SHEET_DEFAULT: ItSheet = { kursUsd: 16000, lines: [] };
 
 export interface RingkasIt {

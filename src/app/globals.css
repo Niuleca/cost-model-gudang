@@ -628,3 +628,19 @@ tr.baris-merah td b { color: #991b1b; }
 .bb-tiang i { position: absolute; bottom: 0; left: 0; right: 0; background: var(--g300); border-radius: 3px 3px 0 0; }
 .bb-tiang i.menang, .lg-kotak.menang { background: var(--ok); }
 .lg-kotak { display: inline-block; width: 10px; height: 10px; background: var(--g300); border-radius: 2px; vertical-align: middle; }
+
+/* ---------- Technology & Equipment: tabel ringkas (UAT fase 3) */
+.input-kecil { display: block; font-size: 12px; padding: 3px 6px; margin-top: 4px; width: 100%; color: var(--g700); }
+table.tabel-fit td.td-lebar { min-width: 150px; }
+table.tabel-fit td.td-lebar label { white-space: nowrap; margin-top: 4px; }
+table.tabel-it td select[aria-label='Cost type'] { min-width: 104px; }
+button.link-kecil { background: none; border: 0; padding: 0; color: var(--ink, #111); text-decoration: underline; cursor: pointer; font-size: 12px; min-height: 0; }
+table.tabel-it td:first-child { min-width: 180px; }
+table.tabel-bl td:first-child { min-width: 200px; }
+table.tabel-bl td select[aria-label='Mode'] { min-width: 96px; }
+table.tabel-bl td input[type=number], table.tabel-it td input[type=number] { width: 100%; min-width: 64px; }
+.dasar-def { font-size: 12px; color: var(--g600, #666); margin-top: 3px; line-height: 1.35; }
+tr.baris-merah .dasar-def { color: #991b1b; }
+.def-driver { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; }
+.def-driver span b { font-weight: 600; }
+.def-driver span.kosong { color: var(--bad, #b91c1c); }

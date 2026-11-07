@@ -6,12 +6,12 @@ export interface Seksi { id: string; label: string; ket: string; kategori: strin
 
 export const SEKSI_BIAYA: Seksi[] = [
   { id: 'office', label: 'Office (furniture & peralatan kantor)', ket: 'Aset kantor — default beli, disusutkan', kategori: ['Office', 'Rental Office', 'Printer'], kelompok: 'Office', mode: 'beli' },
-  { id: 'atk', label: 'Stationery / ATK', ket: 'Habis pakai — qty per bulan', kategori: ['ATK'], kelompok: 'Consumable', mode: 'bulanan' },
-  { id: 'consumable', label: 'Consumable gudang (seragam, konsumsi, wrapping)', ket: 'Habis pakai — qty per bulan', kategori: ['Consumable', 'Seragam', 'Konsumsi'], kelompok: 'Consumable', mode: 'bulanan' },
+  { id: 'atk', label: 'Stationery / ATK', ket: 'Alat tulis office & admin — qty per bulan', kategori: ['ATK'], kelompok: 'Consumable', mode: 'bulanan' },
+  { id: 'consumable', label: 'Consumable', ket: 'Stretch film, lakban, label, air minum — qty per bulan', kategori: ['Consumable', 'Seragam', 'Konsumsi'], kelompok: 'Consumable', mode: 'bulanan' },
   { id: 'palet', label: 'Pallet', ket: 'Beli (disusutkan) atau sewa per bulan', kategori: ['Palet'], kelompok: 'Consumable', mode: 'beli' },
-  { id: 'hse', label: 'HSE & Fire Protection', ket: 'APAR, P3K, rambu, APD — default beli', kategori: ['HSE'], kelompok: 'HSE', mode: 'beli' },
+  { id: 'hse', label: 'HSE & Fire Protection', ket: 'APAR, P3K, rambu, APD & seragam — rekomendasi dari luas & manpower', kategori: ['HSE'], kelompok: 'HSE', mode: 'beli' },
   { id: 'services', label: 'Services (pest control, security, cleaning)', ket: 'Kontrak jasa per bulan', kategori: ['Pest Control', 'Security', 'Cleaning'], kelompok: 'Lainnya', mode: 'bulanan' },
-  { id: 'asuransi', label: 'Asuransi', ket: 'Premi per bulan', kategori: ['Asuransi'], kelompok: 'Asuransi', mode: 'bulanan' },
+  { id: 'asuransi', label: 'Asuransi', ket: 'Premi per bulan dari nilai stok', kategori: ['Asuransi'], kelompok: 'Asuransi', mode: 'bulanan' },
   { id: 'startup', label: 'Startup & konstruksi (one time)', ket: 'Biaya sekali — diamortisasi selama kontrak', kategori: ['Konstruksi'], kelompok: 'Startup', mode: 'sekali' },
   { id: 'lainnya', label: 'Lainnya', ket: 'Item manual di luar klasifikasi di atas', kategori: [], kelompok: 'Lainnya', mode: 'bulanan' },
 ];

@@ -6,9 +6,9 @@ import { KATEGORI_BISNIS, KATEGORI_UMUM } from '@/lib/kategoriBisnis';
 import { KELAS_UMUM, KODE_UOM, UOM_MASTER } from '@/lib/uom';
 import { COST_TYPES, KELOMPOK_IT } from '@/lib/it';
 
-export const KAT_HARGA = ['Gudang','MHE','Racking','Palet','Office','ATK','Seragam','Konsumsi','Printer','Rental Office','IT','Software','HSE','Konstruksi','Pest Control','Asuransi','Security','Cleaning','Utilitas','Lainnya'];
+export const KAT_HARGA = ['Gudang','MHE','Racking','Palet','Office','ATK','Consumable','Seragam','Konsumsi','Printer','Rental Office','IT','Software','HSE','Konstruksi','Pest Control','Asuransi','Security','Cleaning','Utilitas','Lainnya'];
 export const KAT_KANTOR = ['Office', 'ATK', 'Printer', 'Konsumsi', 'Rental Office'];
-export const KAT_GUDANG = ['Palet', 'Racking', 'HSE', 'Seragam', 'Pest Control', 'Asuransi', 'Security', 'Cleaning', 'Utilitas', 'Konstruksi', 'Lainnya'];
+export const KAT_GUDANG = ['Palet', 'Racking', 'HSE', 'Consumable', 'Seragam', 'Pest Control', 'Asuransi', 'Security', 'Cleaning', 'Utilitas', 'Konstruksi', 'Lainnya'];
 const ROLES: AppRole[] = ['procurement','it','engineering','operations','hr','finance','commercial','solution_design','admin'];
 
 export interface Tab {
@@ -182,7 +182,7 @@ const CATATAN_HARGA = ' Harga lewat masa berlaku otomatis expired dan jadi red f
 TABS.push(
   tabItem('pi-racking', 'Racking', ['Racking'], 'Selective, double deep, drive-in, shelving, mezzanine. Isi harga per posisi palet atau per unit di kolom satuan.' + CATATAN_HARGA),
   tabItem('pi-palet', 'Pallet', ['Palet'], 'Palet kayu, plastik, slipsheet. Sewa/bln untuk skema sewa, harga beli + umur untuk skema beli.' + CATATAN_HARGA),
-  tabItem('pi-consumable', 'Consumable', ['Konsumsi', 'Seragam', 'Lainnya'], 'Air minum, konsumsi, seragam, stretch film, label dan bahan habis pakai lain.' + CATATAN_HARGA),
+  tabItem('pi-consumable', 'Consumable', ['Consumable', 'Konsumsi', 'Seragam', 'Lainnya'], 'Stretch film, lakban, label thermal, air minum, seragam dan bahan habis pakai gudang lain.' + CATATAN_HARGA),
   tabItem('pi-stationery', 'Stationery', ['ATK', 'Printer', 'Office', 'Rental Office'], 'ATK, printer & tinta, perlengkapan/furnitur kantor, sewa ruang kantor.' + CATATAN_HARGA),
   tabItem('pi-hse', 'HSE & Fire Protection', ['HSE'], 'APD, APAR, hydrant, sprinkler, fire alarm, P3K, safety sign, training K3.' + CATATAN_HARGA),
   tabItem('pi-it', 'Perangkat IT', ['IT', 'Software'], 'Hardware & software IT gudang (PC, scanner, printer label, CCTV, jaringan). Biaya sistem format BAP ada di tab Katalog IT.' + CATATAN_HARGA, 'it'),

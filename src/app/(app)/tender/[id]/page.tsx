@@ -1,6 +1,6 @@
 'use client';
 import { T, useT } from '@/lib/i18n';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
@@ -66,7 +66,7 @@ const ALOKASI: Record<string, Partial<Record<Bucket, number>>> = {
 };
 const KAT_KE_KELOMPOK: Record<string, Kelompok> = {
   IT: 'IT', Software: 'IT', Office: 'Office', ATK: 'Consumable', 'Rental Office': 'Office', HSE: 'HSE', Konstruksi: 'Startup',
-  'Pest Control': 'HSE', Asuransi: 'Asuransi', Palet: 'Consumable', Racking: 'Racking', Security: 'Lainnya', Cleaning: 'Lainnya', Utilitas: 'Utilitas', Gudang: 'Fasilitas', Seragam: 'Consumable', Konsumsi: 'Consumable', Printer: 'Office',
+  'Pest Control': 'HSE', Asuransi: 'Asuransi', Palet: 'Consumable', Racking: 'Racking', Security: 'Lainnya', Cleaning: 'Lainnya', Utilitas: 'Utilitas', Gudang: 'Fasilitas', Seragam: 'Consumable', Konsumsi: 'Consumable', Consumable: 'Consumable', Printer: 'Office',
 };
 /** Input daftar alat dipisah koma (datalist equipment). Di level modul supaya fokus tidak hilang. */
 function AlatInput({ value, onChange, ...rest }: { value: string[]; onChange: (v: string[]) => void; id?: string; 'aria-label'?: string }) {
@@ -165,11 +165,12 @@ export default function TenderPage() {
   const kunciMaster = t ? `${t.id}|${t.kab_kota}|${t.provinsi}` : '';
   useEffect(() => { if (!t) return; muatMaster(sb, t).then(r => setMasterMp(r.master)).catch(() => {}); }, [kunciMaster]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Hitung langsung untuk sheet Interest cost (daftar sumber pinjaman + hasil bunga live)
+  // Hitung langsung untuk sheet Interest cost (hasil bunga live) dan Technology & Equipment (startup & implementation otomatis live)
+  const tLive = useDeferredValue(t);
   const hasilInterest = useMemo(() => {
-    if (!t || !masterMp || tab !== 'Loan & Interest Calculator') return null;
-    try { return hitungTender(keInput(t), masterMp); } catch { return null; }
-  }, [t, masterMp, tab]);
+    if (!tLive || !masterMp || (tab !== 'Loan & Interest Calculator' && tab !== 'Technology & Equipment')) return null;
+    try { return hitungTender(keInput(tLive), masterMp); } catch { return null; }
+  }, [tLive, masterMp, tab]);
 
   // ---- Undo / redo: setiap perubahan input dicatat; ketikan beruntun (< 800 ms) digabung jadi satu langkah ----
   const tRef = useRef<TenderRow | null>(null); tRef.current = t;
@@ -328,6 +329,29 @@ export default function TenderPage() {
   for (const r of pdFull?.mp ?? []) if (r.resources > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.resources);
   for (const r of pdFull?.indirect.rows ?? []) if (r.qty > 0) qtyRole.set(r.nama, (qtyRole.get(r.nama) ?? 0) + r.qty);
   const rincianMp = Array.from(qtyRole, ([role, qty]) => rincianBiayaRole(role, qty, masterMp, a.rincianBiayaMp?.[role], paramMp, a.processDesign?.hariKerjaKaryawan ?? 25, t.kab_kota, { levelGaji: a.levelGaji, levelRole: a.levelRole }));
+  // ---- Driver default Technology & Equipment (IT + biaya lain) dari tab lain ----
+  const reKantor = /admin|spv|supervisor|manager|ka gudang|kepala gudang|controller|qhse|k3/i, reManajer = /spv|supervisor|manager|ka gudang|kepala gudang/i;
+  const reScan = /checker|picker|picking|receiv|put ?away|inventory|cycle|stock ?count|stock ?opname/i;
+  const barisRole = Array.from(qtyRole, ([nama, n]) => ({ nama, n }));
+  const nRole = (re: RegExp) => barisRole.filter(r => re.test(r.nama)).reduce((x, r) => x + r.n, 0);
+  const oa = orderAdmin(a.profilVolume, volEf, hariOps);
+  const volArus = (ar: Arus) => volEf.find(v => v.arus === ar);
+  const orderDariVol = (ar: Arus) => { const v = volArus(ar); return v && /^(order|do|line)$/i.test(v.uom.trim()) ? Number(v.peakBulan) || 0 : 0; };
+  const orderIn = orderDariVol('inbound') || oa.inbound.orderBulan, orderOut = orderDariVol('outbound') || oa.outbound.orderBulan;
+  const unitMhe = (re: RegExp) => pdMhe.filter(e => re.test(e.nama)).reduce((x, e) => x + e.resources, 0);
+  const luasDriver = hasil?.space.totalM2 || spaceH?.luasDipakai || spaceH?.spaceRent || 0;
+  const driverIt = {
+    luasM2: luasDriver, officeM2: driverListrik?.officeM2 ?? 0, shift: t.jumlah_shift || 1,
+    transaksiBulan: volEf.filter(v => v.arus === 'inbound' || v.arus === 'outbound').reduce((x, v) => x + paletEkuivalen(v).palet, 0),
+    orderBulan: orderIn + orderOut, userKantor: nRole(reKantor), manajer: nRole(reManajer), operatorScan: nRole(reScan),
+    unitRf: unitMhe(/^(RF|RDT|HHT|scanner)/i), unitPc: unitMhe(/^(PC|komputer|desktop)/i), unitLaptop: unitMhe(/laptop/i) };
+  const driverBiaya = {
+    headcount: headcountTotal, userKantor: driverIt.userKantor, manajer: driverIt.manajer, luasM2: luasDriver, officeM2: driverIt.officeM2,
+    posisiPalet: Math.ceil((spaceH?.sd.ppReq ?? 0) + (spaceH?.dd.ppReq ?? 0) + (spaceH?.block.ppReq ?? 0) + (spaceH?.floor.ppReq ?? 0) - 1e-9),
+    paletInBulan: paletEkuivalen(volArus('inbound')).palet, paletOutBulan: paletEkuivalen(volArus('outbound')).palet,
+    orderInBulan: orderIn, orderOutBulan: orderOut, hariKerjaBulan: hariOps, kategori: kategoriDari(t.industri) ?? KATEGORI_UMUM,
+    umk: masterMp?.upahMinimum ?? 0, skenarioAset: t.skenario_aset, tipeGudang: t.tipe_gudang ?? '', nilaiStokRp: a.nilaiStokRp ?? 0 };
+  const fasilitasGudang = lengkapiSpaceExcel(a.space.excel).fasilitas.map(f => ({ nama: f.nama, m2: Number(f.m2) || 0 })).filter(f => f.m2 > 0);
 
   /** Data lengkap untuk tab Export: hitung ulang dengan master terbaru. */
   async function siapkanExport() {
@@ -764,23 +788,17 @@ export default function TenderPage() {
           kebutuhan={true
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
             : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />
-        <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={(() => {
-        const wc = /admin|spv|supervisor|manager|ka gudang|controller|qhse|k3/i, mj = /spv|supervisor|manager|ka gudang/i;
-        const rows = [...(pdFull?.mp ?? []).map(r => ({ nama: r.nama, n: r.resources })), ...(pdFull?.indirect.rows ?? []).map(r => ({ nama: r.nama, n: r.qty }))];
-        const unit = (re: RegExp) => pdMhe.filter(e => re.test(e.nama)).reduce((x, e) => x + e.resources, 0);
-        return { luasM2: hasil?.space.totalM2 || spaceH?.spaceRent || 0,
-          transaksiBulan: volEf.filter(v => v.arus === 'inbound' || v.arus === 'outbound').reduce((x, v) => x + (Number(v.peakBulan) || 0), 0),
-          userKantor: rows.filter(r => wc.test(r.nama)).reduce((x, r) => x + r.n, 0), manajer: rows.filter(r => mj.test(r.nama)).reduce((x, r) => x + r.n, 0),
-          unitRf: unit(/^(RF|RDT|HHT|scanner)/i), unitPc: unit(/^(PC|komputer|desktop)/i), unitLaptop: unit(/laptop/i) };
-      })()} />
+        <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={driverIt} />
 
         <div className="card">
-          <h2>Office, consumable, HSE, services, asuransi & startup</h2>
+          <h2>Office, stationery, consumable, pallet, HSE, services, asuransi & startup</h2>
           {a.it.lines.length > 0 && <p className="small notice">IT di atas ikut dihitung otomatis: ±{rp(ringkasIt(a.it, { kontrakBulan: t.durasi_kontrak_bulan, bungaTahun: 0 }).totalBulan)}/bln (termasuk depresiasi/amortisasi OTC {rp(ringkasIt(a.it).sekali)}). Jangan diinput dua kali di sini.</p>}
           <p className="small muted">Dipisah per klasifikasi sesuai Price Inquiry; pilihan item di tiap bagian hanya dari kategorinya. Bulanan/sewa = qty × harga per bulan. Beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak + bunga modal.</p>
-          <BiayaLainPanel lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan} onChange={costLines => setA({ costLines })}
+          <BiayaLainPanel lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan}
+            onChange={(costLines, tandai) => setA({ costLines, ...(tandai ? { biayaDefaultDiisi: true } : {}) })}
             startup={a.startupAuto ?? STARTUP_DEFAULT} onStartup={startupAuto => setA({ startupAuto })}
-            hasilBaris={hasil?.biaya} onHitung={() => hitung(false)} headcount={headcountTotal} hariKerjaBulan={a.processDesign?.hariKerjaBulan ?? 25} />
+            hasilBaris={hasilInterest?.biaya ?? hasil?.biaya} onHitung={() => hitung(false)}
+            driver={driverBiaya} defaultDiisi={!!a.biayaDefaultDiisi} onNilaiStok={nilaiStokRp => setA({ nilaiStokRp })} fasilitas={fasilitasGudang} />
 
         </div>
       </>}

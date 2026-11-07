@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { COST_TYPES, KELOMPOK_IT, UMUR_IT_DEFAULT, basisDari, biayaBulanIt, perlakuanDari, ringkasIt, type ItLine, type ItSheet, type PerlakuanSekali } from '@/lib/it';
 import { ubahArray } from '@/components/fields';
-import { itDefault, type DriverIt } from '@/lib/itDefault';
+import { itDefault, sinkronIt, type DriverIt } from '@/lib/itDefault';
 import { rp } from '@/lib/format';
 
 interface Katalog { id: number; kelompok: string; item: string; deskripsi: string | null; cost_type: string; harga: number; slab_min: number | null; slab_max: number | null; status: string; berlaku_sampai: string | null }
@@ -21,6 +21,16 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
     sb.from('it_catalog').select('id, kelompok, item, deskripsi, cost_type, harga, slab_min, slab_max, status, berlaku_sampai').order('urutan').order('item')
       .then(({ data }: { data: unknown }) => setKatalog((data ?? []) as Katalog[]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Template otomatis: tender tanpa baris IT langsung diisi; baris template yang qty-nya belum diubah manual ikut data tender.
+  useEffect(() => {
+    if (!driver || !katalog.length || !(driver.luasM2 > 0)) return;
+    const def = itDefault(driver, katalog);
+    if (!def.length) return;
+    if (!sheet.lines.length && !sheet.templateDiisi) { onChange({ ...sheet, lines: def, templateDiisi: true }); return; }
+    const baru = sinkronIt(sheet.lines, def);
+    if (baru) onChange({ ...sheet, lines: baru });
+  }, [JSON.stringify(driver), katalog, sheet.lines]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const opsi = { kontrakBulan, bungaTahun: 0 }; // bunga tidak otomatis — pakai tab Loan & Interest Calculator
   void bunga;
@@ -46,24 +56,27 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
       </div>
       {driver && (() => {
         const def = itDefault(driver, katalog);
-        const isi = (ganti: boolean) => { set(ganti ? def : [...sheet.lines, ...def]); setKonfirm(false); };
+        const isi = (ganti: boolean) => { set(ganti ? def : [...sheet.lines, ...def.filter(d => !sheet.lines.some(l => l.kunci === d.kunci || (l.catalogId != null && l.catalogId === d.catalogId)))]); setKonfirm(false); };
+        const ikut = sheet.lines.filter(l => l.kunci && l.qtyDefault != null && l.qty === l.qtyDefault).length;
+        const manual = sheet.lines.filter(l => l.kunci && l.qtyDefault != null && l.qty !== l.qtyDefault).length;
         return <div className="notice small" style={{ display: 'grid', gap: 6 }}>
-          <div><b>Default IT dari luas & volume</b> — {def.length} item dari katalog, qty dihitung dari:
-            {' '}luas <b>{Math.round(driver.luasM2).toLocaleString('id-ID')} m²</b> · transaksi <b>{Math.round(driver.transaksiBulan).toLocaleString('id-ID')}/bln</b> · user kantor <b>{driver.userKantor}</b> · SPV/manager <b>{driver.manajer}</b> · RF <b>{driver.unitRf}</b> · PC <b>{driver.unitPc}</b> · laptop <b>{driver.unitLaptop}</b>.
-            {' '}Aturan: CCTV 1 kamera / 200 m² (min. 8), NVR 1 / 32 kamera, printer 1 / 5.000 m², HHT = unit RF, PC & laptop dari MHE Summary, lisensi per user, WMS per transaksi. Semua baris tetap bisa diubah qty / harga atau dihapus; dasar qty tercatat di kolom Catatan.</div>
+          <div><b>Template IT otomatis</b> — {def.length} item dari katalog, qty dihitung dari:
+            {' '}luas <b>{Math.round(driver.luasM2).toLocaleString('id-ID')} m²</b>{driver.officeM2 ? <> (office <b>{Math.round(driver.officeM2).toLocaleString('id-ID')} m²</b>)</> : null} · {driver.orderBulan ? <>order <b>{Math.round(driver.orderBulan).toLocaleString('id-ID')}/bln</b></> : <>transaksi <b>{Math.round(driver.transaksiBulan).toLocaleString('id-ID')} palet/bln</b></>} · user kantor <b>{driver.userKantor}</b> · SPV/manager <b>{driver.manajer}</b> · operator scan <b>{driver.operatorScan ?? 0}</b> · RF <b>{driver.unitRf}</b> · PC <b>{driver.unitPc}</b> · laptop <b>{driver.unitLaptop}</b>.
+            {' '}Aturan: WiFi AP 1 / 600 m² gudang + 1 / 150 m² office, switch PoE per 20 port (AP + CCTV), CCTV 1 / 200 m² (min. 8), NVR 1 / 32 kamera, printer 1 / 5.000 m², RF = unit RF di MHE Summary atau operator scan per shift + 10%, PC & laptop dari MHE Summary / user kantor, lisensi per user, WMS per order dengan slab sesuai volume.</div>
           <div className="row">
             {!sheet.lines.length
-              ? <button className="ghost" disabled={!def.length} onClick={() => isi(true)}>Isi default IT</button>
+              ? <button className="ghost" disabled={!def.length} onClick={() => isi(true)}>Isi template IT</button>
               : !konfirm
-                ? <><button className="ghost" disabled={!def.length} onClick={() => setKonfirm(true)}>Ganti dengan default</button>
-                    <button className="ghost" disabled={!def.length} onClick={() => isi(false)}>Tambahkan default di bawah</button></>
+                ? <><button className="ghost" disabled={!def.length} onClick={() => setKonfirm(true)}>Ganti dengan template</button>
+                    <button className="ghost" disabled={!def.length} onClick={() => isi(false)}>Tambahkan item template yang belum ada</button></>
                 : <><span>Ganti {sheet.lines.length} baris IT yang ada?</span><button className="danger" onClick={() => isi(true)}>Ya, ganti</button><button className="ghost" onClick={() => setKonfirm(false)}>Batal</button></>}
-            <span className="muted">Bisa di-Undo. Isi luas & volume dulu agar qty sesuai.</span>
+            {ikut > 0 && <span className="pill info">{ikut} baris ikut data tender otomatis</span>}
+            {manual > 0 && <span className="pill warn">{manual} baris qty diubah manual (tidak ikut otomatis)</span>}
           </div>
         </div>;
       })()}
       <div className="row">
-        <select aria-label="Item katalog IT" value={pilih} onChange={e => setPilih(e.target.value)} style={{ maxWidth: 520 }}>
+        <select aria-label="Item katalog IT" value={pilih} onChange={e => setPilih(e.target.value)} style={{ flex: '1 1 260px', maxWidth: 520 }}>
           <option value="">Pilih dari katalog IT ({katalog.length})</option>
           {KELOMPOK_IT.concat(Array.from(new Set(katalog.map(k => k.kelompok))).filter(k => !KELOMPOK_IT.includes(k))).map(g => {
             const isi = katalog.filter(k => k.kelompok === g); if (!isi.length) return null;
@@ -74,41 +87,46 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
         <button className="ghost" onClick={() => set([...sheet.lines, { kelompok: KELOMPOK_IT[0], item: '', costType: 'PDPM', qty: 1, hargaBudget: 0 }])}>Baris manual</button>
       </div>
 
-      <div className="tablewrap"><table>
-        <thead><tr><th>Kelompok</th><th>Item</th><th>Cost type</th><th className="num">Qty</th><th>Mata uang</th><th className="num">Harga budget</th><th className="num">Total budget</th><th className="num">Harga aktual</th><th className="num">Total aktual</th><th>Perlakuan</th><th className="num">Umur (bln)</th><th className="num">Biaya/bln</th><th>Catatan</th><th></th></tr></thead>
+      <div className="tablewrap fit"><table className="tabel-fit tabel-it">
+        <thead><tr><th>Item & dasar qty</th><th>Cost type</th><th className="num">Qty</th><th className="num">Harga budget</th><th className="num">Total budget</th><th className="num">Harga aktual</th><th>Perlakuan</th><th className="num">Biaya/bln</th><th></th></tr></thead>
         <tbody>
-          {sheet.lines.length === 0 && <tr><td colSpan={14} className="muted">Belum ada kebutuhan IT.</td></tr>}
-          {kelompokAda.map(g => sheet.lines.map((l, i) => l.kelompok !== g ? null : (
+          {sheet.lines.length === 0 && <tr><td colSpan={9} className="muted">Belum ada kebutuhan IT.</td></tr>}
+          {kelompokAda.map(g => [
+            <tr key={`g-${g}`} className="pd-sub"><td colSpan={9}><b>{g}</b></td></tr>,
+            ...sheet.lines.map((l, i) => l.kelompok !== g ? null : (
             <tr key={i}>
-              <td><select aria-label="Kelompok" value={l.kelompok} onChange={e => set(ubahArray(sheet.lines, i, { kelompok: e.target.value }))}>{KELOMPOK_IT.map(k => <option key={k}>{k}</option>)}</select></td>
-              <td><input aria-label="Item" value={l.item} onChange={e => set(ubahArray(sheet.lines, i, { item: e.target.value }))} style={{ minWidth: 180 }} /></td>
+              <td>
+                {l.catalogId ? <b>{l.item}</b> : <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                  <select aria-label="Kelompok" value={l.kelompok} onChange={e => set(ubahArray(sheet.lines, i, { kelompok: e.target.value }))} style={{ maxWidth: 140 }}>{KELOMPOK_IT.map(k => <option key={k}>{k}</option>)}</select>
+                  <input aria-label="Item" value={l.item} placeholder="Nama item" onChange={e => set(ubahArray(sheet.lines, i, { item: e.target.value }))} /></div>}
+                <input aria-label="Catatan" className="input-kecil" value={l.catatan ?? ''} placeholder="dasar qty / keterangan" onChange={e => set(ubahArray(sheet.lines, i, { catatan: e.target.value }))} />
+              </td>
               <td><select aria-label="Cost type" value={l.costType} onChange={e => set(ubahArray(sheet.lines, i, { costType: e.target.value }))}>{COST_TYPES.map(c => <option key={c.v} value={c.v} title={c.ket}>{c.v}</option>)}</select></td>
-              <td className="num"><input aria-label="Qty" type="number" step="any" value={l.qty} onChange={e => set(ubahArray(sheet.lines, i, { qty: Number(e.target.value) }))} title={basisDari(l.costType) === 'Transaksi' ? 'Transaksi per bulan' : ''} /></td>
-              <td><select aria-label="Mata uang" value={l.mataUang ?? 'IDR'} onChange={e => set(ubahArray(sheet.lines, i, { mataUang: e.target.value as 'IDR' | 'USD' }))}><option>IDR</option><option>USD</option></select></td>
-              <td className="num db"><input aria-label="Harga budget" type="number" step="any" value={l.hargaBudget} onChange={e => set(ubahArray(sheet.lines, i, { hargaBudget: Number(e.target.value) }))} /></td>
+              <td className="num"><input aria-label="Qty" type="number" step="any" value={l.qty} onChange={e => set(ubahArray(sheet.lines, i, { qty: Number(e.target.value) }))} title={basisDari(l.costType) === 'Transaksi' ? 'Transaksi per bulan' : ''} />
+                {l.kunci && l.qtyDefault != null && l.qty !== l.qtyDefault && <div className="small muted">manual · <button className="link-kecil" title="Kembalikan ke qty template (ikut data tender lagi)" onClick={() => set(ubahArray(sheet.lines, i, { qty: l.qtyDefault! }))}>default {l.qtyDefault}</button></div>}</td>
+              <td className="num db"><input aria-label="Harga budget" type="number" step="any" value={l.hargaBudget} onChange={e => set(ubahArray(sheet.lines, i, { hargaBudget: Number(e.target.value) }))} />
+                <select aria-label="Mata uang" className="input-kecil" value={l.mataUang ?? 'IDR'} onChange={e => set(ubahArray(sheet.lines, i, { mataUang: e.target.value as 'IDR' | 'USD' }))}><option>IDR</option><option>USD</option></select></td>
               <td className="num">{rp(l.qty * l.hargaBudget * (l.mataUang === 'USD' ? sheet.kursUsd : 1))}</td>
-              <td className="num"><input aria-label="Harga aktual" type="number" step="any" value={l.hargaAktual ?? ''} onChange={e => set(ubahArray(sheet.lines, i, { hargaAktual: e.target.value === '' ? null : Number(e.target.value) }))} /></td>
-              <td className="num">{l.hargaAktual == null ? '—' : rp(l.qty * l.hargaAktual * (l.mataUang === 'USD' ? sheet.kursUsd : 1))}</td>
+              <td className="num"><input aria-label="Harga aktual" type="number" step="any" value={l.hargaAktual ?? ''} onChange={e => set(ubahArray(sheet.lines, i, { hargaAktual: e.target.value === '' ? null : Number(e.target.value) }))} />
+                {l.hargaAktual != null && <div className="small muted">{rp(l.qty * l.hargaAktual * (l.mataUang === 'USD' ? sheet.kursUsd : 1))}</div>}</td>
               {(() => {
                 const sekali = basisDari(l.costType) === 'Sekali', p = perlakuanDari(l), c = biayaBulanIt(l, sheet.kursUsd, opsi);
                 return <>
-                  <td>{sekali
-                    ? <select aria-label="Perlakuan OTC" value={p} style={{ minWidth: 120 }} onChange={e => set(ubahArray(sheet.lines, i, { perlakuanSekali: e.target.value as PerlakuanSekali, umurBulan: l.umurBulan ?? UMUR_IT_DEFAULT }))}>
+                  <td className="td-lebar">{sekali
+                    ? <><select aria-label="Perlakuan OTC" value={p} onChange={e => set(ubahArray(sheet.lines, i, { perlakuanSekali: e.target.value as PerlakuanSekali, umurBulan: l.umurBulan ?? UMUR_IT_DEFAULT }))}>
                         <option value="depresiasi">Depresiasi</option><option value="amortisasi">Amortisasi</option><option value="tagih">Tagih terpisah</option></select>
+                        {p === 'depresiasi' && <label className="small muted row" style={{ gap: 4, flexWrap: 'nowrap' }}>umur <input aria-label="Umur ekonomis" type="number" min={1} value={l.umurBulan ?? UMUR_IT_DEFAULT} style={{ width: 56 }} onChange={e => set(ubahArray(sheet.lines, i, { umurBulan: Number(e.target.value) }))} /> bln</label>}
+                        {p === 'amortisasi' && <div className="small muted">{kontrakBulan} bln kontrak</div>}</>
                     : <span className="small muted">{basisDari(l.costType)}</span>}</td>
-                  <td className="num">{sekali && p === 'depresiasi'
-                    ? <input aria-label="Umur ekonomis" type="number" min={1} value={l.umurBulan ?? UMUR_IT_DEFAULT} style={{ width: 64, minWidth: 64 }} onChange={e => set(ubahArray(sheet.lines, i, { umurBulan: Number(e.target.value) }))} />
-                    : sekali && p === 'amortisasi' ? <span className="small muted">{kontrakBulan}</span> : <span className="small muted">–</span>}</td>
-                  <td className="num" title={c.bunga ? `pokok ${rp(c.pokok)} + bunga ${rp(c.bunga)} · ${c.jenis} ${c.periode} bln` : c.jenis}>{c.total ? rp(c.total) : <span className="small muted">{p === 'tagih' && sekali ? 'di quotation' : '–'}</span>}</td>
+                  <td className="num" title={c.bunga ? `pokok ${rp(c.pokok)} + bunga ${rp(c.bunga)} · ${c.jenis} ${c.periode} bln` : c.jenis}>{c.total ? <b>{rp(c.total)}</b> : <span className="small muted">{p === 'tagih' && sekali ? 'di quotation' : '–'}</span>}</td>
                 </>;
               })()}
-              <td><input aria-label="Catatan" value={l.catatan ?? ''} placeholder="dasar qty / keterangan" onChange={e => set(ubahArray(sheet.lines, i, { catatan: e.target.value }))} style={{ minWidth: 200 }} /></td>
-              <td><button className="danger" onClick={() => set(sheet.lines.filter((_, j) => j !== i))}>Hapus</button></td>
-            </tr>)))}
+              <td><button className="danger" title="Hapus baris" aria-label="Hapus" onClick={() => set(sheet.lines.filter((_, j) => j !== i))}>×</button></td>
+            </tr>))])}
         </tbody>
       </table></div>
 
-      <div className="tablewrap"><table>
+      <div className="tablewrap fit"><table className="tabel-fit">
         <thead><tr><th>Ringkasan</th><th className="num">Budget</th><th className="num">Aktual</th><th className="num">Selisih</th></tr></thead>
         <tbody>
           <tr><td>Biaya bulanan (termasuk transaksi)</td><td className="num">{rp(r.bulanan)}</td><td className="num">{rp(r.bulananAktual)}</td><td className="num">{rp(r.bulananAktual - r.bulanan)}</td></tr>
