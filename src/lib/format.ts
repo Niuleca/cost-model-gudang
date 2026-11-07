@@ -26,4 +26,4 @@ export const BUCKET_LABEL: Record<string, string> = {
 };
 
 // Industri untuk benchmark produktivitas (kolom benchmark di tabel productivity)
-export const INDUSTRI = ['Retail-Consumer', 'Tech', 'Fashion Retail', 'Healthcare', 'Healthcare + Cold Chain', 'E-Commerce', 'FMCG', 'Bahan bangunan', 'Otomotif', 'Kimia'];
+export { NAMA_KATEGORI as INDUSTRI } from './kategoriBisnis';

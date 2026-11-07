@@ -17,6 +17,7 @@ export interface ProdukTender {
   id: string;
   kode: string; nama: string;
   uom: string;                 // satuan simpan / handling: karton, pcs, roll, bag, pail, unit, …
+  kelasBerat?: string;         // kode kelas berat dari master UoM (mis. bag-50, fibc-1000) — kosong = otomatis dari berat
   p: number; l: number; t: number;   // dimensi per UOM (cm)
   cbm?: number | null;         // CBM per UOM — dipakai bila P×L×T kosong
   beratKg: number;             // berat per UOM (kg)

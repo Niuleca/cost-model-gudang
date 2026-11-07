@@ -6,7 +6,8 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useProfile } from '@/lib/useProfile';
 import { ROLE_LABEL, TIM_TENDER, type AppRole } from '@/lib/format';
-import { PRICE_PAGES, PROD_PAGES } from '@/lib/masterTabs';
+import { PRICE_PAGES } from '@/lib/masterTabs';
+import { KATEGORI_BISNIS } from '@/lib/kategoriBisnis';
 import { BAHASA, useBahasa, type Bahasa } from '@/lib/i18n';
 import { useBrandingSaya } from './BrandingProfil';
 
@@ -39,8 +40,10 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
   { id: 'price', label: 'Price Inquiry', item: [...PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })),
     { href: '/price/perbandingan', label: 'Comparation Price (vendor)', roles: 'semua' as const, pisah: true }] },
   { id: 'prod', label: 'Productivity', item: [
-    ...PROD_PAGES.map(p => ({ href: `/produktivitas/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: false })),
-    { href: '/produktivitas', label: 'Semua UoM', roles: 'semua' },
+    ...KATEGORI_BISNIS.map(k => ({ href: `/produktivitas?kategori=${encodeURIComponent(k.nama)}`, label: k.nama, roles: 'semua' as const, grup: 'Business category' })),
+    { href: '/produktivitas/referensi-uom', label: 'UoM & weight class reference', roles: 'semua', grup: 'Reference' },
+    { href: '/produktivitas/semua', label: 'All productivity data', roles: 'semua', grup: 'Reference' },
+    { href: '/produktivitas/kalender', label: 'Holiday calendar', roles: 'semua', grup: 'Reference' },
   ] },
 ];
 const AKUN: Item[] = [

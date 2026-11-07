@@ -55,7 +55,7 @@ export const namaAlok = (a: Partial<Record<Bucket, number>> | undefined, fb: Par
 export const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 export const UOM = ['palet', 'case', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pail', 'pack', 'roll', 'order', 'line', 'lokasi'];
 export const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
-export const INDUSTRI = ['Retail-Consumer', 'Tech', 'Fashion Retail', 'Healthcare', 'Healthcare + Cold Chain', 'E-Commerce', 'FMCG', 'Bahan bangunan', 'Otomotif', 'Kimia'];
+export { NAMA_KATEGORI as INDUSTRI } from './kategoriBisnis';
 export const MATA_UANG = ['USD', 'SGD', 'MYR', 'THB', 'VND', 'PHP', 'KRW', 'JPY', 'CNY', 'HKD', 'TWD', 'INR', 'AUD', 'EUR', 'GBP'];
 export const KELAS_UOM: [string, string][] = [['case', 'case'], ['karton', 'case'], ['dus', 'case'], ['carton', 'case'], ['ctn', 'case'], ['box', 'case'],
   ['pcs', 'pcs'], ['pc', 'pcs'], ['piece', 'pcs'], ['unit', 'pcs'], ['ea', 'pcs'], ['palet', 'palet'], ['pallet', 'palet']];

@@ -5,12 +5,14 @@
 // ikut diperbarui (bisa dimatikan). Turunan: level rak maksimal per berat, zonasi area, dan SKU di Simulasi Warehouse.
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Num } from '@/components/fields';
+import { KELAS_UMUM, UOM_MASTER, kelasDariBerat, uomDari, type KelompokUom } from '@/lib/uom';
+const KELOMPOK_UOM: KelompokUom[] = ['Packaging', 'Each / unit', 'Liquid & bulk container', 'Unit load', 'Weight', 'Volume'];
 import { angka } from '@/lib/format';
 import type { VolumeInput } from '@/lib/engine/types';
 import type { ProfilVolume } from '@/lib/profilVolume';
 import { hitungLevelRak, lengkapiSpaceExcel, type HasilSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
 import {
-  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, UOM_PRODUK, adaProdukNyata, dariTempel, hitungProduk, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
+  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
   type AturanBerat, type PerubahanTender, type ProdukTender,
 } from '@/lib/produk';
 
@@ -138,7 +140,17 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, alignItems: 'end' }}>
             <label style={{ gridColumn: 'span 1' }}>{lab('Kode')}<input aria-label={`Kode ${i + 1}`} value={x.kode} onChange={e => ubah(i, { kode: e.target.value }, false)} style={kecil} /></label>
             <label style={{ gridColumn: 'span 2', minWidth: 200 }}>{lab('Nama produk')}<input aria-label={`Nama ${i + 1}`} value={x.nama} placeholder="Nama produk" onChange={e => ubah(i, { nama: e.target.value }, false)} style={kecil} /></label>
-            <label>{lab('UOM')}<input aria-label={`UOM ${i + 1}`} list="dl-uom-produk" value={x.uom} onChange={e => ubah(i, { uom: e.target.value })} style={kecil} /></label>
+            <label>{lab('UOM')}<select aria-label={`UOM ${i + 1}`} value={uomDari(x.uom)?.kode ?? x.uom} onChange={e => ubah(i, { uom: e.target.value, kelasBerat: undefined })} style={kecil}>
+              {!uomDari(x.uom) && <option value={x.uom}>{x.uom || '—'}</option>}
+              {KELOMPOK_UOM.map(g => <optgroup key={g} label={g}>{UOM_MASTER.filter(u => u.kelompok === g).map(u => <option key={u.kode} value={u.kode}>{u.nama}</option>)}</optgroup>)}
+            </select></label>
+            {(() => { const u = uomDari(x.uom); const daftar = u?.kelas.length ? u.kelas : KELAS_UMUM; const auto = x.beratKg > 0 ? kelasDariBerat(u?.kode ?? 'pcs', x.beratKg) : undefined;
+              const pilih = daftar.find(c => c.kode === x.kelasBerat);
+              return <label title={(pilih ?? auto)?.handling}>{lab('Kelas berat')}<select aria-label={`Kelas berat ${i + 1}`} value={x.kelasBerat ?? ''} style={kecil}
+                onChange={e => { const c = daftar.find(d => d.kode === e.target.value); ubah(i, c ? { kelasBerat: c.kode, beratKg: x.beratKg >= c.minKg && x.beratKg <= c.maxKg && x.beratKg > 0 ? x.beratKg : c.tipikalKg } : { kelasBerat: undefined }); }}>
+                <option value="">{auto ? `Auto: ${auto.label}` : 'Auto (dari berat)'}</option>
+                {daftar.map(c => <option key={c.kode} value={c.kode}>{c.label}</option>)}
+              </select></label>; })()}
             <div style={{ gridColumn: 'span 2', minWidth: 200 }}>{lab(`P × L × T (cm)${x.dimEstimasi ? ' · perkiraan dari CBM' : ''}`)}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                 {(['p', 'l', 't'] as const).map(k => <Angka key={k} aria-label={`${k.toUpperCase()} ${i + 1} (cm)`} placeholder={k.toUpperCase()} value={x[k]} onValue={v => ubah(i, { [k]: v })}
@@ -168,7 +180,6 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
         {!daftar.length && <p className="muted">Belum ada produk. Isi Volume & Parameter muatan di tab Volume untuk baris otomatis, atau tambah / tempel produk.</p>}
       </div>
       {daftar.length > 1 && <p className="small"><b>Total {daftar.length} SKU</b> · {angka(tot.qty)} unit · {angka(tot.palet)} palet · {angka(tot.kg / 1000, 1)} ton · {angka(tot.cbm, 1)} CBM</p>}
-      <datalist id="dl-uom-produk">{UOM_PRODUK.map(u => <option key={u} value={u} />)}</datalist>
       <datalist id="dl-zona-produk">{zona.map(z => <option key={z.zona} value={z.zona} />)}</datalist>
     </div>
 

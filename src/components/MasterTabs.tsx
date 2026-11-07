@@ -6,8 +6,8 @@ import { useProfile } from '@/lib/useProfile';
 import { TABS, type Tab } from '@/lib/masterTabs';
 
 /** Halaman master data per departemen: sekumpulan tab TableEditor + tab khusus (opsional). */
-export default function MasterTabs({ ids, eyebrow, judul, ekstra, tabsLangsung }: {
-  ids: string[]; eyebrow: string; judul: string; tabsLangsung?: Tab[];
+export default function MasterTabs({ ids, eyebrow, judul, ekstra, tabsLangsung, tanpaJudul }: {
+  ids: string[]; eyebrow: string; judul: string; tabsLangsung?: Tab[]; tanpaJudul?: boolean;
   ekstra?: { id: string; label: string; pemilik: string; isi: ReactNode }[];
 }) {
   const { profile } = useProfile();
@@ -18,10 +18,10 @@ export default function MasterTabs({ ids, eyebrow, judul, ekstra, tabsLangsung }
   const pemilik = e?.pemilik ?? t?.pemilik;
   return (
     <>
-      <div className="head">
+      {!tanpaJudul && <div className="head">
         <div><div className="eyebrow">{eyebrow}</div><h1>{judul}</h1></div>
         <span className="small muted">Pemilik data: <b>{pemilik}</b>. Approve oleh Solution Design.</span>
-      </div>
+      </div>}
       {tabs.length > 1 && (
         <div className="tabs" role="tablist">
           {tabs.map(x => <button key={x.id} role="tab" aria-selected={tab === x.id} className={tab === x.id ? 'on' : ''} onClick={() => setTab(x.id)}>{x.label}</button>)}

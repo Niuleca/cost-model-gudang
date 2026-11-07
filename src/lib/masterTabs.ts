@@ -2,6 +2,8 @@
 import type { Kolom } from '@/components/TableEditor';
 import type { AppRole } from '@/lib/format';
 import { INDUSTRI } from '@/lib/format';
+import { KATEGORI_BISNIS, KATEGORI_UMUM } from '@/lib/kategoriBisnis';
+import { KELAS_UMUM, KODE_UOM, UOM_MASTER } from '@/lib/uom';
 import { COST_TYPES, KELOMPOK_IT } from '@/lib/it';
 
 export const KAT_HARGA = ['Gudang','MHE','Racking','Palet','Office','ATK','Seragam','Konsumsi','Printer','Rental Office','IT','Software','HSE','Konstruksi','Pest Control','Asuransi','Security','Cleaning','Utilitas','Lainnya'];
@@ -15,6 +17,9 @@ export interface Tab {
   cari?: string[]; catatan?: string; defaults?: Record<string, unknown>; filter?: Record<string, string | string[]>;
   kelompok?: string;
 }
+
+/** Semua kode kelas berat: umum + per UoM (bag-50, fibc-1000, plt-heavy, …). */
+export const KELAS_BERAT_OPSI = ['semua', ...Array.from(new Set([...KELAS_UMUM, ...UOM_MASTER.flatMap(u => u.kelas)].map(c => c.kode)))];
 
 export const TABS: Tab[] = [
   { id: 'umk', label: 'UMK / UMP', pemilik: 'HR', table: 'umk', editorRoles: ['hr'],
@@ -123,11 +128,11 @@ export const TABS: Tab[] = [
     kolom: [
       { key: 'tahap', label: 'Tahap' }, { key: 'aktivitas', label: 'Aktivitas', width: 240 }, { key: 'tool', label: 'Tool', width: 90 },
       { key: 'role_name', label: 'Role' },
-      { key: 'uom', label: 'UoM', type: 'select', options: ['pcs', 'karton', 'ton', 'cbm', 'liter', 'bag', 'pail', 'pack', 'roll', 'palet', 'order', 'line', 'lokasi'] },
-      { key: 'kelas_berat', label: 'Kelas berat', type: 'select', options: ['semua', 'light', 'medium', 'heavy'] },
-      { key: 'industri', label: 'Industri' }, { key: 'prod_per_jam', label: 'Prod/jam', type: 'number', width: 80 },
+      { key: 'uom', label: 'UoM', type: 'select', options: KODE_UOM },
+      { key: 'kelas_berat', label: 'Kelas berat', type: 'select', options: KELAS_BERAT_OPSI },
+      { key: 'industri', label: 'Business category', type: 'select', options: INDUSTRI }, { key: 'prod_per_jam', label: 'Prod/jam', type: 'number', width: 80 },
       { key: 'detik_per_uom', label: 'Detik/UoM', type: 'number', readonly: true, width: 70 },
-      ...INDUSTRI.slice(0, 6).map(i => ({ key: `benchmark.${i}`, label: `${i} (rentang/jam)`, width: 90 } as Kolom)),
+      ...KATEGORI_BISNIS.filter(k => k.nama !== KATEGORI_UMUM).map(k => ({ key: `benchmark.${k.nama}`, label: `${k.nama} (rentang/jam)`, width: 90 } as Kolom)),
       { key: 'metode', label: 'Metode', type: 'select', options: ['Time Motion Study', 'Benchmark', 'Asumsi'] },
       { key: 'sumber', label: 'Sumber' }, { key: 'tanggal', label: 'Tanggal', type: 'date' }, { key: 'catatan', label: 'Catatan' },
     ] },
@@ -200,8 +205,8 @@ export const PRICE_PAGES: { slug: string; label: string; judul: string; ids: str
   { slug: 'semua', label: 'Semua Price Inquiry', judul: 'Semua price inquiry', ids: ['harga', 'umk'], gudang: true },
 ];
 
-// ---------- Productivity: satu halaman per UoM ----------
-export const UOM_PROD = ['pcs', 'karton', 'ton', 'cbm', 'liter', 'bag', 'pail', 'pack', 'roll', 'palet', 'order', 'line', 'lokasi'];
+// ---------- Productivity: kategori bisnis → UoM ----------
+export const UOM_PROD = KODE_UOM;
 export const PROD_PAGES: { slug: string; label: string; uom: string[] }[] = [
   { slug: 'pcs', label: 'Pcs', uom: ['pcs'] },
   { slug: 'carton', label: 'Case/Carton', uom: ['karton'] },
@@ -217,8 +222,17 @@ export const PROD_PAGES: { slug: string; label: string; uom: string[] }[] = [
   { slug: 'line', label: 'Line', uom: ['line'] },
   { slug: 'lokasi', label: 'Lokasi', uom: ['lokasi'] },
 ];
-export const tabProduktivitas = (uom: string[], label: string): Tab => {
+/** Tab produktivitas untuk satu kategori bisnis & UoM: baris kategori itu + General Cargo (berlaku semua kategori). */
+export const tabProduktivitas = (uom: string[], label: string, kategori?: string): Tab => {
   const dasar = TABS.find(t => t.id === 'produktivitas')!;
-  return { ...dasar, id: `prod-${uom[0]}`, label, filter: { uom }, defaults: { ...(dasar.defaults ?? {}), uom: uom[0] },
-    kelompok: 'tahap', kolom: dasar.kolom.map(k => k.key === 'uom' ? { ...k, options: uom.length > 1 ? uom : UOM_PROD } : k) };
+  const kelasUom = uom.length === 1 ? UOM_MASTER.find(u => u.kode === uom[0])?.kelas ?? [] : [];
+  const kat = kategori && kategori !== KATEGORI_UMUM ? kategori : null;
+  return { ...dasar, id: `prod-${kat ? kat.replace(/[^\w]+/g, '-').toLowerCase() + '-' : ''}${uom[0]}`, label,
+    filter: { uom, ...(kat ? { industri: [kat, KATEGORI_UMUM] } : {}) },
+    defaults: { ...(dasar.defaults ?? {}), uom: uom[0], industri: kat ?? KATEGORI_UMUM },
+    kelompok: 'tahap',
+    kolom: dasar.kolom
+      .filter(k => !k.key.startsWith('benchmark.') || (kat ? k.key === `benchmark.${kat}` : true))
+      .map(k => k.key === 'uom' ? { ...k, options: uom.length > 1 ? uom : UOM_PROD }
+        : k.key === 'kelas_berat' ? { ...k, options: ['semua', ...(kelasUom.length ? kelasUom : KELAS_UMUM).map(c => c.kode)] } : k) };
 };

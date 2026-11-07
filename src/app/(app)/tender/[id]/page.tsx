@@ -27,6 +27,7 @@ import ItPanel from './ItPanel';
 import BiayaLainPanel from './BiayaLainPanel';
 import HapusTender from './HapusTender';
 import ListrikTender from './ListrikTender';
+import { KATEGORI_UMUM, kategoriDari } from '@/lib/kategoriBisnis';
 import AirPanel from './AirPanel';
 import type { DriverListrik } from '@/lib/utilitas';
 import ProcessDesignPanel from './ProcessDesignPanel';
@@ -387,7 +388,7 @@ export default function TenderPage() {
           <h2><T>Key assumption</T></h2>
           <div className="grid3">
             <Txt id="cust" label="Customer" value={t.customer} onChange={v => setKol('customer', v)} />
-            <Sel id="ind" label="Industri (benchmark produktivitas)" value={t.industri ?? ''} options={Array.from(new Set(['', ...INDUSTRI, t.industri ?? ''])).map(v => ({ v, l: v || '—' }))} onChange={v => setKol('industri', v || null)} />
+            <Sel id="ind" label="Business category (produktivitas)" value={t.industri ?? ''} options={Array.from(new Set(['', ...INDUSTRI, t.industri ?? ''])).map(v => ({ v, l: v || '—' }))} onChange={v => setKol('industri', v || null)} />
             <Txt id="pic" label="PIC / account" value={t.pic ?? ''} onChange={v => setKol('pic', v)} />
             <Txt id="alamat" label="Alamat / site" value={t.alamat_lokasi ?? ''} onChange={v => setKol('alamat_lokasi', v)} />
             {(() => {
@@ -814,13 +815,15 @@ export default function TenderPage() {
 function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industri: string | null; onTambah: (p: Prod) => void }) {
   const [q, setQ] = useState('');
   const [pilih, setPilih] = useState('');
-  const daftar = prods.filter(p => !q || `${p.tahap} ${p.aktivitas} ${p.tool} ${p.role_name} ${p.uom}`.toLowerCase().includes(q.toLowerCase()));
+  // produktivitas kategori bisnis tender + General Cargo (berlaku semua kategori)
+  const kat = kategoriDari(industri);
+  const daftar = prods.filter(p => (!kat || !p.industri || p.industri === kat || p.industri === KATEGORI_UMUM) && (!q || `${p.tahap} ${p.aktivitas} ${p.tool} ${p.role_name} ${p.uom}`.toLowerCase().includes(q.toLowerCase())));
   return (
     <div className="row">
       <input aria-label="Cari aktivitas" placeholder="Cari aktivitas, tool, role…" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 240 }} />
       <select aria-label="Aktivitas" value={pilih} onChange={e => setPilih(e.target.value)} style={{ maxWidth: 460 }}>
         <option value="">Pilih aktivitas ({daftar.length})</option>
-        {daftar.map(p => <option key={p.id} value={p.id}>{p.tahap} · {p.aktivitas} · {p.tool} · {p.prod_per_jam} {p.uom}/jam{industri && p.benchmark?.[industri] ? ` · ${industri}: ${p.benchmark[industri]}` : ''}{p.status !== 'approved' ? ' (draft)' : ''}</option>)}
+        {daftar.map(p => <option key={p.id} value={p.id}>{p.tahap} · {p.aktivitas} · {p.tool} · {p.prod_per_jam} {p.uom}/jam{p.industri && p.industri !== KATEGORI_UMUM ? ` · ${p.industri}` : ''}{kat && p.benchmark?.[kat] ? ` · benchmark ${kat}: ${p.benchmark[kat]}` : ''}{p.status !== 'approved' ? ' (draft)' : ''}</option>)}
       </select>
       <button disabled={!pilih} onClick={() => { const p = prods.find(x => x.id === Number(pilih)); if (p) { onTambah(p); setPilih(''); } }}>Tambah</button>
     </div>
