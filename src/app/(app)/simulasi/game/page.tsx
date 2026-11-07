@@ -46,7 +46,7 @@ export default function LecaGame() {
   const batalRef = useRef(false);
 
   useEffect(() => {
-    sb.from('tenders').select('id, kode, customer, status, updated_at').order('updated_at', { ascending: false }).then(({ data: d, error }: { data: unknown[] | null; error: { message: string } | null }) => {
+    sb.from('tenders').select('id, kode, customer, status, updated_at').eq('jenis_tender', 'warehouse').order('updated_at', { ascending: false }).then(({ data: d, error }: { data: unknown[] | null; error: { message: string } | null }) => {
       if (error) setErr(error.message);
       setDaftar((d ?? []) as T[]);
       const q = new URLSearchParams(window.location.search).get('id');

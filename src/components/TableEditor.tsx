@@ -35,6 +35,8 @@ interface Props {
   kelompok?: string;           // kolom pembagi: tombol per nilai + judul grup di tabel
   /** Lampiran quotation vendor per baris (kolom quotation_path / quotation_nama di tabel). */
   lampiran?: boolean;
+  /** Sembunyikan tombol Import Excel bawaan (halaman punya import khusus). */
+  tanpaImport?: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -264,7 +266,7 @@ export default function TableEditor(p: Props) {
         <span className="small muted">{tampil.length} baris</span>
         {bolehEdit && !baru && <button onClick={() => setBaru(grup && p.kelompok && grup !== 'Tanpa kategori' ? { [p.kelompok]: grup } : {})}>Tambah baris{grup ? ` (${grup})` : ''}</button>}
         <button className="ghost" onClick={unduh} disabled={!!sibuk}>Export Excel</button>
-        {bolehEdit && <label className="btn ghost" style={{ cursor: 'pointer' }}>Import Excel
+        {bolehEdit && !p.tanpaImport && <label className="btn ghost" style={{ cursor: 'pointer' }}>Import Excel
           <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={e => { bacaFile(e.target.files?.[0]); e.target.value = ''; }} /></label>}
         {bolehEdit && Object.keys(draft).length > 0 && <>
           <button onClick={simpanSemua}>Simpan perubahan ({Object.keys(draft).length} baris)</button>

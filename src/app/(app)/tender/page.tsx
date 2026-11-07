@@ -26,7 +26,7 @@ export default function DaftarTender() {
   const [draftSaja, setDraftSaja] = useState(false);
   useEffect(() => { setDraftSaja(new URLSearchParams(window.location.search).get('grup') === 'draft'); }, []);
   useEffect(() => {
-    supabaseBrowser().from('tenders').select('id, kode, customer, kab_kota, provinsi, industri, status, versi, updated_at, created_at, pic, hasil, excel:asumsi->historis->ringkasan').order('updated_at', { ascending: false })
+    supabaseBrowser().from('tenders').select('id, kode, customer, kab_kota, provinsi, industri, status, versi, updated_at, created_at, pic, hasil, excel:asumsi->historis->ringkasan').eq('jenis_tender', 'warehouse').order('updated_at', { ascending: false })
       .then(({ data, error }: { data: Baris[] | null; error: { message: string } | null }) => { if (error) setErr(error.message); else setRows(data ?? []); });
   }, []);
 

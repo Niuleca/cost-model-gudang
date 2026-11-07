@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import FilterTender from '@/components/FilterTender';
 import { rp, tanggal } from '@/lib/format';
 import { STATUS, labelStatus, pillStatus } from '@/lib/status';
-import { grupStatus, hariSejak, useTenderOverview } from '@/lib/tenderOverview';
+import { grupStatus, hariSejak, hrefTender, useTenderOverview } from '@/lib/tenderOverview';
 
 /** Logistics Tender → Monitoring → Tender Status & Tracking: posisi tiap tender, lama di tahap sekarang, tender macet. */
 export default function TenderTracking() {
@@ -42,7 +42,7 @@ export default function TenderTracking() {
             const idx = Math.max(0, urut.indexOf(r.status)); const prog = g === 'pipeline' ? (idx + 1) / 7 : 1;
             return (
               <tr key={r.id}>
-                <td><Link href={`/tender/${r.id}`}><b>{r.customer}</b></Link><div className="small muted">{r.kode ?? '—'} · {r.kab_kota}</div></td>
+                <td><Link href={hrefTender(r)}><b>{r.customer}</b></Link><div className="small muted">{r.kode ?? '—'} · {r.kab_kota}</div></td>
                 <td className="small">{(r.jenis_tender ?? 'warehouse').replace(/^./, c => c.toUpperCase())}</td>
                 <td><span className={`pill ${pillStatus(r.status)}`}>{labelStatus(r.status)}</span></td>
                 <td style={{ minWidth: 90 }}><div className="pipe-bar"><i style={{ width: `${prog * 100}%`, background: g === 'menang' ? 'var(--ok)' : g === 'pipeline' ? 'var(--g700)' : 'var(--bad)' }} /></div></td>

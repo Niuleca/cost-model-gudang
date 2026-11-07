@@ -14,6 +14,9 @@ export interface Ov {
   pendapatan_bulan: number | null; biaya_bulan: number | null; gp_persen: number | null; durasi_kontrak_bulan: number;
   jenis_tender: JenisTender | null;
 }
+/** Halaman tender sesuai jenis (warehouse /tender, transportation /transport, intermodal /intermodal). */
+export const hrefTender = (r: { id: string; jenis_tender?: JenisTender | string | null }) =>
+  `${r.jenis_tender === 'transportation' ? '/transport' : r.jenis_tender === 'intermodal' ? '/intermodal' : '/tender'}/${r.id}`;
 export const grupStatus = (s: string) => MENANG.includes(s) ? 'menang' : KALAH.includes(s) ? 'kalah' : DROP.includes(s) ? 'drop' : 'pipeline';
 export const nilaiKontrak = (r: Ov) => Number(r.pendapatan_bulan ?? 0) * (r.durasi_kontrak_bulan || 0);
 export const hariSejak = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));

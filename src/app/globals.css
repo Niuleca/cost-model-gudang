@@ -644,3 +644,11 @@ tr.baris-merah .dasar-def { color: #991b1b; }
 .def-driver { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; }
 .def-driver span b { font-weight: 600; }
 .def-driver span.kosong { color: var(--bad, #b91c1c); }
+
+/* ---------- Transport & Intermodal tender (UAT fase 4) */
+table.tabel-im td:nth-child(2) { min-width: 170px; }
+table.tabel-im td:nth-child(4) input, table.tabel-im td:nth-child(7) input { max-width: 90px; }
+table.tabel-im td:nth-child(5) { min-width: 170px; }
+table.tabel-tr td:first-child { min-width: 170px; }
+table.tabel-tr td:nth-child(3) input, table.tabel-tr td:nth-child(5) input { max-width: 100px; }
+table.tabel-tr td:nth-child(4) { min-width: 200px; }

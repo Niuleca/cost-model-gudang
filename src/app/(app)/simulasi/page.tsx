@@ -96,7 +96,7 @@ export default function DesainGudang() {
   const redo = () => { const r = riwayat.current; const e = editRef.current; const n = r.depan.pop(); if (!n || !e) return; r.lalu.push(e); setEditS(n); setKotor(true); };
 
   useEffect(() => {
-    sb.from('tenders').select('id, kode, customer, status').order('updated_at', { ascending: false }).then(({ data: d, error }: { data: unknown[] | null; error: { message: string } | null }) => {
+    sb.from('tenders').select('id, kode, customer, status').eq('jenis_tender', 'warehouse').order('updated_at', { ascending: false }).then(({ data: d, error }: { data: unknown[] | null; error: { message: string } | null }) => {
       if (error) setErr(error.message);
       setDaftar((d ?? []) as T[]);
       const q = new URLSearchParams(window.location.search).get('id'); if (q) setId(q);

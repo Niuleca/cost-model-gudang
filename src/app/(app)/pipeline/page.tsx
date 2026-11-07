@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import FilterTender from '@/components/FilterTender';
 import { rp, persen } from '@/lib/format';
 import { STATUS } from '@/lib/status';
-import { grupStatus, hariSejak, nilaiKontrak, useTenderOverview } from '@/lib/tenderOverview';
+import { grupStatus, hariSejak, hrefTender, nilaiKontrak, useTenderOverview } from '@/lib/tenderOverview';
 
 const TAHAP = STATUS.filter(s => s.grup === 'pipeline');
 const JENIS_SINGKAT: Record<string, string> = { warehouse: 'WH', transportation: 'TR', intermodal: 'IM' };
@@ -41,7 +41,7 @@ export default function TenderPipeline() {
           {k.isi.slice(0, 25).map(r => {
             const hari = hariSejak(r.updated_at);
             return (
-              <Link key={r.id} href={`/tender/${r.id}`} className="pipe-kartu">
+              <Link key={r.id} href={hrefTender(r)} className="pipe-kartu">
                 <span className="satu-baris"><b>{r.customer}</b></span>
                 <span className="small muted satu-baris">{JENIS_SINGKAT[r.jenis_tender ?? 'warehouse']} · {r.kode ?? '—'} · {r.kab_kota}</span>
                 <span className="row small" style={{ gap: 6 }}>

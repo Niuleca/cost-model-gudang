@@ -125,6 +125,9 @@ export default function TenderPage() {
     ]);
     if (tr.error) { setPesan(tr.error.message); return; }
     const row = tr.data as TenderRow;
+    // tender Transportation / Intermodal punya halaman sendiri
+    const jenis = (row as TenderRow & { jenis_tender?: string }).jenis_tender;
+    if (jenis === 'transportation' || jenis === 'intermodal') { window.location.replace(`/${jenis === 'transportation' ? 'transport' : 'intermodal'}/${row.id}`); return; }
     // status tender dicocokkan dengan quotation (mis. quotation terkirim dibatalkan → kembali Dihitung)
     const stSinkron = await sinkronStatusTender(sb, row.id).catch(() => null);
     if (stSinkron) row.status = stSinkron;
