@@ -18,6 +18,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/trend-bisnis', label: 'Business Trend Intelligence', roles: TIM_TENDER },
     { href: '/', label: 'Summary', roles: TIM_TENDER, pisah: true },
     { href: '/status', label: 'Project Status', roles: TIM_TENDER },
+    { href: '/analisis', label: 'Project Analysis', roles: TIM_TENDER },
     { href: '/heatmap', label: 'Opportunity Control Tower', roles: TIM_TENDER },
   ] },
   { id: 'tender', label: 'Logistics Tender', item: [

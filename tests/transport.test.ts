@@ -45,3 +45,21 @@ test('intermodal: 3 stage digabung + biaya lain, margin, harga per satuan jual',
   assert.equal(h.jualPerSatuan, 644_000);
   assert.equal(h.pendapatanBulan, 64_400_000);
 });
+
+import { hitungMetrik, analisisAkar, rataAktual, type Rencana, type AktualBulan } from '../src/lib/analisisProyek.ts';
+test('project analysis: variance, status & akar masalah', () => {
+  const r: Rencana = { sumber: 'uji', satuanVolume: 'palet', volumeIn: 3000, volumeOut: 3000, stokRata: 2000, satuanStok: 'palet', headcount: 40, headcountDirect: 30, hariKerja: 25,
+    luasM2: 5000, posisiPalet: 2500, biayaBulan: 500_000_000, pendapatanBulan: 600_000_000, biayaKelompok: {} };
+  const a: AktualBulan = { periode: '2026-09', volumeIn: 2400, volumeOut: 2500, stokRata: 2400, headcount: 46, headcountDirect: 36, hariKerja: 25, luasDipakaiM2: 5000, posisiPalet: 2500,
+    biayaBulan: 560_000_000, pendapatanBulan: 590_000_000 };
+  const m = hitungMetrik(r, a);
+  const g = (k: string) => m.find(x => x.kode === k)!;
+  assert.equal(g('hc').status, 'kuning');                 // +15%
+  assert.equal(g('prod').status, 'merah');                // 4.900 ÷ (36×25) vs 6.000 ÷ (30×25)
+  assert.equal(g('util').status, 'merah');                // 96%
+  assert.equal(g('gp').status, 'merah');                  // 5,1% vs 16,7%
+  const kode = analisisAkar(m).map(x => x.kode);
+  for (const k of ['vol-rendah', 'prod', 'hc', 'util-tinggi', 'biaya', 'gp']) assert.ok(kode.includes(k), k);
+  const rata = rataAktual([a, { ...a, periode: '2026-10', biayaBulan: 540_000_000 }])!;
+  assert.equal(rata.biayaBulan, 550_000_000);
+});
