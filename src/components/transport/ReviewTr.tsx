@@ -1,7 +1,7 @@
 'use client';
 // Tab Result tender Transportation / Intermodal: catatan review (siap quotation atau belum) + tabel perbandingan margin
 // (margin saat ini vs tier, mis. 15% / 10% / 5%) dengan harga jual per rute, pendapatan, GP & nilai kontrak.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { rp } from '@/lib/format';
 import { persen1, TIER_DEFAULT, type CatatanReview, type HasilTier } from '@/lib/transport';
 
@@ -24,24 +24,40 @@ export function KartuReview({ review }: { review: CatatanReview[] }) {
     </div>);
 }
 
+/** Isian persen bebas (mis. 7,5); disimpan saat Enter / keluar kolom. */
+function InputPersen({ nilai, set, label, lebar = 70 }: { nilai: number; set: (v: number) => void; label: string; lebar?: number }) {
+  const ke = (v: number) => String(Math.round(v * 10000) / 100).replace('.', ',');
+  const [t, setT] = useState(ke(nilai));
+  useEffect(() => { setT(ke(nilai)); }, [nilai]);
+  const simpan = () => { const v = Number(t.replace(',', '.')); if (t.trim() !== '' && isFinite(v) && v > -100 && v < 95) set(v / 100); else setT(ke(nilai)); };
+  return <span className="row" style={{ gap: 2, flexWrap: 'nowrap', display: 'inline-flex' }}>
+    <input aria-label={label} className="input-kecil" inputMode="decimal" style={{ width: lebar, textAlign: 'right' }} value={t} onChange={e => setT(e.target.value)}
+      onBlur={simpan} onKeyDown={e => { if (e.key === 'Enter') { simpan(); (e.target as HTMLInputElement).blur(); } }} />%</span>;
+}
+
 /** Tabel perbandingan margin. `tiers` disimpan di tender; "Pakai" menerapkan tier ke semua rute (margin global, pengecualian rute dihapus). */
-export function PerbandinganMargin({ hasil, tiers, onTiers, onPakai, kontrakBulan, marginGlobal, adaOverride }: {
+export function PerbandinganMargin({ hasil, tiers, onTiers, onPakai, kontrakBulan, marginGlobal, adaOverride, onMarginGlobal }: {
   hasil: HasilTier; tiers: number[]; onTiers: (t: number[]) => void; onPakai: (m: number) => void; kontrakBulan: number; marginGlobal: number; adaOverride: number;
+  onMarginGlobal?: (m: number) => void;
 }) {
+  const ubahTier = (i: number, v: number) => onTiers(tiers.map((x, j) => (j === i ? v : x)));
   const [baru, setBaru] = useState('');
   const k = hasil.kolom.length;
   const terbaik = hasil.total.reduce((b, x, i) => (x.gp > hasil.total[b].gp ? i : b), 0);
-  const tambah = () => { const v = Number(baru.replace(',', '.')) / 100; if (isFinite(v) && v > -1 && v < 0.95 && !tiers.includes(v)) onTiers([...tiers, v].sort((a, b) => b - a).slice(0, 6)); setBaru(''); };
+  const tambah = () => { const v = Number(baru.replace(',', '.')) / 100; if (isFinite(v) && v > -1 && v < 0.95 && !tiers.includes(v)) onTiers([...tiers, v].slice(0, 8)); setBaru(''); };
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2 style={{ margin: 0 }}>Perbandingan margin</h2>
-        <span className="small muted">Saat ini: margin global {persen1(marginGlobal)}{adaOverride ? ` + ${adaOverride} rute khusus` : ''} · margin = GP% atas harga jual</span>
+        <span className="small muted row" style={{ gap: 6 }}>Saat ini: margin global {onMarginGlobal ? <InputPersen label="Margin global" nilai={marginGlobal} set={onMarginGlobal} /> : persen1(marginGlobal)}
+          {adaOverride ? ` + ${adaOverride} rute khusus` : ''} · margin = GP% atas harga jual</span>
       </div>
       <div className="row small" style={{ gap: 6 }}>
-        <span className="muted">Tier:</span>
-        {tiers.map(m => <span key={m} className="pill info">{persen1(m)} <button className="link-kecil" aria-label={`Hapus tier ${persen1(m)}`} onClick={() => onTiers(tiers.filter(x => x !== m))}>×</button></span>)}
-        <input aria-label="Tier margin baru (%)" className="input-kecil" style={{ width: 80 }} type="number" step="0.5" placeholder="mis. 8" value={baru}
+        <span className="muted">Tier (isi bebas, mis. 7,5):</span>
+        {tiers.map((m, i) => <span key={i} className="pill info" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <InputPersen label={`Tier ${i + 1}`} nilai={m} set={v => ubahTier(i, v)} lebar={56} />
+          <button className="link-kecil" aria-label={`Hapus tier ${persen1(m)}`} onClick={() => onTiers(tiers.filter((_, j) => j !== i))}>×</button></span>)}
+        <input aria-label="Tier margin baru (%)" className="input-kecil" style={{ width: 80 }} inputMode="decimal" placeholder="mis. 8" value={baru}
           onChange={e => setBaru(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') tambah(); }} />
         <button className="ghost" onClick={tambah} disabled={!baru}>+ Tier</button>
         {JSON.stringify(tiers) !== JSON.stringify(TIER_DEFAULT) && <button className="link-kecil" onClick={() => onTiers(TIER_DEFAULT)}>reset 15/10/5%</button>}
@@ -49,7 +65,8 @@ export function PerbandinganMargin({ hasil, tiers, onTiers, onPakai, kontrakBula
       <div className="tablewrap fit"><table className="tabel-fit tabel-tier">
         <thead>
           <tr><th>Rute</th><th>Satuan</th><th className="num">Harga beli</th>
-            {hasil.kolom.map((c, i) => <th key={i} className={`num${i === 0 ? ' tier-kini' : ''}`}>{c.label}
+            {hasil.kolom.map((c, i) => <th key={i} className={`num${i === 0 ? ' tier-kini' : ''}`}>
+              {c.margin != null ? <>Margin <InputPersen label={`Margin kolom ${i}`} nilai={c.margin} set={v => ubahTier(i - 1, v)} lebar={56} /></> : c.label}
               {c.margin != null && <div><button className="link-kecil" onClick={() => onPakai(c.margin!)}>pakai untuk semua rute</button></div>}</th>)}</tr>
         </thead>
         <tbody>

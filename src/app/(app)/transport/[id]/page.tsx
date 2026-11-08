@@ -137,7 +137,7 @@ export default function TransportTender() {
       {tab === 'Result & margin' && <>
         <KartuReview review={review} />
         <PerbandinganMargin hasil={tierTransport(tr, tiers)} tiers={tiers} onTiers={x => setTr({ tierMargin: x })} kontrakBulan={t.durasi_kontrak_bulan}
-          marginGlobal={tr.marginGlobal} adaOverride={override} onPakai={m => setTr({ marginGlobal: m, rute: tr.rute.map(r => ({ ...r, marginPersen: null })) })} />
+          marginGlobal={tr.marginGlobal} adaOverride={override} onMarginGlobal={m => setTr({ marginGlobal: m })} onPakai={m => setTr({ marginGlobal: m, rute: tr.rute.map(r => ({ ...r, marginPersen: null })) })} />
       </>}
 
       {tab === 'Quotation' && <QuotationPanel tender={{ ...t, asumsi: t.asumsi as never }} profile={profile} sumber={{

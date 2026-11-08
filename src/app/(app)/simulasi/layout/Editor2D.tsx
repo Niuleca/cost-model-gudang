@@ -2,13 +2,13 @@
 // Editor denah 2D (SVG): tampak atas, X = panjang gudang (dock di kiri), Z = lebar gudang (ke bawah).
 // Pilih, geser (drag), ubah ukuran (handle), ukur jarak, garis ukur otomatis ke rintangan / dinding, latar denah gambar / DXF.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { BLOK_DEFAULT, aturSisiGate, dindingMiring, poligonLuar, rentangZ, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { BLOK_DEFAULT, aturSisiGate, dindingMiring, poligonLuar, rentangZ, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, uraiGridKolom, denganKolom, asGridKolom, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 
 export type Mode = 'pilih' | 'blok' | 'ukur' | 'geser' | 'kolom';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
 
 export const WARNA_KOMP: Record<string, { isi: string; garis: string }> = {
-  spr: { isi: '#dbe7f7', garis: '#1e56a0' }, areaRak: { isi: '#f1f6fd', garis: '#1e56a0' }, ddr: { isi: '#cbd8ee', garis: '#173f78' }, block: { isi: '#f3e3c8', garis: '#a16207' },
+  spr: { isi: '#dbe7f7', garis: '#1e56a0' }, areaKolom: { isi: '#475569', garis: '#0f766e' }, areaRak: { isi: '#f1f6fd', garis: '#1e56a0' }, ddr: { isi: '#cbd8ee', garis: '#173f78' }, block: { isi: '#f3e3c8', garis: '#a16207' },
   stagingIn: { isi: '#dbeafe', garis: '#2563eb' }, stagingOut: { isi: '#d1fae5', garis: '#059669' }, fasilitas: { isi: '#ede9fe', garis: '#6d28d9' },
   dock: { isi: '#1f2937', garis: '#111827' }, kolom: { isi: '#475569', garis: '#1e293b' }, jalur: { isi: '#fef3c7', garis: '#d97706' }, zona: { isi: '#e0f2fe', garis: '#0284c7' },
   gate: { isi: '#facc15', garis: '#a16207' }, platform: { isi: '#d6d3d1', garis: '#57534e' },
@@ -110,7 +110,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
 
   /** Titik kolom baru: sejajar (as) dengan kolom terdekat bila dalam 0,6 m, selain itu ikut snap grid; tetap di dalam gedung. */
   const titikKolom = (p: { x: number; z: number }) => {
-    const as = edit.komponen.filter(k => k.jenis === 'kolom').map(k => ({ x: k.x + k.w / 2, z: k.z + k.d / 2 }));
+    const as = denganKolom(edit.komponen, g).filter(k => k.jenis === 'kolom').map(k => ({ x: k.x + k.w / 2, z: k.z + k.d / 2 }));
     let x = snap(p.x), z = snap(p.z), sejajarX: number | null = null, sejajarZ: number | null = null, dx = 0.6, dz = 0.6;
     for (const a of as) { if (Math.abs(p.x - a.x) < dx) { dx = Math.abs(p.x - a.x); x = a.x; sejajarX = a.x; } if (Math.abs(p.z - a.z) < dz) { dz = Math.abs(p.z - a.z); z = a.z; sejajarZ = a.z; } }
     const hx = ukKolom.w / 2, hz = ukKolom.d / 2;
@@ -174,7 +174,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         if (k.jenis === 'gate') return seretGate(k, p.x, p.z, ed.gedung, snap);
         if (k.jenis === 'kolom') {   // kolom: as sejajar dengan kolom lain (≤ 0,6 m), ukuran tidak berubah
           let cx = s.x0 + p.x - s.ax + k.w / 2, cz = s.z0 + p.z - s.az + k.d / 2, bx = 0.6, bz = 0.6, kenaX = false, kenaZ = false;
-          for (const o of ed.komponen) if (o.jenis === 'kolom' && o.id !== k.id) {
+          for (const o of denganKolom(ed.komponen, ed.gedung)) if (o.jenis === 'kolom' && o.id !== k.id) {
             const ox = o.x + o.w / 2, oz = o.z + o.d / 2;
             if (Math.abs(cx - ox) < bx) { bx = Math.abs(cx - ox); cx = ox; kenaX = true; }
             if (Math.abs(cz - oz) < bz) { bz = Math.abs(cz - oz); cz = oz; kenaZ = true; }
@@ -261,6 +261,22 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     const w = (k.jenis === 'gate' && k.arus ? WARNA_GATE[k.arus] : WARNA_KOMP[k.jenis]) ?? WARNA_KOMP.zona; const dipilih = k.id === pilih || setMultiSet.has(k.id);
     const isi = k.warna ?? w.isi;
     const el: React.ReactNode[] = [];
+    if (k.gridKolom) {
+      // area kolom: garis putus-putus (bisa dipegang di tepinya) + kolom hasil grid; klik kolom mana pun = pilih area
+      const { xs, zs } = asGridKolom(k); const kol = uraiGridKolom(k, g);
+      el.push(<rect key="hit" data-ekspor="tidak" x={k.x} y={k.z} width={k.w} height={k.d} fill="none" stroke="transparent" strokeWidth={fs * 0.6} style={{ pointerEvents: 'stroke' }} />);
+      el.push(<rect key="r" x={k.x} y={k.z} width={k.w} height={k.d} fill={dipilih ? 'rgba(15,118,110,0.06)' : 'none'} stroke={dipilih ? '#f97316' : w.garis} strokeWidth={dipilih ? fs * 0.14 : fs * 0.06}
+        strokeDasharray={`${fs * 0.5} ${fs * 0.3}`} style={{ pointerEvents: 'none' }} />);
+      if (dipilih) {
+        xs.forEach((x, i) => el.push(<line key={`gx${i}`} x1={x} y1={k.z} x2={x} y2={k.z + k.d} stroke="#0f766e" strokeWidth={fs * 0.03} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} style={{ pointerEvents: 'none' }} />));
+        zs.forEach((z, i) => el.push(<line key={`gz${i}`} x1={k.x} y1={z} x2={k.x + k.w} y2={z} stroke="#0f766e" strokeWidth={fs * 0.03} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} style={{ pointerEvents: 'none' }} />));
+      }
+      for (const c of kol) el.push(<g key={c.id}><rect x={c.x - fs * 0.22} y={c.z - fs * 0.22} width={c.w + fs * 0.44} height={c.d + fs * 0.44} fill="transparent" data-ekspor="tidak" />
+        <rect x={c.x} y={c.z} width={c.w} height={c.d} fill={w.isi} stroke={dipilih ? '#f97316' : '#1e293b'} strokeWidth={fs * 0.05} /></g>);
+      el.push(<text key="t" x={k.x + fs * 0.3} y={k.z - fs * 0.45} fontSize={fs * 0.75} fill="#0f766e" style={{ paintOrder: 'stroke', stroke: '#ffffffcc', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>
+        {k.label} · {xs.length} × {zs.length} as · {kol.length} kolom</text>);
+      return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined }}>{el}</g>;
+    }
     el.push(<rect key="r" x={k.x} y={k.z} width={k.w} height={k.d} fill={k.jenis === 'jalur' ? 'url(#arsir)' : isi} fillOpacity={k.jenis === 'zona' ? 0.5 : k.jenis === 'areaRak' ? 0.45 : 1}
       stroke={dipilih ? '#f97316' : w.garis} strokeWidth={dipilih ? fs * 0.18 : fs * 0.07} strokeDasharray={k.jenis === 'jalur' || k.jenis === 'zona' || k.jenis === 'areaRak' ? `${fs * 0.4} ${fs * 0.25}` : undefined} />);
     el.push(...gambarRak(k, w.garis, ''));
@@ -386,7 +402,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         : garisUkur(g.L + fs * 1.4, 0, g.L + fs * 1.4, g.W, `${f1(g.W)} m`, '#334155', 'dimW')}
       {/* grid pilar: as & rantai dimensi as-ke-as per bentang */}
       {(() => {
-        const kol = edit.komponen.filter(k => k.jenis === 'kolom'); if (kol.length < 2) return null;
+        const kol = denganKolom(edit.komponen, g).filter(k => k.jenis === 'kolom'); if (kol.length < 2) return null;
         const unik = (a: number[]) => a.map(v => Math.round(v * 100) / 100).sort((p, q) => p - q).filter((v, i, arr) => i === 0 || v - arr[i - 1] > 0.05);
         // as pilar tepi yang menempel dinding dianggap di garis dinding (as grid = as dinding)
         const asX = (k: Komponen) => (k.x <= 0.05 ? 0 : k.x + k.w >= g.L - 0.05 ? g.L : k.x + k.w / 2), asZ = (k: Komponen) => (k.z <= 0.05 ? 0 : k.z + k.d >= g.W - 0.05 ? g.W : k.z + k.d / 2);

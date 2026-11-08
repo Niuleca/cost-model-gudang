@@ -161,7 +161,7 @@ export default function IntermodalTender() {
       {tab === 'Result & margin' && <>
         <KartuReview review={review} />
         <PerbandinganMargin hasil={tierIntermodal(im, tiers)} tiers={tiers} onTiers={x => setIm({ tierMargin: x })} kontrakBulan={t.durasi_kontrak_bulan}
-          marginGlobal={im.marginGlobal} adaOverride={override} onPakai={m => setIm({ marginGlobal: m, rute: im.rute.map(r => ({ ...r, marginPersen: null })) })} />
+          marginGlobal={im.marginGlobal} adaOverride={override} onMarginGlobal={m => setIm({ marginGlobal: m })} onPakai={m => setIm({ marginGlobal: m, rute: im.rute.map(r => ({ ...r, marginPersen: null })) })} />
       </>}
 
       {tab === 'Quotation' && <QuotationPanel tender={{ ...t, asumsi: t.asumsi as never }} profile={profile} sumber={{

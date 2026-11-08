@@ -3,7 +3,7 @@
 // Satuan meter. X = panjang gudang (0 = dinding dock), Z = lebar gudang (kiri → kanan).
 import type { BarisRak, Dock, Fasilitas, LayoutGudang, Lorong, Palet, ParamSim, Zona, JenisZona } from './layout';
 
-export type JenisKomp = 'spr' | 'ddr' | 'areaRak' | 'block' | 'stagingIn' | 'stagingOut' | 'fasilitas' | 'dock' | 'kolom' | 'jalur' | 'zona' | 'gate' | 'platform';
+export type JenisKomp = 'spr' | 'ddr' | 'areaRak' | 'areaKolom' | 'block' | 'stagingIn' | 'stagingOut' | 'fasilitas' | 'dock' | 'kolom' | 'jalur' | 'zona' | 'gate' | 'platform';
 export type SisiDinding = 'depan' | 'belakang' | 'kiri' | 'kanan';
 export interface SpekRak {
   arah: 'x' | 'z';          // arah baris memanjang (bay berjejer di sumbu ini)
@@ -61,6 +61,19 @@ export interface SpekBlok {
   /** gangway (lorong lintang memotong baris, sepanjang arah melintang): di awal, di tengah × n, di akhir baris (m) */
   gangwayAwal?: number; gangwayTengah?: number; nGangway?: number; gangwayAkhir?: number;
 }
+/**
+ * Area kolom (grid pilar sebagai satu kelompok, mirip area rak): kotak yang bisa ditarik; kolom di dalamnya dibentuk
+ * otomatis dari bentang as-ke-as. bentangX / bentangZ: 1 nilai = berulang; banyak nilai = per bentang berurutan
+ * (sesudah daftar habis, bentang terakhir diulang). As pertama di tepi area (kolom menempel tepi area).
+ */
+export interface SpekGridKolom {
+  bentangX: number[]; bentangZ: number[];
+  kolomW: number; kolomD: number;
+  /** tambah kolom di ujung area bila sisa bentang terakhir > 0,5 m (kolom dinding). */
+  tutupUjung: boolean;
+  /** kolom yang dilewati, kunci `i-j` (indeks as X - indeks as Z). */
+  lewati?: string[];
+}
 export const BLOK_DEFAULT: SpekBlok = { arah: 'x', paletP: 1.2, paletL: 1.1, paletT: 1.5, deep: 5, barisPerBlok: 2, barisTepi: 1, celahBaris: 0.5, lorongAwal: 4, lorong: 3.5, jarakDinding: 0.3, celahPalet: 0.1,
   gangwayAwal: 0, gangwayTengah: 3.5, nGangway: 0, gangwayAkhir: 0 };
 export interface Komponen {
@@ -73,6 +86,7 @@ export interface Komponen {
   induk?: string;                               // baris rak hasil urai area → id area
   tumpuk?: number;                              // block / staging
   blok?: SpekBlok;                              // block stack berpola (baris, row deep, lorong)
+  gridKolom?: SpekGridKolom;                    // area kolom (grid pilar)
   palet?: number;                               // staging: palet per sequence
   arus?: 'inbound' | 'outbound';                // dock
   sisi?: SisiDinding;                           // gate: dinding tempat pintu (depan = dinding dock x = 0)
@@ -168,6 +182,55 @@ export function posisiBentang(teks: string, panjang: number, awal = 0) {
   return pos.map(r2);
 }
 export const uid = () => Math.random().toString(36).slice(2, 10);
+
+/** Posisi as (pusat kolom) sepanjang satu sumbu area kolom. */
+function asSumbu(a0: number, pj: number, bentang: number[], ukuran: number, tutupUjung: boolean) {
+  const awal = a0 + ukuran / 2, akhir = a0 + pj - ukuran / 2;
+  if (akhir < awal - 1e-6) return [] as number[];
+  const xs = [awal]; const bt = bentang.filter(b => b > 0.3);
+  if (!bt.length) return xs.map(r2);
+  for (let i = 0; xs.length < 400; i++) { const nx = xs[xs.length - 1] + bt[Math.min(i, bt.length - 1)]; if (nx > akhir + 1e-6) break; xs.push(nx); }
+  if (tutupUjung && akhir - xs[xs.length - 1] > 0.5) xs.push(akhir);
+  return xs.map(r2);
+}
+/** As X & Z area kolom. */
+export function asGridKolom(k: Komponen) {
+  const s = k.gridKolom; if (!s) return { xs: [] as number[], zs: [] as number[] };
+  return { xs: asSumbu(k.x, k.w, s.bentangX, s.kolomW, s.tutupUjung), zs: asSumbu(k.z, k.d, s.bentangZ, s.kolomD, s.tutupUjung) };
+}
+/** Bentang aktual (as ke as) yang terbentuk di area kolom. */
+export const bentangAktual = (as: number[]) => as.slice(1).map((v, i) => r2(v - as[i]));
+/** Area kolom → kolom satuan (dipakai kapasitas, cek, rintangan rak adaptif & 3D). Kolom di luar gedung (trapesium) dilewati. */
+export function uraiGridKolom(k: Komponen, g?: Gedung): Komponen[] {
+  const s = k.gridKolom; if (!s) return [];
+  const { xs, zs } = asGridKolom(k); const lewati = new Set(s.lewati ?? []); const out: Komponen[] = [];
+  xs.forEach((x, i) => zs.forEach((z, j) => {
+    if (lewati.has(`${i}-${j}`)) return;
+    const hx = s.kolomW / 2, hz = s.kolomD / 2;
+    if (g?.trapesium && [[x - hx, z - hz], [x + hx, z - hz], [x - hx, z + hz], [x + hx, z + hz]].some(([px, pz]) => !diDalamGedung(g, px, pz, 0.02))) return;
+    out.push({ id: `${k.id}~${i}~${j}`, jenis: 'kolom', label: `${k.label} ${String.fromCharCode(65 + (j % 26))}${i + 1}`, x: r2(x - s.kolomW / 2), z: r2(z - s.kolomD / 2), w: s.kolomW, d: s.kolomD, tinggi: k.tinggi, induk: k.id });
+  }));
+  return out;
+}
+/** Area kolom → kolom satuan yang bisa diedit / digeser satu per satu. */
+export const pecahGridKolom = (k: Komponen, g?: Gedung): Komponen[] => uraiGridKolom(k, g).map(c => ({ ...c, id: uid(), induk: undefined }));
+/** Kolom satuan (semua, atau yang dipilih) → 1 area kolom: as dikelompokkan (toleransi 5 cm), bentang diambil dari jarak as. */
+export function gabungJadiAreaKolom(e: LayoutEdit, ids?: string[]): { edit: LayoutEdit; id: string; n: number } | null {
+  const kol = e.komponen.filter(c => c.jenis === 'kolom' && (!ids?.length || ids.includes(c.id)));
+  if (kol.length < 2) return null;
+  const grup = (v: number[]) => { const out: number[] = []; for (const x of [...v].sort((a, b) => a - b)) if (!out.length || x - out[out.length - 1] > 0.05) out.push(x); return out; };
+  const xs = grup(kol.map(c => c.x + c.w / 2)), zs = grup(kol.map(c => c.z + c.d / 2));
+  const w = Math.max(...kol.map(c => c.w)), d = Math.max(...kol.map(c => c.d));
+  const cari = (as: number[], v: number) => as.findIndex(a => Math.abs(a - v) <= 0.05);
+  const ada = new Set(kol.map(c => `${cari(xs, c.x + c.w / 2)}-${cari(zs, c.z + c.d / 2)}`));
+  const lewati: string[] = []; xs.forEach((_, i) => zs.forEach((__, j) => { if (!ada.has(`${i}-${j}`)) lewati.push(`${i}-${j}`); }));
+  const nb: Komponen = { id: uid(), jenis: 'areaKolom', label: 'Area kolom', x: r2(xs[0] - w / 2), z: r2(zs[0] - d / 2), w: r2(xs[xs.length - 1] - xs[0] + w), d: r2(zs[zs.length - 1] - zs[0] + d),
+    tinggi: Math.max(...kol.map(c => c.tinggi)), gridKolom: { bentangX: bentangAktual(xs).length ? bentangAktual(xs) : [6], bentangZ: bentangAktual(zs).length ? bentangAktual(zs) : [6], kolomW: w, kolomD: d, tutupUjung: false, lewati } };
+  const buang = new Set(kol.map(c => c.id));
+  return { edit: { ...e, komponen: [...e.komponen.filter(c => !buang.has(c.id)), nb] }, id: nb.id, n: kol.length };
+}
+/** Komponen mentah dengan area kolom diganti kolom satuannya (rintangan & cek). */
+export const denganKolom = (ks: Komponen[], g?: Gedung) => ks.flatMap(k => (k.gridKolom ? uraiGridKolom(k, g) : [k]));
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 export const tinggiRak = (r: SpekRak) => (r.level1Mm + Math.max(0, r.level - 1) * r.levelNMm) / 1000;
@@ -338,7 +401,7 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
   const seg: { p: number; pj: number }[] = []; for (let i = 0, p = c.a0 + c.awal; i < c.bay.length; p += c.bay[i] * s.bayW + c.tengah, i++) seg.push({ p, pj: c.bay[i] * s.bayW });
   // rintangan (mode adaptif): kotak di koordinat A (sepanjang baris) & B (melintang), sudah ditambah kelonggaran
   const { A0 } = rentangA(k, e); const A1 = A0 + rentangA(k, e).A;
-  const rint = adaptif && e ? e.komponen.filter(o => o.id !== k.id && JENIS_RINTANGAN.includes(o.jenis)).map(o => {
+  const rint = adaptif && e ? denganKolom(e.komponen, e.gedung).filter(o => o.id !== k.id && JENIS_RINTANGAN.includes(o.jenis)).map(o => {
     const m = o.jenis === 'kolom' ? kel : o.jenis === 'jalur' ? 0 : bebas;
     const oa0 = ax ? o.x : o.z, oa1 = oa0 + (ax ? o.w : o.d), ob0 = ax ? o.z : o.x, ob1 = ob0 + (ax ? o.d : o.w);
     return { a0: oa0 - m, a1: oa1 + m, b0: ob0 - m, b1: ob1 + m, kolom: o.jenis === 'kolom', inti: { b0: ob0, b1: ob1 } };
@@ -424,7 +487,8 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
   return out;
 }
 /** Semua komponen dengan area rak diganti baris-baris raknya (dipakai kapasitas, cek, dan 3D). */
-export const uraiKomponen = (ks: Komponen[], e?: KonteksArea) => ks.flatMap(k => (k.area ? uraiArea(k, e ?? { komponen: ks, gedung: { L: 1e6, W: 1e6, sideMm: 0, centerMm: 0 } }) : [k]));
+export const uraiKomponen = (ks: Komponen[], e?: KonteksArea) => ks.flatMap(k => (k.area ? uraiArea(k, e ?? { komponen: ks, gedung: { L: 1e6, W: 1e6, sideMm: 0, centerMm: 0 } })
+  : k.gridKolom ? uraiGridKolom(k, e?.gedung) : [k]));
 export const ringkasArea = (k: Komponen, e?: KonteksArea) => {
   const rows = uraiArea(k, e); const per = new Set(rows.map(r => (k.area!.rak.arah === 'x' ? r.z : r.x)));
   return { baris: per.size, bay: rows.reduce((a, r) => a + nBay(r), 0), posisi: rows.reduce((a, r) => a + kapasitasRak(r), 0) };
@@ -506,6 +570,7 @@ export function komponenBaru(jenis: JenisKomp, p: ParamSim, pusat: { x: number; 
     case 'fasilitas': return [{ ...dasar, jenis, label: 'Office', w: 6, d: 5, tinggi: 3 }];
     case 'dock': return [{ ...dasar, x: 0, jenis, label: 'Dock', w: 0.3, d: 3.2, tinggi: 4.2, arus: 'inbound' }];
     case 'kolom': return [{ ...dasar, jenis, label: 'Kolom', w: 0.4, d: 0.4, tinggi: p.sideMm / 1000 }];
+    case 'areaKolom': return [{ ...dasar, jenis, label: 'Area kolom', w: 36.5, d: 24.5, tinggi: p.sideMm / 1000, gridKolom: { bentangX: [12], bentangZ: [12], kolomW: 0.5, kolomD: 0.5, tutupUjung: true } }];
     case 'gate': return [{ ...dasar, x: -0.3, jenis, label: 'Gate', w: 0.6, d: 4, tinggi: 5, sisi: 'depan' }];
     case 'platform': return [{ ...dasar, x: -4, jenis, label: 'Loading dock', w: 4, d: 20, tinggi: 1.2, palet: 8 }];
     case 'jalur': return [{ ...dasar, jenis, label: 'Jalur', w: 10, d: 3.5, tinggi: 0 }];
@@ -526,6 +591,7 @@ export function putar(k: Komponen): Komponen {
   const n: Komponen = { ...k, w: k.d, d: k.w };
   if (k.rak) n.rak = { ...k.rak, arah: k.rak.arah === 'x' ? 'z' : 'x' };
   if (k.area) n.area = { ...k.area, rak: { ...k.area.rak, arah: k.area.rak.arah === 'x' ? 'z' : 'x' } };
+  if (k.gridKolom) n.gridKolom = { ...k.gridKolom, bentangX: k.gridKolom.bentangZ, bentangZ: k.gridKolom.bentangX, kolomW: k.gridKolom.kolomD, kolomD: k.gridKolom.kolomW, lewati: k.gridKolom.lewati?.map(x => x.split('-').reverse().join('-')) };
   return n;
 }
 
@@ -545,7 +611,7 @@ export function tarikRak(e: LayoutEdit, opsi: { ids?: string[]; jarakDinding: nu
     // sumbu sepanjang baris (a) & melintang (b)
     const a0 = ax ? k.x : k.z, b0 = ax ? k.z : k.x, lb = ax ? k.d : k.w, batas = ax ? g.L : g.W;
     let mulai = m, akhir = batas - m;
-    for (const o of komp) {
+    for (const o of denganKolom(komp, g)) {
       if (o.id === k.id || o.jenis === 'dock') continue;
       const oa = ax ? o.x : o.z, op = ax ? o.w : o.d, ob = ax ? o.z : o.x, ol = ax ? o.d : o.w;
       if (!(ob < b0 + lb - EPS && b0 < ob + ol - EPS)) continue;      // tidak sejajar dengan baris ini
@@ -570,7 +636,7 @@ const tumpang = (a: Komponen, b: Komponen) => a.x < b.x + b.w - EPS && b.x < a.x
 
 /** Jarak bebas dari tepi komponen ke rintangan terdekat (atau dinding) di 4 arah — dipakai garis ukur otomatis & cek lorong. */
 export function jarakBebas(e: LayoutEdit, k: Komponen) {
-  const lain = e.komponen.filter(o => o.id !== k.id && solid(o));
+  const lain = denganKolom(e.komponen, e.gedung).filter(o => o.id !== k.id && solid(o));
   const g = e.gedung;
   const ke = (arah: 'x-' | 'x+' | 'z-' | 'z+') => {
     let jarak = arah === 'x-' ? k.x : arah === 'x+' ? g.L - (k.x + k.w) : arah === 'z-' ? k.z : g.W - (k.z + k.d);

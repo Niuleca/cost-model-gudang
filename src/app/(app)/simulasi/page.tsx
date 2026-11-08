@@ -12,7 +12,7 @@ import { IT_SHEET_DEFAULT } from '@/lib/it';
 import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import { paramAwal, susunLayout, type LayoutGudang, type ParamSim } from '@/lib/simulasi3d/layout';
 import { dariOtomatis, tarikRak, keLayoutGudang, komponenBaru, levelDariTinggi, nBay, pasanganRak, putar, ringkas, tinggiRak, uid, kapasitasRak, tapakBlok, dimRak,
-  DEFAULT_RAK, BLOK_DEFAULT, uraiBlok, aturSisiGate, posisiBentang, posisiGate, type SpekBlok, celahArea, gabungJadiArea, pecahArea, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
+  DEFAULT_RAK, BLOK_DEFAULT, uraiBlok, aturSisiGate, posisiBentang, posisiGate, type SpekBlok, celahArea, gabungJadiArea, pecahArea, asGridKolom, bentangAktual, pecahGridKolom, gabungJadiAreaKolom, denganKolom, type SpekGridKolom, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
 import { bacaDxf } from '@/lib/simulasi3d/dxf';
 import { labelStatus } from '@/lib/status';
 import { dataTanpaProject, GEDUNG_BARU, ID_PRIBADI, layoutKosong, type SpekGedungBaru } from '@/lib/simulasi3d/tanpaProject';
@@ -34,8 +34,17 @@ const PALET: { jenis: JenisKomp | 'pasSpr' | 'pasDdr' | 'areaAdaptif' | 'ramp' |
   { jenis: 'areaAdaptif', label: 'Area rak otomatis 2 · adaptif (hindari kolom, dinding, office, ramp)' },
   { jenis: 'spr', label: 'Rak SPR (1 baris)' }, { jenis: 'pasSpr', label: 'Rak SPR back-to-back' }, { jenis: 'ddr', label: 'Rak DDR (1 baris)' }, { jenis: 'pasDdr', label: 'Rak DDR back-to-back' },
   { jenis: 'block', label: 'Block stack' }, { jenis: 'stagingIn', label: 'Staging inbound' }, { jenis: 'stagingOut', label: 'Staging outbound' },
-  { jenis: 'dock', label: 'Dock' }, { jenis: 'gateIn', label: 'Gate IN (masuk)' }, { jenis: 'gateOut', label: 'Gate OUT (keluar)' }, { jenis: 'gate', label: 'Gate IN & OUT / pintu (depan, belakang, samping)' }, { jenis: 'platform', label: 'Loading dock (platform beton)' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'kolom', label: 'Kolom' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
+  { jenis: 'dock', label: 'Dock' }, { jenis: 'gateIn', label: 'Gate IN (masuk)' }, { jenis: 'gateOut', label: 'Gate OUT (keluar)' }, { jenis: 'gate', label: 'Gate IN & OUT / pintu (depan, belakang, samping)' }, { jenis: 'platform', label: 'Loading dock (platform beton)' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'areaKolom', label: 'Area kolom / grid pilar (tarik → kolom menyesuaikan)' }, { jenis: 'kolom', label: 'Kolom satuan' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
 ];
+
+const daftarBentang = (t: string) => t.split(/[;\s]+/).map(v => Number(v.replace(',', '.'))).filter(n => n > 0.3);
+/** Isian daftar bentang as-ke-as ("12" = berulang, "12; 12; 16" = per bentang). Disimpan saat Enter / keluar kolom. */
+function BentangInput({ l, v, set }: { l: string; v: number[]; set: (x: number[]) => void }) {
+  const [teks, setTeks] = useState(v.join('; '));
+  useEffect(() => { setTeks(v.join('; ')); }, [v.join(';')]); // eslint-disable-line react-hooks/exhaustive-deps
+  const simpan = () => { const x = daftarBentang(teks); if (x.length) set(x); else setTeks(v.join('; ')); };
+  return <label className="f">{l}<input value={teks} placeholder="12 atau 12; 12; 16" onChange={e => setTeks(e.target.value)} onBlur={simpan} onKeyDown={e => { if (e.key === 'Enter') simpan(); }} /></label>;
+}
 
 /** Isian angka di panel properti. */
 function Angka({ l, v, set, step = 0.1, min, u }: { l: string; v: number; set: (x: number) => void; step?: number; min?: number; u?: string }) {
@@ -206,6 +215,11 @@ export default function DesainGudang() {
       const n = edit.komponen.filter(k => k.jenis === 'gate' && k.arus === (masuk ? 'inbound' : 'outbound')).length;
       const [gt] = komponenBaru('gate', data.p, pos, edit.tinggiPalet);
       baru = [aturSisiGate({ ...gt, label: `Gate ${masuk ? 'IN' : 'OUT'}${n ? ` ${n + 1}` : ''}`, arus: masuk ? 'inbound' : 'outbound', z: r2(Math.min(edit.gedung.W - gt.d, Math.max(0, pos.z + n * 6))) }, 'depan', edit.gedung)];
+    } else if (j === 'areaKolom') {
+      // seperti area rak adaptif: mulai menutupi seluruh gudang, kolom mengikuti bentang & bentuk gedung
+      const [a] = komponenBaru('areaKolom', data.p, { x: 0, z: 0 }, edit.tinggiPalet); const sk = Math.max(0.2, gridPilar.ukuran);
+      baru = [{ ...a, x: 0, z: 0, w: edit.gedung.L, d: edit.gedung.W, tinggi: edit.gedung.sideMm / 1000,
+        gridKolom: { bentangX: daftarBentang(gridPilar.x).length ? daftarBentang(gridPilar.x) : [12], bentangZ: daftarBentang(gridPilar.z).length ? daftarBentang(gridPilar.z) : [12], kolomW: sk, kolomD: sk, tutupUjung: true } }];
     } else if (j === 'ramp') {
       const [z] = komponenBaru('zona', data.p, pos, edit.tinggiPalet); baru = [{ ...z, label: 'Ramp', w: 8, d: 4, warna: '#94a3b8' }];
     } else baru = j === 'pasSpr' ? pasanganRak(data.p, false, pos) : j === 'pasDdr' ? pasanganRak(data.p, true, pos) : komponenBaru(j, data.p, pos, edit.tinggiPalet);
@@ -273,20 +287,34 @@ export default function DesainGudang() {
     setAcuanKolom({ w: uk.w, d: uk.d, tinggi: uk.tinggi });
     setPesan(`Kolom ${n + 1} (${angka(uk.w, 2)} × ${angka(uk.d, 2)} m) ditaruh di X ${angka(x, 2)} m · Z ${angka(z, 2)} m (pusat). Klik lagi untuk kolom berikutnya (ukuran sama); pilih mode "Pilih / geser" untuk selesai.`);
   }
-  const hapusSemuaKolom = () => aksi(e => ({ ...e, komponen: e.komponen.filter(k => k.jenis !== 'kolom') }));
+  const hapusSemuaKolom = () => aksi(e => ({ ...e, komponen: e.komponen.filter(k => k.jenis !== 'kolom' && k.jenis !== 'areaKolom') }));
   function buatGridPilar() {
     if (!edit || !data) return;
-    const { L, W } = edit.gedung; const s = Math.max(0.2, gridPilar.ukuran);
-    const xs = posisiBentang(gridPilar.x, L), zs = posisiBentang(gridPilar.z, W);
-    if (!xs.length || !zs.length) { setPesan('Isi bentang pilar dulu, mis. 6 atau 6; 6; 8 (m, as ke as).'); return; }
-    const [tpl] = komponenBaru('kolom', data.p, { x: 0, z: 0 }, edit.tinggiPalet);
-    const baru: Komponen[] = [];
-    xs.forEach((x, i) => zs.forEach((z, j) => baru.push({ ...tpl, id: uid(), label: `Pilar ${String.fromCharCode(65 + (j % 26))}${i + 1}`, w: s, d: s,
-      x: r2(Math.max(0, Math.min(L - s, x - s / 2))), z: r2(Math.max(0, Math.min(W - s, z - s / 2))), tinggi: edit.gedung.sideMm / 1000 })));
-    aksi(e => ({ ...e, komponen: [...(gridPilar.ganti ? e.komponen.filter(k => k.jenis !== 'kolom') : e.komponen), ...baru] }));
-    const bt = (a: number[]) => a.slice(1).map((v, i) => r2(v - a[i])).join(' · ');
-    setPesan(`${baru.length} pilar dibuat (${xs.length} × ${zs.length}). Bentang X as-ke-as: ${bt(xs)} m · Z: ${bt(zs)} m.`);
+    const { L, W } = edit.gedung; const sk = Math.max(0.2, gridPilar.ukuran);
+    const bx = daftarBentang(gridPilar.x), bz = daftarBentang(gridPilar.z);
+    if (!bx.length || !bz.length) { setPesan('Isi bentang pilar dulu, mis. 6 atau 6; 6; 8 (m, as ke as).'); return; }
+    const [a] = komponenBaru('areaKolom', data.p, { x: 0, z: 0 }, edit.tinggiPalet);
+    const k: Komponen = { ...a, label: 'Grid pilar', x: 0, z: 0, w: L, d: W, tinggi: edit.gedung.sideMm / 1000, gridKolom: { bentangX: bx, bentangZ: bz, kolomW: sk, kolomD: sk, tutupUjung: true } };
+    aksi(e => ({ ...e, komponen: [...(gridPilar.ganti ? e.komponen.filter(c => c.jenis !== 'kolom' && c.jenis !== 'areaKolom') : e.komponen), k] })); setPilih(k.id);
+    const { xs, zs } = asGridKolom(k);
+    setPesan(`Area kolom dibuat: ${xs.length} × ${zs.length} as. Tarik tepi area / ubah bentang di panel kanan — kolom menyesuaikan otomatis. "Pecah jadi kolom satuan" bila ada kolom yang perlu digeser sendiri.`);
   }
+  /** Area kolom → kolom satuan. */
+  function pecahKolom() {
+    if (!terpilih?.gridKolom || !edit) return;
+    const ks = pecahGridKolom(terpilih, edit.gedung); const id = terpilih.id;
+    aksi(e => ({ ...e, komponen: [...e.komponen.filter(k => k.id !== id), ...ks] })); setPilih(null);
+    setPesan(`Area kolom dipecah jadi ${ks.length} kolom satuan — tiap kolom bisa digeser / diubah sendiri.`);
+  }
+  /** Kolom satuan (yang dipilih, atau semua) → 1 area kolom. */
+  function gabungKolom() {
+    if (!edit) return;
+    const ids = multi.length ? multi : undefined;
+    const h = gabungJadiAreaKolom(edit, ids); if (!h) { setPesan('Butuh minimal 2 kolom satuan untuk digabung.'); return; }
+    aksi(() => h.edit); setMulti([]); setPilih(h.id);
+    setPesan(`${h.n} kolom digabung jadi 1 area kolom. Bentang diambil dari jarak as yang ada; ubah di panel kanan bila ada yang berbeda.`);
+  }
+  const ubahGrid = (p: Partial<SpekGridKolom>) => ubahK(k => (k.gridKolom ? { ...k, gridKolom: { ...k.gridKolom, ...p } } : k));
   /** Sebar N gate di dinding yang sama dengan gate terpilih (jarak 0 = merata; > 0 = as ke as dari gate ini). */
   function buatSebarGate() {
     if (!edit || !terpilih || terpilih.jenis !== 'gate') return;
@@ -557,7 +585,7 @@ export default function DesainGudang() {
                   </div>}
                 </div>);
             })()}
-            <div className="eyebrow">Kolom / pilar ({edit.komponen.filter(k => k.jenis === 'kolom').length})</div>
+            <div className="eyebrow">Kolom / pilar ({denganKolom(edit.komponen, edit.gedung).filter(k => k.jenis === 'kolom').length})</div>
             <div className="sim2d-kolom">
               <button type="button" className={mode === 'kolom' ? '' : 'ghost'} onClick={() => setMode(mode === 'kolom' ? 'pilih' : 'kolom')}>{mode === 'kolom' ? '✓ Selesai menaruh kolom' : '＋ Taruh kolom dengan klik'}</button>
               <p className="small muted" style={{ margin: 0 }}>Klik di denah = 1 kolom, ukuran <b>{angka(acuanKolom?.w ?? gridPilar.ukuran, 2)} × {angka(acuanKolom?.d ?? gridPilar.ukuran, 2)} m</b>{acuanKolom ? ' (ikut kolom terakhir dipilih / dibuat)' : ''}{acuanKolom && <> · <button type="button" className="link-kecil" onClick={() => setAcuanKolom(null)}>pakai ukuran pilar {angka(gridPilar.ukuran, 2)} m</button></>}. Otomatis sejajar dengan kolom terdekat (garis biru) dan menampilkan jarak as ke as. Seret kolom = pindah tanpa mengubah ukuran (handle ukuran ada di luar sudut kolom); Ctrl+D = gandakan dengan ukuran sama. Atau buat grid sekaligus:</p>
@@ -577,8 +605,12 @@ export default function DesainGudang() {
               {(() => { const xs = posisiBentang(gridPilar.x, edit.gedung.L), zs = posisiBentang(gridPilar.z, edit.gedung.W);
                 return <p className="small muted" style={{ margin: '4px 0' }}>Jarak diukur <b>as ke as tiap bentang</b>: pilar 1 → 2 = 6 m, pilar 2 → 3 = 6 m (posisi kumulatif 0, 6, 12, …). X: {xs.slice(0, 8).map(v => angka(v, 1)).join(', ')}{xs.length > 8 ? ', …' : ''} ({xs.length} as) · Z: {zs.slice(0, 8).map(v => angka(v, 1)).join(', ')}{zs.length > 8 ? ', …' : ''} ({zs.length} as)</p>; })()}
               <div className="row" style={{ gap: 6 }}>
-                <button type="button" style={{ flex: 1 }} onClick={buatGridPilar}>Buat grid pilar</button>
-                <button type="button" className="ghost danger" onClick={hapusSemuaKolom} disabled={!edit.komponen.some(k => k.jenis === 'kolom')}>Hapus semua kolom</button>
+                <button type="button" style={{ flex: 1 }} onClick={buatGridPilar}>Buat area kolom (grid pilar)</button>
+                <button type="button" className="ghost danger" onClick={hapusSemuaKolom} disabled={!edit.komponen.some(k => k.jenis === 'kolom' || k.jenis === 'areaKolom')}>Hapus semua kolom</button>
+              </div>
+              <div className="row" style={{ gap: 6 }}>
+                <button type="button" className="ghost" style={{ flex: 1 }} onClick={gabungKolom} disabled={edit.komponen.filter(k => k.jenis === 'kolom').length < 2}
+                  title="Kolom satuan (yang dipilih, atau semua bila tidak ada yang dipilih) digabung jadi 1 area kolom yang bisa ditarik">▦ Gabung kolom satuan jadi area kolom</button>
               </div>
             </details>
             <label className="f">Okupansi rak {edit.okupansi == null ? '(sesuai stok desain)' : `${Math.round(edit.okupansi * 100)}%`}
@@ -863,6 +895,37 @@ export default function DesainGudang() {
                   <p className="small muted" style={{ margin: 0 }}>Platform beton di luar dinding, setinggi bak truk ({angka(edit.gedung.tinggiDockM ?? 1.2, 2)} m) — palet diturunkan dari truk ke platform lalu masuk gudang lewat gate / dock.</p>
                 </>)}
                 {terpilih.jenis === 'dock' && (<label className="f">Arus<select value={terpilih.arus ?? 'inbound'} onChange={e => ubahK(k => ({ ...k, arus: e.target.value as 'inbound' | 'outbound' }))}><option value="inbound">Inbound</option><option value="outbound">Outbound</option></select></label>)}
+                {terpilih.gridKolom && (() => { const gk = terpilih.gridKolom; const { xs, zs } = asGridKolom(terpilih); const bX = bentangAktual(xs), bZ = bentangAktual(zs);
+                  const n = denganKolom([terpilih], edit.gedung).length;
+                  // ubah 1 bentang: daftar = bentang aktual, tanpa sisa bentang ujung (supaya saat area ditarik pola tetap berulang)
+                  const ubahSatu = (sumbu: 'x' | 'z', i: number, v: number) => {
+                    const akt = sumbu === 'x' ? bX : bZ, spek = sumbu === 'x' ? gk.bentangX : gk.bentangZ, j = akt.length - 1;
+                    const pola = (n: number) => spek[Math.min(n, spek.length - 1)];
+                    const daftar = gk.tutupUjung && j > 0 && i !== j && Math.abs(akt[j] - pola(j)) > 0.01 ? akt.slice(0, j) : [...akt];
+                    daftar[i] = Math.max(0.5, v); ubahGrid(sumbu === 'x' ? { bentangX: daftar } : { bentangZ: daftar });
+                  };
+                  return (<>
+                    <p className="small muted" style={{ margin: 0 }}>Area kolom: <b>{xs.length} × {zs.length} as = {n} kolom</b>. Tarik tepi area → jumlah kolom menyesuaikan. Bentang 1 nilai = berulang; beberapa nilai = per bentang (sesudah habis, bentang terakhir diulang).</p>
+                    <div className="grid2" style={{ gap: 6 }}>
+                      <BentangInput l="Bentang X (as ke as, m)" v={gk.bentangX} set={x => ubahGrid({ bentangX: x })} />
+                      <BentangInput l="Bentang Z (as ke as, m)" v={gk.bentangZ} set={x => ubahGrid({ bentangZ: x })} />
+                      <Angka l="Kolom panjang X" u="m" step={0.05} v={gk.kolomW} set={x => ubahGrid({ kolomW: Math.max(0.15, x) })} />
+                      <Angka l="Kolom lebar Z" u="m" step={0.05} v={gk.kolomD} set={x => ubahGrid({ kolomD: Math.max(0.15, x) })} />
+                      <Angka l="Tinggi kolom" u="m" step={0.1} v={terpilih.tinggi} set={x => ubahK(k => ({ ...k, tinggi: Math.max(0.5, x) }))} />
+                      <label className="f small" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 'auto' }} checked={gk.tutupUjung} onChange={e => ubahGrid({ tutupUjung: e.target.checked })} />Kolom di ujung area (sisa bentang)</label>
+                    </div>
+                    {(['x', 'z'] as const).map(sb => { const d = sb === 'x' ? bX : bZ; return d.length > 0 && (
+                      <div key={sb} className="sim2d-bentang"><span className="small muted">Bentang {sb.toUpperCase()} per as (ubah yang berbeda):</span>
+                        <div className="row" style={{ gap: 4 }}>{d.slice(0, 40).map((v, i) => (
+                          <label key={i} className="small" title={`As ${i + 1} → ${i + 2}`}>{i + 1}–{i + 2}<input type="number" step={0.1} className="input-kecil" style={{ width: 62 }} value={v} onChange={e => { const x = Number(e.target.value); if (x > 0) ubahSatu(sb, i, x); }} /></label>))}</div>
+                      </div>); })}
+                    {(gk.lewati?.length ?? 0) > 0 && <p className="small muted" style={{ margin: 0 }}>{gk.lewati!.length} titik grid tanpa kolom (dari kolom satuan yang digabung) · <button type="button" className="link-kecil" onClick={() => ubahGrid({ lewati: [] })}>isi semua titik</button></p>}
+                    <div className="row" style={{ gap: 6 }}>
+                      <button type="button" className="ghost" onClick={() => ubahK(k => ({ ...k, x: 0, z: 0, w: edit.gedung.L, d: edit.gedung.W }))}>Pas ke seluruh gedung</button>
+                      <button type="button" className="ghost" onClick={pecahKolom} title="Ubah area jadi kolom satuan yang bisa digeser / diubah satu per satu">Pecah jadi kolom satuan</button>
+                    </div>
+                  </>); })()}
+                {terpilih.jenis === 'kolom' && <div className="row"><button type="button" className="ghost" onClick={gabungKolom} title="Semua kolom satuan (atau yang dipilih) → 1 area kolom">▦ Gabung jadi area kolom</button></div>}
                 {['fasilitas', 'kolom', 'dock'].includes(terpilih.jenis) && <Angka l="Tinggi" u="m" step={0.1} v={terpilih.tinggi} set={x => ubahK(k => ({ ...k, tinggi: Math.max(0.1, x) }))} />}
                 {terpilih.jenis === 'zona' && <label className="f">Warna<input type="color" value={terpilih.warna ?? '#0ea5e9'} onChange={e => ubahK(k => ({ ...k, warna: e.target.value }))} /></label>}
                 <div className="row">
