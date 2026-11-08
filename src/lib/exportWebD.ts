@@ -74,6 +74,7 @@ export function tulisHasil(x: Ctx) {
   HS.note('Σ biaya × alokasi % per layanan (Rincian biaya, kolom alokasi). Manajemen (biaya tetap) disebar ke layanan operasional sesuai porsi biayanya.');
   HS.hdr(['Layanan', 'Rendah', 'Sedang', 'Tinggi', 'Total', 'Porsi ops', '+Man R', '+Man S', '+Man T', 'Rendah ef.', 'Sedang ef.', 'Tinggi ef.', 'Biaya/bln']);
   const bk0 = HS.r;
+  const al = h.alokasiLayanan;
   const bkRow: Record<string, number> = {};
   for (const [i, b] of BUCKETS.entries()) {
     const r = HS.r; bkRow[b] = r;
@@ -88,7 +89,27 @@ export function tulisHasil(x: Ctx) {
     if (b === 'manajemen') { for (let c = 6; c <= 13; c++) HS.put(c, '', { j: 'out' }, r); continue; }
     HS.put(6, { f: `IF(${opsTot}>0,E${r}/${opsTot},0)` }, { j: 'out', fmt: 'pct' }, r);
     RISK.forEach((_, j) => { HS.put(7 + j, { f: `${R(2 + j, bkRow.manajemen)}*F${r}` }, { j: 'out', fmt: 'rp' }, r); HS.put(10 + j, { f: `${R(2 + j, r)}+${R(7 + j, r)}` }, { j: 'out', fmt: 'rp' }, r); });
-    HS.put(13, { f: `SUM(J${r}:L${r})`, v: rcList.find(z => z.bucket === b)?.biayaBulan }, { j: 'out', fmt: 'rp', b: true }, r);
+    HS.put(13, { f: `SUM(J${r}:L${r})`, v: al && al.mode !== 'cts' ? al.biayaCts[b] : rcList.find(z => z.bucket === b)?.biayaBulan }, { j: 'out', fmt: 'rp', b: true }, r);
+  }
+  // Mode pembagian bukan cost-to-serve: total biaya per risiko dibagi ulang sesuai porsi dipakai (bisa diubah di kolom E)
+  if (al && al.mode !== 'cts') {
+    HS.r++;
+    HS.h3(`Pembagian biaya ke layanan — ${al.mode === 'rata' ? 'bagi rata' : 'persentase manual'}`);
+    HS.note('Biaya per risiko = total biaya risiko semua layanan × porsi dipakai. Total biaya tidak berubah; yang bergeser hanya porsi & tarif per layanan. Rate card di bawah memakai tabel ini.');
+    HS.hdr(['Layanan', 'Biaya cost-to-serve', 'Porsi cost-to-serve', 'Selisih/bln', ['Porsi dipakai', true], '', '', '', '', 'Rendah ef.', 'Sedang ef.', 'Tinggi ef.', 'Biaya/bln']);
+    const ops = BUCKETS.filter(b => b !== 'manajemen');
+    for (const b of ops) {
+      const r = HS.r, ra = bkRow[b];
+      HS.put(1, LAYANAN[b], { j: 'txt', b: true });
+      HS.put(2, { f: `M${ra}`, v: al.biayaCts[b] ?? 0 }, { j: 'out', fmt: 'rp' });
+      HS.put(3, { f: `F${ra}`, v: al.porsiCts[b] ?? 0 }, { j: 'out', fmt: 'pct' });
+      HS.put(4, { f: `M${r}-B${r}` }, { j: 'out', fmt: 'rp' });
+      HS.put(5, al.porsiDipakai[b] ?? 0, { j: 'in', fmt: 'pct' });
+      RISK.forEach((_, j) => HS.put(10 + j, { f: `SUM(${R(10 + j, bk0)}:${R(10 + j, bk0 + ops.length - 1)})*$E${r}` }, { j: 'out', fmt: 'rp' }));
+      HS.put(13, { f: `SUM(J${r}:L${r})`, v: rcList.find(z => z.bucket === b)?.biayaBulan ?? 0 }, { j: 'out', fmt: 'rp', b: true });
+      bkRow[b] = r;
+      HS.r++;
+    }
   }
 
   // ===================== Opsi UoM tarif (dasar droplist "Satuan tarif")

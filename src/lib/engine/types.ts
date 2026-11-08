@@ -176,6 +176,8 @@ export interface TenderInput {
   pajak?: { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number };
   /** Margin (markup atas biaya) per layanan, diinput user. Kosong = margin default per kategori risiko (master Finance). */
   marginManual?: Partial<Record<Bucket, number | null>>;
+  /** Cara membagi total biaya ke layanan (rate card): cts = cost-to-serve (default), rata = sama besar, manual = persentase per layanan (pecahan, total 1). */
+  alokasiLayanan?: { mode: 'cts' | 'rata' | 'manual'; porsi?: Partial<Record<Bucket, number>> };
   /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */
   startupAuto?: { aktif: boolean; persenOpex: number; persenManpower: number };
   /** Biaya per orang per bulan diisi manual (lama — tidak dipakai lagi). */

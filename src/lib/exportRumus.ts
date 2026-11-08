@@ -532,7 +532,22 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
   for (const b of OPS) {
     const r = S9.r; rowB.set(b, r);
     S9.baris(kr9, [LAYANAN[b], ...RISIKO.map(k => ({ f: `SUMIFS(${kolB(b)},${rgR},"${k}")`, v: pre(b, k) })), { f: `IF((${opsTot})>0,SUM(${kolB(b)})/(${opsTot}),0)`, v: pre(b) / totOps },
-      ...RISIKO.map((k, j) => ({ f: `${huruf(2 + j)}${r}+SUMIFS(${kolB('manajemen')},${rgR},"${k}")*E${r}`, v: h.biayaPerBucket[b][k] })), { f: `SUM(F${r}:H${r})`, v: h.rateCard.find(x => x.bucket === b)?.biayaBulan ?? 0 }]);
+      ...RISIKO.map((k, j) => ({ f: `${huruf(2 + j)}${r}+SUMIFS(${kolB('manajemen')},${rgR},"${k}")*E${r}`, v: pre(b, k) + pre('manajemen', k) * pre(b) / totOps })), { f: `SUM(F${r}:H${r})`, v: RISIKO.reduce((y, k) => y + pre(b, k) + pre('manajemen', k) * pre(b) / totOps, 0) }]);
+  }
+  const al = h.alokasiLayanan;
+  if (al && al.mode !== 'cts') {
+    // Mode pembagian bukan cost-to-serve: total biaya per risiko dibagi ulang sesuai porsi dipakai (kolom E, bisa diubah)
+    const q1 = S9.r - 1;
+    S9.kosong();
+    S9.bagian(`Pembagian biaya ke layanan — ${al.mode === 'rata' ? 'bagi rata' : 'persentase manual'}`, 'Biaya per risiko = total biaya risiko (semua layanan) × porsi dipakai · total biaya tidak berubah');
+    const kr9b: Kol[] = [{ h: 'Layanan' }, { h: 'Biaya cost-to-serve', fmt: 'rp' }, { h: 'Porsi cost-to-serve', fmt: 'pct' }, { h: 'Selisih / bln', fmt: 'rp' }, { h: 'Porsi dipakai', fmt: 'pct', jenis: 'input' },
+      { h: 'Rendah', fmt: 'rp' }, { h: 'Sedang', fmt: 'rp' }, { h: 'Tinggi', fmt: 'rp' }, { h: 'Biaya / bln', fmt: 'rp' }];
+    S9.header(kr9b);
+    for (const b of OPS) {
+      const r = S9.r, ra = rowB.get(b)!; rowB.set(b, r);
+      S9.baris(kr9b, [LAYANAN[b], { f: `I${ra}`, v: al.biayaCts[b] ?? 0 }, { f: `E${ra}`, v: al.porsiCts[b] ?? 0 }, { f: `I${r}-B${r}`, v: (h.rateCard.find(x => x.bucket === b)?.biayaBulan ?? 0) - (al.biayaCts[b] ?? 0) }, al.porsiDipakai[b] ?? 0,
+        ...RISIKO.map((k, j) => ({ f: `SUM(${huruf(6 + j)}$${q0}:${huruf(6 + j)}$${q1})*$E${r}`, v: h.biayaPerBucket[b][k] })), { f: `SUM(F${r}:H${r})`, v: h.rateCard.find(x => x.bucket === b)?.biayaBulan ?? 0 }]);
+    }
   }
   S9.kosong();
   S9.bagian('Rate card', 'GP manual kosong = pakai margin per risiko · Tarif excl = ROUNDUP(harga ÷ volume tarif) ke 1 / 10 / 100');

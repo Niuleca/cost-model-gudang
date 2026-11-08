@@ -371,6 +371,42 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     for (const b of opsBuckets) biayaBucket[b][risk] += man * porsiOps[b];
     biayaBucket.manajemen[risk] = 0;
   }
+  // Pembagian biaya ke layanan: cost-to-serve (default, sesuai pemicu biaya) / bagi rata / persentase manual.
+  // Total biaya tidak berubah — yang bergeser hanya porsi biaya (dan tarif) antar layanan.
+  const RISK3 = ['Rendah', 'Sedang', 'Tinggi'] as KategoriRisiko[];
+  const totB = (b: Bucket) => RISK3.reduce((a, k) => a + biayaBucket[b][k], 0);
+  const totSemua = opsBuckets.reduce((a, b) => a + totB(b), 0);
+  const porsiCts = Object.fromEntries(opsBuckets.map(b => [b, totSemua > 0 ? totB(b) / totSemua : 0])) as Record<Bucket, number>;
+  const biayaCts = Object.fromEntries(opsBuckets.map(b => [b, bulat(totB(b))])) as Record<Bucket, number>;
+  const modeAlokasi = t.alokasiLayanan?.mode ?? 'cts';
+  let porsiDipakai = porsiCts;
+  let jumlahInputManual: number | null = null;
+  if (modeAlokasi === 'rata') {
+    const aktif = opsBuckets.filter(b => porsiCts[b] > 0);
+    porsiDipakai = Object.fromEntries(opsBuckets.map(b => [b, aktif.includes(b) ? 1 / aktif.length : 0])) as Record<Bucket, number>;
+  } else if (modeAlokasi === 'manual') {
+    const inp = t.alokasiLayanan?.porsi ?? {};
+    const jml = opsBuckets.reduce((a, b) => a + Math.max(0, Number(inp[b]) || 0), 0);
+    jumlahInputManual = jml;
+    if (jml > 0) {
+      porsiDipakai = Object.fromEntries(opsBuckets.map(b => [b, Math.max(0, Number(inp[b]) || 0) / jml])) as Record<Bucket, number>;
+      if (Math.abs(jml - 1) > 0.0005) flags.push({ level: 'peringatan', kode: 'ALOKASI_BUKAN_100', pesan: `Persentase pembagian biaya ke layanan berjumlah ${(jml * 100).toFixed(1)}% — dinormalisasi ke 100%.` });
+    } else flags.push({ level: 'peringatan', kode: 'ALOKASI_KOSONG', pesan: 'Persentase pembagian biaya ke layanan belum diisi — dipakai cost-to-serve.' });
+  }
+  if (porsiDipakai !== porsiCts) {
+    const totRisk = Object.fromEntries(RISK3.map(k => [k, opsBuckets.reduce((a, b) => a + biayaBucket[b][k], 0)])) as Record<KategoriRisiko, number>;
+    for (const b of opsBuckets) for (const k of RISK3) biayaBucket[b][k] = totRisk[k] * porsiDipakai[b];
+    for (const b of opsBuckets) if (porsiCts[b] > 0 && porsiDipakai[b] <= 0)
+      flags.push({ level: 'peringatan', kode: 'ALOKASI_NOL', pesan: `Layanan ${b} punya biaya cost-to-serve tetapi diberi porsi 0% — layanan ini tidak punya tarif sendiri (biayanya ditanggung layanan lain).` });
+  }
+  // Dasar pembagian per kelompok biaya (sebelum manajemen disebar)
+  const rincianAlokasi = Object.values(baris.reduce((acc, b) => {
+    const r = acc[b.kelompok] ??= { kelompok: b.kelompok, total: 0, perBucket: { storage: 0, handling_in: 0, handling_out: 0, vas: 0, manajemen: 0 } as Record<Bucket, number> };
+    r.total += b.biayaBulan; for (const k of BUCKETS) r.perBucket[k] += b.biayaBulan * b.alokasi[k];
+    return acc;
+  }, {} as Record<string, { kelompok: string; total: number; perBucket: Record<Bucket, number> }>)).filter(r => r.total > 0)
+    .map(r => ({ kelompok: r.kelompok, total: bulat(r.total), perBucket: Object.fromEntries(BUCKETS.map(k => [k, bulat(r.perBucket[k])])) as Record<Bucket, number> }));
+  const alokasiLayanan = { mode: modeAlokasi, porsiCts, porsiDipakai, biayaCts, jumlahInputManual, porsiManajemen: porsiOps, rincian: rincianAlokasi };
 
   // ---- 11. Harga & rate card ----
   // Pajak (istilah komersial): PPh EXCLUDE = harga belum termasuk PPh → ditanggung customer → tarif di-gross-up;
@@ -468,7 +504,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     totalHeadcount: payroll.reduce((sum, p) => sum + p.headcount, 0),
     sumberPinjaman, interestCost, perJenis,
     biaya: baris, perKelompok, totalBiayaBulan: bulat(totalBiaya), investasi: bulat(investasi),
-    biayaPerBucket: biayaBucket, rateCard, marginTotal, pajak: { ...pajak, pphPersen: pphRate }, storageAlternatif, simulasi,
+    biayaPerBucket: biayaBucket, alokasiLayanan, rateCard, marginTotal, pajak: { ...pajak, pphPersen: pphRate }, storageAlternatif, simulasi,
     redFlags: flags,
   };
 }
