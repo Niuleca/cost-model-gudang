@@ -22,14 +22,16 @@ const MODE: { v: ModeBiaya; l: string; t: string }[] = [
   { v: 'beli', l: 'Beli', t: 'aset: depresiasi selama min(umur, kontrak)' }, { v: 'sekali', l: 'Sekali', t: 'biaya sekali: diamortisasi selama kontrak' }];
 
 /** Satu klasifikasi biaya: tabel sendiri, item hanya dari kategori klasifikasi itu, subtotal per bulan. Di level modul supaya input tidak kehilangan fokus. */
-function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, onTambah, extra, kurang, onTambahDefault, fasilitas }: {
+function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, onTambah, extra, kurang, onTambahDefault, fasilitas, otomatis }: {
+  /** baris otomatis (mis. startup & implementation) yang ikut dihitung mesin di klasifikasi ini */
+  otomatis?: { n: number; total: number };
   s: Seksi; rows: { b: Baris; i: number }[]; items: Item[]; kontrak: number;
   onUbah: (i: number, patch: Partial<Baris>) => void; onUbahBanyak: (u: { i: number; patch: Partial<Baris> }[]) => void; onHapus: (i: number) => void; onTambah: () => void; extra?: React.ReactNode;
   kurang: number; onTambahDefault: () => void; fasilitas: { nama: string; m2: number }[];
 }) {
   const pilihan = s.id === 'lainnya' ? items.filter(x => !SEKSI_BIAYA.some(z => z.kategori.includes(x.kategori)) && !['MHE', 'Racking', 'Gudang', 'IT'].includes(x.kategori))
     : items.filter(x => s.kategori.includes(x.kategori));
-  const total = rows.reduce((t, r) => t + biayaBulanBaris(r.b, kontrak, 0).total, 0);
+  const total = rows.reduce((t, r) => t + biayaBulanBaris(r.b, kontrak, 0).total, 0) + (otomatis?.total ?? 0);
   const merah = rows.filter(r => r.b.belumDiketahui).length;
   // harga di Price Inquiry berubah sejak item dipilih (atau baris lama yang harganya beda dengan database)
   const hargaBaru = (b: Baris) => { const it = items.find(x => x.id === b.priceItemId); if (!it) return null; const h = hargaUntukMode(it, b.mode); return h > 0 && h !== (b.hargaDb ?? b.hargaSatuan) ? h : null; };
@@ -48,7 +50,7 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
           {basi.length > 0 && <button className="ghost" onClick={() => onUbahBanyak(basi.map(r => { const h = hargaBaru(r.b)!; return { i: r.i, patch: { hargaSatuan: h, hargaDb: h, ...(r.b.hargaDefault != null ? { hargaDefault: h } : {}) } }; }))}>Perbarui {basi.length} harga dari Price Inquiry</button>}
           {s.mode === 'beli' && rows.some(r => r.b.mode === 'bulanan' && !r.b.kunci) && <button className="ghost" onClick={() => onUbahBanyak(rows.filter(r => r.b.mode === 'bulanan' && !r.b.kunci).map(r => ({ i: r.i, patch: { mode: 'beli' as ModeBiaya, umurBulan: r.b.umurBulan || 60 } })))}>Semua jadi Beli (depresiasi)</button>}
           {merah > 0 && <span className="pill bad">{merah} data belum ada</span>}
-          <span className="pill info">{rows.length} item · {rp(total)}/bln</span></span>
+          <span className="pill info" title={otomatis?.n ? 'Termasuk item otomatis — sudah masuk total biaya tender' : undefined}>{rows.length + (otomatis?.n ?? 0)} item{otomatis?.n ? ` (${otomatis.n} otomatis)` : ''} · {rp(total)}/bln</span></span>
       </div>
       {extra}
       {rows.length > 0 && <div className="tablewrap fit"><table className="tabel-fit tabel-bl">
@@ -119,6 +121,10 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
     const c = rows.map(r => biayaBulanBaris(r.b, kontrakBulan, 0));
     return { s, n: rows.length, nilai: c.reduce((t, x) => t + x.nilai, 0), total: c.reduce((t, x) => t + x.total, 0) };
   });
+  // Startup & implementation otomatis (baris hasil mesin) ikut dihitung di ringkasan & kartu Startup
+  const autoStartup = startup.aktif ? (hasilBaris ?? []).filter(b => / \(otomatis\) — amortisasi$/.test(b.deskripsi)) : [];
+  const otoStartup = { n: autoStartup.length, total: autoStartup.reduce((t, b) => t + b.biayaBulan, 0) };
+  for (const r of ringkas) if (r.s.id === 'startup' && otoStartup.n) { r.n += otoStartup.n; r.total += otoStartup.total; r.nilai += otoStartup.total * Math.max(1, kontrakBulan); }
   const totalBulan = ringkas.reduce((t, r) => t + r.total, 0);
 
   // ---- Daftar default (rekomendasi) dari data tender: isi otomatis sekali, lalu baris default ikut data tender ----
@@ -210,7 +216,7 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
       {perSeksi.map(({ s, rows }) => (
         <KartuSeksi key={s.id} s={s} rows={rows} items={items} kontrak={kontrakBulan} fasilitas={fasilitas}
           kurang={kurangDefault(lines, def, s.id).length} onTambahDefault={() => onChange(tambahDefault(lines, def, s.id), true)}
-          extra={s.id === 'startup' ? extraStartup : s.id === 'asuransi' ? extraAsuransi : undefined}
+          extra={s.id === 'startup' ? extraStartup : s.id === 'asuransi' ? extraAsuransi : undefined} otomatis={s.id === 'startup' ? otoStartup : undefined}
           onUbah={ubah} onUbahBanyak={ubahBanyak} onHapus={i => onChange(lines.filter((_, j) => j !== i))}
           onTambah={() => onChange([...lines, { deskripsi: '', kelompok: s.kelompok, mode: s.mode, qty: 1, hargaSatuan: 0, seksi: s.id, ...(s.mode === 'beli' ? { umurBulan: 60 } : {}) }])} />
       ))}
