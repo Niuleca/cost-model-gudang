@@ -25,6 +25,8 @@ export interface StatGerak { n: number; kecTotal: number; kecMaks: number; jarak
 export interface Aktor2D { id: string; jenis: 'mhe' | 'pekerja' | 'pemain'; x: number; z: number; rot: number; sibuk: boolean; bawa: 'palet' | 'karton' | null; kemampuan?: string; mhe?: string; tugas?: JenisTugas }
 export interface KontrolGame {
   jalan: boolean; kecepatan: number; batas: number; pilih: Pilihan | null;
+  /** jam simulasi dijalankan dari luar (Main3D, berbasis jam dinding) — frame 3D tidak memajukan waktu */
+  jamLuar?: boolean;
   jelajah: boolean; tombol: { maju: boolean; mundur: boolean; kiri: boolean; kanan: boolean; lari: boolean; putarKiri?: boolean; putarKanan?: boolean; kamAtas?: boolean; kamBawah?: boolean; lompat?: boolean };
   amatan: Amatan | null; statGerak: Partial<Record<JenisTugas, StatGerak>>;
   aktor2d?: Aktor2D[];
@@ -1074,7 +1076,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
       updateJelajah(dt);
       detikNyata += dt;
       const k = kontrol.current;
-      if (k.jalan && d.t < k.batas) {
+      if (k.jalan && d.t < k.batas && !k.jamLuar) {
         jalankanSampai(d, Math.min(k.batas, d.t + dt * k.kecepatan));
         if (d.t >= k.batas) { k.jalan = false; onBerhenti(); }
       }

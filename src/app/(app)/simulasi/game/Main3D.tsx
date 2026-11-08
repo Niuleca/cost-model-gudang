@@ -39,7 +39,7 @@ function flagGerak(sg: Partial<Record<JenisTugas, StatGerak>>): RedFlag[] {
   return out;
 }
 
-export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '3d' }: { dunia: Dunia; layout: LayoutGudang; hariMaks: number; onTick: () => void; tampilAwal?: TampilSim }) {
+export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '3d', mulaiOtomatis = false }: { dunia: Dunia; layout: LayoutGudang; hariMaks: number; onTick: () => void; tampilAwal?: TampilSim; mulaiOtomatis?: boolean }) {
   const [tampilan, setTampilan] = useState<TampilSim>(tampilAwal);
   const [opsi2d, setOpsi2d] = useState<Opsi2D>({ alur: false, okupansi: true, label: true });
   const kontrol = useRef<KontrolGame>({ jalan: false, kecepatan: 60, batas: hariMaks * HARI - 1, pilih: null,
@@ -92,8 +92,43 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
   const setPilih = (p: Pilihan | null) => { kontrol.current.pilih = p; setPilihState(p); };
 
   const lapisan = useMemo(() => buatLapisanGame(dunia, layout, kontrol, () => setJalan(false), p => setPilih(p)), [dunia, layout]);
-  useEffect(() => { const id = setInterval(() => { setVersi(x => x + 1); onTickRef.current(); }, 400); return () => clearInterval(id); }, []);
-  useEffect(() => { kontrol.current.jalan = false; kontrol.current.statGerak = {}; setJalan(false); setPilih(null); setCatat(null); }, [dunia]);
+  // Lewati jam kosong: saat berjalan di luar jam kerja tanpa truk & tugas aktif, waktu langsung lompat ke awal shift berikutnya
+  // (sebelumnya simulasi tampak "diam" berjam-jam dari 00:00 sampai shift mulai).
+  const [lewati, setLewati] = useState(true); const lewatiRef = useRef(lewati); lewatiRef.current = lewati;
+  // Jam simulasi berbasis jam dinding (bukan frame 3D): tetap maju dengan kecepatan yang dipilih walau 3D berat / fps rendah.
+  kontrol.current.jamLuar = true;
+  useEffect(() => {
+    let lalu = performance.now();
+    const id = setInterval(() => {
+      const kini = performance.now(), dt = Math.min(2, (kini - lalu) / 1000); lalu = kini;
+      const k = kontrol.current;
+      if (k.jalan && dunia.t < k.batas) {
+        jalankanSampai(dunia, Math.min(k.batas, dunia.t + dt * k.kecepatan));
+        if (dunia.t >= k.batas) { k.jalan = false; setJalan(false); }
+      }
+    }, 50);
+    return () => clearInterval(id);
+  }, [dunia]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (kontrol.current.jalan && lewatiRef.current && dunia.t < kontrol.current.batas) {
+        const wk = waktuGame(dunia);
+        let aktif = false; for (const tg of dunia.tugas.values()) if (tg.status === 'jalan') { aktif = true; break; }
+        const sepi = !wk.shiftAktif.length && !aktif && !dunia.dock.some(x => x.truk) && !dunia.antreDock.inbound.length && !dunia.antreDock.outbound.length;
+        if (sepi) { const tuju = Math.min(kontrol.current.batas, shiftBerikut(dunia)); if (tuju > dunia.t + 60) jalankanSampai(dunia, tuju); }
+      }
+      setVersi(x => x + 1); onTickRef.current();
+    }, 400);
+    return () => clearInterval(id);
+  }, [dunia]);
+  useEffect(() => {
+    kontrol.current.statGerak = {}; setPilih(null); setCatat(null);
+    if (mulaiOtomatis) {
+      // mulai langsung di awal shift pertama dan berjalan 1 menit simulasi per detik
+      if (!waktuGame(dunia).shiftAktif.length) jalankanSampai(dunia, Math.min(kontrol.current.batas, shiftBerikut(dunia)));
+      aturKec(60); kontrol.current.jalan = dunia.t < kontrol.current.batas; setJalan(kontrol.current.jalan);
+    } else { kontrol.current.jalan = false; setJalan(false); }
+  }, [dunia]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const putar = (v: boolean) => { kontrol.current.jalan = v && dunia.t < kontrol.current.batas; setJalan(kontrol.current.jalan); };
   const aturKec = (k: number) => { kontrol.current.kecepatan = k; setKec(k); };
@@ -164,6 +199,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
           </div>
           <button type="button" className="ghost" disabled={selesai} onClick={() => lompat(shiftBerikut(dunia))}>Ke shift berikutnya ⏭</button>
           <button type="button" className="ghost" disabled={selesai} onClick={() => lompat((w.hari + 1) * HARI - 1)}>Selesaikan hari ini</button>
+          <label className="small gm-lewati" title="Saat tidak ada shift, truk, maupun tugas berjalan, waktu langsung lompat ke awal shift berikutnya"><input type="checkbox" checked={lewati} onChange={e => setLewati(e.target.checked)} /> Lewati jam kosong</label>
           <div className="tabs" role="group" aria-label="Tampilan">
             {([['2d', '2D'], ['split', '2D + 3D'], ['3d', '3D']] as [TampilSim, string][]).map(([k, l]) => <button key={k} type="button" className={tampilan === k ? 'on' : ''} onClick={() => { setTampilan(k); if (k === '2d' && jelajah) setJelajah(false); if (k !== '3d') setPanel(false); }}>{l}</button>)}
           </div>

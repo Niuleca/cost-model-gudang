@@ -45,8 +45,8 @@ export default function SimulasiDesain({ edit, data, kotor }: { edit: LayoutEdit
       </div>
       {sim && sim.kunci !== kunciEdit && <p className="small" style={{ color: 'var(--warn)' }}>Layout berubah sejak simulasi dimulai — tekan <b>Ulang simulasi</b> supaya memakai layout terbaru.</p>}
       {err && <p className="error small" role="alert">{err}</p>}
-      {sim ? <Main3D dunia={sim.dunia} layout={sim.layout} hariMaks={hari} onTick={() => setVersi(v => v + 1)} tampilAwal="split" />
-        : <div className="card small muted">Tekan <b>Mulai simulasi</b>. Truk, order, putaway, picking, dan muat berjalan sesuai skenario tender; waktu bisa dipercepat, dilompati per shift, atau dijalankan sampai akhir hari.</div>}
+      {sim ? <Main3D dunia={sim.dunia} layout={sim.layout} hariMaks={hari} onTick={() => setVersi(v => v + 1)} tampilAwal="split" mulaiOtomatis />
+        : <div className="card small muted">Tekan <b>Mulai simulasi</b>: simulasi langsung berjalan dari awal shift pertama. Truk, order, putaway, picking, dan muat berjalan sesuai skenario tender; jam kosong di luar shift dilewati otomatis, waktu bisa dipercepat atau dijalankan sampai akhir hari.</div>}
     </>
   );
 }
