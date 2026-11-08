@@ -1,7 +1,8 @@
 // Tender Transportation (rute darat) & Intermodal (3 stage: pickup → main leg laut/udara/kereta → delivery).
 // Disimpan di tenders.asumsi.transport / tenders.asumsi.intermodal (jenis_tender = transportation / intermodal).
-// Harga jual = harga beli × (1 + margin) — sama dengan mark-up di cost model gudang. GP% = (jual − beli) ÷ jual.
-import { jarakKm } from './lokasiIndonesia.ts';
+// Margin = GP% atas harga jual (sama dengan margin manual di tender gudang): harga jual = harga beli ÷ (1 − margin),
+// sehingga input margin 15% menghasilkan GP tepat 15% (bukan mark-up 15% yang hanya memberi GP 13,04%).
+import { jarakKm, bisaDarat } from './lokasiIndonesia.ts';
 
 export type Moda = 'darat' | 'laut' | 'udara' | 'kereta';
 export type Basis = 'trip' | 'cbm' | 'ton' | 'kg' | 'pallet' | 'liter' | 'container';
@@ -87,7 +88,7 @@ export interface RuteTransport {
   marginPersen?: number | null; // null / undefined = ikut margin global
   leadTimeHari?: number | null; catatan?: string;
 }
-export interface TenderTransport { marginGlobal: number; rute: RuteTransport[]; catatan?: string }
+export interface TenderTransport { marginGlobal: number; rute: RuteTransport[]; catatan?: string; tierMargin?: number[] }
 export const TRANSPORT_DEFAULT: TenderTransport = { marginGlobal: 0.12, rute: [] };
 
 export const idBaru = () => Math.random().toString(36).slice(2, 10);
@@ -95,9 +96,14 @@ export const ruteBaru = (p: Partial<RuteTransport> = {}): RuteTransport =>
   ({ id: idBaru(), origin: '', destination: '', armada: 'CDD Box', basis: 'trip', volumeBulan: 0, vendor: '', hargaBeli: 0, sumberHarga: 'manual', ...p });
 
 export const marginRute = (m: number | null | undefined, global: number) => (m == null || !isFinite(m) ? global : m);
+/** Harga jual dari harga beli & margin GP (margin dibatasi −100%…95% supaya tidak membagi nol). */
+export const hargaJual = (beli: number, margin: number) => {
+  const m = Math.min(0.95, Math.max(-1, Number(margin) || 0));
+  return Math.round((beli / (1 - m)) * 100) / 100;
+};
 export function hitungRute(r: RuteTransport, marginGlobal: number) {
   const m = marginRute(r.marginPersen, marginGlobal);
-  const jual = Math.round(r.hargaBeli * (1 + m) * 100) / 100;
+  const jual = hargaJual(r.hargaBeli, m);
   const biayaBulan = r.hargaBeli * (r.volumeBulan || 0), pendapatanBulan = jual * (r.volumeBulan || 0);
   return { margin: m, jual, biayaBulan, pendapatanBulan, gp: pendapatanBulan - biayaBulan, gpPersen: jual > 0 ? (jual - r.hargaBeli) / jual : 0 };
 }
@@ -131,7 +137,7 @@ export interface RuteIntermodal {
   satuanJual: Basis; qtyJual: number;   // harga jual dinyatakan per … (mis. per container 1, per CBM 20)
   marginPersen?: number | null; catatan?: string;
 }
-export interface TenderIntermodal { marginGlobal: number; rute: RuteIntermodal[]; catatan?: string }
+export interface TenderIntermodal { marginGlobal: number; rute: RuteIntermodal[]; catatan?: string; tierMargin?: number[] }
 export const INTERMODAL_DEFAULT: TenderIntermodal = { marginGlobal: 0.12, rute: [] };
 export const NAMA_STAGE = ['Stage 1 · Pickup (first mile)', 'Stage 2 · Main leg (laut / udara / kereta)', 'Stage 3 · Delivery (last mile)'] as const;
 
@@ -145,7 +151,7 @@ export function hitungIntermodal(r: RuteIntermodal, marginGlobal: number) {
   const perStage = r.stage.map(s => (s.harga || 0) * (s.qty || 0));
   const beliShipment = perStage.reduce((t, x) => t + x, 0) + (r.biayaLain || 0);
   const m = marginRute(r.marginPersen, marginGlobal);
-  const jualShipment = Math.round(beliShipment * (1 + m) * 100) / 100;
+  const jualShipment = hargaJual(beliShipment, m);
   const q = r.qtyJual > 0 ? r.qtyJual : 1;
   const biayaBulan = beliShipment * (r.shipmentBulan || 0), pendapatanBulan = jualShipment * (r.shipmentBulan || 0);
   const lead = r.stage.reduce((t, s) => t + (Number(s.leadTimeHari) || 0), 0);
@@ -157,3 +163,106 @@ export const ringkasIntermodal = (t: TenderIntermodal) =>
 
 /** Titik rute (origin → port asal → port tujuan → destination) untuk peta / simulasi. */
 export const titikIntermodal = (r: RuteIntermodal) => [r.origin, r.stage[0].ke || r.stage[1].dari, r.stage[2].dari || r.stage[1].ke, r.destination].filter(Boolean);
+
+// ---------------- Review: perbandingan margin, catatan review, rate card quotation ----------------
+/** Tier margin default untuk perbandingan (GP% atas harga jual). */
+export const TIER_DEFAULT = [0.15, 0.10, 0.05];
+export const persen1 = (x: number) => `${(Math.round(x * 1000) / 10).toLocaleString('id-ID')}%`;
+
+export interface BarisTier { id: string; nama: string; satuan: string; beli: number; volBulan: number; jual: number[]; gpBulan: number[] }
+export interface HasilTier { kolom: { label: string; margin: number | null }[]; baris: BarisTier[]; total: Ringkas[] }
+
+/** Bandingkan harga jual & GP: kolom pertama = margin yang berlaku sekarang (global + khusus rute), lalu tiap tier diterapkan seragam ke semua rute. */
+export function tierTransport(t: TenderTransport, tiers: number[]): HasilTier {
+  const versi: TenderTransport[] = [t, ...tiers.map(m => ({ ...t, marginGlobal: m, rute: t.rute.map(r => ({ ...r, marginPersen: null })) }))];
+  return {
+    kolom: [{ label: 'Saat ini', margin: null }, ...tiers.map(m => ({ label: `Margin ${persen1(m)}`, margin: m }))],
+    baris: t.rute.map((r, i) => {
+      const h = versi.map(v => hitungRute(v.rute[i], v.marginGlobal));
+      return { id: r.id, nama: `${r.origin || '…'} → ${r.destination || '…'}`, satuan: `${r.armada} · ${labelBasis(r.basis)}`, beli: r.hargaBeli, volBulan: r.volumeBulan || 0,
+        jual: h.map(x => x.jual), gpBulan: h.map(x => x.gp) };
+    }),
+    total: versi.map(ringkasTransport),
+  };
+}
+export function tierIntermodal(t: TenderIntermodal, tiers: number[]): HasilTier {
+  const versi: TenderIntermodal[] = [t, ...tiers.map(m => ({ ...t, marginGlobal: m, rute: t.rute.map(r => ({ ...r, marginPersen: null })) }))];
+  return {
+    kolom: [{ label: 'Saat ini', margin: null }, ...tiers.map(m => ({ label: `Margin ${persen1(m)}`, margin: m }))],
+    baris: t.rute.map((r, i) => {
+      const h = versi.map(v => hitungIntermodal(v.rute[i], v.marginGlobal));
+      return { id: r.id, nama: `${r.origin || '…'} → ${r.destination || '…'}`, satuan: labelBasis(r.satuanJual), beli: h[0].beliPerSatuan, volBulan: (r.shipmentBulan || 0) * (r.qtyJual || 1),
+        jual: h.map(x => x.jualPerSatuan), gpBulan: h.map(x => x.gp) };
+    }),
+    total: versi.map(ringkasIntermodal),
+  };
+}
+
+export interface CatatanReview { level: 'kritis' | 'perhatian' | 'info'; rute?: string; pesan: string }
+const hariIniIso = () => new Date().toISOString().slice(0, 10);
+const cekMargin = (m: number, nama: string, out: CatatanReview[]) => {
+  if (m < 0) out.push({ level: 'kritis', rute: nama, pesan: `Margin ${persen1(m)} negatif — harga jual di bawah harga beli.` });
+  else if (m < 0.05) out.push({ level: 'perhatian', rute: nama, pesan: `Margin ${persen1(m)} di bawah 5% — tipis untuk menutup risiko (klaim, demurrage, kenaikan BBM).` });
+  else if (m > 0.35) out.push({ level: 'info', rute: nama, pesan: `Margin ${persen1(m)} cukup tinggi — cek daya saing terhadap harga pasar.` });
+};
+const cekRate = (rateId: number | null | undefined, rates: RateTransport[], nama: string, out: CatatanReview[]) => {
+  if (!rateId) return;
+  const x = rates.find(r => r.id === rateId); if (!x) return;
+  if (x.berlaku_sampai && x.berlaku_sampai < hariIniIso()) out.push({ level: 'perhatian', rute: nama, pesan: `Harga ${x.vendor} sudah lewat masa berlaku (${x.berlaku_sampai}) — minta quotation ulang.` });
+  else if (x.status !== 'approved') out.push({ level: 'info', rute: nama, pesan: `Harga ${x.vendor} di Market Price masih draft (belum di-approve).` });
+};
+
+/** Catatan review tender transport: data wajib, sumber harga, margin, rute lintas pulau, masa berlaku harga. */
+export function reviewTransport(t: TenderTransport, rates: RateTransport[] = []): CatatanReview[] {
+  const out: CatatanReview[] = [];
+  if (!t.rute.length) out.push({ level: 'kritis', pesan: 'Belum ada rute.' });
+  t.rute.forEach((r, i) => {
+    const nama = `${i + 1}. ${r.origin || '…'} → ${r.destination || '…'}`;
+    if (!r.origin || !r.destination) out.push({ level: 'kritis', rute: nama, pesan: 'Origin / destination belum diisi.' });
+    if (!(r.hargaBeli > 0)) out.push({ level: 'kritis', rute: nama, pesan: 'Harga beli belum ada.' });
+    if (!(r.volumeBulan > 0)) out.push({ level: 'perhatian', rute: nama, pesan: 'Volume per bulan 0 — pendapatan & GP rute ini tidak terhitung.' });
+    if (r.sumberHarga === 'estimasi') out.push({ level: 'perhatian', rute: nama, pesan: 'Harga beli masih estimasi tarif per km — konfirmasi dengan quotation vendor.' });
+    if (r.sumberHarga === 'manual' && r.hargaBeli > 0 && !r.vendor) out.push({ level: 'perhatian', rute: nama, pesan: 'Harga manual tanpa nama vendor.' });
+    if (r.origin && r.destination && !bisaDarat(r.origin, r.destination)) out.push({ level: 'perhatian', rute: nama, pesan: 'Origin & destination beda pulau — trucking saja tidak cukup, pertimbangkan tender Intermodal.' });
+    cekMargin(marginRute(r.marginPersen, t.marginGlobal), nama, out);
+    cekRate(r.rateId, rates, nama, out);
+  });
+  return out;
+}
+/** Catatan review tender intermodal: tiap stage punya harga, titik sambung stage cocok, lead time, margin. */
+export function reviewIntermodal(t: TenderIntermodal, rates: RateTransport[] = []): CatatanReview[] {
+  const out: CatatanReview[] = [];
+  if (!t.rute.length) out.push({ level: 'kritis', pesan: 'Belum ada rute.' });
+  t.rute.forEach((r, i) => {
+    const nama = `${i + 1}. ${r.origin || '…'} → ${r.destination || '…'}`;
+    if (!r.origin || !r.destination) out.push({ level: 'kritis', rute: nama, pesan: 'Origin / destination belum diisi.' });
+    r.stage.forEach((s, k) => {
+      const st = ['Pickup', 'Main leg', 'Delivery'][k];
+      if (!(s.harga > 0)) out.push({ level: 'kritis', rute: nama, pesan: `${st}: harga beli belum ada.` });
+      else if (s.sumberHarga === 'estimasi') out.push({ level: 'perhatian', rute: nama, pesan: `${st}: harga masih estimasi — konfirmasi dengan vendor.` });
+      if (!s.dari || !s.ke) out.push({ level: 'perhatian', rute: nama, pesan: `${st}: titik dari / ke belum lengkap.` });
+      if (s.leadTimeHari == null) out.push({ level: 'info', rute: nama, pesan: `${st}: lead time belum diisi.` });
+      cekRate(s.rateId, rates, `${nama} · ${st}`, out);
+    });
+    if (!(r.shipmentBulan > 0)) out.push({ level: 'perhatian', rute: nama, pesan: 'Shipment per bulan 0.' });
+    cekMargin(marginRute(r.marginPersen, t.marginGlobal), nama, out);
+  });
+  return out;
+}
+
+export interface BarisRateCard { layanan: string; satuan: string; tarif: number; catatan?: string }
+const fmtAngka = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+/** Rate card quotation tender transport: satu baris per rute (tarif jual per basis). */
+export const rateCardTransport = (t: TenderTransport): BarisRateCard[] => t.rute.filter(r => r.hargaBeli > 0).map(r => {
+  const h = hitungRute(r, t.marginGlobal);
+  return { layanan: `${r.origin} → ${r.destination}`, satuan: `${r.armada}, ${labelBasis(r.basis)}`, tarif: Math.ceil(h.jual),
+    catatan: [r.leadTimeHari ? `Lead time ${fmtAngka(r.leadTimeHari)} hari` : '', r.volumeBulan ? `estimasi ${fmtAngka(r.volumeBulan)} ${r.basis}/bulan` : ''].filter(Boolean).join('; ') };
+});
+/** Rate card quotation intermodal: satu baris per rute door-to-door (tarif jual per satuan jual), rincian moda di keterangan. */
+export const rateCardIntermodal = (t: TenderIntermodal): BarisRateCard[] => t.rute.filter(r => r.stage.every(s => s.harga > 0)).map(r => {
+  const h = hitungIntermodal(r, t.marginGlobal);
+  const main = r.stage[1];
+  return { layanan: `${r.origin} → ${r.destination} (door to door)`, satuan: `${labelBasis(r.satuanJual)}${r.qtyJual > 1 ? ` (${fmtAngka(r.qtyJual)} per shipment)` : ''}`,
+    tarif: Math.ceil(h.jualPerSatuan),
+    catatan: [`via ${MODA.find(m => m.v === main.moda)?.l.split(' ')[0] ?? main.moda} ${main.dari} → ${main.ke} (${main.armada})`, h.leadTimeHari ? `lead time ±${fmtAngka(h.leadTimeHari)} hari` : ''].filter(Boolean).join('; ') };
+});

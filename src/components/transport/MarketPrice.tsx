@@ -82,6 +82,15 @@ async function unduhTemplate(kolom: Kolom[], contoh: Row[], nama: string) {
 
 interface Pratinjau { file: string; baru: Row[]; ubah: { id: number; lama: number; row: Row }[]; sama: number; error: { baris: number; pesan: string }[] }
 
+/** Contoh baris template: satu per moda (trucking, laut, udara, kereta) supaya transport & intermodal bisa diisi di satu sheet. */
+const CONTOH: Row[] = [
+  { moda: 'darat', origin: 'Jakarta', destination: 'Surabaya', armada: 'CDD Box', basis: 'trip', harga: null, vendor: '(nama vendor)', lead_time_hari: 2, cakupan: 'termasuk tol & BBM; tidak termasuk bongkar muat', sumber: 'quotation vendor' },
+  { moda: 'darat', origin: 'Cibitung', destination: 'Tanjung Priok', armada: 'Trailer 20 ft', basis: 'trip', harga: null, vendor: '(nama vendor)', lead_time_hari: 1, cakupan: 'pickup / delivery container', sumber: 'quotation vendor' },
+  { moda: 'laut', origin: 'Tanjung Priok', destination: 'Makassar New Port', armada: 'Container 20 ft', basis: 'container', harga: null, vendor: '(shipping line)', lead_time_hari: 5, cakupan: 'port to port, belum THC', sumber: 'quotation vendor' },
+  { moda: 'udara', origin: 'Soekarno-Hatta (CGK)', destination: 'Sultan Hasanuddin (UPG)', armada: 'Air Cargo General', basis: 'kg', harga: null, vendor: '(airline / GSA)', lead_time_hari: 1, min_charge: null, cakupan: 'airport to airport, min. 10 kg', sumber: 'quotation vendor' },
+  { moda: 'kereta', origin: 'Jakarta', destination: 'Surabaya', armada: 'Kereta Container 20 ft', basis: 'container', harga: null, vendor: '(operator KA)', lead_time_hari: 2, cakupan: 'stasiun ke stasiun', sumber: 'quotation vendor' },
+];
+
 export default function MarketPrice({ moda, judul }: { moda?: Moda[]; judul: string }) {
   const { profile } = useProfile();
   const sb = supabaseBrowser();
@@ -91,12 +100,12 @@ export default function MarketPrice({ moda, judul }: { moda?: Moda[]; judul: str
   const [sibuk, setSibuk] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [filterModa, setFilterModa] = useState<Moda | 'semua'>('semua');
   const bolehEdit = !!profile && (!!profile.is_master || ['admin', 'manager', ...PERAN_EDIT].includes(profile.role));
   const kolomExcel: KolomExcel[] = kolom.map(k => ({ key: k.key, label: k.label, type: k.type === 'number' || k.type === 'date' ? k.type : 'text' }));
   const modaDefault = moda?.[0] ?? 'darat';
-  const contoh: Row[] = modaDefault === 'darat'
-    ? [{ moda: 'darat', origin: 'Jakarta', destination: 'Surabaya', armada: 'CDD Box', basis: 'trip', harga: null, vendor: '(nama vendor)', lead_time_hari: 2, cakupan: 'termasuk tol & BBM; tidak termasuk bongkar muat', sumber: 'quotation vendor' }]
-    : [{ moda: 'laut', origin: 'Tanjung Priok', destination: 'Makassar New Port', armada: 'Container 20 ft', basis: 'container', harga: null, vendor: '(shipping line)', lead_time_hari: 5, cakupan: 'port to port, belum THC', sumber: 'quotation vendor' }];
+  const contoh: Row[] = CONTOH.filter(r => !moda || moda.includes(r.moda as Moda));
+  const modaTampil = filterModa === 'semua' ? moda : [filterModa];
 
   async function unggah(f: File | undefined) {
     if (!f) return;
@@ -154,7 +163,7 @@ export default function MarketPrice({ moda, judul }: { moda?: Moda[]; judul: str
         <h2>{judul}</h2>
         <p className="small muted" style={{ margin: 0 }}>Harga beli vendor per rute. Dipakai tender sebagai pilihan vendor & harga (termurah tampil pertama). Isi banyak harga sekaligus: unduh template → isi di Excel → upload. Baris dengan moda, origin, destination, armada, basis & vendor yang sama dianggap harga yang sama → diperbarui; kombinasi baru → ditambahkan.</p>
         <div className="row">
-          <button className="ghost" onClick={() => unduhTemplate(kolom, contoh, 'Template_Market_Price')}>Unduh template Excel</button>
+          <button className="ghost" onClick={() => unduhTemplate(kolom, contoh, 'Template_Market_Price')}>Unduh template Excel (semua moda)</button>
           {bolehEdit && <label className="btn ghost" style={{ cursor: 'pointer' }}>Upload Excel
             <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={e => { unggah(e.target.files?.[0]); e.target.value = ''; }} /></label>}
           {sibuk && <span className="small muted">{sibuk}</span>}
@@ -171,8 +180,11 @@ export default function MarketPrice({ moda, judul }: { moda?: Moda[]; judul: str
           <div className="row"><button disabled={!pv.baru.length && !pv.ubah.length || !!sibuk} onClick={simpan}>Simpan {pv.baru.length + pv.ubah.length} harga</button><button className="ghost" onClick={() => setPv(null)}>Batal</button></div>
         </div>}
       </div>
-      <TableEditor key={versi} table="transport_rates" kolom={kolom} editorRoles={[...PERAN_EDIT]} approval orderBy={[{ col: 'origin' }, { col: 'destination' }, { col: 'harga' }]}
-        cari={['origin', 'destination', 'armada', 'vendor']} defaults={{ moda: modaDefault, basis: 'trip' }} filter={moda ? { moda } : undefined}
+      {(!moda || moda.length > 1) && <div className="tabs" role="tablist" aria-label="Filter moda">
+        {(['semua', ...(moda ?? MODA.map(m => m.v))] as (Moda | 'semua')[]).map(m => <button key={m} role="tab" aria-selected={filterModa === m} className={filterModa === m ? 'on' : ''} onClick={() => setFilterModa(m)}>
+          {m === 'semua' ? 'Semua moda' : MODA.find(x => x.v === m)?.l}</button>)}</div>}
+      <TableEditor key={`${versi}-${filterModa}`} table="transport_rates" kolom={kolom} editorRoles={[...PERAN_EDIT]} approval orderBy={[{ col: 'moda' }, { col: 'origin' }, { col: 'destination' }, { col: 'harga' }]}
+        cari={['origin', 'destination', 'armada', 'vendor']} defaults={{ moda: filterModa === 'semua' ? modaDefault : filterModa, basis: filterModa === 'laut' || filterModa === 'kereta' ? 'container' : filterModa === 'udara' ? 'kg' : 'trip' }} filter={modaTampil ? { moda: modaTampil } : undefined}
         profile={profile} namaExport="Market_Price" tanpaImport />
     </div>);
 }

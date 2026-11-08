@@ -1,19 +1,18 @@
 'use client';
-import { useTabUrl } from '@/lib/useTabUrl';
+import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { DaftarTenderTr } from '@/components/transport/shared';
-import MarketPrice from '@/components/transport/MarketPrice';
 import { INTERMODAL_DEFAULT } from '@/lib/transport';
 
-const TABS = ['Tender', 'Market Price'] as const;
-
-/** Menu Intermodal Tender: sheet Tender + sheet Market Price (semua moda: darat untuk pickup/delivery, laut/udara/kereta untuk main leg). */
+/** Menu Intermodal Tender: daftar & tender baru. Harga beli tiap stage diambil dari menu Market Price (semua moda). */
 export default function IntermodalPage() {
-  const [tab, setTab] = useTabUrl(TABS, 'Tender');
+  const router = useRouter();
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('tab') === 'market-price') router.replace('/market-price'); }, [router]);
   return (
     <>
-      <div className="head"><div><div className="eyebrow">Transport & Intermodal</div><h1>Intermodal Tender</h1></div></div>
-      <div className="tabs" role="tablist">{TABS.map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}</div>
-      {tab === 'Tender' ? <DaftarTenderTr jenis="intermodal" asumsiAwal={{ intermodal: INTERMODAL_DEFAULT }} basePath="/intermodal" />
-        : <MarketPrice judul="Market Price — semua moda (trucking, laut, udara, kereta)" />}
+      <div className="head"><div><div className="eyebrow">Transport & Intermodal</div><h1>Intermodal Tender</h1></div>
+        <Link className="btn ghost" href="/market-price">Market Price</Link></div>
+      <DaftarTenderTr jenis="intermodal" asumsiAwal={{ intermodal: INTERMODAL_DEFAULT }} basePath="/intermodal" />
     </>);
 }

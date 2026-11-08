@@ -1,19 +1,19 @@
 'use client';
-import { useTabUrl } from '@/lib/useTabUrl';
+import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { DaftarTenderTr } from '@/components/transport/shared';
-import MarketPrice from '@/components/transport/MarketPrice';
 import { TRANSPORT_DEFAULT } from '@/lib/transport';
 
-const TABS = ['Tender', 'Market Price'] as const;
-
-/** Menu Transportation Tender: sheet Tender (daftar & tender baru) + sheet Market Price (harga beli vendor per rute darat). */
+/** Menu Transportation Tender: daftar & tender baru. Harga beli vendor ada di menu Market Price (satu sheet semua moda). */
 export default function TransportPage() {
-  const [tab, setTab] = useTabUrl(TABS, 'Tender');
+  const router = useRouter();
+  // tautan lama ?tab=market-price → menu Market Price
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('tab') === 'market-price') router.replace('/market-price'); }, [router]);
   return (
     <>
-      <div className="head"><div><div className="eyebrow">Transport & Intermodal</div><h1>Transportation Tender</h1></div></div>
-      <div className="tabs" role="tablist">{TABS.map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}</div>
-      {tab === 'Tender' ? <DaftarTenderTr jenis="transportation" asumsiAwal={{ transport: TRANSPORT_DEFAULT }} basePath="/transport" />
-        : <MarketPrice moda={['darat']} judul="Market Price — trucking (darat)" />}
+      <div className="head"><div><div className="eyebrow">Transport & Intermodal</div><h1>Transportation Tender</h1></div>
+        <Link className="btn ghost" href="/market-price">Market Price</Link></div>
+      <DaftarTenderTr jenis="transportation" asumsiAwal={{ transport: TRANSPORT_DEFAULT }} basePath="/transport" />
     </>);
 }

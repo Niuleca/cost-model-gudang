@@ -13,6 +13,8 @@ export interface QuotationPdfData {
   gudang?: InfoGudangPdf | null; catatanRevisi?: string | null; durasiBulan?: number; termasukPpn?: boolean; ppnPersen?: number;
   termCondition: string; penandatangan: string; jabatan: string; perusahaan: string;
   logo?: GambarPdf | null; ttd?: GambarPdf | null; watermark?: string;
+  /** Jenis jasa di kalimat pembuka (default: jasa pergudangan) & sub judul kop (default: Warehousing & Distribution). */
+  jenisJasa?: string; subjudul?: string;
 }
 export interface GambarPdf { dataUrl: string; format: string; w: number; h: number }
 /** Ukuran gambar (mm) dalam kotak maksimum, aspek dijaga. */
@@ -27,7 +29,7 @@ export async function buatQuotationPdf(d: QuotationPdfData) {
   const rp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
   const tgl = (s: string) => new Date(s).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   // Font standar PDF tidak punya glyph ² ³ → tulis m2 / m3 supaya tidak hilang
-  const ascii = (t: string) => t.replace(/²/g, '2').replace(/³/g, '3');
+  const ascii = (t: string) => t.replace(/²/g, '2').replace(/³/g, '3').replace(/→/g, '->').replace(/≈/g, '~');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const akhirTabel = () => (doc as any).lastAutoTable.finalY as number;
   const GELAP: [number, number, number] = [43, 43, 43], ABU: [number, number, number] = [240, 240, 240], GARIS: [number, number, number] = [210, 210, 210];
@@ -48,7 +50,7 @@ export async function buatQuotationPdf(d: QuotationPdfData) {
     try { doc.addImage(d.logo.dataUrl, d.logo.format, kiri, 12 + (15 - u.h) / 2, u.w, u.h); xNama = kiri + u.w + 5; } catch { /* format tidak didukung */ }
   }
   doc.setFont('helvetica', 'bold'); doc.setFontSize(14); teks(20); doc.text(d.perusahaan, xNama, 18.5);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); teks(110); doc.text('Warehousing & Distribution', xNama, 23.5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); teks(110); doc.text(d.subjudul ?? 'Warehousing & Distribution', xNama, 23.5);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(15); teks(30); doc.text('QUOTATION', kanan, 18.5, { align: 'right' });
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); teks(110); doc.text(d.nomor, kanan, 23.5, { align: 'right' });
   doc.setDrawColor(...GELAP); doc.setLineWidth(0.6); doc.line(kiri, 30, kanan, 30);
@@ -76,7 +78,7 @@ export async function buatQuotationPdf(d: QuotationPdfData) {
   garis(y); y += 6;
 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); teks(30);
-  const pembuka = doc.splitTextToSize(ascii(`Dengan hormat, bersama ini kami sampaikan penawaran harga jasa pergudangan untuk ${d.customer} di ${d.lokasi} dengan rincian sebagai berikut:`), lebar);
+  const pembuka = doc.splitTextToSize(ascii(`Dengan hormat, bersama ini kami sampaikan penawaran harga ${d.jenisJasa ?? 'jasa pergudangan'} untuk ${d.customer}${d.lokasi && d.lokasi !== '-' ? ` di ${d.lokasi}` : ''} dengan rincian sebagai berikut:`), lebar);
   doc.text(pembuka, kiri, y); y += pembuka.length * 4.6 + 3;
 
   // ---- Lokasi gudang ----

@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cariLokasi, jarakKm, bisaDarat } from '../src/lib/lokasiIndonesia.ts';
-import { hitungRute, ringkasTransport, hitungIntermodal, ruteIntermodalBaru, estimasiHarga, cocokRate, kapasitasBasis, armada, type RateTransport } from '../src/lib/transport.ts';
+import { hitungRute, ringkasTransport, hitungIntermodal, ruteIntermodalBaru, estimasiHarga, cocokRate, kapasitasBasis, armada, tierTransport, tierIntermodal,
+  reviewTransport, reviewIntermodal, rateCardTransport, rateCardIntermodal, type RateTransport } from '../src/lib/transport.ts';
 
 test('lokasi: nama bebas, alias & jarak', () => {
   assert.equal(cariLokasi('Kota Bekasi')?.nama, 'Bekasi');
@@ -14,14 +15,28 @@ test('lokasi: nama bebas, alias & jarak', () => {
   assert.equal(bisaDarat('Jakarta', 'Medan'), true);
 });
 
-test('transport: harga jual = beli × (1 + margin), margin rute menimpa global', () => {
+test('transport: margin = GP% → harga jual = beli ÷ (1 − margin), margin rute menimpa global', () => {
   const r = { id: 'a', origin: 'Jakarta', destination: 'Bandung', armada: 'CDD Box', basis: 'trip' as const, volumeBulan: 20, vendor: 'V', hargaBeli: 2_000_000 };
-  const h = hitungRute(r, 0.1);
-  assert.equal(h.jual, 2_200_000); assert.equal(h.biayaBulan, 40_000_000); assert.equal(h.pendapatanBulan, 44_000_000);
-  assert.equal(Math.round(h.gpPersen * 10000) / 10000, 0.0909);
-  assert.equal(hitungRute({ ...r, marginPersen: 0.2 }, 0.1).jual, 2_400_000);
+  const h = hitungRute(r, 0.15);
+  assert.equal(h.jual, 2_352_941.18); assert.equal(h.biayaBulan, 40_000_000);
+  assert.equal(Math.round(h.gpPersen * 10000) / 10000, 0.15);          // input 15% → GP tepat 15% (bukan 13,04%)
+  assert.equal(hitungRute({ ...r, marginPersen: 0.2 }, 0.1).jual, 2_500_000);
   const s = ringkasTransport({ marginGlobal: 0.1, rute: [r, { ...r, id: 'b', hargaBeli: 0 }] });
-  assert.equal(s.tanpaHarga, 1); assert.equal(s.pendapatanBulan, 44_000_000);
+  assert.equal(s.tanpaHarga, 1); assert.equal(Math.round(s.gpPersen * 1000) / 1000, 0.1);
+});
+
+test('transport: perbandingan tier margin, review & rate card quotation', () => {
+  const r = { id: 'a', origin: 'Jakarta', destination: 'Surabaya', armada: 'CDD Box', basis: 'trip' as const, volumeBulan: 10, vendor: 'V', hargaBeli: 4_000_000, marginPersen: 0.2, leadTimeHari: 2 };
+  const t = { marginGlobal: 0.12, rute: [r, { ...r, id: 'b', destination: 'Makassar', hargaBeli: 0, marginPersen: null }] };
+  const x = tierTransport(t, [0.15, 0.1, 0.05]);
+  assert.deepEqual(x.kolom.map(k => k.label), ['Saat ini', 'Margin 15%', 'Margin 10%', 'Margin 5%']);
+  assert.equal(x.baris[0].jual[0], 5_000_000);                         // margin rute 20% tetap di kolom "Saat ini"
+  assert.deepEqual(x.total.slice(1).map(k => Math.round(k.gpPersen * 100)), [15, 10, 5]);
+  const rv = reviewTransport(t);
+  assert.ok(rv.some(c => c.level === 'kritis' && /harga beli/i.test(c.pesan)));
+  assert.ok(rv.some(c => /beda pulau/.test(c.pesan)));
+  const rc = rateCardTransport(t);
+  assert.equal(rc.length, 1); assert.equal(rc[0].tarif, 5_000_000); assert.match(rc[0].catatan ?? '', /Lead time 2 hari/);
 });
 
 test('transport: estimasi per km & konversi basis, market price termurah', () => {
@@ -41,9 +56,13 @@ test('intermodal: 3 stage digabung + biaya lain, margin, harga per satuan jual',
   r.stage[0].harga = 2_000_000; r.stage[1].harga = 8_000_000; r.stage[2].harga = 3_000_000;
   const h = hitungIntermodal(r, 0.15);
   assert.equal(h.beliShipment, 14_000_000);
-  assert.equal(h.jualShipment, 16_100_000);
-  assert.equal(h.jualPerSatuan, 644_000);
-  assert.equal(h.pendapatanBulan, 64_400_000);
+  assert.equal(h.jualShipment, 16_470_588.24);                          // 14 jt ÷ 0,85
+  assert.equal(h.jualPerSatuan, 658_823.53);
+  assert.equal(Math.round(h.gpPersen * 1000) / 1000, 0.15);
+  const t = { marginGlobal: 0.15, rute: [r] };
+  assert.deepEqual(tierIntermodal(t, [0.1]).total.map(k => Math.round(k.gpPersen * 100)), [15, 10]);
+  assert.equal(rateCardIntermodal(t)[0].tarif, 658_824);
+  assert.deepEqual(reviewIntermodal(t).filter(c => c.level === 'kritis').map(c => c.pesan), ['Origin / destination belum diisi.']);   // semua stage sudah berharga
 });
 
 import { hitungMetrik, analisisAkar, rataAktual, type Rencana, type AktualBulan } from '../src/lib/analisisProyek.ts';

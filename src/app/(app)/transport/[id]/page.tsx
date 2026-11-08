@@ -5,10 +5,14 @@ import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import StatusControl from '@/components/StatusControl';
 import { DatalistLokasi, InfoTenderTr, KartuRingkas, PersenInput, useRates, useTenderTr, type TenderTr } from '@/components/transport/shared';
+import { KartuReview, PerbandinganMargin } from '@/components/transport/ReviewTr';
+import QuotationPanel from '@/app/(app)/tender/[id]/QuotationPanel';
 import {
-  ARMADA, BASIS_DARAT, TRANSPORT_DEFAULT, armada, cocokRate, estimasiHarga, hasilOverview, hitungRute, kapasitasBasis, labelBasis,
-  ringkasTransport, ruteBaru, type RuteTransport, type TenderTransport,
+  ARMADA, BASIS_DARAT, TIER_DEFAULT, TRANSPORT_DEFAULT, armada, cocokRate, estimasiHarga, hasilOverview, hitungRute, kapasitasBasis, labelBasis,
+  rateCardTransport, reviewTransport, ringkasTransport, ruteBaru, tierTransport, type RuteTransport, type TenderTransport,
 } from '@/lib/transport';
+import { useTabUrl } from '@/lib/useTabUrl';
+import { useProfile } from '@/lib/useProfile';
 import { jarakKm, bisaDarat } from '@/lib/lokasiIndonesia';
 import { rp } from '@/lib/format';
 import { labelStatus, pillStatus } from '@/lib/status';
@@ -16,6 +20,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 
 const Rute3D = dynamic(() => import('@/components/transport/Rute3D'), { ssr: false, loading: () => <div className="rute3d-wadah sim3d-muat">Menyiapkan peta 3D…</div> });
 
+const TABS = ['Input rute', 'Result & margin', 'Quotation', 'Simulasi 3D'] as const;
 const ambilTr = (t: TenderTr): TenderTransport => ({ ...TRANSPORT_DEFAULT, ...((t.asumsi?.transport as TenderTransport | undefined) ?? {}) });
 
 /** Tender Transportation: rute origin → destination, armada, buying basis, vendor & harga beli (market price), margin, harga jual. */
@@ -26,12 +31,16 @@ export default function TransportTender() {
   const { rates, err: errRate, muat: muatRate } = useRates();
   const [info, setInfo] = useState<string | null>(null);
   const [sim, setSim] = useState<string>('semua');
+  const [tab, setTab] = useTabUrl(TABS, 'Input rute');
+  const { profile } = useProfile();
   if (!t) return <p className="muted">{err ?? 'Memuat tender…'}</p>;
   const tr = ambilTr(t);
   const setTr = (p: Partial<TenderTransport>) => ubah({ asumsi: { ...t.asumsi, transport: { ...tr, ...p } } });
   const setRute = (i: number, p: Partial<RuteTransport>) => setTr({ rute: tr.rute.map((r, j) => (j === i ? { ...r, ...p } : r)) });
   const ringkas = ringkasTransport(tr);
   const override = tr.rute.filter(r => r.marginPersen != null).length;
+  const tiers = tr.tierMargin ?? TIER_DEFAULT;
+  const review = reviewTransport(tr, rates);
 
   async function keMarket(r: RuteTransport) {
     setInfo(null);
@@ -56,13 +65,15 @@ export default function TransportTender() {
       <InfoTenderTr t={t} ubah={ubah} marginGlobal={tr.marginGlobal} onMargin={v => setTr({ marginGlobal: v })} adaOverride={override}
         onMarginSemua={() => setTr({ rute: tr.rute.map(r => ({ ...r, marginPersen: null })) })} />
       <KartuRingkas r={ringkas} kontrakBulan={t.durasi_kontrak_bulan} />
+      <div className="tabs" role="tablist">{TABS.map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}
+        {x === 'Result & margin' && review.some(c => c.level === 'kritis') ? ' ⚠' : ''}</button>)}</div>
 
-      <div className="card" style={{ display: 'grid', gap: 10 }}>
+      {tab === 'Input rute' && <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0 }}>Rute & harga</h2>
           <div className="row small">
             <span className="muted">{rates.length} harga di Market Price</span>
-            <Link className="btn ghost" href="/transport?tab=market-price" target="_blank">Buka Market Price</Link>
+            <Link className="btn ghost" href="/market-price" target="_blank">Buka Market Price</Link>
             <button onClick={() => setTr({ rute: [...tr.rute, ruteBaru({ origin: tr.rute.at(-1)?.origin ?? t.kab_kota ?? '' })] })}>+ Tambah rute</button>
           </div>
         </div>
@@ -121,9 +132,21 @@ export default function TransportTender() {
         </table></div>
         <p className="small muted" style={{ margin: 0 }}>Jarak & estimasi harga memakai koordinat kota perkiraan × faktor jalan 1,3 dan tarif indikatif per km per armada (Deliveree) — hanya acuan bila Market Price belum ada; harga final dari quotation vendor.</p>
         <DatalistLokasi id="dl-tr-kota" jenis={['kota', 'pelabuhan']} />
-      </div>
+      </div>}
 
-      {tr.rute.length > 0 && <div className="card" style={{ display: 'grid', gap: 10 }}>
+      {tab === 'Result & margin' && <>
+        <KartuReview review={review} />
+        <PerbandinganMargin hasil={tierTransport(tr, tiers)} tiers={tiers} onTiers={x => setTr({ tierMargin: x })} kontrakBulan={t.durasi_kontrak_bulan}
+          marginGlobal={tr.marginGlobal} adaOverride={override} onPakai={m => setTr({ marginGlobal: m, rute: tr.rute.map(r => ({ ...r, marginPersen: null })) })} />
+      </>}
+
+      {tab === 'Quotation' && <QuotationPanel tender={{ ...t, asumsi: t.asumsi as never }} profile={profile} sumber={{
+        rate: () => rateCardTransport(tr), perihal: 'Penawaran Harga Jasa Transportasi', jenisJasa: 'jasa transportasi darat (trucking)', subjudul: 'Transportation & Distribution',
+        cek: () => { const k = review.filter(c => c.level === 'kritis'); return k.length ? `Masih ada ${k.length} catatan kritis di tab Result & margin (mis. ${k[0].pesan.toLowerCase()}).` : null; },
+        keterangan: 'Tarif per rute = harga jual hasil margin saat ini (pakai tier di tab Result & margin bila ingin mengganti). Simpan perubahan rute dulu sebelum membuat quotation.',
+      }} />}
+
+      {tab === 'Simulasi 3D' && (tr.rute.length === 0 ? <div className="card muted">Belum ada rute.</div> : <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0 }}>Simulasi rute 3D</h2>
           <select aria-label="Pilih rute simulasi" value={sim} onChange={e => setSim(e.target.value)} style={{ maxWidth: 320 }}>
@@ -131,7 +154,7 @@ export default function TransportTender() {
             {tr.rute.map((r, i) => <option key={r.id} value={r.id}>{i + 1}. {r.origin || '…'} → {r.destination || '…'} · {r.armada}</option>)}
           </select>
         </div>
-        <Rute3D rute={tr.rute.filter(r => sim === 'semua' || r.id === sim).map((r, i) => ({ nama: `${sim === 'semua' ? `${i + 1}. ` : ''}${r.origin} → ${r.destination}`, legs: [{ moda: 'darat' as const, dari: r.origin, ke: r.destination, hari: r.leadTimeHari, label: r.armada }] }))} />
-      </div>}
+        <Rute3D rute={tr.rute.filter(r => sim === 'semua' || r.id === sim).map((r, i) => ({ nama: `${sim === 'semua' ? `${i + 1}. ` : ''}${r.origin} → ${r.destination}`, legs: [{ moda: 'darat' as const, dari: r.origin, ke: r.destination, hari: r.leadTimeHari, label: r.armada, armada: r.armada }] }))} />
+      </div>)}
     </>);
 }

@@ -7,7 +7,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRe
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import type { LayoutGudang, JenisMhe } from '@/lib/simulasi3d/layout';
-import { dindingMiring, poligonLuar } from '@/lib/simulasi3d/editor';
+import { dindingMiring, poligonLuar, rentangZ, diDalamGedung } from '@/lib/simulasi3d/editor';
 import { WARNA_MHE, WARNA_ORANG } from './warna';
 
 export type Kamera = 'iso' | 'atas' | 'dock' | 'lorong' | 'dekat';
@@ -299,6 +299,34 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
       l2.geometry.dispose(); l2.material.dispose();
     } else if (s.envDasar) { scene.environment = s.envDasar; scene.environmentIntensity = 0.5; }
 
+    // ---------- bentuk gedung: kotak, atau trapesium (satu sisi miring) → lantai, pondasi, dinding, atap & rangka mengikuti bentuk ini
+    const gTr = { L, W, sideMm: 0, centerMm: 0, trapesium: layout.trapesium ?? null };
+    const luarTr = layout.trapesium ? poligonLuar(gTr) : null, garisTr = luarTr ? dindingMiring(gTr) : null;
+    const sisiMiring = luarTr ? layout.trapesium!.sisi : null;
+    const rz = (x: number): [number, number] => (luarTr ? rentangZ(gTr, x) : [0, W]);
+    /** Tinggi bawah atap pelana di posisi z (eave H di z = 0 / W, puncak di W/2). */
+    const yAtap = (z: number) => H + (1 - Math.abs(z - W / 2) / (W / 2)) * (puncak - H);
+    const poliGedung: [number, number][] = [[0, rz(0)[0]], [L, rz(L)[0]], [L, rz(L)[1]], [0, rz(0)[1]]];
+    /** Poligon cembung digeser keluar sejauh d (m). */
+    const geserPoli = (pts: [number, number][], d: number): [number, number][] => {
+      const luas = pts.reduce((t, p, i) => { const q = pts[(i + 1) % pts.length]; return t + p[0] * q[1] - q[0] * p[1]; }, 0), arah = luas > 0 ? -1 : 1;
+      return pts.map((p, i) => {
+        const a = pts[(i - 1 + pts.length) % pts.length], b = pts[(i + 1) % pts.length];
+        const n = (u: [number, number], v: [number, number]) => { const dx = v[0] - u[0], dz = v[1] - u[1], l = Math.hypot(dx, dz) || 1; return [arah * dz / l, -arah * dx / l]; };
+        const n1 = n(a, p), n2 = n(p, b), k = d / Math.max(0.2, 1 + n1[0] * n2[0] + n1[1] * n2[1]);
+        return [p[0] + (n1[0] + n2[0]) * k, p[1] + (n1[1] + n2[1]) * k];
+      });
+    };
+    /** Pelat poligon (ekstrusi ke atas setebal t), bawah di y. UV = koordinat dunia (m). */
+    const pelat = (pts: [number, number][], t: number, y: number, m: THREE.Material) => {
+      const g = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z))), { depth: t, bevelEnabled: false }), m);
+      g.rotation.x = -Math.PI / 2; g.position.y = y; return g;
+    };
+    /** Balok tipis antara dua titik (lis atap miring). */
+    const balokAntara = (a: THREE.Vector3, b: THREE.Vector3, tebal: number, m: THREE.Material) => {
+      const g = new THREE.Mesh(new THREE.BoxGeometry(tebal, tebal, a.distanceTo(b)), m); g.position.copy(a).add(b).multiplyScalar(0.5); g.lookAt(b); return g;
+    };
+
     // ---------- tanah, halaman beton luar, pondasi & lantai
     const BX0 = -62, BX1 = L + 18, BZ0 = -46, BZ1 = W + 42;   // batas halaman beton (sisi dock lebih luas untuk manuver & antre truk)
     {
@@ -317,12 +345,18 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     if (bersih) { for (let i = 0; i < 6; i++) cat(13, 0.12, -24, -6 - i * 4.2); cat(30, 0.14, -15, -3.5, '#ffffff'); cat(30, 0.14, -15, W + 3.5, '#ffffff'); }
     // pondasi / dinding plinth beton: lantai gudang terangkat setinggi dock dari halaman
     if (dockH > 0.01) {
-      const pl = new THREE.Mesh(new THREE.BoxGeometry(L + 0.3, dockH, W + 0.3), mat('#ffffff', { roughness: 0.9, map: teksProsedural('precast', (L + 0.3) / 6, 1) ?? undefined }));
-      pl.position.set(L / 2, y0 + dockH / 2 - 0.05, W / 2); pl.castShadow = true; pl.receiveShadow = true; gBangunan.add(pl);
+      if (luarTr) {   // trapesium: pondasi mengikuti bentuk gedung (tanpa bagian di luar dinding miring)
+        const pl = pelat(geserPoli(poliGedung, 0.15), dockH, y0 - 0.05, mat('#ffffff', { roughness: 0.9, map: teksProsedural('precast', 1 / 6, 1 / Math.max(0.3, dockH)) ?? undefined }));
+        pl.castShadow = true; pl.receiveShadow = true; gBangunan.add(pl);
+      } else {
+        const pl = new THREE.Mesh(new THREE.BoxGeometry(L + 0.3, dockH, W + 0.3), mat('#ffffff', { roughness: 0.9, map: teksProsedural('precast', (L + 0.3) / 6, 1) ?? undefined }));
+        pl.position.set(L / 2, y0 + dockH / 2 - 0.05, W / 2); pl.castShadow = true; pl.receiveShadow = true; gBangunan.add(pl);
+      }
     }
-    const lantai = new THREE.Mesh(new THREE.BoxGeometry(L, 0.1, W), new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: bersih ? 0.42 : 0.38, metalness: 0, clearcoat: 0.35, clearcoatRoughness: 0.35,
-      map: bersih ? teksProsedural('beton', L / 6, W / 6) : teks('lantai', L / 6, W / 6) }));   // beton floor hardener mengilap   // beton floor hardener mengilap
-    lantai.position.set(L / 2, -0.05, W / 2); lantai.receiveShadow = true; gBangunan.add(lantai);
+    const mLantai = (rx: number, ry: number) => new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: bersih ? 0.42 : 0.38, metalness: 0, clearcoat: 0.35, clearcoatRoughness: 0.35,
+      map: bersih ? teksProsedural('beton', rx, ry) : teks('lantai', rx, ry) });   // beton floor hardener mengilap
+    if (luarTr) { const lt = pelat(poliGedung, 0.1, -0.1, mLantai(1 / 6, 1 / 6)); lt.receiveShadow = true; gBangunan.add(lt); }
+    else { const lantai = new THREE.Mesh(new THREE.BoxGeometry(L, 0.1, W), mLantai(L / 6, W / 6)); lantai.position.set(L / 2, -0.05, W / 2); lantai.receiveShadow = true; gBangunan.add(lantai); }
     // zona: warna lantai tipis + garis kuning
     const garis = mat('#facc15', { roughness: 0.6 });
     for (const z of layout.zona) {
@@ -371,8 +405,9 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     ];
     /** Dinding sepanjang satu sisi, dipotong di tiap lubang (pintu dock / gate). tinggi < H = dinding cutaway (tema bersih). */
     const dindingSisi = (sisi: Sisi, tinggiD: number, padat: boolean, tebal = 0.15) => {
-      const sz = sisi === 'depan' || sisi === 'belakang'; const pj = sz ? W : L;
+      const sz = sisi === 'depan' || sisi === 'belakang';
       const tetap = sisi === 'depan' ? 0 : sisi === 'belakang' ? L : sisi === 'kiri' ? 0 : W;
+      const [r0, pj] = sz ? rz(tetap) : [0, L];   // trapesium: dinding ujung hanya selebar gedung di ujung itu
       const seg = (a: number, b: number, ya: number, yb: number) => {
         if (b - a < 0.05 || yb - ya < 0.05) return;
         const bagian = (p: number, q: number, beton: boolean) => { if (q - p < 0.05) return; const c = (a + b) / 2, len = b - a, h = q - p, y = (p + q) / 2;
@@ -380,28 +415,21 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
           if (sz) f(beton ? 0.2 : tebal, h, len, tetap, y, c); else f(len, h, beton ? 0.2 : tebal, c, y, tetap); };
         if (bersih) bagian(ya, yb, false); else { bagian(ya, Math.min(yb, DADO), true); bagian(Math.max(ya, DADO), yb, false); }
       };
-      const ls = lubangDi(sisi).map(l => ({ a: Math.max(0, l.c - l.w / 2), b: Math.min(pj, l.c + l.w / 2), h: Math.min(tinggiD - 0.3, l.h) })).filter(l => l.b > l.a).sort((p, q) => p.a - q.a);
-      let prev = 0;
+      const ls = lubangDi(sisi).map(l => ({ a: Math.max(r0, l.c - l.w / 2), b: Math.min(pj, l.c + l.w / 2), h: Math.min(tinggiD - 0.3, l.h) })).filter(l => l.b > l.a).sort((p, q) => p.a - q.a);
+      let prev = r0;
       for (const l of ls) { if (l.a > prev) seg(prev, l.a, 0, tinggiD); seg(Math.max(prev, l.a), l.b, l.h, tinggiD); prev = Math.max(prev, l.b); }
       seg(prev, pj, 0, tinggiD);
     };
     /** Segitiga pelana di dinding ujung (x = 0 & x = L): side height di tepi → center height di tengah lebar. */
     const pelana = (x: number, padat: boolean) => {
       if (puncak - H < 0.05) return;
-      const sh = new THREE.Shape(); sh.moveTo(0, H); sh.lineTo(W / 2, puncak); sh.lineTo(W, H); sh.lineTo(0, H);
+      const [za, zb] = rz(x);
+      const sh = new THREE.Shape(); sh.moveTo(za, H); sh.lineTo(za, yAtap(za)); if (za < W / 2 && zb > W / 2) sh.lineTo(W / 2, puncak); sh.lineTo(zb, yAtap(zb)); sh.lineTo(zb, H); sh.lineTo(za, H);
       const mt = bersih ? new THREE.MeshStandardMaterial({ color: '#f8fafc', transparent: !padat, opacity: padat ? 1 : 0.35, side: THREE.DoubleSide, depthWrite: padat })
         : new THREE.MeshStandardMaterial({ color: '#eef2f6', map: teks('cladding', W / 4, (puncak - H) / 4), transparent: true, opacity: 0.5, roughness: 0.42, metalness: 0.45, side: THREE.DoubleSide, depthWrite: false });
       const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), mt); m.rotation.y = -Math.PI / 2; m.position.set(x, 0, 0); gDinding.add(m);
     };
-    // ---------- gedung trapesium: dinding samping miring + area di luar dinding ditutup perkerasan halaman
-    const gTr = layout.trapesium ? { L, W, sideMm: 0, centerMm: 0, trapesium: layout.trapesium } : null;
-    const luarTr = gTr ? poligonLuar(gTr) : null, garisTr = luarTr && gTr ? dindingMiring(gTr) : null;
-    const sisiMiring = luarTr ? layout.trapesium!.sisi : null;
-    if (luarTr) {
-      const sh = new THREE.Shape(luarTr.map(p => new THREE.Vector2(p.x, -p.z)));
-      const tutup = new THREE.Mesh(new THREE.ShapeGeometry(sh), mat('#c9ced4', { roughness: 0.95 }));
-      tutup.rotation.x = -Math.PI / 2; tutup.position.y = 0.03; tutup.receiveShadow = true; gBangunan.add(tutup);
-    }
+    // ---------- gedung trapesium: dinding samping miring; area di luar dinding tidak dibangun (halaman beton saja)
     const dindingMiringDi = (tinggiD: number, padat: boolean) => {
       if (!garisTr) return;
       const dx = garisTr.x1 - garisTr.x0, dz = garisTr.z1 - garisTr.z0, pj = Math.hypot(dx, dz), sudut = -Math.atan2(dz, dx);
@@ -414,7 +442,20 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
         const w = new THREE.Mesh(new THREE.BoxGeometry(pj, yb - ya, beton ? 0.2 : 0.15), m);
         w.position.set(cx, (ya + yb) / 2, cz); w.rotation.y = sudut; w.castShadow = beton || padat; w.receiveShadow = true; gDinding.add(w);
       };
-      if (bersih) bagian(0, tinggiD, false); else { bagian(0, Math.min(tinggiD, DADO), true); bagian(Math.max(0, DADO), tinggiD, false); }
+      // dinding penuh: bagian atas mengikuti garis atap (eave dinding miring naik ke arah bubungan)
+      const penuh = tinggiD >= H - 0.01;
+      const t0 = penuh ? yAtap(garisTr.z0) : tinggiD, t1 = penuh ? yAtap(garisTr.z1) : tinggiD;
+      const quad = (ya: number, yb0: number, yb1: number, m: THREE.Material) => {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute([garisTr.x0, ya, garisTr.z0, garisTr.x1, ya, garisTr.z1, garisTr.x1, yb1, garisTr.z1, garisTr.x0, yb0, garisTr.z0], 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute([0, ya / 4, pj / 4, ya / 4, pj / 4, yb1 / 4, 0, yb0 / 4], 2));
+        g.setIndex([0, 1, 2, 0, 2, 3]); g.computeVertexNormals();
+        const w = new THREE.Mesh(g, m); w.receiveShadow = true; w.castShadow = padat; gDinding.add(w);
+      };
+      const mClad = bersih ? new THREE.MeshStandardMaterial({ color: '#f8fafc', transparent: !padat, opacity: padat ? 1 : 0.35, roughness: 0.6, side: THREE.DoubleSide, depthWrite: padat })
+        : new THREE.MeshStandardMaterial({ color: '#eef2f6', map: teks('cladding', 1 + 1e-9, 1), transparent: true, opacity: 0.5, roughness: 0.42, metalness: 0.45, side: THREE.DoubleSide, depthWrite: false });
+      if (bersih) { if (penuh) quad(0, t0, t1, mClad); else bagian(0, tinggiD, false); }
+      else { bagian(0, Math.min(tinggiD, DADO), true); if (t0 > DADO + 0.05 || t1 > DADO + 0.05) quad(Math.max(0, DADO), t0, t1, mClad); }
     };
     const dindingSisiAsli = dindingSisi;
     const dindingSisiTr = (sisi: Sisi, tinggiD: number, padat: boolean, tebal = 0.15) => (sisi === sisiMiring ? dindingMiringDi(tinggiD, padat) : dindingSisiAsli(sisi, tinggiD, padat, tebal));
@@ -426,33 +467,44 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
       const sudut: [number, number][] = garisTr
         ? (sisiMiring === 'kanan' ? [[0, 0], [L, 0], [L, garisTr.z1], [0, garisTr.z0]] : [[0, garisTr.z0], [L, garisTr.z1], [L, W], [0, W]])
         : [[0, 0], [L, 0], [L, W], [0, W]];
-      for (const [x, z] of sudut) { const k = new THREE.Mesh(new THREE.BoxGeometry(0.35, z === W && x !== 0 && x !== L ? 1.2 : H, 0.35), lis); k.position.set(x, H / 2, z); k.castShadow = true; gDinding.add(k); }
+      for (const [x, z] of sudut) { const hk = garisTr && sisiMiring === 'kiri' && Math.abs(z - (x === 0 ? garisTr.z0 : garisTr.z1)) < 0.01 ? yAtap(z) : z === W && x !== 0 && x !== L ? 1.2 : H;
+        const k = new THREE.Mesh(new THREE.BoxGeometry(0.35, hk, 0.35), lis); k.position.set(x, hk / 2, z); k.castShadow = true; gDinding.add(k); }
       const tepiAtas = (sx: number, sz: number, x: number, z: number, y: number) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.25, sz), lis); m.position.set(x, y, z); gDinding.add(m); };
       if (sisiMiring !== 'kiri') tepiAtas(L, 0.3, L / 2, 0, H);
-      tepiAtas(0.3, W, L, W / 2, H);
+      else if (garisTr) gDinding.add(balokAntara(new THREE.Vector3(garisTr.x0, yAtap(garisTr.z0), garisTr.z0), new THREE.Vector3(garisTr.x1, yAtap(garisTr.z1), garisTr.z1), 0.28, lis));
+      { const [b0, b1] = rz(L); tepiAtas(0.3, b1 - b0, L, (b0 + b1) / 2, H); }
       if (sisiMiring !== 'kanan') tepiAtas(L, 0.3, L / 2, W, 1.2);
     } else { for (const sisi of ['depan', 'belakang', 'kiri', 'kanan'] as const) dindingSisiTr(sisi, H, false); pelana(0, false); pelana(L, false); }
+    /** z tepi atap (eave) di posisi x untuk sisi atap sgn (−1 = z kecil, +1 = z besar). */
+    const zTepi = (x: number, sgn: number) => (sgn < 0 ? rz(x)[0] : rz(x)[1]);
     // kolom baja dinding + portal frame (rafter) mengikuti atap pelana
     const mKolom = mat(bersih ? '#2563eb' : '#3f4a57', { metalness: bersih ? 0.1 : 0.65, roughness: 0.38 });
     const langkahKolom = Math.max(6, L / Math.ceil(L / 8));
     const xsKolom: number[] = []; for (let x = 0; x <= L + 0.01; x += langkahKolom) xsKolom.push(x);
-    for (const x of xsKolom) for (const z of bersih ? [0] : [0, W]) { const k = new THREE.Mesh(new THREE.BoxGeometry(0.3, H, 0.3), mKolom); k.position.set(x, H / 2, z); k.castShadow = true; gDinding.add(k); }
+    for (const x of xsKolom) for (const sg of bersih ? [-1] : [-1, 1]) {
+      const z = zTepi(x, sg), hk = luarTr ? Math.max(H, yAtap(z)) : H;
+      const k = new THREE.Mesh(new THREE.BoxGeometry(0.3, hk, 0.3), mKolom); k.position.set(x, hk / 2, z); k.castShadow = true; gDinding.add(k);
+    }
     const miring = Math.hypot(W / 2, puncak - H), sudutAtap = Math.atan2(puncak - H, W / 2);
     {
       const mRafter = mat('#4b5563', { metalness: 0.6, roughness: 0.4 });
       for (const x of xsKolom) for (const sgn of [-1, 1]) {
-        const rf = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, miring), mRafter);
-        rf.position.set(Math.min(L - 0.15, Math.max(0.15, x)), (H + puncak) / 2 - 0.45, W / 2 + (sgn * W) / 4); rf.rotation.x = sgn * sudutAtap; rf.castShadow = true; gAtap.add(rf);
+        const ze = zTepi(Math.min(L, Math.max(0, x)), sgn), dz = Math.abs(W / 2 - ze); if (dz < 0.3) continue;
+        const rf = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, dz / Math.cos(sudutAtap)), mRafter);
+        rf.position.set(Math.min(L - 0.15, Math.max(0.15, x)), (yAtap(ze) + puncak) / 2 - 0.45, (W / 2 + ze) / 2); rf.rotation.x = sgn * sudutAtap; rf.castShadow = true; gAtap.add(rf);
       }
       // gording (purlin) tiap ±1,5 m sepanjang atap
       const nP = Math.max(2, Math.round(miring / 1.5)); const mPurlin = mat('#9ca3af', { metalness: 0.6, roughness: 0.4 });
       for (const sgn of [-1, 1]) for (let i = 0; i <= nP; i++) {
         const f = i / nP; const z = sgn < 0 ? f * W / 2 : W - f * W / 2; const y = H + f * (puncak - H) - 0.2;
-        const pu = new THREE.Mesh(new THREE.BoxGeometry(L, 0.15, 0.08), mPurlin); pu.position.set(L / 2, y, z); gAtap.add(pu);
+        // trapesium: gording hanya sepanjang bagian gedung pada z ini
+        let xa = 0, xb = L;
+        if (luarTr) { const xs = Array.from({ length: 41 }, (_, k) => (k / 40) * L).filter(xx => diDalamGedung(gTr, xx, z, 0)); if (xs.length < 2) continue; xa = xs[0]; xb = xs[xs.length - 1]; }
+        const pu = new THREE.Mesh(new THREE.BoxGeometry(xb - xa, 0.15, 0.08), mPurlin); pu.position.set((xa + xb) / 2, y, z); gAtap.add(pu);
       }
       // lampu high-bay LED (grid ±9 × 8 m) — emissive, menggantung di bawah gording
       const pos: [number, number][] = []; const nx = Math.max(1, Math.round(L / 9)), nz = Math.max(1, Math.round(W / 8));
-      for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) pos.push([(i + 0.5) * L / nx, (j + 0.5) * W / nz]);
+      for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const lx = (i + 0.5) * L / nx, lz = (j + 0.5) * W / nz; if (!luarTr || diDalamGedung(gTr, lx, lz, -0.8)) pos.push([lx, lz]); }
       const lampu = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.28, 0.22, 0.14, 18), new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#fff7e6', emissiveIntensity: 2.2, roughness: 0.3 }), pos.length);
       const rumah = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.3, 0.22, 18), mat('#374151', { metalness: 0.6, roughness: 0.35 }), pos.length);
       const tmpL = new THREE.Object3D();
@@ -462,8 +514,19 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
     }
     // atap pelana (bubungan sepanjang X) — metal deck bergelombang
     const mAtap = new THREE.MeshStandardMaterial({ color: bersih ? '#3b82f6' : '#dfe4ea', roughness: 0.38, metalness: bersih ? 0.1 : 0.55, side: THREE.DoubleSide, transparent: true, opacity: bersih ? 0.97 : 0.94,
-      map: bersih ? null : teks('cladding', (L + 1) / 4, (miring + 0.6) / 4) });
+      map: bersih ? null : luarTr ? teks('cladding', 1 + 1e-9, 1) : teks('cladding', (L + 1) / 4, (miring + 0.6) / 4) });
     for (const sgn of [-1, 1]) {
+      if (luarTr) {   // bidang atap: bubungan (W/2) → tepi atap yang mengikuti dinding miring, overstek 0,3 m & 0,5 m di ujung
+        const ext = (x: number) => zTepi(0, sgn) + (zTepi(L, sgn) - zTepi(0, sgn)) * (x / L) + sgn * 0.3;
+        const xa = -0.5, xb = L + 0.5, za = ext(xa), zb = ext(xb), yy = (z: number) => yAtap(z) + 0.08;
+        const sA = (z: number) => Math.abs(z - W / 2) / Math.cos(sudutAtap);
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute([xa, puncak + 0.08, W / 2, xb, puncak + 0.08, W / 2, xb, yy(zb), zb, xa, yy(za), za], 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute([xa / 4, 0, xb / 4, 0, xb / 4, sA(zb) / 4, xa / 4, sA(za) / 4], 2));
+        g.setIndex([0, 1, 2, 0, 2, 3]); g.computeVertexNormals();
+        const a = new THREE.Mesh(g, mAtap); a.castShadow = true; gAtap.add(a);
+        continue;
+      }
       const a = new THREE.Mesh(new THREE.BoxGeometry(L + 1, 0.12, miring + 0.6), mAtap);
       a.position.set(L / 2, (H + puncak) / 2, W / 2 + (sgn * W) / 4); a.rotation.x = sgn * sudutAtap; a.castShadow = true; gAtap.add(a);
     }

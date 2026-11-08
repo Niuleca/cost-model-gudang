@@ -5,9 +5,13 @@ import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import StatusControl from '@/components/StatusControl';
 import { DatalistLokasi, InfoTenderTr, KartuRingkas, PersenInput, useRates, useTenderTr, type TenderTr } from '@/components/transport/shared';
+import { KartuReview, PerbandinganMargin } from '@/components/transport/ReviewTr';
+import QuotationPanel from '@/app/(app)/tender/[id]/QuotationPanel';
+import { useTabUrl } from '@/lib/useTabUrl';
+import { useProfile } from '@/lib/useProfile';
 import {
-  BASIS, INTERMODAL_DEFAULT, MODA, NAMA_STAGE, armadaModa, cocokRate, estimasiHarga, hasilOverview, hitungIntermodal, labelBasis,
-  ringkasIntermodal, ruteIntermodalBaru, type Basis, type Moda, type RateTransport, type RuteIntermodal, type StageIntermodal, type TenderIntermodal,
+  BASIS, INTERMODAL_DEFAULT, MODA, NAMA_STAGE, TIER_DEFAULT, armadaModa, cocokRate, estimasiHarga, hasilOverview, hitungIntermodal, labelBasis,
+  rateCardIntermodal, reviewIntermodal, ringkasIntermodal, ruteIntermodalBaru, tierIntermodal, type Basis, type Moda, type RateTransport, type RuteIntermodal, type StageIntermodal, type TenderIntermodal,
 } from '@/lib/transport';
 import { jarakKm } from '@/lib/lokasiIndonesia';
 import { rp } from '@/lib/format';
@@ -15,6 +19,7 @@ import { labelStatus, pillStatus } from '@/lib/status';
 
 const Rute3D = dynamic(() => import('@/components/transport/Rute3D'), { ssr: false, loading: () => <div className="rute3d-wadah sim3d-muat">Menyiapkan peta 3D…</div> });
 
+const TABS = ['Input rute', 'Result & margin', 'Quotation', 'Simulasi 3D'] as const;
 const ambilIm = (t: TenderTr): TenderIntermodal => ({ ...INTERMODAL_DEFAULT, ...((t.asumsi?.intermodal as TenderIntermodal | undefined) ?? {}) });
 const BASIS_MODA: Record<Moda, Basis[]> = { darat: ['trip', 'cbm', 'ton', 'pallet', 'liter'], laut: ['container', 'cbm', 'ton'], udara: ['kg'], kereta: ['container', 'ton'] };
 
@@ -61,6 +66,8 @@ export default function IntermodalTender() {
   const { t, ubah, kotor, pesan, err, simpanSekarang, setT } = useTenderTr(id, hitungHasil);
   const { rates, err: errRate } = useRates();
   const [sim, setSim] = useState('semua');
+  const [tab, setTab] = useTabUrl(TABS, 'Input rute');
+  const { profile } = useProfile();
   if (!t) return <p className="muted">{err ?? 'Memuat tender…'}</p>;
   const im = ambilIm(t);
   const setIm = (p: Partial<TenderIntermodal>) => ubah({ asumsi: { ...t.asumsi, intermodal: { ...im, ...p } } });
@@ -82,6 +89,8 @@ export default function IntermodalTender() {
   };
   const ringkas = ringkasIntermodal(im);
   const override = im.rute.filter(r => r.marginPersen != null).length;
+  const tiers = im.tierMargin ?? TIER_DEFAULT;
+  const review = reviewIntermodal(im, rates);
 
   return (
     <>
@@ -99,10 +108,13 @@ export default function IntermodalTender() {
         onMarginSemua={() => setIm({ rute: im.rute.map(r => ({ ...r, marginPersen: null })) })} />
       <KartuRingkas r={ringkas} kontrakBulan={t.durasi_kontrak_bulan} />
       {errRate && <p className="error small">Market Price belum bisa dibaca: {errRate}</p>}
+      <div className="tabs" role="tablist">{TABS.map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}
+        {x === 'Result & margin' && review.some(c => c.level === 'kritis') ? ' ⚠' : ''}</button>)}</div>
 
+      {tab === 'Input rute' && <>
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <span className="small muted">{rates.length} harga di Market Price · harga beli per shipment = Σ (harga stage × qty) + biaya lain; harga jual = beli × (1 + margin).</span>
-        <div className="row"><Link className="btn ghost" href="/intermodal?tab=market-price" target="_blank">Buka Market Price</Link>
+        <span className="small muted">{rates.length} harga di Market Price · harga beli per shipment = Σ (harga stage × qty) + biaya lain; harga jual = beli ÷ (1 − margin) → GP% = margin.</span>
+        <div className="row"><Link className="btn ghost" href="/market-price" target="_blank">Buka Market Price</Link>
           <button onClick={() => setIm({ rute: [...im.rute, ruteIntermodalBaru({ origin: t.kab_kota ?? '', stage: ruteIntermodalBaru().stage.map((s, k) => (k === 0 ? { ...s, dari: t.kab_kota ?? '' } : s)) as RuteIntermodal['stage'] })] })}>+ Tambah rute</button></div>
       </div>
       {im.rute.length === 0 && <div className="card muted">Belum ada rute. Klik “+ Tambah rute”.</div>}
@@ -144,7 +156,21 @@ export default function IntermodalTender() {
             </table></div>
           </div>);
       })}
-      {im.rute.length > 0 && <div className="card" style={{ display: 'grid', gap: 10 }}>
+      </>}
+
+      {tab === 'Result & margin' && <>
+        <KartuReview review={review} />
+        <PerbandinganMargin hasil={tierIntermodal(im, tiers)} tiers={tiers} onTiers={x => setIm({ tierMargin: x })} kontrakBulan={t.durasi_kontrak_bulan}
+          marginGlobal={im.marginGlobal} adaOverride={override} onPakai={m => setIm({ marginGlobal: m, rute: im.rute.map(r => ({ ...r, marginPersen: null })) })} />
+      </>}
+
+      {tab === 'Quotation' && <QuotationPanel tender={{ ...t, asumsi: t.asumsi as never }} profile={profile} sumber={{
+        rate: () => rateCardIntermodal(im), perihal: 'Penawaran Harga Jasa Intermodal (Door to Door)', jenisJasa: 'jasa pengiriman intermodal door to door', subjudul: 'Intermodal & Freight Forwarding',
+        cek: () => { const k = review.filter(c => c.level === 'kritis'); return k.length ? `Masih ada ${k.length} catatan kritis di tab Result & margin (mis. ${k[0].pesan.toLowerCase()}).` : null; },
+        keterangan: 'Tarif per rute = harga jual door to door per satuan jual dengan margin saat ini (pakai tier di tab Result & margin bila ingin mengganti).',
+      }} />}
+
+      {tab === 'Simulasi 3D' && (im.rute.length === 0 ? <div className="card muted">Belum ada rute.</div> : <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0 }}>Simulasi rute 3D (pickup → main leg → delivery)</h2>
           <select aria-label="Pilih rute simulasi" value={sim} onChange={e => setSim(e.target.value)} style={{ maxWidth: 320 }}>
@@ -153,8 +179,8 @@ export default function IntermodalTender() {
           </select>
         </div>
         <Rute3D rute={im.rute.filter(r => sim === 'semua' || r.id === sim).map((r, i) => ({ nama: `${sim === 'semua' ? `${i + 1}. ` : ''}${r.origin} → ${r.destination}`,
-          legs: r.stage.map((s, k) => ({ moda: s.moda, dari: s.dari, ke: s.ke, hari: s.leadTimeHari, label: ['Pickup', 'Main leg', 'Delivery'][k] })) }))} />
-      </div>}
+          legs: r.stage.map((s, k) => ({ moda: s.moda, dari: s.dari, ke: s.ke, hari: s.leadTimeHari, label: ['Pickup', 'Main leg', 'Delivery'][k], armada: s.armada })) }))} />
+      </div>)}
       <DatalistLokasi id="dl-im-darat" jenis={['kota', 'pelabuhan', 'bandara']} />
       <DatalistLokasi id="dl-im-laut" jenis={['pelabuhan']} />
       <DatalistLokasi id="dl-im-udara" jenis={['bandara']} />

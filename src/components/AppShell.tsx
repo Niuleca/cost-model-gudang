@@ -30,6 +30,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua', grup: 'Warehouse Tender' },
     { href: '/transport', label: 'Transportation Tender', roles: TIM_TENDER, grup: 'Transport & Intermodal' },
     { href: '/intermodal', label: 'Intermodal Tender', roles: TIM_TENDER, grup: 'Transport & Intermodal' },
+    { href: '/market-price', label: 'Market Price (semua moda)', roles: 'semua', grup: 'Transport & Intermodal' },
     { href: '/pipeline', label: 'Tender Pipeline', roles: TIM_TENDER, grup: 'Monitoring' },
     { href: '/tracking', label: 'Tender Status & Tracking', roles: TIM_TENDER, grup: 'Monitoring' },
     { href: '/analytics', label: 'Tender Performance Analytics', roles: TIM_TENDER, grup: 'Monitoring' },

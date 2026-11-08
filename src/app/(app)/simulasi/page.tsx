@@ -72,6 +72,8 @@ export default function DesainGudang() {
   const [sibuk, setSibuk] = useState(false);
   const [lapis, setLapis] = useState({ n: 2, jarak: 0, arah: 'z' as 'x' | 'z', asKeAs: false });
   const [gridPilar, setGridPilar] = useState({ x: '6', z: '6', ukuran: 0.5, ganti: true });
+  /** Ukuran kolom baru = kolom terakhir yang dipilih / diubah / dibuat (null = pakai "Ukuran pilar"). */
+  const [acuanKolom, setAcuanKolom] = useState<{ w: number; d: number; tinggi: number } | null>(null);
   const [sebarGate, setSebarGate] = useState({ n: 3, jarak: 0 });
   const [jarakDinding, setJarakDinding] = useState(0.5);
   const [langkah, setLangkah] = useState<'layout' | 'simulasi'>('layout');
@@ -174,6 +176,9 @@ export default function DesainGudang() {
   const kec = useMemo(() => ({ faktor: 10, siklus: {} }), []);
 
   const terpilih = edit?.komponen.find(k => k.id === pilih) ?? null;
+  // kolom yang dipilih / diubah ukurannya menjadi acuan ukuran kolom baru (mode kolom)
+  const kolomAcuan = terpilih?.jenis === 'kolom' ? `${terpilih.w}|${terpilih.d}|${terpilih.tinggi}` : '';
+  useEffect(() => { if (!kolomAcuan) return; const [w, d, t] = kolomAcuan.split('|').map(Number); setAcuanKolom({ w, d, tinggi: t }); }, [kolomAcuan]);
   /** Tarik rak otomatis: rak terpilih saja (kalau yang dipilih rak), selain itu semua rak. */
   const tarik = (hanyaTerpilih: boolean) => {
     if (!edit) return;
@@ -260,11 +265,13 @@ export default function DesainGudang() {
   function taruhKolom(x: number, z: number) {
     if (!edit || !data) return;
     const s = Math.max(0.2, gridPilar.ukuran);
+    const uk = acuanKolom ?? { w: s, d: s, tinggi: edit.gedung.sideMm / 1000 };
     const [tpl] = komponenBaru('kolom', data.p, { x: 0, z: 0 }, edit.tinggiPalet);
     const n = edit.komponen.filter(k => k.jenis === 'kolom').length;
-    const k: Komponen = { ...tpl, id: uid(), label: `Kolom ${n + 1}`, w: s, d: s, x: r2(x - s / 2), z: r2(z - s / 2), tinggi: edit.gedung.sideMm / 1000 };
+    const k: Komponen = { ...tpl, id: uid(), label: `Kolom ${n + 1}`, w: uk.w, d: uk.d, x: r2(x - uk.w / 2), z: r2(z - uk.d / 2), tinggi: uk.tinggi };
     aksi(e => ({ ...e, komponen: [...e.komponen, k] }));
-    setPesan(`Kolom ${n + 1} ditaruh di X ${angka(x, 2)} m · Z ${angka(z, 2)} m (pusat). Klik lagi untuk kolom berikutnya; pilih mode "Pilih / geser" untuk selesai.`);
+    setAcuanKolom({ w: uk.w, d: uk.d, tinggi: uk.tinggi });
+    setPesan(`Kolom ${n + 1} (${angka(uk.w, 2)} × ${angka(uk.d, 2)} m) ditaruh di X ${angka(x, 2)} m · Z ${angka(z, 2)} m (pusat). Klik lagi untuk kolom berikutnya (ukuran sama); pilih mode "Pilih / geser" untuk selesai.`);
   }
   const hapusSemuaKolom = () => aksi(e => ({ ...e, komponen: e.komponen.filter(k => k.jenis !== 'kolom') }));
   function buatGridPilar() {
@@ -553,7 +560,7 @@ export default function DesainGudang() {
             <div className="eyebrow">Kolom / pilar ({edit.komponen.filter(k => k.jenis === 'kolom').length})</div>
             <div className="sim2d-kolom">
               <button type="button" className={mode === 'kolom' ? '' : 'ghost'} onClick={() => setMode(mode === 'kolom' ? 'pilih' : 'kolom')}>{mode === 'kolom' ? '✓ Selesai menaruh kolom' : '＋ Taruh kolom dengan klik'}</button>
-              <p className="small muted" style={{ margin: 0 }}>Klik di denah = 1 kolom. Otomatis sejajar dengan kolom terdekat (garis biru) dan menampilkan jarak as ke as. Atau buat grid sekaligus:</p>
+              <p className="small muted" style={{ margin: 0 }}>Klik di denah = 1 kolom, ukuran <b>{angka(acuanKolom?.w ?? gridPilar.ukuran, 2)} × {angka(acuanKolom?.d ?? gridPilar.ukuran, 2)} m</b>{acuanKolom ? ' (ikut kolom terakhir dipilih / dibuat)' : ''}{acuanKolom && <> · <button type="button" className="link-kecil" onClick={() => setAcuanKolom(null)}>pakai ukuran pilar {angka(gridPilar.ukuran, 2)} m</button></>}. Otomatis sejajar dengan kolom terdekat (garis biru) dan menampilkan jarak as ke as. Seret kolom = pindah tanpa mengubah ukuran (handle ukuran ada di luar sudut kolom); Ctrl+D = gandakan dengan ukuran sama. Atau buat grid sekaligus:</p>
               <div className="row" style={{ gap: 4 }}>
                 {[['6', '6'], ['8', '8'], ['10', '10'], ['12', '24']].map(([x, z]) => (
                   <button key={`${x}x${z}`} type="button" className="ghost" style={{ padding: '3px 8px' }} onClick={() => setGridPilar(g => ({ ...g, x, z }))} title={`Bentang ${x} m × ${z} m`}>{x}×{z}</button>))}
@@ -564,7 +571,7 @@ export default function DesainGudang() {
               <div className="grid2" style={{ gap: 6 }}>
                 <label className="f">Bentang X (m)<input value={gridPilar.x} onChange={e => setGridPilar(g => ({ ...g, x: e.target.value }))} placeholder="6 atau 6; 6; 8" /></label>
                 <label className="f">Bentang Z (m)<input value={gridPilar.z} onChange={e => setGridPilar(g => ({ ...g, z: e.target.value }))} placeholder="6 atau 6; 6; 8" /></label>
-                <Angka l="Ukuran pilar" u="m" step={0.05} v={gridPilar.ukuran} set={x => setGridPilar(g => ({ ...g, ukuran: Math.max(0.2, x) }))} />
+                <Angka l="Ukuran pilar" u="m" step={0.05} v={gridPilar.ukuran} set={x => { setGridPilar(g => ({ ...g, ukuran: Math.max(0.2, x) })); setAcuanKolom(null); }} />
                 <label className="f small" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 'auto' }} checked={gridPilar.ganti} onChange={e => setGridPilar(g => ({ ...g, ganti: e.target.checked }))} />Ganti kolom lama</label>
               </div>
               {(() => { const xs = posisiBentang(gridPilar.x, edit.gedung.L), zs = posisiBentang(gridPilar.z, edit.gedung.W);
@@ -639,7 +646,7 @@ export default function DesainGudang() {
             </div>
             <div className={`sim2d-kanvas ${tampil}`}>
               <div className="sim2d-panel2d" style={{ display: tampil === '3d' ? 'none' : undefined }}>
-                <Editor2D ref={ed2} edit={edit} pilih={pilih} setPilih={setPilih} multi={multi} setMulti={setMulti} mulaiAksi={mulaiAksi} ubah={ubah} mode={mode} grid={grid} snapTepi={snapTepi} taruhKolom={taruhKolom} ukuranKolom={Math.max(0.2, gridPilar.ukuran)}
+                <Editor2D ref={ed2} edit={edit} pilih={pilih} setPilih={setPilih} multi={multi} setMulti={setMulti} mulaiAksi={mulaiAksi} ubah={ubah} mode={mode} grid={grid} snapTepi={snapTepi} taruhKolom={taruhKolom} ukuranKolom={acuanKolom ?? Math.max(0.2, gridPilar.ukuran)}
                   potong={potongan ? { sumbu: potongan.arah === 'depan' ? 'x' : 'z', nilai: potongan.nilai } : null} />
               </div>
               {tampil !== '2d' && layout3d && (

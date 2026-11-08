@@ -85,7 +85,7 @@ export function InfoTenderTr({ t, ubah, marginGlobal, onMargin, onMarginSemua, a
         <label className="f">Margin global (%)<PersenInput label="Margin global" nilai={marginGlobal} onChange={v => onMargin(v ?? 0)} /></label>
       </div>
       <div className="row small" style={{ marginTop: 8 }}>
-        <span className="muted">Margin global dipakai semua rute; isi kolom margin di baris rute untuk pengecualian. Harga jual = harga beli × (1 + margin).</span>
+        <span className="muted">Margin global dipakai semua rute; isi kolom margin di baris rute untuk pengecualian. Margin = GP% atas harga jual: harga jual = harga beli ÷ (1 − margin), jadi margin 15% → GP 15%.</span>
         {adaOverride > 0 && <button className="ghost" onClick={onMarginSemua}>Pakai margin global di {adaOverride} rute yang diubah</button>}
       </div>
       <DatalistLokasi id="dl-kota" jenis={['kota']} />

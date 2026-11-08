@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import type { TenderRow, GudangTerpilih } from '@/lib/tender';
+import type { TenderRow, GudangTerpilih, Asumsi } from '@/lib/tender';
 import type { HasilTender } from '@/lib/engine/index.ts';
 import type { Profile } from '@/lib/useProfile';
 import { rp, tanggal, angka, BUCKET_LABEL } from '@/lib/format';
@@ -27,12 +27,21 @@ const SATUAN: Record<string, (uom: string) => string> = {
   storage: u => `per ${u} per bulan`, handling_in: u => `per ${u} masuk`, handling_out: u => `per ${u} keluar`, vas: u => `per ${u}`,
 };
 
+/** Sumber tarif selain tender gudang (Transportation / Intermodal): rate card dihitung dari tender itu sendiri. */
+export interface SumberQuotation {
+  rate: () => RateRow[]; sekali?: () => Sekali[];
+  /** Pesan bila tender belum siap dibuat quotation (mis. rute tanpa harga); null = siap. */
+  cek?: () => string | null;
+  perihal: string; jenisJasa: string; subjudul?: string; keterangan?: string;
+}
+type TenderQuo = Pick<TenderRow, 'id' | 'customer' | 'kab_kota' | 'provinsi' | 'payment_term_hari' | 'durasi_kontrak_bulan'> & { versi?: number; hasil: unknown; asumsi: Partial<Asumsi> };
+
 const infoGudang = (g: GudangTerpilih | null | undefined, hasil: HasilTender): InfoGudangPdf | null => g ? {
   nama: g.nama, alamat: g.alamat ?? `${g.kab_kota}, ${g.provinsi}`, kota: `${g.kab_kota}, ${g.provinsi}`, luasM2: g.luas_m2,
   luasDipakaiM2: hasil.space.totalM2, tinggiM: g.tinggi_bersih_m, dock: g.jumlah_dock, tipe: g.tipe, gmaps: g.gmaps_url,
 } : null;
 
-export default function QuotationPanel({ tender, profile }: { tender: TenderRow; profile: Profile | null }) {
+export default function QuotationPanel({ tender, profile, sumber }: { tender: TenderQuo; profile: Profile | null; sumber?: SumberQuotation }) {
   const sb = supabaseBrowser();
   const [list, setList] = useState<Quo[]>([]);
   const [tc, setTc] = useState<Tc[]>([]);
@@ -49,7 +58,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
   const [tambahIdx, setTambahIdx] = useState('');
   // Nomor otomatis: DDMMYYYY/Customer/Akun/Pembuatan ke-/Urutan hari ini. Berhenti otomatis kalau diketik manual.
   const [nomorAuto, setNomorAuto] = useState<{ pembuatan: number; urutan: number } | null>(null);
-  const hasil = tender.hasil as HasilTender | null;
+  const hasil = sumber ? null : tender.hasil as HasilTender | null;
+  const siap = !!sumber || !!hasil;
   const bolehApprove = isApprover(profile);
   const [batalId, setBatalId] = useState<string | null>(null);
   const [namaAkun, setNamaAkun] = useState<Record<string, string>>({});
@@ -85,6 +95,15 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     return { rate, sekali };
   }
 
+  /** Tarif terkini: dari hasil hitung gudang, atau dari sumber (transport / intermodal). */
+  function ambilTarif() {
+    if (sumber) return { rate: sumber.rate(), sekali: sumber.sekali?.() ?? [] };
+    return hasil ? dariHasil(hasil) : null;
+  }
+  function cekSiap() {
+    if (sumber) { const m = sumber.cek?.() ?? null; setErr(m); return !m; }
+    return !!hasil && cekKritis(hasil);
+  }
   function cekKritis(h: HasilTender) {
     const kritis = h.redFlags.filter(f => f.level === 'kritis');
     if (kritis.length) { setErr(`Masih ada ${kritis.length} red flag kritis. Selesaikan dulu di tab Result.`); return false; }
@@ -111,29 +130,31 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
 
   async function mulai() {
     if (kurangBranding) { setErr('Unggah logo perusahaan & tanda tangan di Profil dulu sebelum membuat quotation.'); return; }
-    if (!hasil || !cekKritis(hasil)) return;
+    if (!cekSiap()) return;
+    const tarif = ambilTarif(); if (!tarif) return;
     const hari = new Date();
     const urutan = await urutanHariIni();
-    const { rate, sekali } = dariHasil(hasil);
+    const { rate, sekali } = tarif;
     const berlaku = new Date(hari); berlaku.setDate(berlaku.getDate() + 30);
     setNomorAuto({ pembuatan: 1, urutan });
     setDraft({ nomor: susunNomor(tglLokal(hari), tender.customer, 1, urutan), tanggal: tglLokal(hari), berlaku_sampai: tglLokal(berlaku),
       kepada: tender.customer, rate_card: rate, term_condition: isiTc(tc[0]?.isi ?? ''), revisi: 0, parent_id: null, catatan_revisi: null,
-      tagihan_sekali: sekali, info_gudang: infoGudang(tender.asumsi.gudang, hasil) });
+      tagihan_sekali: sekali, info_gudang: hasil ? infoGudang(tender.asumsi.gudang, hasil) : null });
   }
 
   /** Revisi: tarif diambil ulang dari hasil hitung terakhir; nomor pembuatan ke-(revisi+1), T&C ikut versi sebelumnya. */
   async function revisi(q: Quo) {
-    if (!hasil || !cekKritis(hasil)) return;
+    if (!cekSiap()) return;
+    const tarif = ambilTarif(); if (!tarif) return;
     const akar = q.parent_id ? list.find(x => x.id === q.parent_id) ?? q : q;
     const n = Math.max(...list.filter(x => x.id === akar.id || x.parent_id === akar.id).map(x => x.revisi)) + 1;
-    const { rate, sekali } = dariHasil(hasil);
+    const { rate, sekali } = tarif;
     const hari = new Date(); const berlaku = new Date(hari); berlaku.setDate(berlaku.getDate() + 30);
     const urutan = await urutanHariIni();
     setNomorAuto({ pembuatan: n + 1, urutan });
     setDraft({ nomor: susunNomor(tglLokal(hari), q.kepada, n + 1, urutan), tanggal: tglLokal(hari), berlaku_sampai: tglLokal(berlaku),
       kepada: q.kepada, rate_card: rate, term_condition: q.term_condition, revisi: n, parent_id: akar.id, catatan_revisi: '',
-      tagihan_sekali: sekali, info_gudang: infoGudang(tender.asumsi.gudang, hasil) ?? q.info_gudang });
+      tagihan_sekali: sekali, info_gudang: (hasil ? infoGudang(tender.asumsi.gudang, hasil) : null) ?? q.info_gudang });
   }
 
   /** Edit quotation draft/batal: dibuka di editor, disimpan ke baris yang sama (batal → kembali draft). */
@@ -182,7 +203,9 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     const [logo, ttdImg] = await Promise.all([gambarUntukPdf(branding.logoPath), gambarUntukPdf(branding.ttdPath)]);
     return { logo, ttd: ttdImg, watermark: !q.status || ['draft', 'menunggu', 'revisi'].includes(q.status) ? 'DRAFT' : q.status === 'ditolak' ? 'DITOLAK' : q.status === 'batal' ? 'BATAL' : undefined,
       nomor: q.nomor, tanggal: q.tanggal, berlakuSampai: q.berlaku_sampai, kepada: q.kepada ?? tender.customer, customer: tender.customer,
-      lokasi: `${tender.kab_kota}, ${tender.provinsi}`, perihal: q.revisi > 0 ? `Revisi ${q.revisi} Penawaran Harga Jasa Pergudangan` : 'Penawaran Harga Jasa Pergudangan',
+      lokasi: [tender.kab_kota, tender.provinsi].filter(x => x && x !== '-').join(', ') || '-',
+      perihal: q.revisi > 0 ? `Revisi ${q.revisi} ${sumber?.perihal ?? 'Penawaran Harga Jasa Pergudangan'}` : sumber?.perihal ?? 'Penawaran Harga Jasa Pergudangan',
+      jenisJasa: sumber?.jenisJasa, subjudul: sumber?.subjudul,
       rateCard: q.rate_card, tagihanSekali: q.tagihan_sekali ?? [], gudang: q.info_gudang, catatanRevisi: q.catatan_revisi,
       durasiBulan: tender.durasi_kontrak_bulan, termasukPpn: (tender.asumsi.pajak?.ppn ?? 'exclude') === 'include', ppnPersen: tender.asumsi.pajak?.ppnPersen ?? 0.11,
       termCondition: q.term_condition, penandatangan: ttd.nama, jabatan: ttd.jabatan, perusahaan: ttd.perusahaan };
@@ -210,15 +233,16 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
     <div className="card">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2>Quotation</h2>
-        {!draft && <button onClick={mulai} disabled={!hasil || kurangBranding} title={kurangBranding ? 'Unggah logo & TTD di Profil dulu' : undefined}>Buat quotation baru dari hasil tersimpan</button>}
+        {!draft && <button onClick={mulai} disabled={!siap || kurangBranding} title={kurangBranding ? 'Unggah logo & TTD di Profil dulu' : undefined}>Buat quotation baru dari hasil tersimpan</button>}
       </div>
-      {!hasil && <p className="muted">Simpan hasil hitung dulu di tab Result.</p>}
+      {!siap && <p className="muted">Simpan hasil hitung dulu di tab Result.</p>}
+      {sumber?.keterangan && <p className="small muted">{sumber.keterangan}</p>}
       {err && <p className="error small" role="alert">{err}</p>}
 
       {draft && (
         <div className="card" style={{ background: 'var(--surface-2)' }}>
           {editId && <p className="notice small"><b>Mengedit {draft.nomor}</b> — disimpan ke quotation yang sama{list.find(x => x.id === editId)?.status === 'batal' ? '; status kembali menjadi draft (perlu approve lagi)' : ''}.</p>}
-          {draft.revisi > 0 && <p className="notice small">Revisi {draft.revisi}: tarif diambil dari hasil hitung terakhir (v{tender.versi}). Kalau negosiasi mengubah asumsi, ubah input lalu hitung ulang dulu.</p>}
+          {draft.revisi > 0 && <p className="notice small">Revisi {draft.revisi}: tarif diambil dari hasil hitung terakhir{tender.versi ? ` (v${tender.versi})` : ''}. Kalau negosiasi mengubah asumsi, ubah input lalu hitung ulang dulu.</p>}
           <div className="grid3">
             <label className="f" htmlFor="qno">Nomor<input id="qno" value={draft.nomor} onChange={e => { setNomorAuto(null); setDraft({ ...draft, nomor: e.target.value }); }} />
               <span className="small muted">{nomorAuto ? 'Otomatis: ddmmyy / inisial perusahaan Anda / inisial customer / inisial akun / pembuatan ke- / urutan hari ini' : 'Manual'}
@@ -237,8 +261,8 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
                 <td><input aria-label="Keterangan" value={r.catatan ?? ''} onChange={e => ubahRate(i, { catatan: e.target.value })} /></td>
                 <td><button className="danger" onClick={() => setDraft({ ...draft, rate_card: draft.rate_card.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}</tbody></table></div>
-          {hasil && (() => {
-            const semua = dariHasil(hasil).rate;
+          {siap && (() => {
+            const semua = ambilTarif()?.rate ?? [];
             const kunci = (r: RateRow) => `${r.layanan}|${r.satuan}`;
             const ada = new Set(draft.rate_card.map(kunci));
             const hilang = semua.map((r, i) => ({ r, i })).filter(x => !ada.has(kunci(x.r)));
@@ -256,7 +280,7 @@ export default function QuotationPanel({ tender, profile }: { tender: TenderRow;
             <h3>Biaya sekali (ditagih terpisah)</h3>
             <table><tbody>{draft.tagihan_sekali.map((x, i) => <tr key={i}><td>{x.deskripsi}</td><td className="num out">{rp(x.nilai)}</td></tr>)}</tbody></table>
           </>}
-          {draft.info_gudang
+          {sumber ? null : draft.info_gudang
             ? <p className="small">Data gudang ikut di PDF: <b>{draft.info_gudang.nama}</b>, {draft.info_gudang.kota}, {angka(draft.info_gudang.luasDipakaiM2)} m² dari {angka(draft.info_gudang.luasM2)} m².</p>
             : <p className="small muted">Belum memilih gudang di tab Gudang — PDF tidak memuat data lokasi gudang.</p>}
           {tc.length > 1 && (

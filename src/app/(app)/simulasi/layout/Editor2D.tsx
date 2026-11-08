@@ -45,10 +45,12 @@ interface Props {
   /** Garis potong untuk view potongan (sumbu tetap & nilainya, m). */
   potong?: { sumbu: 'x' | 'z'; nilai: number } | null;
   /** Mode kolom: klik di denah → kolom baru (pusat x, z). Ukuran sisi kolom (m) untuk pratinjau. */
-  taruhKolom?: (x: number, z: number) => void; ukuranKolom?: number;
+  taruhKolom?: (x: number, z: number) => void; ukuranKolom?: number | { w: number; d: number };
 }
 
-const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih, setPilih, multi, setMulti, mulaiAksi, ubah, mode, grid, snapTepi, potong, taruhKolom, ukuranKolom = 0.5 }, ref) {
+const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih, setPilih, multi, setMulti, mulaiAksi, ubah, mode, grid, snapTepi, potong, taruhKolom, ukuranKolom: ukKolomProp = 0.5 }, ref) {
+  const ukKolom = typeof ukKolomProp === 'number' ? { w: ukKolomProp, d: ukKolomProp } : ukKolomProp;
+  const ukuranKolom = Math.max(ukKolom.w, ukKolom.d);
   const svg = useRef<SVGSVGElement>(null);
   const [view, setView] = useState({ x: -5, z: -5, w: 100 });     // viewBox: kiri, atas, lebar (m)
   const [ukuran, setUkuran] = useState({ w: 800, h: 500 });
@@ -111,8 +113,8 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     const as = edit.komponen.filter(k => k.jenis === 'kolom').map(k => ({ x: k.x + k.w / 2, z: k.z + k.d / 2 }));
     let x = snap(p.x), z = snap(p.z), sejajarX: number | null = null, sejajarZ: number | null = null, dx = 0.6, dz = 0.6;
     for (const a of as) { if (Math.abs(p.x - a.x) < dx) { dx = Math.abs(p.x - a.x); x = a.x; sejajarX = a.x; } if (Math.abs(p.z - a.z) < dz) { dz = Math.abs(p.z - a.z); z = a.z; sejajarZ = a.z; } }
-    const h = ukuranKolom / 2;
-    x = Math.min(g.L - h, Math.max(h, x)); z = Math.min(g.W - h, Math.max(h, z));
+    const hx = ukKolom.w / 2, hz = ukKolom.d / 2;
+    x = Math.min(g.L - hx, Math.max(hx, x)); z = Math.min(g.W - hz, Math.max(hz, z));
     // jarak as-ke-as ke kolom terdekat sebaris / sekolom (untuk label pratinjau)
     const kiri = as.filter(a => sejajarZ != null && Math.abs(a.z - z) < 0.01 && a.x < x).sort((a, b) => b.x - a.x)[0];
     const atas = as.filter(a => sejajarX != null && Math.abs(a.x - x) < 0.01 && a.z < z).sort((a, b) => b.z - a.z)[0];
@@ -170,6 +172,17 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         let x = snap(s.x0 + p.x - s.ax), z = snap(s.z0 + p.z - s.az);
         if (k.jenis === 'dock') x = 0;
         if (k.jenis === 'gate') return seretGate(k, p.x, p.z, ed.gedung, snap);
+        if (k.jenis === 'kolom') {   // kolom: as sejajar dengan kolom lain (≤ 0,6 m), ukuran tidak berubah
+          let cx = s.x0 + p.x - s.ax + k.w / 2, cz = s.z0 + p.z - s.az + k.d / 2, bx = 0.6, bz = 0.6, kenaX = false, kenaZ = false;
+          for (const o of ed.komponen) if (o.jenis === 'kolom' && o.id !== k.id) {
+            const ox = o.x + o.w / 2, oz = o.z + o.d / 2;
+            if (Math.abs(cx - ox) < bx) { bx = Math.abs(cx - ox); cx = ox; kenaX = true; }
+            if (Math.abs(cz - oz) < bz) { bz = Math.abs(cz - oz); cz = oz; kenaZ = true; }
+          }
+          x = kenaX ? cx - k.w / 2 : snap(cx - k.w / 2); z = kenaZ ? cz - k.d / 2 : snap(cz - k.d / 2);
+          x = Math.min(ed.gedung.L - k.w, Math.max(0, x)); z = Math.min(ed.gedung.W - k.d, Math.max(0, z));
+          return { ...k, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100 };
+        }
         ({ x, z } = tempel(k, x, z));
         return { ...k, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100 };
       }
@@ -314,11 +327,16 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       el.push(<text key="t" x={cx} y={cz} fontSize={fs * 0.8} textAnchor={k.jenis === 'dock' ? 'end' : 'middle'} dominantBaseline="middle" fill="#0f172a"
         transform={tegak ? `rotate(-90 ${cx} ${cz})` : undefined} style={{ paintOrder: 'stroke', stroke: '#ffffffcc', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>{label}</text>);
     }
+    // kolom kecil: area pegang transparan lebih besar supaya mudah diseret
+    if (k.jenis === 'kolom') { const pad = fs * 0.22; el.unshift(<rect key="hit" data-ekspor="tidak" x={k.x - pad} y={k.z - pad} width={k.w + 2 * pad} height={k.d + 2 * pad} fill="transparent" />); }
     return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined }}>{el}</g>;
   };
 
+  /** Handle ubah ukuran. Komponen kecil (mis. kolom 0,5 m) → handle di LUAR bentuk supaya bagian tengah tetap bisa diseret tanpa mengubah ukuran. */
   const handle = (k: Komponen) => {
-    const s = fs * 0.45; const pts: [string, number, number][] = [['nw', k.x, k.z], ['n', k.x + k.w / 2, k.z], ['ne', k.x + k.w, k.z], ['e', k.x + k.w, k.z + k.d / 2], ['se', k.x + k.w, k.z + k.d], ['s', k.x + k.w / 2, k.z + k.d], ['sw', k.x, k.z + k.d], ['w', k.x, k.z + k.d / 2]];
+    const s = fs * 0.45; const kecil = Math.min(k.w, k.d) < s * 3; const o = kecil ? s * 1.2 : 0;
+    const semua: [string, number, number][] = [['nw', k.x - o, k.z - o], ['n', k.x + k.w / 2, k.z - o], ['ne', k.x + k.w + o, k.z - o], ['e', k.x + k.w + o, k.z + k.d / 2], ['se', k.x + k.w + o, k.z + k.d + o], ['s', k.x + k.w / 2, k.z + k.d + o], ['sw', k.x - o, k.z + k.d + o], ['w', k.x - o, k.z + k.d / 2]];
+    const pts = kecil ? semua.filter(([h]) => h.length === 2) : semua;   // kecil: cukup 4 sudut
     return pts.map(([h, x, z]) => <rect key={h} data-ekspor="tidak" x={x - s / 2} y={z - s / 2} width={s} height={s} fill="#fff" stroke="#f97316" strokeWidth={fs * 0.08}
       style={{ cursor: `${h}-resize` }} onPointerDown={e => { e.stopPropagation(); turun(e, k.id, h); }} />);
   };
@@ -400,10 +418,10 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
           <g data-ekspor="tidak" style={{ pointerEvents: 'none' }}>
             {t.sejajarX != null && <line x1={t.x} y1={0} x2={t.x} y2={g.W} stroke="#2563eb" strokeWidth={fs * 0.05} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />}
             {t.sejajarZ != null && <line x1={0} y1={t.z} x2={g.L} y2={t.z} stroke="#2563eb" strokeWidth={fs * 0.05} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />}
-            <rect x={t.x - u / 2} y={t.z - u / 2} width={u} height={u} fill="rgba(71,85,105,0.55)" stroke="#0f172a" strokeWidth={fs * 0.06} />
+            <rect x={t.x - ukKolom.w / 2} y={t.z - ukKolom.d / 2} width={ukKolom.w} height={ukKolom.d} fill="rgba(71,85,105,0.55)" stroke="#0f172a" strokeWidth={fs * 0.06} />
             {t.kiri && garisUkur(t.kiri.x, t.z - u, t.x, t.z - u, `${f1(t.x - t.kiri.x)} m`, '#2563eb', 'kolomX', false)}
             {t.atas && garisUkur(t.x + u, t.atas.z, t.x + u, t.z, `${f1(t.z - t.atas.z)} m`, '#2563eb', 'kolomZ', false)}
-            <text x={t.x + u} y={t.z + u * 2 + fs * 0.6} fontSize={fs * 0.7} fill="#0f172a">klik = taruh kolom ({f1(t.x)}; {f1(t.z)})</text>
+            <text x={t.x + u} y={t.z + u * 2 + fs * 0.6} fontSize={fs * 0.7} fill="#0f172a">klik = taruh kolom {f1(ukKolom.w)} × {f1(ukKolom.d)} m ({f1(t.x)}; {f1(t.z)})</text>
           </g>);
       })()}
       {/* ukur sementara */}
