@@ -199,3 +199,18 @@ export async function muatMaster(sb: SupabaseClient, t: TenderRow): Promise<{ ma
     },
   };
 }
+
+/** Role yang dipakai tender: direct (Aktivitas), peran tetap, dan supervisor otomatis (span of control > 0). */
+export function roleDipakaiTender(a: Pick<Asumsi, 'aktivitas' | 'peranTetap' | 'spanOfControl' | 'roleSupervisor'>) {
+  return new Set([...(a.aktivitas ?? []).map(r => r.roleName), ...(a.peranTetap ?? []).map(r => r.roleName), ...(a.spanOfControl > 0 && a.roleSupervisor ? [a.roleSupervisor] : [])]);
+}
+
+/** Role yang dihapus dari tender (ada di `lama`, tidak ada di `baru`) ikut dibuang dari rincian biaya manpower & level jabatan,
+ *  supaya tidak muncul lagi / terbawa saat role itu nanti ditambahkan kembali. */
+export function bersihkanRoleTerhapus(lama: Asumsi, baru: Asumsi): Asumsi {
+  const sebelum = roleDipakaiTender(lama), sesudah = roleDipakaiTender(baru);
+  const hilang = [...sebelum].filter(r => !sesudah.has(r));
+  if (!hilang.length) return baru;
+  const buang = <V,>(o: Record<string, V> | undefined) => { if (!o || !hilang.some(r => r in o)) return o; const x = { ...o }; for (const r of hilang) delete x[r]; return x; };
+  return { ...baru, rincianBiayaMp: buang(baru.rincianBiayaMp), levelRole: buang(baru.levelRole) };
+}

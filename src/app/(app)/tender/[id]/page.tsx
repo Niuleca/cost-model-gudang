@@ -4,7 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { useParams } from 'next/navigation';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, type Asumsi, type TenderRow } from '@/lib/tender';
+import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, bersihkanRoleTerhapus, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
 import { skemaVsmDefault, VSM_DEFAULT, tagDariDefault } from '@/lib/vsmDefault';
@@ -200,7 +200,12 @@ export default function TenderPage() {
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setKol = <K extends keyof TenderRow>(k: K, v: TenderRow[K]) => { catat(); setT(x => x && ({ ...x, [k]: v })); setKotor(true); };
-  const setA = (patch: Partial<Asumsi>) => { catat(); setT(x => x && ({ ...x, asumsi: { ...x.asumsi, ...patch } })); setKotor(true); };
+  const setA = (patch: Partial<Asumsi>) => {
+    catat();
+    const peran = 'aktivitas' in patch || 'peranTetap' in patch || 'spanOfControl' in patch || 'roleSupervisor' in patch;
+    setT(x => x && ({ ...x, asumsi: peran ? bersihkanRoleTerhapus(x.asumsi, { ...x.asumsi, ...patch }) : { ...x.asumsi, ...patch } }));
+    setKotor(true);
+  };
   // Produk = sumber data tender: setiap perubahan produk / aturan berat langsung diterapkan ke Volume, Parameter muatan & Space
   const [dampakProduk, setDampakProduk] = useState<PerubahanTender[]>([]);
   const ubahProduk = (produk: ProdukTender[] | undefined, aturanBerat: AturanBerat | undefined = t?.asumsi.aturanBerat, aktifkan = false) => {
@@ -668,9 +673,23 @@ export default function TenderPage() {
                 <td className="num"><b>{headcountTetap(r, shiftN)}</b>{r.perShift ? <div className="small muted">{r.qty} × {shiftN} shift</div> : null}</td>
                 <td><AlatInput aria-label={`Alat pendukung ${r.roleName}`} value={r.alat ?? []} onChange={v => setA({ peranTetap: ubahArray(a.peranTetap, i, { alat: v }) })} /></td>
                 <td><select aria-label="Alokasi" value={namaAlokasi(r.alokasi)} onChange={e => setA({ peranTetap: ubahArray(a.peranTetap, i, { alokasi: ALOKASI[e.target.value] }) })}>{Object.keys(ALOKASI).map(k => <option key={k} value={k}>{k}</option>)}</select></td>
-                <td><button className="danger" onClick={() => setA({ peranTetap: a.peranTetap.filter((_, j) => j !== i) })}>Hapus</button></td>
+                <td><button className="danger" title={r.roleName === a.roleSupervisor ? 'Hapus supervisor — perhitungan otomatis dari span of control ikut dimatikan' : undefined}
+                  onClick={() => setA({ peranTetap: a.peranTetap.filter((_, j) => j !== i), ...(r.roleName === a.roleSupervisor && !a.peranTetap.some((p, j) => j !== i && p.roleName === r.roleName) ? { spanOfControl: 0 } : {}) })}>Hapus</button></td>
               </tr>))}
-              {!a.peranTetap.length && <tr><td colSpan={7} className="muted small">Belum ada peran tetap.</td></tr>}</tbody></table></div>
+              {!spvManual && a.spanOfControl > 0 && (pdFull?.indirect.spv ?? 0) > 0 && (
+                <tr className="baris-otomatis">
+                  <td><b>{a.roleSupervisor}</b><div className="small muted">otomatis dari span of control</div></td>
+                  <td className="num"><span className="small muted">span 1:{a.spanOfControl}</span></td>
+                  <td><span className="small muted">Per shift</span></td>
+                  <td className="num"><b>{pdFull?.indirect.spv}</b><div className="small muted">⌈direct/shift ÷ {a.spanOfControl}⌉ × shift</div></td>
+                  <td className="small muted">{(a.alatSupervisor ?? []).join(', ') || '–'}</td>
+                  <td className="small muted">Manajemen</td>
+                  <td><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                    <button className="ghost" title="Jadikan peran tetap dengan jumlah yang bisa diisi sendiri" onClick={() => setA({ peranTetap: [...a.peranTetap, { roleName: a.roleSupervisor, qty: Math.max(1, Math.round((pdFull?.indirect.spv ?? 1) / shiftN)), perShift: true, alat: a.alatSupervisor ?? [], alokasi: { manajemen: 1 } }] })}>Ubah manual</button>
+                    <button className="danger" title="Hapus supervisor (span of control = 0)" onClick={() => setA({ spanOfControl: 0 })}>Hapus</button></div></td>
+                </tr>)}
+              {!a.peranTetap.length && !(a.spanOfControl > 0 && (pdFull?.indirect.spv ?? 0) > 0) && <tr><td colSpan={7} className="muted small">Belum ada peran tetap.</td></tr>}</tbody></table></div>
+          {a.spanOfControl === 0 && !spvManual && <p className="small muted" style={{ margin: 0 }}>Supervisor tidak dihitung (span of control 0). <button className="link-kecil" onClick={() => setA({ spanOfControl: 15 })}>Aktifkan lagi (span 15)</button></p>}
           <div className="row"><button className="ghost" onClick={tambah} disabled={!jabatan.length}>Tambah peran tetap</button></div>
             </>;
           })()}
