@@ -161,26 +161,54 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       </table></div>
     </div>
 
-    {(() => {
-      const pj = h.perJenis ?? { opex: 0, capex: 0, interest: 0 };
-      const tot = pj.opex + pj.capex + pj.interest || 1;
-      const rows: [string, number, string][] = [
-        ['Opex', pj.opex, 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, overhead, dll.'],
-        ['Capex', pj.capex, `depresiasi/amortisasi investasi (total investasi ${rp(h.investasi)})`],
-        ['Interest cost', pj.interest, 'bunga pinjaman yang dipilih di tab Loan & Interest Calculator'],
-      ];
-      const maks = Math.max(...rows.map(r => r[1]), 1);
-      return <div className="card">
-        <h2>Opex vs capex</h2>
-        <div className="tablewrap"><table>
-          <thead><tr><th>Jenis</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th><th style={{ width: '35%' }}></th></tr></thead>
-          <tbody>
-            {rows.map(([l, v, k]) => <tr key={l}><td><b>{l}</b><div className="small muted">{k}</div></td><td className="num">{rp(v)}</td><td className="num">{rp(v * 12)}</td><td className="num"><b>{persen(v / tot)}</b></td>
-              <td><div className="bar-kat"><i style={{ width: `${(v / maks) * 100}%` }} /></div></td></tr>)}
-            <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{rp(tot)}</b></td><td className="num"><b>{rp(tot * 12)}</b></td><td className="num"><b>100%</b></td><td></td></tr>
-          </tbody>
-        </table></div>
-      </div>;
-    })()}
+    <RincianJenis h={h} />
   </>);
+}
+
+/** Opex vs capex vs interest cost, tiap jenis bisa dibuka: per kategori → per item (dasar hitung, nilai investasi capex). */
+function RincianJenis({ h }: { h: HasilTender }) {
+  const [buka, setBuka] = useState<Record<string, boolean>>({});
+  const pj = h.perJenis ?? { opex: 0, capex: 0, interest: 0 };
+  const tot = pj.opex + pj.capex + pj.interest || 1;
+  const rows: { k: 'opex' | 'capex' | 'interest'; l: string; v: number; ket: string }[] = [
+    { k: 'opex', l: 'Opex', v: pj.opex, ket: 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, services, overhead, dll.' },
+    { k: 'capex', l: 'Capex', v: pj.capex, ket: `depresiasi/amortisasi investasi (total investasi ${rp(h.investasi)})` },
+    { k: 'interest', l: 'Interest cost', v: pj.interest, ket: 'bunga pinjaman yang dipilih di tab Loan & Interest Calculator' },
+  ];
+  const maks = Math.max(...rows.map(r => r.v), 1);
+  const semua = rows.every(r => buka[r.k]);
+  return <div className="card">
+    <div className="row" style={{ justifyContent: 'space-between' }}>
+      <h2 style={{ margin: 0 }}>Opex vs capex</h2>
+      <button className="ghost" onClick={() => setBuka(semua ? {} : { opex: true, capex: true, interest: true })}>{semua ? 'Tutup semua rincian' : 'Buka semua rincian'}</button>
+    </div>
+    <p className="small muted">Klik baris Opex / Capex / Interest cost untuk melihat isinya per kategori dan per item, lengkap dengan dasar hitung.</p>
+    <div className="tablewrap fit"><table className="tabel-fit">
+      <thead><tr><th>Jenis · kategori · item</th><th className="num">Nilai investasi</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th><th style={{ width: '22%' }}></th></tr></thead>
+      <tbody>
+        {rows.map(r => {
+          const item = h.biaya.filter(b => (b.jenis ?? 'opex') === r.k && b.biayaBulan);
+          const perKat = new Map<string, typeof item>();
+          for (const b of item) perKat.set(b.kelompok, [...(perKat.get(b.kelompok) ?? []), b]);
+          const kat = [...perKat.entries()].map(([k, xs]) => ({ k, xs: xs.sort((a, b) => b.biayaBulan - a.biayaBulan), v: xs.reduce((t, x) => t + x.biayaBulan, 0), inv: xs.reduce((t, x) => t + (x.nilaiInvestasi ?? 0), 0) })).sort((a, b) => b.v - a.v);
+          return [
+            <tr key={r.k} className="kat-link" onClick={() => setBuka(x => ({ ...x, [r.k]: !x[r.k] }))} title="Klik untuk membuka / menutup rincian">
+              <td><b>{buka[r.k] ? '▾' : '▸'} {r.l}</b> <span className="small muted">({item.length} item)</span><div className="small muted">{r.ket}</div></td>
+              <td className="num">{r.k === 'capex' ? rp(h.investasi) : ''}</td>
+              <td className="num"><b>{rp(r.v)}</b></td><td className="num">{rp(r.v * 12)}</td><td className="num"><b>{persen(r.v / tot)}</b></td>
+              <td><div className="bar-kat"><i style={{ width: `${(r.v / maks) * 100}%` }} /></div></td></tr>,
+            ...(buka[r.k] ? kat.flatMap(c => [
+              <tr key={`${r.k}-${c.k}`} className="pd-sub"><td style={{ paddingLeft: 22 }}><b>{c.k}</b> <span className="small muted">· {c.xs.length} item</span></td>
+                <td className="num">{r.k === 'capex' ? rp(c.inv) : ''}</td><td className="num"><b>{rp(c.v)}</b></td><td className="num">{rp(c.v * 12)}</td><td className="num">{persen(c.v / tot)}</td><td></td></tr>,
+              ...c.xs.map((b, i) => (
+                <tr key={`${r.k}-${c.k}-${i}`}><td style={{ paddingLeft: 38 }}>{b.deskripsi}<div className="small muted">{b.dasar}</div></td>
+                  <td className="num">{b.nilaiInvestasi ? rp(b.nilaiInvestasi) : ''}</td><td className="num">{rp(b.biayaBulan)}</td><td className="num">{rp(b.biayaBulan * 12)}</td><td className="num small">{persen(b.biayaBulan / tot)}</td><td></td></tr>)),
+            ]) : []),
+            ...(buka[r.k] && !kat.length ? [<tr key={`${r.k}-kosong`}><td colSpan={6} className="muted small" style={{ paddingLeft: 22 }}>Tidak ada item {r.l.toLowerCase()} di tender ini.</td></tr>] : []),
+          ];
+        })}
+        <tr className="pd-sub"><td><b>Total</b></td><td className="num">{rp(h.investasi)}</td><td className="num"><b>{rp(tot)}</b></td><td className="num"><b>{rp(tot * 12)}</b></td><td className="num"><b>100%</b></td><td></td></tr>
+      </tbody>
+    </table></div>
+  </div>;
 }

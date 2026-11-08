@@ -12,8 +12,8 @@ export function tulisKeyAssumption(x: Ctx) {
   KA.h2('Key assumption', 'Sel putih tulang = input (boleh diubah) · sel abu-abu = hasil rumus · droplist sama dengan web');
   KA.field('Customer', t.customer, 'teks', 'in', '', '', 'Cust');
   KA.field('Industri (benchmark produktivitas)', t.industri || '—', 'teks', 'in', '', '', 'Industri', 'L_Industri');
-  KA.field('PIC / account', t.pic ?? '', 'teks', 'in');
-  KA.field('Alamat / site', t.alamat_lokasi ?? '', 'teks', 'in');
+  KA.field('PIC / account', t.pic ?? '', 'teks', 'in', '', '', 'PIC');
+  KA.field('Alamat / site', t.alamat_lokasi ?? '', 'teks', 'in', '', '', 'Alamat');
   KA.field('Provinsi project', t.provinsi, 'teks', 'in', '', 'pilih provinsi → daftar kab/kota menyesuaikan', 'Prov', 'L_Prov');
   KA.field('Area / kab-kota (menentukan UMK)', t.kab_kota, 'teks', 'in', '', 'pilihan hanya kab/kota di provinsi terpilih', 'Kab', 'OFFSET(D_UpKab,MATCH(Prov,D_UpProv,0)-1,0,COUNTIF(D_UpProv,Prov),1)');
   KA.field('UMK area project', { f: 'SUMIFS(D_UpUmk,D_UpProv,Prov,D_UpKab,Kab)', v: d.m.upahMinimum }, 'rp', 'out', 'Rp/bln', '→ dari master UMK · dipakai sebagai gaji pokok default di Rincian biaya manpower', 'UMK');
@@ -27,7 +27,7 @@ export function tulisKeyAssumption(x: Ctx) {
   KA.field('Jumlah shift', t.jumlah_shift, 'n0', 'in', 'shift', '', 'Shift', 'L_Shift');
   KA.field('Hari kerja per minggu', t.hari_kerja_per_minggu, 'n0', 'in', 'hari', '5 = Senin–Jumat · 6 = Senin–Sabtu · 7 = setiap hari', 'HariMinggu', 'L_HariMinggu');
   KA.field('Kode akhir pekan (otomatis)', { f: 'CHOOSE(MAX(1,MIN(3,HariMinggu-4)),"0000011","0000001","0000000")' }, 'teks', 'out', '', 'dipakai NETWORKDAYS.INTL', 'WeekendKode');
-  KA.field('Jam kerja per shift', Number(t.jam_kerja_per_shift), 'n2', 'in', 'jam');
+  KA.field('Jam kerja per shift', Number(t.jam_kerja_per_shift), 'n2', 'in', 'jam', '', 'JamKerja');
   KA.field('Jam efektif per shift', Number(t.jam_efektif_per_shift), 'n2', 'in', 'jam', 'Setelah istirahat, briefing, ganti baterai', 'JamEfektif');
   KA.field('Payment term', t.payment_term_hari, 'n0', 'in', 'hari', '', 'PaymentTerm');
   KA.field('Cuti tahunan per orang', a.cutiTahunanHari, 'n0', 'in', 'hari', 'Masuk ke faktor pengganti headcount', 'Cuti');

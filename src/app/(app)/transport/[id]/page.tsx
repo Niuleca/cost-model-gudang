@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import StatusControl from '@/components/StatusControl';
 import { DatalistLokasi, InfoTenderTr, KartuRingkas, PersenInput, useRates, useTenderTr, type TenderTr } from '@/components/transport/shared';
@@ -13,6 +14,8 @@ import { rp } from '@/lib/format';
 import { labelStatus, pillStatus } from '@/lib/status';
 import { supabaseBrowser } from '@/lib/supabase/client';
 
+const Rute3D = dynamic(() => import('@/components/transport/Rute3D'), { ssr: false, loading: () => <div className="rute3d-wadah sim3d-muat">Menyiapkan peta 3D…</div> });
+
 const ambilTr = (t: TenderTr): TenderTransport => ({ ...TRANSPORT_DEFAULT, ...((t.asumsi?.transport as TenderTransport | undefined) ?? {}) });
 
 /** Tender Transportation: rute origin → destination, armada, buying basis, vendor & harga beli (market price), margin, harga jual. */
@@ -22,6 +25,7 @@ export default function TransportTender() {
   const { t, ubah, kotor, pesan, err, simpanSekarang, setT } = useTenderTr(id, hitungHasil);
   const { rates, err: errRate, muat: muatRate } = useRates();
   const [info, setInfo] = useState<string | null>(null);
+  const [sim, setSim] = useState<string>('semua');
   if (!t) return <p className="muted">{err ?? 'Memuat tender…'}</p>;
   const tr = ambilTr(t);
   const setTr = (p: Partial<TenderTransport>) => ubah({ asumsi: { ...t.asumsi, transport: { ...tr, ...p } } });
@@ -118,5 +122,16 @@ export default function TransportTender() {
         <p className="small muted" style={{ margin: 0 }}>Jarak & estimasi harga memakai koordinat kota perkiraan × faktor jalan 1,3 dan tarif indikatif per km per armada (Deliveree) — hanya acuan bila Market Price belum ada; harga final dari quotation vendor.</p>
         <DatalistLokasi id="dl-tr-kota" jenis={['kota', 'pelabuhan']} />
       </div>
+
+      {tr.rute.length > 0 && <div className="card" style={{ display: 'grid', gap: 10 }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h2 style={{ margin: 0 }}>Simulasi rute 3D</h2>
+          <select aria-label="Pilih rute simulasi" value={sim} onChange={e => setSim(e.target.value)} style={{ maxWidth: 320 }}>
+            <option value="semua">Semua rute ({tr.rute.length})</option>
+            {tr.rute.map((r, i) => <option key={r.id} value={r.id}>{i + 1}. {r.origin || '…'} → {r.destination || '…'} · {r.armada}</option>)}
+          </select>
+        </div>
+        <Rute3D rute={tr.rute.filter(r => sim === 'semua' || r.id === sim).map((r, i) => ({ nama: `${sim === 'semua' ? `${i + 1}. ` : ''}${r.origin} → ${r.destination}`, legs: [{ moda: 'darat' as const, dari: r.origin, ke: r.destination, hari: r.leadTimeHari, label: r.armada }] }))} />
+      </div>}
     </>);
 }

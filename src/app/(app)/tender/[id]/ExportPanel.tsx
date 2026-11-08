@@ -16,11 +16,12 @@ const KET: Record<string, string> = {
   'Hasil': 'KPI, red flag, rate card & margin, simulasi, kurs, porsi kategori, opex/capex, kalender, rincian biaya per bulan',
   'Quotation': 'Rate card penawaran & tagihan sekali',
   'Daftar': 'Sumber semua droplist (Data Validation) & data master yang dipakai rumus',
+  'Data Input': 'Semua isian tender (path → nilai) terhubung ke sel input — dipakai untuk upload kembali ke Leca',
   'Master Data': 'UMK, payroll, finance, margin, jabatan, hari libur yang dipakai',
   'Data Mentah': 'Seluruh isi asumsi & hasil (path → nilai) untuk audit',
 };
 /** Sheet yang saling dirujuk rumus — selalu ikut diunduh. */
-const WAJIB = ['0 Ringkasan', 'Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Daftar'];
+const WAJIB = ['0 Ringkasan', 'Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Daftar', 'Data Input'];
 const kolom = (c: number) => { let s = ''; c++; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
 const fmt = (v: string | number | null) => v == null ? '' : typeof v === 'number' ? (Math.abs(v) >= 10000 ? Math.round(v).toLocaleString('id-ID') : Number.isInteger(v) ? String(v) : v.toLocaleString('id-ID', { maximumFractionDigits: 4 })) : String(v);
 
@@ -63,7 +64,7 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
         </div>
       </div>
       <p className="small muted">Tender dihitung ulang dengan data master terbaru, lalu disusun menjadi workbook <b>{namaFile}</b>. Review isi tiap sheet di bawah, hapus centang sheet yang tidak perlu, lalu unduh.
-        Sheet sama dengan tab web (urutan, kartu, kolom & <b>droplist</b>), semua angka berupa <b>rumus Excel</b> yang saling terhubung — ubah sel putih tulang (input) di Excel, hasil, rate card, quotation & ringkasan ikut berubah. Menu tab di baris atas tiap sheet bisa diklik. Headcount hasil multi-skill pooling (Shift 1–3) ditulis sebagai input.</p>
+        Sheet sama dengan tab web (urutan, kartu, kolom & <b>droplist</b>), semua angka berupa <b>rumus Excel</b> yang saling terhubung — ubah sel putih tulang (input) di Excel, hasil, rate card, quotation & ringkasan ikut berubah. Menu tab di baris atas tiap sheet bisa diklik. Headcount hasil multi-skill pooling (Shift 1–3) ditulis sebagai input. Ingin mengubah data lewat Excel? Ubah lalu upload kembali di kartu <b>Upload Excel</b> di bawah — sheet <b>Data Input</b> memuat semua isian tender.</p>
 
       {!pv && <div className="umk-box"><span className="small">Tekan <b>Siapkan review</b> untuk melihat isi file sebelum diunduh.</span></div>}
 

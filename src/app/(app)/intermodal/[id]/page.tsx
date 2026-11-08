@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import StatusControl from '@/components/StatusControl';
 import { DatalistLokasi, InfoTenderTr, KartuRingkas, PersenInput, useRates, useTenderTr, type TenderTr } from '@/components/transport/shared';
@@ -11,6 +12,8 @@ import {
 import { jarakKm } from '@/lib/lokasiIndonesia';
 import { rp } from '@/lib/format';
 import { labelStatus, pillStatus } from '@/lib/status';
+
+const Rute3D = dynamic(() => import('@/components/transport/Rute3D'), { ssr: false, loading: () => <div className="rute3d-wadah sim3d-muat">Menyiapkan peta 3D…</div> });
 
 const ambilIm = (t: TenderTr): TenderIntermodal => ({ ...INTERMODAL_DEFAULT, ...((t.asumsi?.intermodal as TenderIntermodal | undefined) ?? {}) });
 const BASIS_MODA: Record<Moda, Basis[]> = { darat: ['trip', 'cbm', 'ton', 'pallet', 'liter'], laut: ['container', 'cbm', 'ton'], udara: ['kg'], kereta: ['container', 'ton'] };
@@ -57,6 +60,7 @@ export default function IntermodalTender() {
   const hitungHasil = useCallback((t: TenderTr) => { const im = ambilIm(t); return hasilOverview(ringkasIntermodal(im), { jenis: 'intermodal', rute: im.rute.length }); }, []);
   const { t, ubah, kotor, pesan, err, simpanSekarang, setT } = useTenderTr(id, hitungHasil);
   const { rates, err: errRate } = useRates();
+  const [sim, setSim] = useState('semua');
   if (!t) return <p className="muted">{err ?? 'Memuat tender…'}</p>;
   const im = ambilIm(t);
   const setIm = (p: Partial<TenderIntermodal>) => ubah({ asumsi: { ...t.asumsi, intermodal: { ...im, ...p } } });
@@ -140,6 +144,17 @@ export default function IntermodalTender() {
             </table></div>
           </div>);
       })}
+      {im.rute.length > 0 && <div className="card" style={{ display: 'grid', gap: 10 }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h2 style={{ margin: 0 }}>Simulasi rute 3D (pickup → main leg → delivery)</h2>
+          <select aria-label="Pilih rute simulasi" value={sim} onChange={e => setSim(e.target.value)} style={{ maxWidth: 320 }}>
+            <option value="semua">Semua rute ({im.rute.length})</option>
+            {im.rute.map((r, i) => <option key={r.id} value={r.id}>{i + 1}. {r.origin || '…'} → {r.destination || '…'}</option>)}
+          </select>
+        </div>
+        <Rute3D rute={im.rute.filter(r => sim === 'semua' || r.id === sim).map((r, i) => ({ nama: `${sim === 'semua' ? `${i + 1}. ` : ''}${r.origin} → ${r.destination}`,
+          legs: r.stage.map((s, k) => ({ moda: s.moda, dari: s.dari, ke: s.ke, hari: s.leadTimeHari, label: ['Pickup', 'Main leg', 'Delivery'][k] })) }))} />
+      </div>}
       <DatalistLokasi id="dl-im-darat" jenis={['kota', 'pelabuhan', 'bandara']} />
       <DatalistLokasi id="dl-im-laut" jenis={['pelabuhan']} />
       <DatalistLokasi id="dl-im-udara" jenis={['bandara']} />

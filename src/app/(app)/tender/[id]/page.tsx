@@ -14,6 +14,7 @@ import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfek
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
+import UploadExcelPanel from './UploadExcelPanel';
 import { namaFileExport } from '@/lib/exportTender';
 import type { DaftarWeb } from '@/lib/exportWebUtil';
 import InterestPanel from './InterestPanel';
@@ -246,6 +247,17 @@ export default function TenderPage() {
     for (const c of catatan) h.redFlags.push({ level: 'peringatan', kode: 'MASTER_DATA', pesan: c });
     for (const pesan of cekProduk()) h.redFlags.push({ level: 'peringatan', kode: 'PRODUK', pesan });
     setHasil(h); setCatatanMaster(catatan); if (pindahTab) setTab('Result'); setPesan(pindahTab ? null : 'Dihitung ulang — hasil terbaru ada di tab Result.'); if (!pindahTab) setTimeout(() => setPesan(null), 3000);
+  }
+
+  /** Upload Excel: terapkan kolom tender & asumsi dari file, lalu hitung ulang dengan data master terbaru. */
+  async function terapkanExcel(kolom: Partial<TenderRow>, asumsiBaru: TenderRow['asumsi']) {
+    if (!t) return;
+    const nt: TenderRow = { ...t, ...kolom, asumsi: asumsiBaru };
+    catat(); setT(nt); setKotor(true);
+    const { master, catatan } = await muatMaster(sb, nt);
+    const h = hitungTender(keInput(nt), master);
+    for (const c of catatan) h.redFlags.push({ level: 'peringatan', kode: 'MASTER_DATA', pesan: c });
+    setHasil(h); setCatatanMaster(catatan);
   }
 
   /** Peringatan dari tab Produk: palet berat vs posisi level 1 / lantai, total palet vs posisi simpan. */
@@ -828,6 +840,7 @@ export default function TenderPage() {
       </fieldset>
       {tab === 'Export' && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
       {tab === 'Export' && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={namaFileExport(nomorQ, t.kode ?? t.customer)} />}
+      {tab === 'Export' && bolehExport(profile) && <UploadExcelPanel t={t} bisaEdit={bisaEdit} onTerapkan={terapkanExcel} />}
       {tab !== 'Result' && tab !== 'Quotation' && tab !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
     </>
   );

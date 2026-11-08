@@ -5,6 +5,7 @@ import type { HasilTender } from '@/lib/engine/index.ts';
 import type { MasterData } from '@/lib/engine/types';
 import type { TenderRow } from '@/lib/tender';
 import type { ParamBiayaMp, RincianBiayaRole } from '@/lib/engine/biayaMp';
+import { tulisDataInput } from '@/lib/excelSinkron';
 import { keInput } from '@/lib/tender';
 import { tulisModelWeb } from '@/lib/exportWeb';
 import type { DaftarWeb } from '@/lib/exportWebUtil';
@@ -45,7 +46,7 @@ export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-export const SHEET_EXPORT = ['0 Ringkasan', 'Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Daftar', 'Master Data', 'Data Mentah'] as const;
+export const SHEET_EXPORT = ['0 Ringkasan', 'Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Daftar', 'Data Input', 'Master Data', 'Data Mentah'] as const;
 
 /** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya). */
 export type GayaSel = { bg?: string; b?: boolean; pct?: boolean; c?: string; al?: 'left' | 'center' | 'right'; span?: number } | null;
@@ -194,6 +195,9 @@ async function susunWorkbook(p: DataExport) {
   // Sheet sama dengan tab web (rumus hidup + droplist) — 0 Ringkasan format PNL
   tulisModelWeb(wb, { t, h, m, inp: keInput(t), daftar: p.daftar, nomorQuotation: p.nomorQuotation, catatanMaster: p.catatanMaster });
   void rateCardRapi; void kv; void tabel; void lebar; void hasilCell; void gayaHeader; void judul;
+
+  // 6b. Data Input — semua isian tender (terhubung ke sel input sheet lain) untuk upload kembali ke Leca
+  tulisDataInput(wb, t);
 
   // 7. Master data yang dipakai
   {

@@ -249,6 +249,8 @@ export interface BiayaBaris {
   biayaSistem?: number;
   /** opex = biaya operasional; capex = depresiasi/amortisasi investasi; interest = bunga yang dipilih (Interest cost) */
   jenis?: 'opex' | 'capex' | 'interest';
+  /** Capex: nilai investasi (harga beli / biaya sekali) yang disusutkan / diamortisasi. */
+  nilaiInvestasi?: number;
 }
 
 /** Simulasi pinjaman bank: pokok pinjaman × bunga → interest cost masuk ke biaya. */

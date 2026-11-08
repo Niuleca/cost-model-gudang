@@ -452,7 +452,10 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     flags.push({ level: 'peringatan', kode: 'HARGA_KEDALUWARSA', pesan: `Harga "${item}" sudah lewat masa berlaku.` });
 
   // Opex vs capex vs interest cost
-  for (const b of baris) b.jenis = b.kelompok === 'Interest cost' || b.kelompok === 'Finance' ? 'interest' : nilaiModal.has(b.deskripsi) ? 'capex' : 'opex';
+  for (const b of baris) {
+    b.jenis = b.kelompok === 'Interest cost' || b.kelompok === 'Finance' ? 'interest' : nilaiModal.has(b.deskripsi) ? 'capex' : 'opex';
+    if (b.jenis === 'capex') b.nilaiInvestasi = bulat(nilaiModal.get(b.deskripsi)!);
+  }
   const perJenis = { opex: 0, capex: 0, interest: 0 };
   for (const b of baris) perJenis[b.jenis!] = bulat(perJenis[b.jenis!] + b.biayaBulan);
   const perKelompok: Record<string, number> = {};
