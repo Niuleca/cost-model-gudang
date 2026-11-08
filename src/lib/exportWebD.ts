@@ -68,6 +68,27 @@ export function tulisHasil(x: Ctx) {
   for (const l of lines) if (!urutKel.includes(l.kel)) urutKel.push(l.kel);
   const grup = urutKel.map(k => ({ k, rows: lines.filter(l => l.kel === k) })).filter(g0 => g0.rows.length);
 
+  // ===================== Matriks pembagian biaya per kategori (tab Cost Allocation)
+  const mxList = h.alokasiLayanan?.matriks ?? [];
+  const mxRow: Record<string, number> = {};
+  const OPS4 = ['storage', 'handling_in', 'handling_out', 'vas'] as const;
+  HS.r++;
+  HS.h3('Pembagian biaya per kategori (tab Cost Allocation)');
+  HS.note('"Pakai matriks" = Ya → semua baris kategori itu memakai porsi di kolom C–F (dinormalisasi ke 100%), menggantikan alokasi per baris. Tidak → alokasi per baris (default simulasi cost-to-serve; kolom H–K = porsi efektifnya, manajemen sudah disebar).');
+  HS.hdr(['Kategori', ['Pakai matriks', true], ['Storage', true], ['Handling In', true], ['Handling Out', true], ['VAS', true], 'Total %', 'Default Sto', 'Default HIn', 'Default HOut', 'Default VAS']);
+  for (const g0 of grup) {
+    const m = mxList.find(z => z.kelompok === g0.k);
+    if (!m) continue;
+    const r = HS.r; mxRow[g0.k] = r;
+    const ov = m.override ? a.alokasiKategori?.[g0.k] : null;
+    HS.put(1, g0.k, { j: 'txt', b: true });
+    HS.put(2, m.override ? 'Ya' : 'Tidak', { j: 'in', al: 'center' }); HS.dd(2, 'L_YaTidak');
+    OPS4.forEach((b, k) => HS.put(3 + k, ov ? Math.max(0, Number(ov[b]) || 0) : (m.porsiDefault[b] ?? 0), { j: 'in', fmt: 'pct' }));
+    HS.put(7, { f: `SUM(C${r}:F${r})` }, { j: 'out', fmt: 'pct' });
+    OPS4.forEach((b, k) => HS.put(8 + k, m.porsiDefault[b] ?? 0, { j: 'out', fmt: 'pct', size: 8 }));
+    HS.r++;
+  }
+
   // ===================== Biaya per layanan & kategori risiko
   HS.r++;
   HS.h3('Biaya per layanan & kategori risiko (dasar rate card)');
@@ -336,7 +357,10 @@ export function tulisHasil(x: Ctx) {
       HS.put(5, l.revisi ?? null, { j: 'in', fmt: 'rp' });
       HS.put(6, { f: `IF(E${r2}<>"",E${r2},D${r2})`, v: l.v }, { j: 'out', fmt: 'rp', b: true });
       HS.put(7, l.kel, { j: 'txt', size: 8 }); HS.put(8, l.tahap, { j: 'txt', fmt: 'n0', size: 8 }); HS.put(9, l.jenis, { j: 'txt', size: 8 });
-      const al = l.alokDari?.row ? BUCKETS.map((_, k) => ({ f: R(10 + k, l.alokDari!.row!) } as NilaiSel)) : l.alok;
+      const al0 = l.alokDari?.row ? BUCKETS.map((_, k) => ({ f: R(10 + k, l.alokDari!.row!) } as NilaiSel)) : l.alok;
+      const mr = mxRow[l.kel];
+      const ex = (v: NilaiSel) => (v && typeof v === 'object' ? `(${v.f})` : String(Number(v) || 0));
+      const al = mr ? BUCKETS.map((_, k) => ({ f: `IF($B$${mr}="Ya",${k < 4 ? `IF($G$${mr}>0,${R(3 + k, mr)}/$G$${mr},0)` : '0'},${ex(al0[k] ?? 0)})` } as NilaiSel)) : al0;
       al.forEach((v, k) => HS.put(10 + k, v, { j: 'out', fmt: 'pct', size: 8 }));
       HS.r++;
     }

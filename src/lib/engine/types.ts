@@ -178,6 +178,8 @@ export interface TenderInput {
   marginManual?: Partial<Record<Bucket, number | null>>;
   /** Cara membagi total biaya ke layanan (rate card): cts = cost-to-serve (default), rata = sama besar, manual = persentase per layanan (pecahan, total 1). */
   alokasiLayanan?: { mode: 'cts' | 'rata' | 'manual'; porsi?: Partial<Record<Bucket, number>> };
+  /** Matriks pembagian biaya per kategori (Fasilitas, Manpower, MHE, …) ke layanan; kategori yang diisi menggantikan alokasi per baris. Pecahan, total 1. */
+  alokasiKategori?: Partial<Record<string, Partial<Record<Bucket, number>> | null>>;
   /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */
   startupAuto?: { aktif: boolean; persenOpex: number; persenManpower: number };
   /** Biaya per orang per bulan diisi manual (lama — tidak dipakai lagi). */

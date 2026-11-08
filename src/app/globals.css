@@ -678,3 +678,7 @@ table.tabel-aktual th { font-size: 11.5px; }
 .rute3d-wadah { background: #bcdcf4; }
 .sim2d-bentang { display: grid; gap: 4px; }
 .sim2d-bentang label { display: inline-flex; align-items: center; gap: 3px; }
+/* Cost Allocation: matriks kategori → layanan */
+.tabel-matriks td { vertical-align: top; }
+.tabel-matriks tr.baris-ubah td:first-child { box-shadow: inset 3px 0 0 var(--warn, #b45309); }
+.tabel-matriks tfoot td { background: var(--g50, #fafafa); }

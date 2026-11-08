@@ -357,6 +357,45 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   if (m.finance.overheadPersen <= 0) flags.push({ level: 'peringatan', kode: 'OVERHEAD_NOL', pesan: 'Overhead 0% — pastikan memang disengaja.' });
   tambah('Overhead', 'Overhead', subtotal * m.finance.overheadPersen, normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 }), `${(m.finance.overheadPersen * 100).toFixed(1)}% × subtotal`);
 
+  // ---- 9b. Matriks pembagian biaya per kategori (menu Cost Allocation) ----
+  // Default = hasil simulasi cost-to-serve (alokasi tiap baris: jam aktivitas, jam MHE, space, dst.) dengan biaya manajemen
+  // sudah disebar ke layanan operasional. Kategori yang diisi user memakai porsi tetap (menggantikan alokasi per baris).
+  const OPS4: Bucket[] = ['storage', 'handling_in', 'handling_out', 'vas'];
+  const matriksEfektif = (rows: BiayaBaris[]) => {
+    const tot = Object.fromEntries(BUCKETS.map(k => [k, rows.reduce((a, b) => a + b.biayaBulan * b.alokasi[k], 0)])) as Record<Bucket, number>;
+    const tOps = OPS4.reduce((a, k) => a + tot[k], 0);
+    const pOps = Object.fromEntries(OPS4.map(k => [k, tOps > 0 ? tot[k] / tOps : 0])) as Record<Bucket, number>;
+    const per: Record<string, { total: number; porsi: Record<Bucket, number> }> = {};
+    for (const b of rows) {
+      const r = per[b.kelompok] ??= { total: 0, porsi: { storage: 0, handling_in: 0, handling_out: 0, vas: 0, manajemen: 0 } };
+      r.total += b.biayaBulan;
+      for (const k of OPS4) r.porsi[k] += b.biayaBulan * (b.alokasi[k] + b.alokasi.manajemen * pOps[k]);
+    }
+    for (const r of Object.values(per)) for (const k of OPS4) r.porsi[k] = r.total > 0 ? r.porsi[k] / r.total : 0;
+    return per;
+  };
+  const matriksDefault = matriksEfektif(baris);
+  const ovKat = t.alokasiKategori ?? {};
+  const katOverride: string[] = [];
+  for (const [kel, o] of Object.entries(ovKat)) {
+    if (!o) continue;
+    const jml = OPS4.reduce((a, k) => a + Math.max(0, Number(o[k]) || 0), 0);
+    if (jml <= 0) continue;
+    if (!baris.some(b => b.kelompok === kel)) continue;
+    katOverride.push(kel);
+    if (Math.abs(jml - 1) > 0.0005) flags.push({ level: 'peringatan', kode: 'ALOKASI_KAT_BUKAN_100', pesan: `Pembagian biaya kategori ${kel} berjumlah ${(jml * 100).toFixed(1)}% — dinormalisasi ke 100%.` });
+    const al = { storage: 0, handling_in: 0, handling_out: 0, vas: 0, manajemen: 0 } as Record<Bucket, number>;
+    for (const k of OPS4) al[k] = Math.max(0, Number(o[k]) || 0) / jml;
+    for (const b of baris) if (b.kelompok === kel) b.alokasi = al;
+  }
+  const matriksDipakai = katOverride.length ? matriksEfektif(baris) : matriksDefault;
+  const matriksKategori = Object.entries(matriksDipakai).filter(([, r]) => r.total > 0).sort((a, b) => b[1].total - a[1].total).map(([kelompok, r]) => ({
+    kelompok, biayaBulan: bulat(r.total), override: katOverride.includes(kelompok),
+    porsiDefault: Object.fromEntries(OPS4.map(k => [k, bulat(matriksDefault[kelompok]?.porsi[k] ?? 0, 4)])) as Record<Bucket, number>,
+    porsi: Object.fromEntries(OPS4.map(k => [k, bulat(r.porsi[k], 4)])) as Record<Bucket, number>,
+    biayaPerLayanan: Object.fromEntries(OPS4.map(k => [k, bulat(r.total * r.porsi[k])])) as Record<Bucket, number>,
+  }));
+
   // ---- 10. Alokasi ke bucket (cost-to-serve) per kategori risiko ----
   const biayaBucket: Record<Bucket, Record<KategoriRisiko, number>> = Object.fromEntries(
     BUCKETS.map(b => [b, { Rendah: 0, Sedang: 0, Tinggi: 0 }])) as never;
@@ -406,7 +445,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     return acc;
   }, {} as Record<string, { kelompok: string; total: number; perBucket: Record<Bucket, number> }>)).filter(r => r.total > 0)
     .map(r => ({ kelompok: r.kelompok, total: bulat(r.total), perBucket: Object.fromEntries(BUCKETS.map(k => [k, bulat(r.perBucket[k])])) as Record<Bucket, number> }));
-  const alokasiLayanan = { mode: modeAlokasi, porsiCts, porsiDipakai, biayaCts, jumlahInputManual, porsiManajemen: porsiOps, rincian: rincianAlokasi };
+  const alokasiLayanan = { mode: modeAlokasi, porsiCts, porsiDipakai, biayaCts, jumlahInputManual, porsiManajemen: porsiOps, rincian: rincianAlokasi, matriks: matriksKategori };
 
   // ---- 11. Harga & rate card ----
   // Pajak (istilah komersial): PPh EXCLUDE = harga belum termasuk PPh → ditanggung customer → tarif di-gross-up;
