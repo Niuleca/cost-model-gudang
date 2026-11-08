@@ -85,9 +85,55 @@ export interface LatarDenah {
   x: number; z: number; w: number; d: number;    // posisi & ukuran latar (m)
   opasitas: number; nama: string;
 }
+/** Bentuk gedung trapesium: lebar depan (dinding dock, x = 0) ≠ lebar belakang (x = L). Dinding sisi `sisi` miring,
+ *  sisi lainnya lurus. W gedung = lebar terbesar; bagian di luar dinding miring tidak bisa dipakai. */
+export interface Trapesium { lebarDepan: number; lebarBelakang: number; sisi: 'kanan' | 'kiri' }
+export interface Gedung { L: number; W: number; sideMm: number; centerMm: number; tinggiDockM?: number; trapesium?: Trapesium | null }
+
+/** Rentang Z yang ada di dalam gedung pada posisi x (gedung kotak → 0..W). */
+export function rentangZ(g: Gedung, x: number): [number, number] {
+  const t = g.trapesium; if (!t) return [0, g.W];
+  const f = Math.max(0, Math.min(1, x / Math.max(0.001, g.L)));
+  const lebar = t.lebarDepan + (t.lebarBelakang - t.lebarDepan) * f;
+  return t.sisi === 'kanan' ? [0, lebar] : [g.W - lebar, g.W];
+}
+/** Dinding miring (garis) — null untuk gedung kotak. */
+export function dindingMiring(g: Gedung) {
+  const t = g.trapesium; if (!t) return null;
+  const [a0, a1] = rentangZ(g, 0), [b0, b1] = rentangZ(g, g.L);
+  return t.sisi === 'kanan' ? { x0: 0, z0: a1, x1: g.L, z1: b1 } : { x0: 0, z0: a0, x1: g.L, z1: b0 };
+}
+/** Area di luar dinding miring (poligon) — untuk arsir di denah & penutup lantai di 3D. */
+export function poligonLuar(g: Gedung): { x: number; z: number }[] | null {
+  const d = dindingMiring(g); if (!d) return null;
+  const tepi = g.trapesium!.sisi === 'kanan' ? g.W : 0;
+  if (Math.abs(d.z0 - tepi) < 0.01 && Math.abs(d.z1 - tepi) < 0.01) return null;
+  return [{ x: 0, z: d.z0 }, { x: g.L, z: d.z1 }, { x: g.L, z: tepi }, { x: 0, z: tepi }];
+}
+/** Kotak-kotak bertangga (tiap `langkah` m sepanjang X) yang menutupi area di luar dinding miring — rintangan untuk rak adaptif. */
+export function kotakLuar(g: Gedung, langkah = 1): { x0: number; x1: number; z0: number; z1: number }[] {
+  if (!poligonLuar(g)) return [];
+  const out: { x0: number; x1: number; z0: number; z1: number }[] = [];
+  for (let x = 0; x < g.L - 1e-6; x += langkah) {
+    const x1 = Math.min(g.L, x + langkah);
+    const [a0, a1] = rentangZ(g, x), [b0, b1] = rentangZ(g, x1);
+    if (g.trapesium!.sisi === 'kanan') { const z = Math.min(a1, b1); if (z < g.W - 1e-6) out.push({ x0: x, x1, z0: z, z1: g.W }); }
+    else { const z = Math.max(a0, b0); if (z > 1e-6) out.push({ x0: x, x1, z0: 0, z1: z }); }
+  }
+  return out;
+}
+/** Luas lantai gedung (m²): kotak L × W, trapesium L × (lebar depan + lebar belakang) ÷ 2. */
+export const luasGedung = (g: Gedung) => (g.trapesium ? g.L * (g.trapesium.lebarDepan + g.trapesium.lebarBelakang) / 2 : g.L * g.W);
+/** Titik di dalam gedung (dengan toleransi). */
+export function diDalamGedung(g: Gedung, x: number, z: number, tol = 0.05) {
+  if (x < -tol || x > g.L + tol) return false;
+  const [z0, z1] = rentangZ(g, Math.max(0, Math.min(g.L, x)));
+  return z >= z0 - tol && z <= z1 + tol;
+}
+
 export interface LayoutEdit {
   versi: 1;
-  gedung: { L: number; W: number; sideMm: number; centerMm: number; tinggiDockM?: number };
+  gedung: Gedung;
   komponen: Komponen[];
   ukur: Ukur[];
   latar?: LatarDenah | null;
@@ -296,7 +342,12 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
     const m = o.jenis === 'kolom' ? kel : o.jenis === 'jalur' ? 0 : bebas;
     const oa0 = ax ? o.x : o.z, oa1 = oa0 + (ax ? o.w : o.d), ob0 = ax ? o.z : o.x, ob1 = ob0 + (ax ? o.d : o.w);
     return { a0: oa0 - m, a1: oa1 + m, b0: ob0 - m, b1: ob1 + m, kolom: o.jenis === 'kolom', inti: { b0: ob0, b1: ob1 } };
-  }).filter(r => r.a1 > A0 && r.a0 < A1 && r.b1 > B0 && r.b0 < B1) : [];
+  }).concat(kotakLuar(e.gedung).map(o => {
+    // area di luar dinding miring (gedung trapesium) diperlakukan sebagai rintangan + jarak bebas dinding
+    const m = Math.max(0, a.bebasDinding ?? 0.5);
+    const oa0 = ax ? o.x0 : o.z0, oa1 = ax ? o.x1 : o.z1, ob0 = ax ? o.z0 : o.x0, ob1 = ax ? o.z1 : o.x1;
+    return { a0: oa0 - m, a1: oa1 + m, b0: ob0 - m, b1: ob1 + m, kolom: false, inti: { b0: ob0, b1: ob1 } };
+  })).filter(r => r.a1 > A0 && r.a0 < A1 && r.b1 > B0 && r.b0 < B1) : [];
   // garis kolom melintang (dikelompokkan bila bertumpuk), untuk diletakkan di row spacer
   const garisKolom: { b0: number; b1: number }[] = [];
   for (const r of rint.filter(x => x.kolom).sort((p, q) => p.inti.b0 - q.inti.b0)) {
@@ -557,6 +608,8 @@ export function ringkas(e0: LayoutEdit): Ringkasan {
   for (const k of e0.komponen) if (k.area && uraiArea(k, e0).length === 0) peringatan.push({ level: 'peringatan', pesan: `${k.label}: area terlalu kecil untuk 1 baris rak.`, id: k.id });
   for (const k of ks) {
     if (k.jenis !== 'gate' && k.jenis !== 'platform' && (k.x < -EPS || k.z < -EPS || k.x + k.w > g.L + EPS || k.z + k.d > g.W + EPS)) peringatan.push({ level: 'kritis', pesan: `${k.label} keluar dari batas gedung.`, id: k.induk ?? k.id });
+    else if (g.trapesium && !['gate', 'platform', 'dock', 'areaRak'].includes(k.jenis) && [[k.x, k.z], [k.x + k.w, k.z], [k.x, k.z + k.d], [k.x + k.w, k.z + k.d]].some(([x, z]) => !diDalamGedung(g, x, z)))
+      peringatan.push({ level: 'kritis', pesan: `${k.label} melewati dinding miring (gedung trapesium).`, id: k.induk ?? k.id });
     if (k.rak && tinggiRak(k.rak) > sideM + 1e-6) peringatan.push({ level: 'kritis', pesan: `${k.label}: tinggi rak ${r2(tinggiRak(k.rak))} m melebihi side height ${r2(sideM)} m.`, id: k.induk ?? k.id });
     if (k.rak) {
       const jb = jarakBebas(e, k);
@@ -570,7 +623,7 @@ export function ringkas(e0: LayoutEdit): Ringkasan {
   for (let i = 0; i < pad.length; i++) for (let j = i + 1; j < pad.length; j++)
     if (tumpang(pad[i], pad[j])) peringatan.push({ level: 'kritis', pesan: `${pad[i].label} bertabrakan dengan ${pad[j].label}.`, id: pad[i].induk ?? pad[i].id });
   if (totalRak > 0 && e.stokDesain > totalRak) peringatan.push({ level: 'kritis', pesan: `Kapasitas ${totalRak.toLocaleString('id-ID')} posisi < stok desain ${e.stokDesain.toLocaleString('id-ID')} palet.` });
-  return { posisiSpr, posisiDdr, posisiBlock, posisiStaging, totalRak, luasGedung: g.L * g.W, luasRak: luas(k => !!k.rak), luasBlock: luas(k => k.jenis === 'block'),
+  return { posisiSpr, posisiDdr, posisiBlock, posisiStaging, totalRak, luasGedung: luasGedung(g), luasRak: luas(k => !!k.rak), luasBlock: luas(k => k.jenis === 'block'),
     luasStaging: luas(k => k.jenis === 'stagingIn' || k.jenis === 'stagingOut'), luasFasilitas: luas(k => k.jenis === 'fasilitas'), luasJalur: luas(k => k.jenis === 'jalur'),
     okupansi, paletDitampilkan: Math.round(okupansi * totalRak), peringatan };
 }
@@ -628,7 +681,7 @@ export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang
     } else if (k.jenis === 'fasilitas') { fasilitas.push({ nama: k.label, x0: k.x, x1: k.x + k.w, z0: k.z, z1: k.z + k.d, tinggi: k.tinggi }); }
     else if (k.jenis === 'dock') dock.push({ z: k.z + k.d / 2, arus: k.arus ?? 'inbound' });
     else if (k.jenis === 'kolom') kolom.push({ x: k.x, z: k.z, w: k.w, d: k.d, tinggi: k.tinggi || g.sideMm / 1000 });
-    else if (k.jenis === 'gate') { const pg = posisiGate(k, g); gate.push({ sisi: pg.sisi, pos: pg.pos, lebar: pg.lebar, tinggi: pg.tinggi }); }
+    else if (k.jenis === 'gate') { const pg = posisiGate(k, g); gate.push({ sisi: pg.sisi, pos: pg.pos, lebar: pg.lebar, tinggi: pg.tinggi, arus: k.arus, label: k.label }); }
     else if (k.jenis === 'platform') platform.push({ x0: k.x, x1: k.x + k.w, z0: k.z, z1: k.z + k.d, tinggi: k.tinggi || (g.tinggiDockM ?? 1.2), palet: k.palet ?? 0, label: k.label });
     else zona.push({ id: k.id, jenis: k.jenis === 'jalur' ? 'jalur' : 'custom', label: k.label, ...box, ket: `${r2(k.w)} × ${r2(k.d)} m`, warna: k.warna });
   }
@@ -637,11 +690,11 @@ export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang
   const stagingIn = (() => { const k = ks.find(c => c.jenis === 'stagingIn'); return k ? { x0: k.x, x1: k.x + k.w, z0: k.z, z1: k.z + k.d } : { x0: 0, x1: 6, z0: 0, z1: g.W / 2 }; })();
   const stagingOut = (() => { const k = ks.find(c => c.jenis === 'stagingOut'); return k ? { x0: k.x, x1: k.x + k.w, z0: k.z, z1: k.z + k.d } : { x0: 0, x1: 6, z0: g.W / 2, z1: g.W }; })();
   const ringkasan = [
-    { label: 'Gedung', nilai: `${r2(g.L)} × ${r2(g.W)} m = ${Math.round(g.L * g.W).toLocaleString('id-ID')} m²` },
+    { label: 'Gedung', nilai: g.trapesium ? `trapesium ${r2(g.L)} m × lebar ${r2(g.trapesium.lebarDepan)} → ${r2(g.trapesium.lebarBelakang)} m = ${Math.round(luasGedung(g)).toLocaleString('id-ID')} m²` : `${r2(g.L)} × ${r2(g.W)} m = ${Math.round(g.L * g.W).toLocaleString('id-ID')} m²` },
     { label: 'Posisi SPR / DDR / block', nilai: `${rk.posisiSpr} / ${rk.posisiDdr} / ${rk.posisiBlock}` },
     { label: 'Okupansi', nilai: `${Math.round(rk.okupansi * 100)}%` },
   ];
-  return { ...dasar, L: g.L, W: g.W, H: g.sideMm / 1000, puncak: Math.max(g.sideMm, g.centerMm) / 1000, luasLayout: g.L * g.W,
+  return { ...dasar, L: g.L, W: g.W, H: g.sideMm / 1000, puncak: Math.max(g.sideMm, g.centerMm) / 1000, luasLayout: luasGedung(g), trapesium: g.trapesium ?? undefined,
     zona, rak, palet, lorong, dock, fasilitas, kolom, gate, platform, tinggiDock: g.tinggiDockM ?? 1.2, tinggiPalet: tp, tinggiRak: Math.max(maxTinggi, 1), stagingIn, stagingOut,
     ringkas: ringkasan, asumsi: rk.peringatan.map(p => p.pesan) };
 }

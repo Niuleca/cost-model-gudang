@@ -7,6 +7,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRe
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import type { LayoutGudang, JenisMhe } from '@/lib/simulasi3d/layout';
+import { dindingMiring, poligonLuar } from '@/lib/simulasi3d/editor';
 import { WARNA_MHE, WARNA_ORANG } from './warna';
 
 export type Kamera = 'iso' | 'atas' | 'dock' | 'lorong' | 'dekat';
@@ -392,15 +393,45 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
         : new THREE.MeshStandardMaterial({ color: '#eef2f6', map: teks('cladding', W / 4, (puncak - H) / 4), transparent: true, opacity: 0.5, roughness: 0.42, metalness: 0.45, side: THREE.DoubleSide, depthWrite: false });
       const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), mt); m.rotation.y = -Math.PI / 2; m.position.set(x, 0, 0); gDinding.add(m);
     };
+    // ---------- gedung trapesium: dinding samping miring + area di luar dinding ditutup perkerasan halaman
+    const gTr = layout.trapesium ? { L, W, sideMm: 0, centerMm: 0, trapesium: layout.trapesium } : null;
+    const luarTr = gTr ? poligonLuar(gTr) : null, garisTr = luarTr && gTr ? dindingMiring(gTr) : null;
+    const sisiMiring = luarTr ? layout.trapesium!.sisi : null;
+    if (luarTr) {
+      const sh = new THREE.Shape(luarTr.map(p => new THREE.Vector2(p.x, -p.z)));
+      const tutup = new THREE.Mesh(new THREE.ShapeGeometry(sh), mat('#c9ced4', { roughness: 0.95 }));
+      tutup.rotation.x = -Math.PI / 2; tutup.position.y = 0.03; tutup.receiveShadow = true; gBangunan.add(tutup);
+    }
+    const dindingMiringDi = (tinggiD: number, padat: boolean) => {
+      if (!garisTr) return;
+      const dx = garisTr.x1 - garisTr.x0, dz = garisTr.z1 - garisTr.z0, pj = Math.hypot(dx, dz), sudut = -Math.atan2(dz, dx);
+      const cx = (garisTr.x0 + garisTr.x1) / 2, cz = (garisTr.z0 + garisTr.z1) / 2;
+      const bagian = (ya: number, yb: number, beton: boolean) => {
+        if (yb - ya < 0.05) return;
+        const m = beton ? (() => { const mt = mPrecast.clone(); mt.map = teksProsedural('precast', Math.max(1, pj / 6), Math.max(1, (yb - ya) / 2.4)) ?? null; return mt; })()
+          : bersih ? new THREE.MeshStandardMaterial({ color: '#f8fafc', transparent: !padat, opacity: padat ? 1 : 0.35, roughness: 0.6, side: THREE.DoubleSide, depthWrite: padat })
+          : new THREE.MeshStandardMaterial({ color: '#eef2f6', map: teks('cladding', Math.max(1, pj / 4), Math.max(1, (yb - ya) / 4)), transparent: true, opacity: 0.5, roughness: 0.42, metalness: 0.45, side: THREE.DoubleSide, depthWrite: false });
+        const w = new THREE.Mesh(new THREE.BoxGeometry(pj, yb - ya, beton ? 0.2 : 0.15), m);
+        w.position.set(cx, (ya + yb) / 2, cz); w.rotation.y = sudut; w.castShadow = beton || padat; w.receiveShadow = true; gDinding.add(w);
+      };
+      if (bersih) bagian(0, tinggiD, false); else { bagian(0, Math.min(tinggiD, DADO), true); bagian(Math.max(0, DADO), tinggiD, false); }
+    };
+    const dindingSisiAsli = dindingSisi;
+    const dindingSisiTr = (sisi: Sisi, tinggiD: number, padat: boolean, tebal = 0.15) => (sisi === sisiMiring ? dindingMiringDi(tinggiD, padat) : dindingSisiAsli(sisi, tinggiD, padat, tebal));
     if (bersih) {
       // dinding belakang & ujung padat putih; sisi yang menghadap kamera dipotong rendah (cutaway) supaya isi gudang terlihat
-      dindingSisi('kiri', H, true, 0.2); dindingSisi('belakang', H, true, 0.2); dindingSisi('kanan', 1.2, true, 0.2); dindingSisi('depan', H, false);
+      dindingSisiTr('kiri', H, true, 0.2); dindingSisiTr('belakang', H, true, 0.2); dindingSisiTr('kanan', 1.2, true, 0.2); dindingSisiTr('depan', H, false);
       pelana(L, true);
       const lis = mat('#2563eb', { roughness: 0.4 });
-      for (const [x, z] of [[0, 0], [L, 0], [L, W], [0, W]] as const) { const k = new THREE.Mesh(new THREE.BoxGeometry(0.35, z === W && x !== 0 && x !== L ? 1.2 : H, 0.35), lis); k.position.set(x, H / 2, z); k.castShadow = true; gDinding.add(k); }
+      const sudut: [number, number][] = garisTr
+        ? (sisiMiring === 'kanan' ? [[0, 0], [L, 0], [L, garisTr.z1], [0, garisTr.z0]] : [[0, garisTr.z0], [L, garisTr.z1], [L, W], [0, W]])
+        : [[0, 0], [L, 0], [L, W], [0, W]];
+      for (const [x, z] of sudut) { const k = new THREE.Mesh(new THREE.BoxGeometry(0.35, z === W && x !== 0 && x !== L ? 1.2 : H, 0.35), lis); k.position.set(x, H / 2, z); k.castShadow = true; gDinding.add(k); }
       const tepiAtas = (sx: number, sz: number, x: number, z: number, y: number) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.25, sz), lis); m.position.set(x, y, z); gDinding.add(m); };
-      tepiAtas(L, 0.3, L / 2, 0, H); tepiAtas(0.3, W, L, W / 2, H); tepiAtas(L, 0.3, L / 2, W, 1.2);
-    } else { for (const sisi of ['depan', 'belakang', 'kiri', 'kanan'] as const) dindingSisi(sisi, H, false); pelana(0, false); pelana(L, false); }
+      if (sisiMiring !== 'kiri') tepiAtas(L, 0.3, L / 2, 0, H);
+      tepiAtas(0.3, W, L, W / 2, H);
+      if (sisiMiring !== 'kanan') tepiAtas(L, 0.3, L / 2, W, 1.2);
+    } else { for (const sisi of ['depan', 'belakang', 'kiri', 'kanan'] as const) dindingSisiTr(sisi, H, false); pelana(0, false); pelana(L, false); }
     // kolom baja dinding + portal frame (rafter) mengikuti atap pelana
     const mKolom = mat(bersih ? '#2563eb' : '#3f4a57', { metalness: bersih ? 0.1 : 0.65, roughness: 0.38 });
     const langkahKolom = Math.max(6, L / Math.ceil(L / 8));
@@ -497,7 +528,7 @@ const Viewer3D = forwardRef<ViewerApi, { layout: LayoutGudang; shift: number; op
         ramp.position.copy(titik(c, y0, 0)); gBangunan.add(ramp);
         for (const d of [-1, 1]) { const tb = titik(c + d * (g.lebar / 2 + 0.5), y0 + 0.6, rl * 0.25); const bol = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.2, 14), mKuning); bol.position.copy(tb); bol.castShadow = true; gBangunan.add(bol); }
       }
-      const tl = label(`Gate ${i + 1} · ${f1(g.lebar)} × ${f1(h)} m`, 'kecil'); tl.position.copy(titik(c, h + 1.1, 0.6)); gLabel.add(tl);
+      const tl = label(`${g.label && g.label !== 'Gate' ? g.label : g.arus === 'inbound' ? 'Gate IN' : g.arus === 'outbound' ? 'Gate OUT' : `Gate ${i + 1}`} · ${f1(g.lebar)} × ${f1(h)} m`, 'kecil'); tl.position.copy(titik(c, h + 1.1, 0.6)); gLabel.add(tl);
     });
 
     // dock leveler + pintu + truk (lantai bak truk ≈ tinggi dock)

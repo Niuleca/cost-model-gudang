@@ -2,9 +2,9 @@
 // Editor denah 2D (SVG): tampak atas, X = panjang gudang (dock di kiri), Z = lebar gudang (ke bawah).
 // Pilih, geser (drag), ubah ukuran (handle), ukur jarak, garis ukur otomatis ke rintangan / dinding, latar denah gambar / DXF.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { BLOK_DEFAULT, aturSisiGate, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { BLOK_DEFAULT, aturSisiGate, dindingMiring, poligonLuar, rentangZ, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 
-export type Mode = 'pilih' | 'blok' | 'ukur' | 'geser';
+export type Mode = 'pilih' | 'blok' | 'ukur' | 'geser' | 'kolom';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
 
 export const WARNA_KOMP: Record<string, { isi: string; garis: string }> = {
@@ -13,6 +13,9 @@ export const WARNA_KOMP: Record<string, { isi: string; garis: string }> = {
   dock: { isi: '#1f2937', garis: '#111827' }, kolom: { isi: '#475569', garis: '#1e293b' }, jalur: { isi: '#fef3c7', garis: '#d97706' }, zona: { isi: '#e0f2fe', garis: '#0284c7' },
   gate: { isi: '#facc15', garis: '#a16207' }, platform: { isi: '#d6d3d1', garis: '#57534e' },
 };
+/** Warna gate menurut fungsi: IN hijau, OUT oranye, IN & OUT kuning. */
+export const WARNA_GATE = { inbound: { isi: '#86efac', garis: '#15803d' }, outbound: { isi: '#fdba74', garis: '#c2410c' } } as const;
+
 type SisiG = 'depan' | 'belakang' | 'kiri' | 'kanan';
 /** Gate diseret: menempel ke dinding terdekat dari kursor, posisi sepanjang dinding mengikuti kursor. */
 function seretGate(k: Komponen, px: number, pz: number, g: { L: number; W: number }, snap: (v: number) => number): Komponen {
@@ -41,9 +44,11 @@ interface Props {
   mode: Mode; grid: number; snapTepi: boolean;
   /** Garis potong untuk view potongan (sumbu tetap & nilainya, m). */
   potong?: { sumbu: 'x' | 'z'; nilai: number } | null;
+  /** Mode kolom: klik di denah → kolom baru (pusat x, z). Ukuran sisi kolom (m) untuk pratinjau. */
+  taruhKolom?: (x: number, z: number) => void; ukuranKolom?: number;
 }
 
-const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih, setPilih, multi, setMulti, mulaiAksi, ubah, mode, grid, snapTepi, potong }, ref) {
+const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih, setPilih, multi, setMulti, mulaiAksi, ubah, mode, grid, snapTepi, potong, taruhKolom, ukuranKolom = 0.5 }, ref) {
   const svg = useRef<SVGSVGElement>(null);
   const [view, setView] = useState({ x: -5, z: -5, w: 100 });     // viewBox: kiri, atas, lebar (m)
   const [ukuran, setUkuran] = useState({ w: 800, h: 500 });
@@ -101,9 +106,23 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     return { x: bx, z: bz };
   };
 
+  /** Titik kolom baru: sejajar (as) dengan kolom terdekat bila dalam 0,6 m, selain itu ikut snap grid; tetap di dalam gedung. */
+  const titikKolom = (p: { x: number; z: number }) => {
+    const as = edit.komponen.filter(k => k.jenis === 'kolom').map(k => ({ x: k.x + k.w / 2, z: k.z + k.d / 2 }));
+    let x = snap(p.x), z = snap(p.z), sejajarX: number | null = null, sejajarZ: number | null = null, dx = 0.6, dz = 0.6;
+    for (const a of as) { if (Math.abs(p.x - a.x) < dx) { dx = Math.abs(p.x - a.x); x = a.x; sejajarX = a.x; } if (Math.abs(p.z - a.z) < dz) { dz = Math.abs(p.z - a.z); z = a.z; sejajarZ = a.z; } }
+    const h = ukuranKolom / 2;
+    x = Math.min(g.L - h, Math.max(h, x)); z = Math.min(g.W - h, Math.max(h, z));
+    // jarak as-ke-as ke kolom terdekat sebaris / sekolom (untuk label pratinjau)
+    const kiri = as.filter(a => sejajarZ != null && Math.abs(a.z - z) < 0.01 && a.x < x).sort((a, b) => b.x - a.x)[0];
+    const atas = as.filter(a => sejajarX != null && Math.abs(a.x - x) < 0.01 && a.z < z).sort((a, b) => b.z - a.z)[0];
+    return { x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, sejajarX, sejajarZ, kiri, atas };
+  };
+
   function turun(e: React.PointerEvent, id?: string, h?: string) {
     (e.target as Element).setPointerCapture?.(e.pointerId);
     const p = keDunia(e.clientX, e.clientY);
+    if (mode === 'kolom' && e.button === 0 && !h) { const t = titikKolom(p); taruhKolom?.(t.x, t.z); return; }
     if (mode === 'ukur') {
       const q = { x: snap(p.x), z: snap(p.z) };
       if (!ukurA) setUkurA(q);
@@ -226,7 +245,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
   };
 
   const gambarKomp = (k: Komponen) => {
-    const w = WARNA_KOMP[k.jenis] ?? WARNA_KOMP.zona; const dipilih = k.id === pilih || setMultiSet.has(k.id);
+    const w = (k.jenis === 'gate' && k.arus ? WARNA_GATE[k.arus] : WARNA_KOMP[k.jenis]) ?? WARNA_KOMP.zona; const dipilih = k.id === pilih || setMultiSet.has(k.id);
     const isi = k.warna ?? w.isi;
     const el: React.ReactNode[] = [];
     el.push(<rect key="r" x={k.x} y={k.z} width={k.w} height={k.d} fill={k.jenis === 'jalur' ? 'url(#arsir)' : isi} fillOpacity={k.jenis === 'zona' ? 0.5 : k.jenis === 'areaRak' ? 0.45 : 1}
@@ -305,14 +324,16 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
   };
 
   const jb = terpilih && !['dock', 'gate', 'platform'].includes(terpilih.jenis) ? jarakBebas(edit, terpilih) : null;
+  const luar = poligonLuar(g), miring = dindingMiring(g);
   return (
     <svg ref={svg} className="sim2d-svg" viewBox={`${view.x} ${view.z} ${view.w} ${tinggiView}`} preserveAspectRatio="xMinYMin meet"
       onPointerDown={e => turun(e)} onPointerMove={gerak} onPointerUp={naik} onPointerLeave={() => setKursor(null)} onWheel={roda}
-      style={{ cursor: mode === 'geser' ? 'grab' : mode === 'ukur' || mode === 'blok' ? 'crosshair' : 'default', fontFamily: 'Noto Sans, Arial, sans-serif' }}>
+      style={{ cursor: mode === 'geser' ? 'grab' : mode === 'ukur' || mode === 'blok' || mode === 'kolom' ? 'crosshair' : 'default', fontFamily: 'Noto Sans, Arial, sans-serif' }}>
       <defs>
         <marker id="panah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" /></marker>
         <pattern id="arsir" width="1" height="1" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1" height="1" fill="#fef9c3" /><line x1="0" y1="0" x2="0" y2="1" stroke="#facc15" strokeWidth="0.25" /></pattern>
         <pattern id="kisi1" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M 1 0 L 0 0 0 1" fill="none" stroke="#e2e8f0" strokeWidth="0.03" /></pattern>
+        <pattern id="luarGedung" width="1.2" height="1.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.2" height="1.2" fill="#e2e8f0" /><line x1="0" y1="0" x2="0" y2="1.2" stroke="#94a3b8" strokeWidth="0.18" /></pattern>
         <pattern id="kisi5" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="url(#kisi1)" /><path d="M 5 0 L 0 0 0 5" fill="none" stroke="#cbd5e1" strokeWidth="0.06" /></pattern>
       </defs>
       <rect x={view.x} y={view.z} width={view.w} height={tinggiView} fill="#f8fafc" data-ekspor="tidak" />
@@ -333,11 +354,18 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       {edit.komponen.filter(k => k.jenis === 'jalur' || k.jenis === 'zona').map(gambarKomp)}
       {edit.komponen.filter(k => !['jalur', 'zona', 'areaRak', 'gate'].includes(k.jenis)).map(gambarKomp)}
       {edit.komponen.filter(k => k.jenis === 'gate').map(gambarKomp)}
+      {/* gedung trapesium: area di luar dinding miring diarsir abu-abu (tidak bisa dipakai) */}
+      {luar && <polygon points={luar.map(p => `${p.x},${p.z}`).join(' ')} fill="url(#luarGedung)" stroke="none" style={{ pointerEvents: 'none' }} />}
       {/* dinding */}
-      <rect x={0} y={0} width={g.L} height={g.W} fill="none" stroke="#0f172a" strokeWidth={fs * 0.22} style={{ pointerEvents: 'none' }} />
+      {luar && miring
+        ? <polygon points={[[0, rentangZ(g, 0)[0]], [g.L, rentangZ(g, g.L)[0]], [g.L, rentangZ(g, g.L)[1]], [0, rentangZ(g, 0)[1]]].map(([x, z]) => `${x},${z}`).join(' ')} fill="none" stroke="#0f172a" strokeWidth={fs * 0.22} style={{ pointerEvents: 'none' }} />
+        : <rect x={0} y={0} width={g.L} height={g.W} fill="none" stroke="#0f172a" strokeWidth={fs * 0.22} style={{ pointerEvents: 'none' }} />}
       {/* dimensi gedung */}
       {garisUkur(0, -fs * 1.6, g.L, -fs * 1.6, `${f1(g.L)} m`, '#334155', 'dimL')}
-      {garisUkur(g.L + fs * 1.4, 0, g.L + fs * 1.4, g.W, `${f1(g.W)} m`, '#334155', 'dimW')}
+      {g.trapesium
+        ? <>{garisUkur(-fs * 1.4 - 14, rentangZ(g, 0)[0], -fs * 1.4 - 14, rentangZ(g, 0)[1], `depan ${f1(g.trapesium.lebarDepan)} m`, '#334155', 'dimWd')}
+            {garisUkur(g.L + fs * 1.4, rentangZ(g, g.L)[0], g.L + fs * 1.4, rentangZ(g, g.L)[1], `belakang ${f1(g.trapesium.lebarBelakang)} m`, '#334155', 'dimWb')}</>
+        : garisUkur(g.L + fs * 1.4, 0, g.L + fs * 1.4, g.W, `${f1(g.W)} m`, '#334155', 'dimW')}
       {/* grid pilar: as & rantai dimensi as-ke-as per bentang */}
       {(() => {
         const kol = edit.komponen.filter(k => k.jenis === 'kolom'); if (kol.length < 2) return null;
@@ -365,6 +393,19 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         <rect data-ekspor="tidak" x={Math.min(kotak.ax, kotak.bx)} y={Math.min(kotak.az, kotak.bz)} width={Math.abs(kotak.bx - kotak.ax)} height={Math.abs(kotak.bz - kotak.az)}
           fill={silang ? 'rgba(22,163,74,0.08)' : 'rgba(37,99,235,0.08)'} stroke={silang ? '#16a34a' : '#2563eb'} strokeWidth={fs * 0.08}
           strokeDasharray={silang ? `${fs * 0.4} ${fs * 0.25}` : undefined} style={{ pointerEvents: 'none' }} />); })()}
+      {/* pratinjau kolom (mode kolom): kotak bayangan + garis bantu sejajar + jarak as ke as */}
+      {mode === 'kolom' && kursor && (() => {
+        const t = titikKolom(kursor), u = ukuranKolom;
+        return (
+          <g data-ekspor="tidak" style={{ pointerEvents: 'none' }}>
+            {t.sejajarX != null && <line x1={t.x} y1={0} x2={t.x} y2={g.W} stroke="#2563eb" strokeWidth={fs * 0.05} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />}
+            {t.sejajarZ != null && <line x1={0} y1={t.z} x2={g.L} y2={t.z} stroke="#2563eb" strokeWidth={fs * 0.05} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />}
+            <rect x={t.x - u / 2} y={t.z - u / 2} width={u} height={u} fill="rgba(71,85,105,0.55)" stroke="#0f172a" strokeWidth={fs * 0.06} />
+            {t.kiri && garisUkur(t.kiri.x, t.z - u, t.x, t.z - u, `${f1(t.x - t.kiri.x)} m`, '#2563eb', 'kolomX', false)}
+            {t.atas && garisUkur(t.x + u, t.atas.z, t.x + u, t.z, `${f1(t.z - t.atas.z)} m`, '#2563eb', 'kolomZ', false)}
+            <text x={t.x + u} y={t.z + u * 2 + fs * 0.6} fontSize={fs * 0.7} fill="#0f172a">klik = taruh kolom ({f1(t.x)}; {f1(t.z)})</text>
+          </g>);
+      })()}
       {/* ukur sementara */}
       {mode === 'ukur' && ukurA && kursor && garisUkur(ukurA.x, ukurA.z, snap(kursor.x), snap(kursor.z), `${f1(Math.hypot(snap(kursor.x) - ukurA.x, snap(kursor.z) - ukurA.z))} m`, '#be123c', 'tmp', false)}
       {/* terpilih: handle + jarak bebas ke rintangan / dinding */}

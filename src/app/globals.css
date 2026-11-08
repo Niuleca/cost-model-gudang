@@ -656,3 +656,13 @@ table.tabel-aktual td input { min-width: 0; width: 100%; padding: 4px 6px; }
 table.tabel-aktual th { font-size: 11.5px; }
 .gm-lewati { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .gm-lewati input { width: auto; }
+
+/* ---------- Editor desain gudang: perbesar / layar penuh / tanpa panel (UAT E1) */
+.sim2d-tata.layar-besar { position: fixed; inset: 0; z-index: 90; background: var(--bg); padding: 10px; overflow: auto; }
+.sim2d-tata.layar-penuh { background: var(--bg); padding: 10px; overflow: auto; }
+.sim2d-tata.layar-besar .sim2d-kanvas, .sim2d-tata.layar-penuh .sim2d-kanvas { height: calc(100vh - 74px); min-height: 360px; }
+.sim2d-tata.layar-besar .sim2d-kiri, .sim2d-tata.layar-besar .sim2d-kanan,
+.sim2d-tata.layar-penuh .sim2d-kiri, .sim2d-tata.layar-penuh .sim2d-kanan { top: 0; max-height: calc(100vh - 20px); }
+.sim2d-tata.tanpa-panel { grid-template-columns: minmax(0, 1fr); }
+.sim2d-tata.tanpa-panel > .sim2d-kiri, .sim2d-tata.tanpa-panel > .sim2d-kanan { display: none; }
+.sim2d-kolom { display: grid; gap: 6px; }

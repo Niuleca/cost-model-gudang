@@ -43,11 +43,13 @@ export interface LayoutGudang {
   mhe: UnitMhe[]; orang: GrupOrang[]; shiftAktif: number[]; aktivitas: AktSim[];
   kolom?: { x: number; z: number; w: number; d: number; tinggi: number }[];
   /** pintu gate di dinding (sisi, posisi sepanjang dinding dari ujung kiri/depan, lebar, tinggi) */
-  gate?: { sisi: 'depan' | 'belakang' | 'kiri' | 'kanan'; pos: number; lebar: number; tinggi: number }[];
+  gate?: { sisi: 'depan' | 'belakang' | 'kiri' | 'kanan'; pos: number; lebar: number; tinggi: number; arus?: 'inbound' | 'outbound'; label?: string }[];
   /** platform loading dock beton di luar dinding (bagian atas = tinggi lantai gudang) */
   platform?: { x0: number; x1: number; z0: number; z1: number; tinggi: number; palet: number; label: string }[];
   /** tinggi lantai gudang di atas halaman (m) — truk mundur dengan bak setinggi lantai */
   tinggiDock?: number;
+  /** gedung trapesium (lebar depan ≠ lebar belakang, satu dinding samping miring) */
+  trapesium?: { lebarDepan: number; lebarBelakang: number; sisi: 'kanan' | 'kiri' };
   ringkas: { label: string; nilai: string }[];
   asumsi: string[];
 }

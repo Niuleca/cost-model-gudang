@@ -16,7 +16,7 @@ import { dariOtomatis, tarikRak, keLayoutGudang, komponenBaru, levelDariTinggi, 
 import { bacaDxf } from '@/lib/simulasi3d/dxf';
 import { labelStatus } from '@/lib/status';
 import { dataTanpaProject, GEDUNG_BARU, ID_PRIBADI, layoutKosong, type SpekGedungBaru } from '@/lib/simulasi3d/tanpaProject';
-import Editor2D, { WARNA_KOMP, type Editor2DApi, type Mode } from './layout/Editor2D';
+import Editor2D, { WARNA_GATE, WARNA_KOMP, type Editor2DApi, type Mode } from './layout/Editor2D';
 import Potongan, { potongAwal, type ArahPotong, type PotonganApi } from './layout/Potongan';
 import ParamSpace from './ParamSpace';
 import type { Kamera, OpsiViewer, ViewerApi } from './Viewer3D';
@@ -29,12 +29,12 @@ interface Versi { id: string; nama: string; updated_at: string; data: LayoutEdit
 const angka = (v: number, d = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d });
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
-const PALET: { jenis: JenisKomp | 'pasSpr' | 'pasDdr' | 'areaAdaptif' | 'ramp'; label: string }[] = [
+const PALET: { jenis: JenisKomp | 'pasSpr' | 'pasDdr' | 'areaAdaptif' | 'ramp' | 'gateIn' | 'gateOut'; label: string }[] = [
   { jenis: 'areaRak', label: 'Area rak otomatis 1 · grid (tarik → baris & lorong terbentuk)' },
   { jenis: 'areaAdaptif', label: 'Area rak otomatis 2 · adaptif (hindari kolom, dinding, office, ramp)' },
   { jenis: 'spr', label: 'Rak SPR (1 baris)' }, { jenis: 'pasSpr', label: 'Rak SPR back-to-back' }, { jenis: 'ddr', label: 'Rak DDR (1 baris)' }, { jenis: 'pasDdr', label: 'Rak DDR back-to-back' },
   { jenis: 'block', label: 'Block stack' }, { jenis: 'stagingIn', label: 'Staging inbound' }, { jenis: 'stagingOut', label: 'Staging outbound' },
-  { jenis: 'dock', label: 'Dock' }, { jenis: 'gate', label: 'Gate / pintu (depan, belakang, samping)' }, { jenis: 'platform', label: 'Loading dock (platform beton)' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'kolom', label: 'Kolom' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
+  { jenis: 'dock', label: 'Dock' }, { jenis: 'gateIn', label: 'Gate IN (masuk)' }, { jenis: 'gateOut', label: 'Gate OUT (keluar)' }, { jenis: 'gate', label: 'Gate IN & OUT / pintu (depan, belakang, samping)' }, { jenis: 'platform', label: 'Loading dock (platform beton)' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'kolom', label: 'Kolom' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
 ];
 
 /** Isian angka di panel properti. */
@@ -85,6 +85,26 @@ export default function DesainGudang() {
   const pribadi = id === ID_PRIBADI;
   const [opsi3d, setOpsi3d] = useState<OpsiViewer>({ atap: false, dinding: true, label: true, animasi: true, truk: true, orang: true });
   const riwayat = useRef<{ lalu: LayoutEdit[]; depan: LayoutEdit[] }>({ lalu: [], depan: [] });
+  // ---------- ukuran editor: normal · perbesar (memenuhi jendela) · layar penuh (Fullscreen API) · sembunyikan panel samping
+  const tataRef = useRef<HTMLDivElement>(null);
+  const [besarEd, setBesarEd] = useState(false); const [penuhEd, setPenuhEd] = useState(false); const [tanpaPanel, setTanpaPanel] = useState(false);
+  useEffect(() => {
+    const f = () => setPenuhEd(!!tataRef.current && document.fullscreenElement === tataRef.current);
+    document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f);
+  }, []);
+  useEffect(() => {
+    if (!besarEd) return;
+    const f = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.fullscreenElement) setBesarEd(false); };
+    const ov = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', f); return () => { window.removeEventListener('keydown', f); document.body.style.overflow = ov; };
+  }, [besarEd]);
+  const layarPenuhEd = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (tataRef.current?.requestFullscreen) await tataRef.current.requestFullscreen();
+      else setBesarEd(true);
+    } catch { setBesarEd(true); }
+  };
   const ed2 = useRef<Editor2DApi>(null);
   const api3 = useRef<ViewerApi>(null);
   const editRef = useRef<LayoutEdit | null>(null); editRef.current = edit;
@@ -176,6 +196,11 @@ export default function DesainGudang() {
       const [a] = komponenBaru('areaRak', data.p, { x: 0, z: 0 }, edit.tinggiPalet);
       baru = [{ ...a, label: 'Area rak adaptif', x: 0, z: 0, w: edit.gedung.L, d: edit.gedung.W,
         area: { ...a.area!, mode: 'adaptif', crossAwal: 0, crossAkhir: 0, kelonggaran: 0.1, bebasRintangan: 0.3, bebasDinding: 0.5, rak: { ...a.area!.rak, lebarLorong: Math.max(3.4, a.area!.rak.lebarLorong) } } }];
+    } else if (j === 'gateIn' || j === 'gateOut') {
+      const masuk = j === 'gateIn';
+      const n = edit.komponen.filter(k => k.jenis === 'gate' && k.arus === (masuk ? 'inbound' : 'outbound')).length;
+      const [gt] = komponenBaru('gate', data.p, pos, edit.tinggiPalet);
+      baru = [aturSisiGate({ ...gt, label: `Gate ${masuk ? 'IN' : 'OUT'}${n ? ` ${n + 1}` : ''}`, arus: masuk ? 'inbound' : 'outbound', z: r2(Math.min(edit.gedung.W - gt.d, Math.max(0, pos.z + n * 6))) }, 'depan', edit.gedung)];
     } else if (j === 'ramp') {
       const [z] = komponenBaru('zona', data.p, pos, edit.tinggiPalet); baru = [{ ...z, label: 'Ramp', w: 8, d: 4, warna: '#94a3b8' }];
     } else baru = j === 'pasSpr' ? pasanganRak(data.p, false, pos) : j === 'pasDdr' ? pasanganRak(data.p, true, pos) : komponenBaru(j, data.p, pos, edit.tinggiPalet);
@@ -231,6 +256,17 @@ export default function DesainGudang() {
   }
 
   /** Grid pilar dari daftar bentang as-ke-as (6 = 6 m berulang; "6; 6; 8" = per bentang). */
+  /** Mode kolom: klik di denah → 1 kolom baru, pusat di titik klik (sudah disejajarkan di editor 2D). */
+  function taruhKolom(x: number, z: number) {
+    if (!edit || !data) return;
+    const s = Math.max(0.2, gridPilar.ukuran);
+    const [tpl] = komponenBaru('kolom', data.p, { x: 0, z: 0 }, edit.tinggiPalet);
+    const n = edit.komponen.filter(k => k.jenis === 'kolom').length;
+    const k: Komponen = { ...tpl, id: uid(), label: `Kolom ${n + 1}`, w: s, d: s, x: r2(x - s / 2), z: r2(z - s / 2), tinggi: edit.gedung.sideMm / 1000 };
+    aksi(e => ({ ...e, komponen: [...e.komponen, k] }));
+    setPesan(`Kolom ${n + 1} ditaruh di X ${angka(x, 2)} m · Z ${angka(z, 2)} m (pusat). Klik lagi untuk kolom berikutnya; pilih mode "Pilih / geser" untuk selesai.`);
+  }
+  const hapusSemuaKolom = () => aksi(e => ({ ...e, komponen: e.komponen.filter(k => k.jenis !== 'kolom') }));
   function buatGridPilar() {
     if (!edit || !data) return;
     const { L, W } = edit.gedung; const s = Math.max(0.2, gridPilar.ukuran);
@@ -461,12 +497,12 @@ export default function DesainGudang() {
       )}
       {edit && data && langkah === 'simulasi' && <SimulasiDesain edit={edit} data={data} kotor={kotor} />}
       {edit && data && rk && langkah === 'layout' && (
-        <div className="sim2d-tata">
+        <div ref={tataRef} className={`sim2d-tata${besarEd && !penuhEd ? ' layar-besar' : ''}${penuhEd ? ' layar-penuh' : ''}${tanpaPanel ? ' tanpa-panel' : ''}`}>
           {/* ---------- kiri: alat & komponen */}
           <div className="card sim2d-kiri">
             <div className="eyebrow">Mode</div>
             <div className="tabs">
-              {([['pilih', 'Pilih / geser'], ['blok', 'Seleksi blok'], ['geser', 'Pan'], ['ukur', 'Ukur jarak']] as [Mode, string][]).map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)}>{l}</button>)}
+              {([['pilih', 'Pilih / geser'], ['blok', 'Seleksi blok'], ['geser', 'Pan'], ['ukur', 'Ukur jarak'], ['kolom', '＋ Kolom (klik)']] as [Mode, string][]).map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)} title={k === 'kolom' ? 'Klik di denah untuk menaruh kolom; otomatis sejajar dengan kolom terdekat dan menampilkan jarak as ke as' : undefined}>{l}</button>)}
             </div>
             <div className="grid2" style={{ gap: 6 }}>
               <label className="f">Snap grid
@@ -487,20 +523,43 @@ export default function DesainGudang() {
             <div className="sim2d-palet">
               {PALET.map(p => (
                 <button key={p.jenis} className="ghost" onClick={() => tambah(p.jenis)}>
-                  <i style={{ background: (WARNA_KOMP[p.jenis.startsWith('pas') ? (p.jenis === 'pasSpr' ? 'spr' : 'ddr') : p.jenis] ?? WARNA_KOMP.zona).isi, borderColor: (WARNA_KOMP[p.jenis.startsWith('pas') ? (p.jenis === 'pasSpr' ? 'spr' : 'ddr') : p.jenis] ?? WARNA_KOMP.zona).garis }} />{p.label}
+                  <i style={{ background: (p.jenis === 'gateIn' ? WARNA_GATE.inbound : p.jenis === 'gateOut' ? WARNA_GATE.outbound : WARNA_KOMP[p.jenis.startsWith('pas') ? (p.jenis === 'pasSpr' ? 'spr' : 'ddr') : p.jenis] ?? WARNA_KOMP.zona).isi, borderColor: (p.jenis === 'gateIn' ? WARNA_GATE.inbound : p.jenis === 'gateOut' ? WARNA_GATE.outbound : WARNA_KOMP[p.jenis.startsWith('pas') ? (p.jenis === 'pasSpr' ? 'spr' : 'ddr') : p.jenis] ?? WARNA_KOMP.zona).garis }} />{p.label}
                 </button>
               ))}
             </div>
             <div className="eyebrow">Gedung</div>
             <div className="grid2" style={{ gap: 6 }}>
               <Angka l="Panjang (X)" u="m" v={edit.gedung.L} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, L: Math.max(5, x) } }))} />
-              <Angka l="Lebar (Z)" u="m" v={edit.gedung.W} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, W: Math.max(5, x) } }))} />
+              <Angka l={edit.gedung.trapesium ? 'Lebar maks. (Z, dari trapesium)' : 'Lebar (Z)'} u="m" v={edit.gedung.W} set={x => aksi(e => ({ ...e, gedung: e.gedung.trapesium ? e.gedung : { ...e.gedung, W: Math.max(5, x) } }))} />
               <Angka l="Side height" u="mm" step={100} v={edit.gedung.sideMm} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, sideMm: Math.max(2000, x) } }))} />
               <Angka l="Center height (puncak)" u="mm" step={100} v={edit.gedung.centerMm} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, centerMm: Math.max(2000, x) } }))} />
               <Angka l="Tinggi lantai / dock" u="m" step={0.05} v={edit.gedung.tinggiDockM ?? 1.2} set={x => aksi(e => ({ ...e, gedung: { ...e.gedung, tinggiDockM: Math.max(0, Math.min(2, x)) } }))} />
               <p className="small muted" style={{ margin: 0, alignSelf: 'end' }}>Atap pelana: side {angka(edit.gedung.sideMm / 1000, 1)} m di dinding kiri/kanan, naik ke {angka(Math.max(edit.gedung.sideMm, edit.gedung.centerMm) / 1000, 1)} m di tengah lebar.</p>
             </div>
-            <details className="sim2d-detail">
+            {(() => {
+              const tr = edit.gedung.trapesium;
+              const setTr = (t: typeof tr) => aksi(e => ({ ...e, gedung: { ...e.gedung, trapesium: t, ...(t ? { W: r2(Math.max(t.lebarDepan, t.lebarBelakang)) } : {}) } }));
+              return (
+                <div className="sim2d-kolom">
+                  <label className="sim3d-cek"><input type="checkbox" checked={!!tr} onChange={e => setTr(e.target.checked ? { lebarDepan: edit.gedung.W, lebarBelakang: r2(edit.gedung.W * 0.8), sisi: 'kanan' } : null)} />Bentuk trapesium (lebar depan ≠ belakang)</label>
+                  {tr && <div className="grid2" style={{ gap: 6 }}>
+                    <Angka l="Lebar depan (sisi dock)" u="m" v={tr.lebarDepan} set={x => setTr({ ...tr, lebarDepan: Math.max(3, x) })} />
+                    <Angka l="Lebar belakang" u="m" v={tr.lebarBelakang} set={x => setTr({ ...tr, lebarBelakang: Math.max(3, x) })} />
+                    <label className="f">Dinding miring<select value={tr.sisi} onChange={e => setTr({ ...tr, sisi: e.target.value as 'kanan' | 'kiri' })}><option value="kanan">Samping kanan (Z = lebar)</option><option value="kiri">Samping kiri (Z = 0)</option></select></label>
+                    <p className="small muted" style={{ margin: 0, alignSelf: 'end' }}>Luas {angka(edit.gedung.L * (tr.lebarDepan + tr.lebarBelakang) / 2)} m². Area di luar dinding miring diarsir dan dihindari rak adaptif.</p>
+                  </div>}
+                </div>);
+            })()}
+            <div className="eyebrow">Kolom / pilar ({edit.komponen.filter(k => k.jenis === 'kolom').length})</div>
+            <div className="sim2d-kolom">
+              <button type="button" className={mode === 'kolom' ? '' : 'ghost'} onClick={() => setMode(mode === 'kolom' ? 'pilih' : 'kolom')}>{mode === 'kolom' ? '✓ Selesai menaruh kolom' : '＋ Taruh kolom dengan klik'}</button>
+              <p className="small muted" style={{ margin: 0 }}>Klik di denah = 1 kolom. Otomatis sejajar dengan kolom terdekat (garis biru) dan menampilkan jarak as ke as. Atau buat grid sekaligus:</p>
+              <div className="row" style={{ gap: 4 }}>
+                {[['6', '6'], ['8', '8'], ['10', '10'], ['12', '24']].map(([x, z]) => (
+                  <button key={`${x}x${z}`} type="button" className="ghost" style={{ padding: '3px 8px' }} onClick={() => setGridPilar(g => ({ ...g, x, z }))} title={`Bentang ${x} m × ${z} m`}>{x}×{z}</button>))}
+              </div>
+            </div>
+            <details className="sim2d-detail" open>
               <summary className="eyebrow">Grid pilar (as ke as)</summary>
               <div className="grid2" style={{ gap: 6 }}>
                 <label className="f">Bentang X (m)<input value={gridPilar.x} onChange={e => setGridPilar(g => ({ ...g, x: e.target.value }))} placeholder="6 atau 6; 6; 8" /></label>
@@ -510,7 +569,10 @@ export default function DesainGudang() {
               </div>
               {(() => { const xs = posisiBentang(gridPilar.x, edit.gedung.L), zs = posisiBentang(gridPilar.z, edit.gedung.W);
                 return <p className="small muted" style={{ margin: '4px 0' }}>Jarak diukur <b>as ke as tiap bentang</b>: pilar 1 → 2 = 6 m, pilar 2 → 3 = 6 m (posisi kumulatif 0, 6, 12, …). X: {xs.slice(0, 8).map(v => angka(v, 1)).join(', ')}{xs.length > 8 ? ', …' : ''} ({xs.length} as) · Z: {zs.slice(0, 8).map(v => angka(v, 1)).join(', ')}{zs.length > 8 ? ', …' : ''} ({zs.length} as)</p>; })()}
-              <button type="button" style={{ width: '100%' }} onClick={buatGridPilar}>Buat grid pilar</button>
+              <div className="row" style={{ gap: 6 }}>
+                <button type="button" style={{ flex: 1 }} onClick={buatGridPilar}>Buat grid pilar</button>
+                <button type="button" className="ghost danger" onClick={hapusSemuaKolom} disabled={!edit.komponen.some(k => k.jenis === 'kolom')}>Hapus semua kolom</button>
+              </div>
             </details>
             <label className="f">Okupansi rak {edit.okupansi == null ? '(sesuai stok desain)' : `${Math.round(edit.okupansi * 100)}%`}
               <div className="row" style={{ flexWrap: 'nowrap' }}>
@@ -568,11 +630,16 @@ export default function DesainGudang() {
                   ))}
                 </>)}
               </div>
+              <div className="tabs" role="group" aria-label="Ukuran editor">
+                <button type="button" className={tanpaPanel ? 'on' : ''} onClick={() => setTanpaPanel(v => !v)} title="Sembunyikan / tampilkan panel alat & properti supaya kanvas lebih lebar">{tanpaPanel ? '◨ Tampilkan panel' : '◧ Sembunyikan panel'}</button>
+                <button type="button" className={besarEd && !penuhEd ? 'on' : ''} onClick={() => setBesarEd(v => !v)} title={besarEd ? 'Kembali ke ukuran normal (Esc)' : 'Perbesar editor memenuhi jendela browser'}>{besarEd && !penuhEd ? '⤡ Kecilkan' : '⤢ Perbesar'}</button>
+                <button type="button" className={penuhEd ? 'on' : ''} onClick={layarPenuhEd} title={penuhEd ? 'Keluar layar penuh (Esc)' : 'Layar penuh (seluruh monitor)'}>{penuhEd ? '✕ Keluar layar penuh' : '⛶ Layar penuh'}</button>
+              </div>
               <span className="small muted">{edit.komponen.length} komponen · {edit.ukur.length} garis ukur {edit.ukur.length > 0 && <button className="ghost" style={{ padding: '2px 8px', marginLeft: 6 }} onClick={() => aksi(e => ({ ...e, ukur: [] }))}>hapus ukur</button>}</span>
             </div>
             <div className={`sim2d-kanvas ${tampil}`}>
               <div className="sim2d-panel2d" style={{ display: tampil === '3d' ? 'none' : undefined }}>
-                <Editor2D ref={ed2} edit={edit} pilih={pilih} setPilih={setPilih} multi={multi} setMulti={setMulti} mulaiAksi={mulaiAksi} ubah={ubah} mode={mode} grid={grid} snapTepi={snapTepi}
+                <Editor2D ref={ed2} edit={edit} pilih={pilih} setPilih={setPilih} multi={multi} setMulti={setMulti} mulaiAksi={mulaiAksi} ubah={ubah} mode={mode} grid={grid} snapTepi={snapTepi} taruhKolom={taruhKolom} ukuranKolom={Math.max(0.2, gridPilar.ukuran)}
                   potong={potongan ? { sumbu: potongan.arah === 'depan' ? 'x' : 'z', nilai: potongan.nilai } : null} />
               </div>
               {tampil !== '2d' && layout3d && (
@@ -755,6 +822,9 @@ export default function DesainGudang() {
                   const setLebar = (v: number) => ubahK(k => aturSisiGate({ ...k, ...(sz ? { d: Math.max(1, v) } : { w: Math.max(1, v) }) }, pg.sisi, edit.gedung));
                   return <>
                     <div className="grid2" style={{ gap: 6 }}>
+                      <label className="f">Fungsi gate<select value={terpilih.arus ?? 'dua'} onChange={e => { const v = e.target.value; ubahK(k => ({ ...k, arus: v === 'dua' ? undefined : v as 'inbound' | 'outbound',
+                        label: /^Gate( IN| OUT)?( \d+)?$/.test(k.label) ? (v === 'inbound' ? 'Gate IN' : v === 'outbound' ? 'Gate OUT' : 'Gate') : k.label })); }}>
+                        <option value="inbound">IN — truk / barang masuk</option><option value="outbound">OUT — truk / barang keluar</option><option value="dua">IN & OUT</option></select></label>
                       <label className="f">Dinding<select value={pg.sisi} onChange={e => ubahK(k => aturSisiGate(k, e.target.value as typeof pg.sisi, edit.gedung))}>
                         <option value="depan">Depan (sisi dock)</option><option value="belakang">Belakang</option><option value="kiri">Samping kiri</option><option value="kanan">Samping kanan</option></select></label>
                       <Angka l={`Posisi dari ujung (0–${angka(batas - pg.lebar, 1)})`} u="m" step={0.5} v={r2(pg.pos)} set={setPos} />
