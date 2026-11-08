@@ -1,4 +1,5 @@
 'use client';
+import UmurKontrak from '@/components/UmurKontrak';
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { RakHarga, SpaceInput } from '@/lib/engine/types';
@@ -96,7 +97,7 @@ export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, pos
                 </select>
                 <div className="row small">
                   <label>Harga/posisi <input type="number" value={b.h.harga} onChange={e => setRak(b.j, { harga: Number(e.target.value) })} style={{ width: 110, minWidth: 110, textAlign: 'right', background: 'var(--input)' }} /></label>
-                  <label>Umur <input type="number" value={b.h.umurBulan} onChange={e => setRak(b.j, { umurBulan: Number(e.target.value) })} style={{ width: 64, minWidth: 64, textAlign: 'right', background: 'var(--input)' }} /> bln</label>
+                  <label className="row" style={{ gap: 4, alignItems: 'flex-start' }}>Umur <UmurKontrak umur={b.h.umurBulan} kontrak={kontrakBulan} onChange={v => setRak(b.j, { umurBulan: v })} lebar={64} inputStyle={{ background: 'var(--input)' }} /> bln</label>
                   {b.beda && <button className="ghost" style={{ padding: '0 6px' }} onClick={() => setRak(b.j, { harga: Number(b.it!.harga_beli ?? 0), umurBulan: b.it!.umur_ekonomis_bulan ?? b.h.umurBulan })}>Samakan dengan database ({rp(b.it!.harga_beli ?? 0)})</button>}
                 </div>
                 <div className="small muted">Investasi {rp(b.nilai)} · depresiasi {Math.min(Math.max(1, b.h.umurBulan || n), n)} bln + bunga → <b>{rp(b.bulan)}/bln</b></div>

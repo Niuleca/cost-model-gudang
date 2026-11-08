@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import type { Bucket, KategoriRisiko } from '@/lib/engine/types';
+import UmurKontrak from '@/components/UmurKontrak';
 import { SEKSI_BIAYA, biayaBulanBaris, hargaUntukMode, seksiDari, type ModeBiaya, type Seksi } from '@/lib/biayaLain';
 import { rp } from '@/lib/format';
 import { biayaLainDefault, kurangDefault, sinkronBiaya, tambahDefault, type BarisBiaya, type DriverBiaya } from '@/lib/biayaLainDefault';
@@ -51,7 +52,7 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
       </div>
       {extra}
       {rows.length > 0 && <div className="tablewrap fit"><table className="tabel-fit tabel-bl">
-        <thead><tr><th>Item & dasar qty</th><th>Mode</th><th className="num">Qty</th><th className="num">Harga satuan</th><th className="num">Umur (bln)</th><th className="num">Biaya/bln</th><th>Risiko · alokasi</th><th></th></tr></thead>
+        <thead><tr><th>Item & dasar qty</th><th>Mode</th><th className="num">Qty</th><th className="num">Harga satuan</th><th className="num" title="Periode depresiasi = min(umur ekonomis, masa kontrak)">Depresiasi (bln)</th><th className="num">Biaya/bln</th><th>Risiko · alokasi</th><th></th></tr></thead>
         <tbody>{rows.map(({ b, i }) => {
           const it = items.find(x => x.id === b.priceItemId);
           const c = biayaBulanBaris(b, kontrak, 0);
@@ -88,7 +89,7 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
               }}>{MODE.map(m => <option key={m.v} value={m.v} title={m.t}>{m.l}</option>)}</select></td>
               <td className="num"><input aria-label="Qty" type="number" step="any" value={b.qty} onChange={e => onUbah(i, { qty: Number(e.target.value) })} /></td>
               <td className="num db"><input aria-label="Harga satuan" type="number" value={b.hargaSatuan} onChange={e => onUbah(i, { hargaSatuan: Number(e.target.value) })} /></td>
-              <td className="num">{b.mode === 'beli' ? <input aria-label="Umur" type="number" value={b.umurBulan ?? ''} onChange={e => onUbah(i, { umurBulan: Number(e.target.value) })} /> : <span className="small muted">{b.mode === 'sekali' ? kontrak : '–'}</span>}</td>
+              <td className="num">{b.mode === 'beli' ? <UmurKontrak umur={b.umurBulan} kontrak={kontrak} onChange={v => onUbah(i, { umurBulan: v })} lebar={80} /> : <span className="small muted">{b.mode === 'sekali' ? kontrak : '–'}</span>}</td>
               <td className="num" title={`nilai ${rp(c.nilai)}${c.periode > 1 ? ` ÷ ${c.periode} bln` : ''}`}><b>{rp(c.total)}</b>{c.periode > 1 && <div className="small muted">nilai {rp(c.nilai)}</div>}</td>
               <td><select aria-label="Risiko" value={b.kategoriRisiko ?? ''} onChange={e => onUbah(i, { kategoriRisiko: (e.target.value || undefined) as KategoriRisiko | undefined })}><option value="">Default</option>{RISIKO.map(r => <option key={r}>{r}</option>)}</select>
                 <select aria-label="Alokasi" className="input-kecil" value={namaAlokasi(b.alokasi)} onChange={e => onUbah(i, { alokasi: ALOKASI[e.target.value] })}>{Object.keys(ALOKASI).map(k => <option key={k}>{k}</option>)}</select></td>

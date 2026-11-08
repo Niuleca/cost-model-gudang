@@ -1,4 +1,5 @@
 'use client';
+import UmurKontrak from '@/components/UmurKontrak';
 import type { MheInput } from '@/lib/engine/types';
 import { rp, angka } from '@/lib/format';
 
@@ -6,7 +7,8 @@ interface Item { id: number; kategori: string; item: string; harga_beli: number 
 type Mhe = MheInput & { priceItemId?: number };
 
 /** Kebutuhan MHE = equipment dari Value Stream Mapping (MHE Summary). User cukup memilih item harga per alat. */
-export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange }: {
+export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange, kontrakBulan }: {
+  kontrakBulan: number;
   kebutuhan: { nama: string; fte: number | null; unit: number | null }[];   // dari process design / hasil hitung
   mhe: Mhe[]; items: Item[]; metodeExcel: boolean; onChange: (m: Mhe[]) => void;
 }) {
@@ -59,7 +61,7 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange 
                   ubah(b.nama, { mode, harga: it ? hargaDari(it, mode) : m?.harga ?? 0 });
                 }}><option value="sewa">Sewa</option><option value="beli">Beli</option></select></td>
                 <td className="num db"><input aria-label="Harga" type="number" value={m?.harga ?? ''} disabled={!m} onChange={e => ubah(b.nama, { harga: Number(e.target.value) })} style={{ width: 120, minWidth: 120 }} /></td>
-                <td className="num"><input aria-label="Umur" type="number" value={m?.umurBulan ?? ''} disabled={!m || m.mode === 'sewa'} onChange={e => ubah(b.nama, { umurBulan: Number(e.target.value) })} style={{ width: 70, minWidth: 70 }} /></td>
+                <td className="num"><UmurKontrak umur={m?.umurBulan} kontrak={kontrakBulan} disabled={!m || m.mode === 'sewa'} onChange={v => ubah(b.nama, { umurBulan: v })} /></td>
                 {!metodeExcel && <td className="num"><input aria-label="Ketersediaan" type="number" value={m ? +(m.ketersediaan * 100).toFixed(1) : ''} disabled={!m} onChange={e => ubah(b.nama, { ketersediaan: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>}
                 <td className="num"><input aria-label="Spare" type="number" value={m ? +(m.sparePersen * 100).toFixed(1) : ''} disabled={!m} onChange={e => ubah(b.nama, { sparePersen: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>
                 <td className="num"><b>{b.unit != null ? unitTot : '–'}</b></td>

@@ -243,11 +243,12 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     }
     baris.push({ deskripsi, kelompok, kategoriRisiko: risiko ?? RISIKO_DEFAULT[kelompok], biayaBulan: bulat(biayaBulan), alokasi, dasar });
   };
+  const umurLebih: string[] = [];
   // biaya beli: depresiasi selama min(umur, kontrak) + bunga atas rata-rata nilai buku
   const capex = (deskripsi: string, kelompok: Kelompok, nilai: number, umur: number | undefined, alokasi: Record<Bucket, number>, risiko?: KategoriRisiko) => {
     const u = umur && umur > 0 ? umur : n;
     const periode = Math.min(u, n);
-    if (u > n) flags.push({ level: 'peringatan', kode: 'UMUR_GT_KONTRAK', pesan: `${deskripsi}: umur ${u} bln > kontrak ${n} bln — disusutkan penuh selama kontrak (customer menanggung seluruh nilai). Kalau aset akan dipakai ulang setelah kontrak, pertimbangkan umur penuh.` });
+    if (u > n) umurLebih.push(deskripsi);
     tambah(`${deskripsi} — depresiasi`, kelompok, nilai / periode, alokasi, `Rp${bulat(nilai).toLocaleString('id-ID')} ÷ ${periode} bln`, risiko);
     nilaiModal.set(`${deskripsi} — depresiasi`, nilai);
     // bunga tidak otomatis — hanya lewat sheet Interest cost (dipilih user)
@@ -352,6 +353,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     tambah('Interest cost — working capital (payment term)', 'Interest cost', subtotalOperasi * (selisihHari / 30) * r,
       normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 }), `biaya bulanan × (${t.paymentTermHari} − ${m.finance.apHari}) hari ÷ 30 × bunga`);
 
+  if (umurLebih.length) flags.push({ level: 'info', kode: 'UMUR_GT_KONTRAK', pesan: `${umurLebih.length} aset beli punya umur ekonomis > kontrak ${n} bln — disusutkan penuh selama kontrak (customer menanggung seluruh nilai): ${umurLebih.slice(0, 6).join(', ')}${umurLebih.length > 6 ? ', …' : ''}.` });
   // ---- 9. Overhead ----
   const subtotal = baris.reduce((sum, b) => sum + b.biayaBulan, 0);
   if (m.finance.overheadPersen <= 0) flags.push({ level: 'peringatan', kode: 'OVERHEAD_NOL', pesan: 'Overhead 0% — pastikan memang disengaja.' });

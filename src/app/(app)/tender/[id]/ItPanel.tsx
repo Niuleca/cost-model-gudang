@@ -1,4 +1,5 @@
 'use client';
+import UmurKontrak from '@/components/UmurKontrak';
 import { useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { COST_TYPES, KELOMPOK_IT, UMUR_IT_DEFAULT, basisDari, biayaBulanIt, perlakuanDari, ringkasIt, type ItLine, type ItSheet, type PerlakuanSekali } from '@/lib/it';
@@ -115,7 +116,7 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
                   <td className="td-lebar">{sekali
                     ? <><select aria-label="Perlakuan OTC" value={p} onChange={e => set(ubahArray(sheet.lines, i, { perlakuanSekali: e.target.value as PerlakuanSekali, umurBulan: l.umurBulan ?? UMUR_IT_DEFAULT }))}>
                         <option value="depresiasi">Depresiasi</option><option value="amortisasi">Amortisasi</option><option value="tagih">Tagih terpisah</option></select>
-                        {p === 'depresiasi' && <label className="small muted row" style={{ gap: 4, flexWrap: 'nowrap' }}>umur <input aria-label="Umur ekonomis" type="number" min={1} value={l.umurBulan ?? UMUR_IT_DEFAULT} style={{ width: 56 }} onChange={e => set(ubahArray(sheet.lines, i, { umurBulan: Number(e.target.value) }))} /> bln</label>}
+                        {p === 'depresiasi' && <label className="small muted row" style={{ gap: 4, flexWrap: 'nowrap' }}>umur <UmurKontrak label="Umur ekonomis" umur={l.umurBulan ?? UMUR_IT_DEFAULT} kontrak={kontrakBulan} lebar={56} onChange={v => set(ubahArray(sheet.lines, i, { umurBulan: v }))} /> bln</label>}
                         {p === 'amortisasi' && <div className="small muted">{kontrakBulan} bln kontrak</div>}</>
                     : <span className="small muted">{basisDari(l.costType)}</span>}</td>
                   <td className="num" title={c.bunga ? `pokok ${rp(c.pokok)} + bunga ${rp(c.bunga)} · ${c.jenis} ${c.periode} bln` : c.jenis}>{c.total ? <b>{rp(c.total)}</b> : <span className="small muted">{p === 'tagih' && sekali ? 'di quotation' : '–'}</span>}</td>
