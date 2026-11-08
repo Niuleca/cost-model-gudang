@@ -1,4 +1,4 @@
-// Sheet "Gudang, space & MHE", "IT", "Biaya lain" (+ listrik) dan "Interest cost".
+// Sheet "Warehouse Planning" (gudang, space, racking), "Technology & Equipment" (MHE, IT, biaya lain), "Utilities Management" (listrik, air) dan "Loan & Interest Calculator".
 import { R, q, BUCKETS, ALOKASI, normAlok, namaAlok, RISIKO_DEFAULT, type Ctx, type Line } from '@/lib/exportWebUtil';
 import { lengkapiSpaceExcel } from '@/lib/engine/space';
 import { KELOMPOK_ASET, basisDari, perlakuanDari, UMUR_IT_DEFAULT } from '@/lib/it';
@@ -135,7 +135,7 @@ export function tulisGudang(x: Ctx) {
 
   // ===================== Biaya space & racking
   GD.r++;
-  GD.h2('Biaya space & racking', 'Sewa gudang mengikuti skenario aset Rental. Racking: posisi dari sheet Space × harga per posisi ÷ MIN(umur, kontrak) — bunga hanya lewat sheet Interest cost.');
+  GD.h2('Biaya space & racking', 'Sewa gudang mengikuti skenario aset Rental. Racking: posisi dari bagian Space × harga per posisi ÷ MIN(umur, kontrak) — bunga hanya lewat sheet Loan & Interest Calculator.');
   GD.field('Luas sewa (Space Rent)', { f: 'LuasM2' }, 'n0', 'out', 'm²');
   GD.field('Sumber tarif sewa', g0 && !a.space.tarifManual ? 'Database' : 'Manual', 'teks', 'in', '', 'Database = tarif gudang terpilih', 'TarifSrc', 'L_TarifSrc');
   GD.field('Tarif sewa manual', a.space.tarifManual || !g0 ? a.space.tarifSewaM2Bulan : inp.space.tarifSewaM2Bulan, 'rp', 'in', 'Rp/m²/bln', '', 'TarifManual');
@@ -149,7 +149,7 @@ export function tulisGudang(x: Ctx) {
     qty: { f: 'IF(SewaUtuh="Ya",1,LuasM2)' }, harga: { f: 'IF(SewaUtuh="Ya",GdHargaBln,TarifSewa)' }, uom: 'm²' });
   void rSw;
   GD.r++;
-  GD.hdr(['Racking', ['Item (Price Inquiry)', true], 'Posisi', ['Harga / posisi', true], ['Umur (bln)', true], 'Harga DB', 'Nilai investasi', 'Depresiasi / bln']);
+  GD.hdr(['Racking', ['Item (Price Inquiry)', true], 'Posisi', ['Harga / posisi', true], ['Umur ekonomis (bln)', true, 'Disusutkan MIN(umur ekonomis, kontrak)'], 'Harga DB', 'Nilai investasi', 'Depresiasi / bln']);
   for (const [j, l, req] of [['spr', 'SPR · Selective Pallet Rack', 'SprReq'], ['ddr', 'DDR · Double Deep Rack', 'DdrReq']] as const) {
     const r = GD.r;
     const hr = a.space.rak?.[j] ?? { harga: a.space.hargaRakPerPosisi ?? 0, umurBulan: a.space.umurRakBulan ?? 120 };
@@ -167,10 +167,17 @@ export function tulisGudang(x: Ctx) {
     GD.r++;
   }
 
+  void alokAngka;
+  void R; void q; void normAlok; void namaAlok;
+}
+
+/** Technology & Equipment — Kebutuhan MHE (di web: tab Technology & Equipment, di atas IT). */
+export function tulisMhe(x: Ctx) {
+  const GD = x.TE; const { d, a } = x; const { h } = d;
+  const SN = `'${GD.nama}'!`;
   // ===================== Kebutuhan MHE
-  GD.r++;
-  GD.h2('Kebutuhan MHE', 'Satu baris per alat ber-harga (sama dengan daftar harga MHE di web). Unit = MHE Summary (sheet Aktivitas & manpower) + spare. Sewa = unit × harga · Beli = unit × harga ÷ MIN(umur, kontrak). Alokasi biaya per layanan otomatis dari bobot alat di VSM (peak × % × pengali ÷ prod); alat tanpa aktivitas utama → man hour alat; tidak ada → 40/30/30.');
-  GD.hdr([['Equipment', true, 'Nama alat persis seperti di Aktivitas (huruf besar/kecil berpengaruh)'], ['FTE', false, 'Dari MHE Summary'], ['Unit kebutuhan', false, 'Resources di MHE Summary'], ['Item harga', true], ['Mode', true], ['Harga', true], ['Umur (bln)', true], ['Spare %', true],
+  GD.h2('Kebutuhan MHE', 'Satu baris per alat ber-harga (sama dengan daftar harga MHE di web). Unit = MHE Summary (sheet Value Stream Mapping) + spare. Sewa = unit × harga · Beli = unit × harga ÷ MIN(umur, kontrak). Alokasi biaya per layanan otomatis dari bobot alat di VSM (peak × % × pengali ÷ prod); alat tanpa aktivitas utama → man hour alat; tidak ada → 40/30/30.');
+  GD.hdr([['Equipment', true, 'Nama alat persis seperti di Aktivitas (huruf besar/kecil berpengaruh)'], ['FTE', false, 'Dari MHE Summary'], ['Unit kebutuhan', false, 'Resources di MHE Summary'], ['Item harga', true], ['Mode', true], ['Harga', true], ['Umur ekonomis (bln)', true, 'Beli: disusutkan MIN(umur ekonomis, kontrak)'], ['Spare %', true],
     ['Spare', false, 'ROUNDUP(unit × spare %)'], ['Total unit', false, 'Unit + spare'], ['Biaya/bln', false, 'Sewa: unit × harga · Beli: unit × harga ÷ MIN(umur, kontrak)'], 'Nilai investasi', 'Harga DB (sesuai mode)',
     ['Bobot VSM', false, 'Σ bobot alat di kolom "Bobot alat" VSM'], ['Sto', false, 'Alokasi ke Storage = bobot arus storage ÷ bobot total'], 'HIn', 'HOut', 'VAS', 'Man']);
   const tools = Array.from(new Set([...a.mhe.map(m => m.tool), ...x.pd.mhe.map(e => e.nama)]));
@@ -209,16 +216,14 @@ export function tulisGudang(x: Ctx) {
   GD.nmR('MheHarga_Tool', 1, m0, GD.r - 1); GD.nmR('MheHarga_Biaya', 11, m0, GD.r - 1);
   GD.put(1, 'Total estimasi biaya MHE / bulan', { j: 'tot' }); GD.put(11, { f: `SUM(K${m0}:K${GD.r - 1})` }, { j: 'tot', fmt: 'rp' }); GD.r++;
   GD.note('Alat baru di Aktivitas otomatis muncul di MHE Summary; agar dibiayai, isi nama alatnya di baris kosong tabel ini lalu pilih item harga / isi harga.');
-  void alokAngka;
-  void R; void q; void normAlok; void namaAlok;
 }
 
 export function tulisIt(x: Ctx) {
   const { IT, a } = x;
   const SN = `'${IT.nama}'!`;
   const it = a.it ?? { kursUsd: 16000, lines: [] };
-  IT.lebar(24, 34, 16, 9, 10, 15, 15, 15, 15, 15, 10, 15, 34, 12, 14, 12, 14);
-  IT.h2('Kebutuhan IT (format BAP)', 'Bulanan (PUPM, PDPM, Cost/Month, Monthly/Site) & transaksi = biaya bulanan; Yearly ÷ 12; OTC perangkat (hardware, CCTV, device) didepresiasi MIN(umur, kontrak); development, cabling & mandays diamortisasi selama kontrak; atau ditagih terpisah di quotation. Bunga hanya lewat sheet Interest cost.');
+  IT.r++;
+  IT.h2('Kebutuhan IT (format BAP)', 'Bulanan (PUPM, PDPM, Cost/Month, Monthly/Site) & transaksi = biaya bulanan; Yearly ÷ 12; OTC perangkat (hardware, CCTV, device) didepresiasi MIN(umur, kontrak); development, cabling & mandays diamortisasi selama kontrak; atau ditagih terpisah di quotation. Bunga hanya lewat sheet Loan & Interest Calculator.');
   IT.field('Nomor BAP', it.nomorBap ?? '', 'teks', 'in');
   IT.field('Kurs USD (Rp)', it.kursUsd, 'rp', 'in', 'Rp', '', 'KursUsd');
   IT.r++;
@@ -274,8 +279,8 @@ const d0 = (x: Ctx) => x.d.h.biaya;
 export function tulisBiayaLain(x: Ctx) {
   const { BL, a, d } = x;
   const SN = `'${BL.nama}'!`;
-  BL.lebar(40, 40, 15, 9, 15, 10, 15, 15, 11, 18, 14, 10, 12, 10, 8, 8, 8, 8, 8);
-  BL.h2('Biaya lain', 'Dipisah per klasifikasi sesuai Price Inquiry. Bulanan/sewa = qty × harga per bulan · Beli = nilai ÷ MIN(umur, kontrak) · Sekali = nilai ÷ kontrak. Tanpa bunga — pilih di sheet Interest cost. IT dari sheet IT ikut otomatis (jangan diinput dua kali).');
+  BL.r++;
+  BL.h2('Biaya lain (office, consumable, pallet, HSE, services, asuransi & startup)', 'Dipisah per klasifikasi sesuai Price Inquiry. Bulanan/sewa = qty × harga per bulan · Beli = nilai ÷ MIN(umur, kontrak) · Sekali = nilai ÷ kontrak. Tanpa bunga — pilih di sheet Loan & Interest Calculator. IT di atas ikut otomatis (jangan diinput dua kali).');
   // ringkasan per klasifikasi di atas (diisi setelah tabel)
   BL.h3('Ringkasan per klasifikasi');
   BL.hdr(['Klasifikasi', 'Item', 'Nilai (qty × harga)', 'Biaya/bln']);
@@ -299,7 +304,7 @@ export function tulisBiayaLain(x: Ctx) {
       BL.r++;
     }
     if (s.id === 'consumable') BL.note(`Galon minum bulanan (web): headcount × 1,5 L × ${x.pdIn.hariKerjaBulan ?? 25} hari ÷ 19 L — tambahkan sebagai baris "Air minum galon" bila perlu.`);
-    BL.hdr([['Item', true], ['Deskripsi', true], ['Mode', true], ['Qty', true], ['Harga satuan', true], ['Umur (bln)', true], 'Nilai', 'Biaya/bln', ['Risiko', true], ['Alokasi', true], 'Harga DB', 'Seksi', 'Kelompok', 'Risiko ef.', 'Sto', 'HIn', 'HOut', 'VAS', 'Man']);
+    BL.hdr([['Item', true], ['Deskripsi', true], ['Mode', true], ['Qty', true], ['Harga satuan', true], ['Umur ekonomis (bln)', true, 'Mode beli: disusutkan selama MIN(umur ekonomis, kontrak) — lihat kolom Depresiasi'], 'Nilai', 'Biaya/bln', ['Risiko', true], ['Alokasi', true], 'Harga DB', 'Seksi', 'Kelompok', 'Risiko ef.', 'Sto', 'HIn', 'HOut', 'VAS', 'Man', ['Depresiasi (bln)', false, 'Beli: MIN(umur ekonomis, kontrak) · Sekali: kontrak — sama dengan kolom Depresiasi di web']]);
     const sr: number[] = []; seksiRows[s.id] = sr;
     for (const z of [...rows, null, null]) {
       const r = BL.r; sr.push(r);
@@ -321,6 +326,7 @@ export function tulisBiayaLain(x: Ctx) {
       const kus = normAlok(c?.alokasi, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
       const kolAl = ['Storage', 'HIn', 'HOut', 'Vas', 'Man'];
       BUCKETS.forEach((b, k) => BL.put(15 + k, { f: `IF(J${r}="Kustom (dari web)",${+kus[b].toFixed(6)},IFERROR(INDEX(D_Al${kolAl[k]},MATCH(J${r},D_AlNama,0)),${MERATA[k]}))` }, { j: 'out', fmt: 'pct', size: 8 }));
+      BL.put(20, { f: `IF(C${r}="beli",MIN(IF(N(F${r})>0,F${r},Kontrak),Kontrak),IF(C${r}="sekali",Kontrak,""))` }, { j: 'out', fmt: 'n0' });
       const key = c ? (c.mode === 'beli' ? `${c.deskripsi} — depresiasi` : c.mode === 'sekali' ? `${c.deskripsi} — amortisasi` : c.deskripsi) : '';
       const eng = d.h.biaya.find(b => b.deskripsi === key);
       x.lines.push({ kel, tahap: 1, desk: { f: `IF(${SN}B${r}="","",${SN}B${r}&IF(${SN}C${r}="beli"," — depresiasi",IF(${SN}C${r}="sekali"," — amortisasi","")))`, v: key }, deskKey: key,
@@ -337,8 +343,11 @@ export function tulisBiayaLain(x: Ctx) {
   let rr = ring0;
   for (const s of SEKSI_BIAYA) {
     const sr = seksiRows[s.id];
-    BL.put(1, s.label, { j: 'txt' }, rr); BL.put(2, { f: `COUNTIF(B${sr[0]}:B${sr[sr.length - 1]},"?*")` }, { j: 'out', fmt: 'n0' }, rr);
-    BL.put(3, { f: `SUM(G${sr[0]}:G${sr[sr.length - 1]})` }, { j: 'out', fmt: 'rp' }, rr); BL.put(4, { f: `SUM(H${sr[0]}:H${sr[sr.length - 1]})` }, { j: 'out', fmt: 'rp' }, rr); rr++;
+    // Startup: item otomatis (startup & implementation) ikut dihitung — sama dengan ringkasan di web
+    const oto = s.id === 'startup';
+    BL.put(1, s.label, { j: 'txt' }, rr); BL.put(2, { f: `COUNTIF(B${sr[0]}:B${sr[sr.length - 1]},"?*")${oto ? '+(N(StartupBln)>0)+(N(ImplBln)>0)' : ''}` }, { j: 'out', fmt: 'n0' }, rr);
+    BL.put(3, { f: `SUM(G${sr[0]}:G${sr[sr.length - 1]})${oto ? '+IF(StartupAktif="Ya",NilaiStartup+NilaiImpl,0)' : ''}` }, { j: 'out', fmt: 'rp' }, rr);
+    BL.put(4, { f: `SUM(H${sr[0]}:H${sr[sr.length - 1]})${oto ? '+N(StartupBln)+N(ImplBln)' : ''}` }, { j: 'out', fmt: 'rp' }, rr); rr++;
   }
   BL.put(1, 'Total biaya lain per bulan (tanpa bunga)', { j: 'tot' }, rr); BL.put(2, '', { j: 'tot' }, rr); BL.put(3, '', { j: 'tot' }, rr); BL.put(4, { f: `SUM(D${ring0}:D${rr - 1})` }, { j: 'tot', fmt: 'rp' }, rr);
   // startup otomatis → baris biaya tahap 2
@@ -346,9 +355,15 @@ export function tulisBiayaLain(x: Ctx) {
   x.lines.push({ kel: 'Startup', tahap: 2, desk: 'Startup cost (otomatis) — amortisasi', deskKey: 'Startup cost (otomatis) — amortisasi', jenis: 'Capex', risk: 'Tinggi', sistem: 'StartupBln', alok: MERATA, dasar: st?.dasar ?? '', v: st?.biayaBulan, nilai: 'IF(StartupAktif="Ya",NilaiStartup,0)', capex: true, umur: { f: 'Kontrak' }, qty: 1, harga: { f: 'NilaiStartup' }, uom: 'sekali' });
   x.lines.push({ kel: 'Startup', tahap: 2, desk: 'Implementation cost (otomatis) — amortisasi', deskKey: 'Implementation cost (otomatis) — amortisasi', jenis: 'Capex', risk: 'Tinggi', sistem: 'ImplBln', alok: MERATA, dasar: im?.dasar ?? '', v: im?.biayaBulan, nilai: 'IF(StartupAktif="Ya",NilaiImpl,0)', capex: true, umur: { f: 'Kontrak' }, qty: 1, harga: { f: 'NilaiImpl' }, uom: 'sekali' });
 
+  void RISIKO_DEFAULT; void ALOKASI;
+}
+
+/** Utilities Management — Electrical (listrik) & Water (air), sama dengan tab web. */
+export function tulisUtilities(x: Ctx) {
+  const BL = x.UT; const { a, d } = x;
+  BL.lebar(46, 16, 12, 12, 14, 14, 40);
   // ===================== Listrik
-  BL.r++;
-  BL.h2('Listrik', 'Simulasi Utilities (Price Inquiry) atau peralatan per titik. Peralatan: Σ watt × qty × jam/hari × hari operasional/bln ÷ 1000 × tarif.');
+  BL.h2('Electrical (listrik)', 'Simulasi Utilities (Price Inquiry) atau peralatan per titik. Peralatan: Σ watt × qty × jam/hari × hari operasional/bln ÷ 1000 × tarif.');
   const sim = a.listrikSimulasi;
   BL.field('Sumber biaya listrik', sim ? 'Simulasi Utilities (Price Inquiry)' : 'Pilih peralatan per titik', 'teks', 'in', '', '', 'ListrikSumber', 'L_ListrikSumber');
   BL.field('Simulasi — nama', sim?.nama ?? '', 'teks', 'in', '', 'dari kalkulator listrik (Price Inquiry › Utilities)', 'SimNama');
@@ -369,13 +384,38 @@ export function tulisBiayaLain(x: Ctx) {
     BL.r++;
   }
   BL.put(1, 'Total kWh per hari', { j: 'sub' }); BL.put(5, { f: `SUM(E${l0}:E${BL.r - 1})` }, { j: 'sub', fmt: 'n2' }); BL.nm('KwhHari', 5); BL.r++;
-  BL.field('Pemakaian per bulan (peralatan)', { f: 'KwhHari*HariOpsBln' }, 'n0', 'out', 'kWh/bln', '× hari operasional/bln (kalender, sheet Hasil)', 'KwhBln');
+  BL.field('Pemakaian per bulan (peralatan)', { f: 'KwhHari*HariOpsBln' }, 'n0', 'out', 'kWh/bln', '× hari operasional/bln (kalender, sheet Result)', 'KwhBln');
   const pakaiSim = 'AND(LEFT(ListrikSumber,8)="Simulasi",N(SimTotal)>0)';
   const ls = d.h.biaya.find(b => b.kelompok === 'Utilitas');
   BL.field('Biaya listrik per bulan (masuk cost model)', { f: `IF(${pakaiSim},SimTotal,KwhBln*TarifKwh)`, v: ls?.biayaSistem ?? ls?.biayaBulan }, 'rp', 'out', 'Rp/bln', '', 'ListrikBln');
   x.lines.push({ kel: 'Utilitas', tahap: 1, desk: { f: `IF(${pakaiSim},"Listrik — "&SimNama,"Listrik")`, v: ls?.deskripsi ?? 'Listrik' }, deskKey: ls?.deskripsi ?? 'Listrik', jenis: 'Opex', risk: 'Rendah', sistem: 'ListrikBln',
     alok: [0.6, 0.2, 0.2, 0, 0], dasar: ls?.dasar ?? '', v: ls?.biayaBulan, qty: { f: `IF(${pakaiSim},SimKwh,KwhBln)` }, harga: { f: `IF(${pakaiSim},"",TarifKwh)` }, uom: 'kWh/bln' });
-  void RISIKO_DEFAULT; void ALOKASI;
+
+  // ===================== Water
+  BL.r++;
+  const air = a.air;
+  BL.h2('Water (air bersih)', 'Kebutuhan: orang × L/orang/hari × hari kerja + luas × L/m²/hari × hari kerja (÷ 1000 = m³). Biaya = m³ × tarif + abonemen (0 bila termasuk sewa gudang). Headcount, luas & hari kerja = nilai yang disimpan di tab web saat dihitung.');
+  if (!air) BL.note('Water belum diisi di web (tab Utilities Management) — tidak ada biaya air.');
+  else {
+    const SUMBER: Record<string, [string, boolean]> = { pdam: ['PDAM', true], kawasan: ['Pengelola kawasan industri', true], sumur: ['Sumur bor / air tanah', true], termasuk_sewa: ['Termasuk sewa gudang', false] };
+    const [lbl, bayar] = SUMBER[air.sumber] ?? SUMBER.kawasan;
+    BL.field('Sumber air', lbl, 'teks', 'in', '', bayar ? 'berbayar per m³' : 'tidak dihitung terpisah', 'AirSumber');
+    BL.field('Berbayar?', { f: `IF(AirSumber="Termasuk sewa gudang","Tidak","Ya")`, v: bayar ? 'Ya' : 'Tidak' }, 'teks', 'out', '', '', 'AirBayar');
+    BL.field('Kebutuhan per orang', air.literOrangHari, 'n1', 'in', 'L/orang/hari', 'SNI 03-7065-2005 ±50 L', 'AirLOrang');
+    BL.field('Kebutuhan area', air.literM2Hari, 'n2', 'in', 'L/m²/hari', 'pembersihan lantai / toilet', 'AirLM2');
+    BL.field('Tarif air', air.tarifM3, 'rp', 'in', 'Rp/m³', '', 'AirTarif');
+    BL.field('Abonemen / beban tetap', air.abonemenBulan, 'rp', 'in', 'Rp/bln', '', 'AirBeban');
+    BL.field('Headcount (disimpan dari web)', air.headcount ?? 0, 'n0', 'in', 'orang', `total headcount saat ini: lihat TotalHeadcount`, 'AirOrang');
+    BL.field('Luas (disimpan dari web)', air.luasM2 ?? 0, 'n1', 'in', 'm²', '', 'AirLuas');
+    BL.field('Hari kerja / bln (disimpan dari web)', air.hariKerjaBulan ?? 25, 'n0', 'in', 'hari', '', 'AirHari');
+    BL.field('Air untuk orang', { f: 'AirOrang*AirLOrang*AirHari/1000' }, 'n1', 'out', 'm³/bln', '', 'AirM3Orang');
+    BL.field('Air untuk area', { f: 'AirLuas*AirLM2*AirHari/1000' }, 'n1', 'out', 'm³/bln', '', 'AirM3Area');
+    BL.field('Total pemakaian', { f: 'AirM3Orang+AirM3Area' }, 'n1', 'out', 'm³/bln', '', 'AirM3');
+    const wl = d.h.biaya.find(b => b.kelompok === 'Utilitas' && b.deskripsi.startsWith('Water — '));
+    BL.field('Biaya air per bulan (masuk cost model)', { f: 'IF(AirBayar="Ya",ROUND(AirM3*AirTarif+AirBeban,0),0)', v: wl?.biayaBulan ?? 0 }, 'rp', 'out', 'Rp/bln', 'dibulatkan seperti web', 'AirBln');
+    if (bayar && wl) x.lines.push({ kel: 'Utilitas', tahap: 1, desk: { f: `IF(AirBln>0,"Water — "&AirSumber&" ("&ROUND(AirM3,0)&" m³/bln)","")`, v: wl.deskripsi }, deskKey: wl.deskripsi, jenis: 'Opex',
+      risk: 'Sedang', sistem: 'AirBln', alok: MERATA, dasar: wl.dasar ?? '', v: wl.biayaBulan, qty: { f: 'AirM3' }, harga: { f: 'AirTarif' }, uom: 'm³/bln' });
+  }
 }
 
 export function tulisInterest(x: Ctx) {

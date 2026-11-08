@@ -21,7 +21,10 @@ export interface ItKatalogDb { id: number; kelompok: string; item: string; cost_
 export interface DaftarWeb { prods: ProdDb[]; items: ItemDb[]; jabatan: string[]; upah: UpahDb[]; tarif: { golongan: string; tarif_kwh: number }[]; gudang: GudangDb[]; itKatalog: ItKatalogDb[] }
 export interface DataWeb { t: TenderRow; h: HasilTender; m: MasterData; inp: TenderInput; daftar?: DaftarWeb; nomorQuotation?: string | null; catatanMaster?: string[] }
 
-export const SHEET_WEB = ['Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation'] as const;
+/** Nama sheet = nama tab tender di web (urutan sama). */
+export const SH = { ka: 'Key assumption', vo: 'Volume', pr: 'Produk', vsm: 'Value Stream Mapping', wp: 'Warehouse Planning', lic: 'Loan & Interest Calculator',
+  te: 'Technology & Equipment', um: 'Utilities Management', ca: 'Cost Allocation', rs: 'Result', qu: 'Quotation' } as const;
+export const SHEET_WEB = [SH.ka, SH.vo, SH.pr, SH.vsm, SH.wp, SH.lic, SH.te, SH.um, SH.ca, SH.rs, SH.qu] as const;
 export const MENU: [string, string][] = [['0 Ringkasan', 'Ringkasan'], ...SHEET_WEB.map(s => [s, s] as [string, string]), ['Daftar', 'Daftar (droplist)']];
 
 export const huruf = (c: number) => { let s = ''; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
@@ -147,7 +150,7 @@ export interface Line {
 
 export interface Ctx {
   wb: WB; d: DataWeb; a: TenderRow['asumsi']; pd: NonNullable<HasilTender['processDesign']>; n: number; nShift: number; pdIn: typeof PD_DEFAULT;
-  L0: DaftarWeb; DF: S; KA: S; VO: S; AK: S; GD: S; IC: S; IT: S; BL: S; HS: S; QU: S; S0: S;
+  L0: DaftarWeb; DF: S; KA: S; VO: S; PR: S; AK: S; GD: S; IC: S; IT: S; BL: S; TE: S; UT: S; CA: S; HS: S; QU: S; S0: S;
   lk: (tabel: string, kunci: string, kolomCari: string, kolomAmbil: string, def?: string | number) => string;
   normU: (x: string) => string; isPal: (x: string) => string;
   lines: Line[];

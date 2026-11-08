@@ -277,7 +277,7 @@ export function terapkanProduk<A extends { volumes: VolumeInput[]; profilVolume?
     const tinggi = d.tinggiMaksMm > 0 ? Math.ceil((d.tinggiMaksMm - PALET_CM.tinggiKayu * 10) / 50 - 1e-9) * 50 : 0;   // tanpa tebal palet kayu
     excel = { ...sx };
     if (tinggi > 0 && tinggi !== Number(rak.productMm ?? 1250)) {
-      per.push({ bagian: 'Gudang, space & MHE', item: 'Tinggi produk di rak (bukaan level)', dari: `${f(Number(rak.productMm ?? 1250), 0)} mm`, ke: `${f(tinggi, 0)} mm` });
+      per.push({ bagian: 'Warehouse Planning', item: 'Tinggi produk di rak (bukaan level)', dari: `${f(Number(rak.productMm ?? 1250), 0)} mm`, ke: `${f(tinggi, 0)} mm` });
       excel.rak = { ...rak, productMm: tinggi };
     }
     const pr0 = sx.porsi as Record<string, number> | undefined;
@@ -288,7 +288,7 @@ export function terapkanProduk<A extends { volumes: VolumeInput[]; profilVolume?
         const sisa = Math.max(0, 1 - lantai - Number(pr0.block ?? 0));
         const rakTot = Number(pr0.spr ?? 0) + Number(pr0.ddr ?? 0) || 1;
         excel.porsi = { ...pr0, floor: lantai, spr: Math.round((Number(pr0.spr ?? 0) / rakTot) * sisa * 1000) / 1000, ddr: Math.round((Number(pr0.ddr ?? 0) / rakTot) * sisa * 1000) / 1000 };
-        per.push({ bagian: 'Gudang, space & MHE', item: 'Porsi pallet floor (palet > kapasitas beam)', dari: `${f(floor0 * 100, 1)}%`, ke: `${f(lantai * 100, 1)}%` });
+        per.push({ bagian: 'Warehouse Planning', item: 'Porsi pallet floor (palet > kapasitas beam)', dari: `${f(floor0 * 100, 1)}%`, ke: `${f(lantai * 100, 1)}%` });
       }
     }
   }

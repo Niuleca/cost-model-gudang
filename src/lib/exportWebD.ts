@@ -22,7 +22,7 @@ export function tulisHasil(x: Ctx) {
   const rcList: Rc[] = h.rateCard.length ? h.rateCard : ['storage', 'handling_in', 'handling_out'].map(kosong);
   x.rcList = rcList;
   // ===================== KPI
-  HS.h2('Hasil', 'Semua angka di sheet ini rumus dari sheet input. Ubah input (sel putih tulang) → hasil, rate card, quotation & ringkasan ikut berubah.');
+  HS.h2('Result', 'Semua angka di sheet ini rumus dari sheet input. Ubah input (sel putih tulang) → hasil, rate card, quotation & ringkasan ikut berubah.');
   HS.hdr(['Indikator', 'Nilai', 'Keterangan']);
   HS.put(1, 'Cost per bulan', { j: 'txt', b: true }); HS.put(2, { f: 'TotalBiaya', v: h.totalBiayaBulan }, { j: 'out', fmt: 'rp', b: true }); HS.put(3, { f: '"per tahun "&FIXED(TotalBiaya*12,0)' }, { j: 'txt' }); HS.r++;
   HS.put(1, 'Selling per bulan', { j: 'txt', b: true }); HS.put(2, { f: 'Sim_Pend', v: s0?.pendapatanBulan }, { j: 'out', fmt: 'rp', b: true }); HS.put(3, { f: '"per tahun "&FIXED(Sim_Pend*12,0)&" · bersih setelah PPh"' }, { j: 'txt' }); HS.r++;
@@ -68,26 +68,62 @@ export function tulisHasil(x: Ctx) {
   for (const l of lines) if (!urutKel.includes(l.kel)) urutKel.push(l.kel);
   const grup = urutKel.map(k => ({ k, rows: lines.filter(l => l.kel === k) })).filter(g0 => g0.rows.length);
 
-  // ===================== Matriks pembagian biaya per kategori (tab Cost Allocation)
+  // ===================== Sheet Cost Allocation: matriks pembagian biaya per kategori → layanan (sama dengan tab web)
+  const { CA } = x;
+  const CAN = `'${CA.nama}'!`;
   const mxList = h.alokasiLayanan?.matriks ?? [];
   const mxRow: Record<string, number> = {};
   const OPS4 = ['storage', 'handling_in', 'handling_out', 'vas'] as const;
-  HS.r++;
-  HS.h3('Pembagian biaya per kategori (tab Cost Allocation)');
-  HS.note('"Pakai matriks" = Ya → semua baris kategori itu memakai porsi di kolom C–F (dinormalisasi ke 100%), menggantikan alokasi per baris. Tidak → alokasi per baris (default simulasi cost-to-serve; kolom H–K = porsi efektifnya, manajemen sudah disebar).');
-  HS.hdr(['Kategori', ['Pakai matriks', true], ['Storage', true], ['Handling In', true], ['Handling Out', true], ['VAS', true], 'Total %', 'Default Sto', 'Default HIn', 'Default HOut', 'Default VAS']);
+  CA.lebar(26, 16, 13, 13, 13, 11, 10, 16, 16, 16, 14, 11, 11, 11, 11, 4, 60);
+  CA.h2('Pembagian biaya per kategori', 'Default = hasil simulasi cost-to-serve dari data tender (jam aktivitas per arus di VSM, jam pakai MHE, space, alokasi per baris biaya), biaya manajemen sudah disebar ke layanan. "Diubah" = Ya → semua baris kategori itu memakai porsi di kolom D–G (dinormalisasi ke 100%), menggantikan alokasi per baris di Rincian biaya (sheet Result). Hasilnya dipakai Rate card & margin.', 17);
+  CA.hdr(['Kategori', ['Biaya/bln', false, 'Σ Rincian biaya kategori ini (sheet Result)'], ['Diubah?', true, 'Ya = pakai porsi di kolom D–G · Tidak = default simulasi'],
+    ['Storage', true], ['Handling In', true], ['Handling Out', true], ['VAS', true], ['Total %', false, 'Harus 100% bila Diubah = Ya (kalau tidak, dinormalisasi)'],
+    ['Biaya Storage', false, 'Biaya × porsi dipakai'], ['Biaya Handling In', false], ['Biaya Handling Out', false], ['Biaya VAS', false],
+    ['Default Sto', false, 'Default simulasi (efektif, termasuk sebaran manajemen)'], ['Default HIn', false], ['Default HOut', false], '', ['Dasar default (simulasi)', false]]);
+  const DASAR: Record<string, string> = {
+    Manpower: 'Direct: jam aktivitas per arus (VSM). Indirect: 40% In · 40% Out · 20% Storage. Peran tetap → manajemen (disebar).',
+    Fasilitas: 'Sewa gedung / space → 100% Storage.', Racking: 'Rak → 100% Storage.', MHE: 'Jam pakai alat per aktivitas (VSM); tanpa data: 40/30/30.',
+    Utilitas: 'Listrik 60% Storage · 20% In · 20% Out; air 40/30/30.', IT: 'Alokasi baris IT (manajemen → disebar).', Overhead: '% × subtotal, 40/30/30.',
+    Startup: 'Amortisasi startup otomatis 40/30/30.', 'Interest cost': 'Mengikuti alokasi aset yang dibiayai.',
+  };
+  const mx0 = CA.r;
   for (const g0 of grup) {
     const m = mxList.find(z => z.kelompok === g0.k);
     if (!m) continue;
-    const r = HS.r; mxRow[g0.k] = r;
+    const r = CA.r; mxRow[g0.k] = r;
     const ov = m.override ? a.alokasiKategori?.[g0.k] : null;
-    HS.put(1, g0.k, { j: 'txt', b: true });
-    HS.put(2, m.override ? 'Ya' : 'Tidak', { j: 'in', al: 'center' }); HS.dd(2, 'L_YaTidak');
-    OPS4.forEach((b, k) => HS.put(3 + k, ov ? Math.max(0, Number(ov[b]) || 0) : (m.porsiDefault[b] ?? 0), { j: 'in', fmt: 'pct' }));
-    HS.put(7, { f: `SUM(C${r}:F${r})` }, { j: 'out', fmt: 'pct' });
-    OPS4.forEach((b, k) => HS.put(8 + k, m.porsiDefault[b] ?? 0, { j: 'out', fmt: 'pct', size: 8 }));
-    HS.r++;
+    CA.put(1, g0.k, { j: 'txt', b: true });
+    CA.put(2, { f: `SUMIFS(Rinci_Biaya,Rinci_Kel,A${r})`, v: m.biayaBulan }, { j: 'out', fmt: 'rp' });
+    CA.put(3, m.override ? 'Ya' : 'Tidak', { j: 'in', al: 'center' }); CA.dd(3, 'L_YaTidak');
+    OPS4.forEach((b, k) => CA.put(4 + k, ov ? Math.max(0, Number(ov[b]) || 0) : (m.porsiDefault[b] ?? 0), { j: 'in', fmt: 'pct' }));
+    CA.put(8, { f: `SUM(D${r}:G${r})` }, { j: 'out', fmt: 'pct' });
+    const AL = ['Rinci_AlSto', 'Rinci_AlHIn', 'Rinci_AlHOut', 'Rinci_AlVas'];
+    OPS4.forEach((b, k) => CA.put(9 + k, { f: `SUMPRODUCT((Rinci_Kel=$A${r})*Rinci_Biaya*(${AL[k]}+Rinci_AlMan*CA_Pops${k}))`, v: m.biayaPerLayanan[b] }, { j: 'out', fmt: 'rp' }));
+    OPS4.slice(0, 3).forEach((b, k) => CA.put(13 + k, m.porsiDefault[b] ?? 0, { j: 'out', fmt: 'pct', size: 8 }));
+    CA.put(17, DASAR[g0.k] ?? 'Alokasi per baris biaya (default 40/30/30).', { j: 'none', size: 8, color: C.MUTED, wrap: false });
+    CA.r++;
   }
+  const mx1 = CA.r - 1;
+  CA.put(1, 'Biaya per layanan / bln', { j: 'tot' }); CA.put(2, { f: `SUM(B${mx0}:B${mx1})` }, { j: 'tot', fmt: 'rp' });
+  for (let k = 0; k < 4; k++) { const c = String.fromCharCode(73 + k); CA.put(9 + k, { f: `SUM(${c}${mx0}:${c}${mx1})` }, { j: 'tot', fmt: 'rp' }); }
+  const rTot = CA.r; CA.r++;
+  CA.put(1, 'Porsi layanan', { j: 'sub' });
+  for (let k = 0; k < 4; k++) { const c = String.fromCharCode(73 + k); CA.put(9 + k, { f: `IF($B$${rTot}>0,${c}${rTot}/$B$${rTot},0)` }, { j: 'sub', fmt: 'pct' }); }
+  CA.r++;
+  const rTarif = CA.r; CA.put(1, 'Tarif rate card (excl. PPN, sheet Result)', { j: 'sub' }); CA.r++;
+  CA.put(1, 'Porsi sebaran biaya manajemen', { j: 'txt', size: 9 });
+  ['Rinci_AlSto', 'Rinci_AlHIn', 'Rinci_AlHOut', 'Rinci_AlVas'].forEach((n, k) => {
+    CA.put(9 + k, { f: `IFERROR(SUMPRODUCT(Rinci_Biaya,${n})/(SUMPRODUCT(Rinci_Biaya,Rinci_AlSto)+SUMPRODUCT(Rinci_Biaya,Rinci_AlHIn)+SUMPRODUCT(Rinci_Biaya,Rinci_AlHOut)+SUMPRODUCT(Rinci_Biaya,Rinci_AlVas)),0)` }, { j: 'out', fmt: 'pct', size: 9 });
+    CA.nm(`CA_Pops${k}`, 9 + k);
+  });
+  CA.put(17, 'Manajemen (supervisor, manager, biaya tetap) disebar ke layanan sesuai porsi biaya operasionalnya — sama dengan web.', { j: 'none', size: 8, color: C.MUTED, wrap: false });
+  CA.r++;
+  CA.r++;
+  CA.note('Kolom Biaya per layanan = cost-to-serve per kategori. Total per layanan = biaya rate card sebelum margin (sheet Result › Biaya per layanan). Tarif sudah termasuk margin & PPh dari sheet Result.');
+  x.later.push(() => {
+    (x.rcList as HasilRc[]).forEach(rc => { const k = OPS4.indexOf(rc.bucket as typeof OPS4[number]); if (k < 0) return;
+      const z = (x.rcRefCA as Record<string, Record<string, string>> | undefined)?.[rc.bucket]; if (z) CA.put(9 + k, { f: z.tarif, v: rc.tarifPerUnit }, { j: 'sub', fmt: 'rp' }, rTarif); });
+  });
 
   // ===================== Biaya per layanan & kategori risiko
   HS.r++;
@@ -172,6 +208,7 @@ export function tulisHasil(x: Ctx) {
     HS.put(14, { f: `INDEX($E$${o.r0}:$E$${o.r1},${idx})` }, { j: 'out', fmt: 'n0' });
     HS.put(15, { f: `IF(AND(Km_${k}>0,N(N${r})=0),C${r}/Km_${k},1)` }, { j: 'out', fmt: 'x' });
     HS.put(17, { f: `IF(H${r}>0,1-D${r}/H${r},0)`, v: rc.gpPersen }, { j: 'out', fmt: 'pct' });
+    x.rcRefCA = rcRef;
     rcRef[b] = { uom: `${SN}B${r}`, vol: `${SN}C${r}`, tarif: `${SN}J${r}`, incl: `${SN}L${r}`, gp: `${SN}Q${r}`, bpu: `${SN}E${r}`, quote: `${SN}M${r}`, harga: `${SN}I${r}`, tetap: `${SN}N${r}`, rasio: `${SN}O${r}` };
     HS.r++;
   }
@@ -244,7 +281,7 @@ export function tulisHasil(x: Ctx) {
   HS.hdr(['Jenis', 'Biaya/bln', 'Biaya/thn', '%', 'Keterangan']);
   const oj0 = HS.r;
   const inv = lines.filter(l => l.nilai && (l.capex || l.kel === 'Startup' || l.kel === 'MHE' || l.kel === 'IT' || l.kel === 'Racking' || l.nilai.startsWith('IF(OR('))).map(l => l.nilai!);
-  for (const [l, k, ket] of [['Opex', 'Opex', 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, overhead, dll.'], ['Capex', 'Capex', null], ['Interest cost', 'Interest', 'bunga pinjaman yang dipilih di sheet Interest cost']] as const) {
+  for (const [l, k, ket] of [['Opex', 'Opex', 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, overhead, dll.'], ['Capex', 'Capex', null], ['Interest cost', 'Interest', 'bunga pinjaman yang dipilih di sheet Loan & Interest Calculator']] as const) {
     const r = HS.r;
     HS.put(1, l, { j: 'txt', b: true }); HS.put(2, { f: `SUMIFS(Rinci_Biaya,Rinci_Jenis,${q(k)})`, v: h.perJenis[k === 'Opex' ? 'opex' : k === 'Capex' ? 'capex' : 'interest'] }, { j: 'out', fmt: 'rp' });
     HS.put(3, { f: `B${r}*12` }, { j: 'out', fmt: 'rp' }); HS.put(4, { f: `IF(TotalBiaya>0,B${r}/TotalBiaya,0)` }, { j: 'out', fmt: 'pct', b: true });
@@ -289,7 +326,7 @@ export function tulisHasil(x: Ctx) {
   HS.r++;
   HS.h2('Kebutuhan manpower & MHE', 'Hanya jumlah (orang / unit). Biayanya ada di Rincian biaya per bulan (kategori Manpower & MHE).');
   HS.hdr(['Role', 'Jenis', ['FTE', false, 'Dari Man Power Summary'], ['Orang per shift', false, 'Hasil pooling (Man Power Summary)'], ['Headcount', false, 'Manpower di Rincian biaya manpower'], ['Utilisasi', false, 'FTE ÷ headcount'], 'Skema']);
-  const AKN = `'Aktivitas & manpower'!`;
+  const AKN = `'${x.AK.nama}'!`;
   const mpRows = x.mpRows as MpBarisXl[];
   for (const z of mpRows) {
     const r = HS.r, br = z.row, sr = z.sumRow;
@@ -305,7 +342,7 @@ export function tulisHasil(x: Ctx) {
   HS.r++;
   HS.h3('MHE');
   HS.hdr(['MHE', 'Mode', 'Unit']);
-  const GDN = `'Gudang, space & MHE'!`;
+  const GDN = `'${x.GD.nama}'!`;
   void GDN;
   for (const l of lines.filter(z => z.kel === 'MHE')) {
     HS.put(1, { f: `${l.sistem.replace(/\$K\$(\d+)/, '$$D$$$1')}&" ("&${l.sistem.replace(/\$K\$(\d+)/, '$$A$$$1')}&")"` }, { j: 'txt' });
@@ -339,7 +376,7 @@ export function tulisHasil(x: Ctx) {
       const al0 = l.alokDari?.row ? BUCKETS.map((_, k) => ({ f: R(10 + k, l.alokDari!.row!) } as NilaiSel)) : l.alok;
       const mr = mxRow[l.kel];
       const ex = (v: NilaiSel) => (v && typeof v === 'object' ? `(${v.f})` : String(Number(v) || 0));
-      const al = mr ? BUCKETS.map((_, k) => ({ f: `IF($B$${mr}="Ya",${k < 4 ? `IF($G$${mr}>0,${R(3 + k, mr)}/$G$${mr},0)` : '0'},${ex(al0[k] ?? 0)})` } as NilaiSel)) : al0;
+      const al = mr ? BUCKETS.map((_, k) => ({ f: `IF(${CAN}$C$${mr}="Ya",${k < 4 ? `IF(${CAN}$H$${mr}>0,${CAN}${R(4 + k, mr)}/${CAN}$H$${mr},0)` : '0'},${ex(al0[k] ?? 0)})` } as NilaiSel)) : al0;
       al.forEach((v, k) => HS.put(10 + k, v, { j: 'out', fmt: 'pct', size: 8 }));
       HS.r++;
     }
@@ -359,7 +396,7 @@ export function tulisQuotation(x: Ctx) {
   const { h, t } = d;
   const rcRef = x.rcRef as Record<string, Record<string, string>>;
   QU.lebar(34, 34, 18, 40);
-  QU.h2('Quotation', 'Rate card untuk penawaran (dari sheet Hasil). Nomor, T&C, tanda tangan & PDF tetap dibuat di tab Quotation di web.');
+  QU.h2('Quotation', 'Rate card untuk penawaran (dari sheet Result). Nomor, T&C, tanda tangan & PDF tetap dibuat di tab Quotation di web.');
   QU.field('Nomor quotation', d.nomorQuotation ?? '(belum ada)', 'teks', 'in');
   QU.field('Kepada', { f: 'Cust', v: t.customer }, 'teks', 'out');
   QU.field('Lokasi', { f: 'Kab&", "&Prov' }, 'teks', 'out');
@@ -389,7 +426,7 @@ export function tulisRingkasan(x: Ctx) {
   const { h, m } = d;
   const n = x.n;
   const rcRef = x.rcRef as Record<string, Record<string, string>>;
-  const AKN = `'Aktivitas & manpower'!`, HSN = `'Hasil'!`;
+  const AKN = `'${x.AK.nama}'!`, HSN = `'${x.HS.nama}'!`;
   S0.lebar(22, 46, 16, 16, 18, 18, 20, 50);
   const ws0 = S0.ws;
   const GR = { style: 'thin', color: { argb: 'FF8C8C8C' } };
@@ -431,7 +468,7 @@ export function tulisRingkasan(x: Ctx) {
   const ho0 = baris(['', 'Jumlah manpower', { f: 'TotalHeadcount', v: h.totalHeadcount }], [undefined, undefined, 'n0']);
   const ho1 = baris(['', 'Luas gudang (m²)', { f: 'LuasM2', v: h.space.totalM2 }], [undefined, undefined, 'n0']);
   gabung(ho0, ho1, 'Operasional');
-  S0.note('Semua angka merujuk sheet web (Key assumption … Hasil) — ubah input (sel putih tulang) di sana, ringkasan ikut berubah');
+  S0.note('Semua angka merujuk sheet web (Key assumption … Result) — ubah input (sel putih tulang) di sana, ringkasan ikut berubah');
   S0.r += 2;
 
   // 1-1 PNL
@@ -454,7 +491,7 @@ export function tulisRingkasan(x: Ctx) {
   const rSum = sub('Sum (gross)', (x.rcList as HasilRc[]).length ? `SUM(F${sel0}:F${S0.r - 1})` : '0', jualKotor);
   const rPph = S0.r;
   baris(['', 'Potongan PPh 23 (dipotong customer)', '%', { f: 'PPh', v: m.finance.pphGrossUp }, '', { f: `-F${rSum}*PPh` }, { f: `F${rPph}*Kontrak` }, 'Tarif sudah di-gross-up bila PPh exclude'], [undefined, undefined, undefined, 'pct', undefined, 'rp', 'rp']);
-  const rNet = sub('Selling bersih', `F${rSum}+F${rPph}`, s0?.pendapatanBulan ?? 0, '= sheet Hasil · simulasi volume komitmen', C.KPI);
+  const rNet = sub('Selling bersih', `F${rSum}+F${rPph}`, s0?.pendapatanBulan ?? 0, '= sheet Result · simulasi volume komitmen', C.KPI);
   gabung(sel0, rNet, 'Selling');
   const INDIRECT = ['Overhead', 'Interest cost'];
   const kat = Array.from(new Set(x.lines.map(l => l.kel)));
@@ -479,7 +516,7 @@ export function tulisRingkasan(x: Ctx) {
   gabung(ind0, rInd, 'Indirect Cost');
   const rTc = S0.r;
   baris(['Total Cost', '', '', '', '', { f: `F${rCost}+F${rInd}`, v: h.totalBiayaBulan }, { f: `F${rTc}*Kontrak`, v: h.totalBiayaBulan * n },
-    { f: `IF(ABS(F${rTc}-TotalBiaya)<1,"✓ sama dengan total Rincian biaya (Hasil)","⚠ cek: beda dengan total Rincian biaya")` }], RP2, { b: true, bg: C.HASIL });
+    { f: `IF(ABS(F${rTc}-TotalBiaya)<1,"✓ sama dengan total Rincian biaya (Result)","⚠ cek: beda dengan total Rincian biaya")` }], RP2, { b: true, bg: C.HASIL });
   const rGp = S0.r;
   baris(['Gross Profit', '', '', '', '', { f: `F${rNet}-F${rTc}`, v: s0?.gp }, { f: `G${rNet}-G${rTc}`, v: (s0?.gp ?? 0) * n }], RP2, { b: true, bg: C.KPI });
   baris(['(%)', '', '', '', '', { f: `IF(F${rNet}>0,F${rGp}/F${rNet},0)`, v: s0?.gpPersen }, { f: `IF(G${rNet}>0,G${rGp}/G${rNet},0)`, v: s0?.gpPersen }], [undefined, undefined, undefined, undefined, undefined, 'pct', 'pct'], { b: true, bg: C.KPI });
@@ -533,7 +570,7 @@ export function tulisRingkasan(x: Ctx) {
   judulTabel('4. Opex vs capex', 6);
   header(['Jenis', 'Keterangan', 'Biaya / bln', 'Biaya / thn', `Biaya kontrak (${n} bln)`, '%']);
   const oj0 = S0.r;
-  for (const [l, k, ket] of [['Opex', 'Opex', 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, overhead, dll.'], ['Capex', 'Capex', null], ['Interest cost', 'Interest', 'bunga pinjaman yang dipilih di sheet Interest cost']] as const) {
+  for (const [l, k, ket] of [['Opex', 'Opex', 'biaya operasional: manpower, sewa gudang/MHE, utilitas, consumable, overhead, dll.'], ['Capex', 'Capex', null], ['Interest cost', 'Interest', 'bunga pinjaman yang dipilih di sheet Loan & Interest Calculator']] as const) {
     const r = S0.r;
     baris([l, ket ?? { f: '"depresiasi/amortisasi investasi (total investasi Rp"&FIXED(TotalInvestasi,0)&")"' }, { f: `SUMIFS(Rinci_Biaya,Rinci_Jenis,${q(k)})` }, { f: `C${r}*12` }, { f: `C${r}*Kontrak` }, { f: `IF(TotalBiaya>0,C${r}/TotalBiaya,0)` }], FK);
     ws0.getCell(r, 1).font = { size: 10, bold: true };
@@ -552,9 +589,12 @@ export function tulisRingkasan(x: Ctx) {
   judulTabel('6. Alur perhitungan (sama dengan tab web)', 8, '');
   header(['Sheet', 'Isi']); ws0.mergeCells(S0.r - 1, 2, S0.r - 1, nK);
   const alur = ['Key assumption — data tender, UMK, shift, faktor, porsi palletize/loose, working day & workload shift', 'Volume — volume, konversi, ringkasan order, parameter muatan, profil order & kendaraan',
-    'Aktivitas & manpower — summary, skema kontrak, rincian biaya manpower, rincian per task, matriks, indirect, VSM', 'Gudang, space & MHE — gudang, space A–E, racking level, biaya space & racking, MHE',
-    'Interest cost — pinjaman capex & manual', 'IT — kebutuhan IT format BAP', 'Biaya lain — per klasifikasi, startup otomatis, listrik',
-    'Hasil — KPI, rate card & margin, simulasi, kurs, porsi kategori, opex/capex, rincian biaya', 'Quotation — rate card penawaran', 'Daftar — sumber semua droplist & data master'];
+    'Produk — daftar SKU, CBM & berat per palet, level rak maks, zonasi, turunan tertimbang',
+    'Value Stream Mapping — summary, skema kontrak, rincian biaya manpower, rincian per task, matriks multi-skill, indirect & peran tetap, VSM',
+    'Warehouse Planning — gudang, space A–E, racking level, komposisi luas, biaya space & racking',
+    'Loan & Interest Calculator — pinjaman capex & baris manual, working capital', 'Technology & Equipment — MHE, IT (format BAP), office/consumable/pallet/HSE/services/asuransi/startup',
+    'Utilities Management — listrik (electrical) & air (water)', 'Cost Allocation — pembagian biaya per kategori ke Storage / Handling In / Handling Out',
+    'Result — KPI, red flag, rate card & margin, simulasi, kurs, porsi kategori, opex/capex, kalender, rincian biaya', 'Quotation — rate card penawaran', 'Daftar — sumber semua droplist & data master'];
   for (const a2 of alur) { const [sh, isi] = a2.split(' — '); const r = baris([sh, isi], []); ws0.mergeCells(r, 2, r, nK); ws0.getCell(r, 1).value = { text: sh, hyperlink: `#'${sh === 'Daftar' ? 'Daftar' : sh}'!A1` }; }
   S0.r += 2;
   judulTabel('Legenda warna', 2, '');

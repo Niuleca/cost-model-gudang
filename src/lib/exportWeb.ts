@@ -3,7 +3,7 @@
 // semua angka berupa rumus hidup yang saling terhubung. Pengecualian (bersifat algoritma di web):
 // headcount hasil multi-skill pooling & per shift → ditulis sebagai sel input (bisa diubah), alokasi biaya
 // manpower/MHE per layanan → nilai dari web. Rumus memakai fungsi yang kompatibel Excel 2016+ / 365.
-import { MENU, SHEET_WEB, S, BUCKETS, RISIKO_DEFAULT, ALOKASI, TOOLS, UOM, UOM_ISI, INDUSTRI, MATA_UANG, KELAS_UOM, R, A, C, type Ctx, type DataWeb, type Fmt } from '@/lib/exportWebUtil';
+import { MENU, SHEET_WEB, SH, S, BUCKETS, RISIKO_DEFAULT, ALOKASI, TOOLS, UOM, UOM_ISI, INDUSTRI, MATA_UANG, KELAS_UOM, R, A, C, type Ctx, type DataWeb, type Fmt } from '@/lib/exportWebUtil';
 import { LEVEL_JABATAN } from '@/lib/engine/biayaMp';
 import { MODA, MUATAN, SATUAN_UNIT } from '@/lib/profilVolume';
 import { OPSI_TAG, labelTag } from '@/lib/porsiMuat';
@@ -12,7 +12,8 @@ import { SEKSI_BIAYA } from '@/lib/biayaLain';
 import { PD_DEFAULT, RANGKAP_DEFAULT } from '@/lib/engine/processDesign';
 import { tulisKeyAssumption, tulisVolume } from '@/lib/exportWebA';
 import { tulisAktivitas } from '@/lib/exportWebB';
-import { tulisGudang, tulisIt, tulisBiayaLain, tulisInterest } from '@/lib/exportWebC';
+import { tulisGudang, tulisMhe, tulisIt, tulisBiayaLain, tulisUtilities, tulisInterest } from '@/lib/exportWebC';
+import { tulisProduk } from '@/lib/exportWebP';
 import { tulisHasil, tulisQuotation, tulisRingkasan } from '@/lib/exportWebD';
 export { SHEET_WEB, MENU };
 export type { DataWeb };
@@ -31,15 +32,18 @@ export function tulisModelWeb(wb: WB, d: DataWeb) {
 
   // Sheet dibuat sesuai urutan tab web; isi ditulis setelahnya (rujukan antar-sheet memakai nama/alamat).
   const S0 = new S(wb, '0 Ringkasan', `${t.customer} — ${t.kode ?? ''}`, sub0, 'FF1F2A37');
-  const KA = new S(wb, 'Key assumption', 'Key assumption', sub0);
-  const VO = new S(wb, 'Volume', 'Volume', sub0);
-  const AK = new S(wb, 'Aktivitas & manpower', 'Aktivitas & manpower', sub0);
-  const GD = new S(wb, 'Gudang, space & MHE', 'Gudang, space & MHE', sub0);
-  const IC = new S(wb, 'Interest cost', 'Interest cost — simulasi pinjaman bank', sub0);
-  const IT = new S(wb, 'IT', 'Kebutuhan IT (format BAP)', sub0);
-  const BL = new S(wb, 'Biaya lain', 'Biaya lain', sub0);
-  const HS = new S(wb, 'Hasil', 'Hasil', sub0, 'FF2F6FD0');
-  const QU = new S(wb, 'Quotation', 'Quotation', sub0);
+  const KA = new S(wb, SH.ka, 'Key assumption', sub0);
+  const VO = new S(wb, SH.vo, 'Volume', sub0);
+  const PR = new S(wb, SH.pr, 'Produk / SKU', sub0);
+  const AK = new S(wb, SH.vsm, 'Value Stream Mapping — aktivitas & manpower', sub0);
+  const GD = new S(wb, SH.wp, 'Warehouse Planning — gudang, space & racking', sub0);
+  const IC = new S(wb, SH.lic, 'Loan & Interest Calculator — simulasi pinjaman bank', sub0);
+  const TE = new S(wb, SH.te, 'Technology & Equipment — MHE, IT & biaya lain', sub0);
+  const UT = new S(wb, SH.um, 'Utilities Management — listrik & air', sub0);
+  const CA = new S(wb, SH.ca, 'Cost Allocation — pembagian biaya ke layanan', sub0);
+  const HS = new S(wb, SH.rs, 'Result', sub0, 'FF2F6FD0');
+  const QU = new S(wb, SH.qu, 'Quotation', sub0);
+  const IT = TE, BL = TE;
   const DF = new S(wb, 'Daftar', 'Daftar pilihan (droplist) & data master', 'Sumber semua droplist di sheet lain — boleh ditambah di bawah tiap daftar', 'FF9CA3AF');
 
   // ===================================================================================== Daftar
@@ -173,17 +177,22 @@ export function tulisModelWeb(wb: WB, d: DataWeb) {
   const normU = (x: string) => `IFERROR(INDEX(D_KelasKelas,MATCH(LOWER(TRIM(${x})),D_KelasUom,0)),LOWER(TRIM(${x})))`;
   const isPal = (x: string) => `OR(LOWER(TRIM(${x}))="palet",LOWER(TRIM(${x}))="pallet")`;
 
-  const ctx: Ctx = { wb, d, a, pd, n, nShift, pdIn, L0, KA, VO, AK, GD, IC, IT, BL, HS, QU, S0, DF, lk, normU, isPal, lines: [], later: [] };
+  const ctx: Ctx = { wb, d, a, pd, n, nShift, pdIn, L0, KA, VO, PR, AK, GD, IC, IT, BL, TE, UT, CA, HS, QU, S0, DF, lk, normU, isPal, lines: [], later: [] };
   tulisKeyAssumption(ctx);
   tulisVolume(ctx);
   tulisAktivitas(ctx);
+  tulisProduk(ctx);
   tulisGudang(ctx);
+  TE.lebar(40, 40, 16, 12, 15, 12, 15, 15, 14, 18, 15, 14, 34, 12, 14, 10, 10, 10, 10, 12);
+  tulisMhe(ctx);
   tulisIt(ctx);
   tulisBiayaLain(ctx);
+  tulisUtilities(ctx);
   tulisInterest(ctx);
   tulisHasil(ctx);
   tulisQuotation(ctx);
   tulisRingkasan(ctx);
+  for (const f of ctx.later) f();
   wb.calcProperties = { fullCalcOnLoad: true };
   return wb;
 }

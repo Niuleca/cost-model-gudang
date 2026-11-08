@@ -50,7 +50,7 @@ export function tulisKeyAssumption(x: Ctx) {
   KA.nmR('PorsiKode', 7, p0, KA.r - 1); KA.nmR('PorsiPal', 2, p0, KA.r - 1);
 
   // ---- Process Design
-  KA.h2('Process Design & Resource Calculation', 'Matriks multi-skill (siapa boleh merangkap siapa) ada di sheet Aktivitas & manpower.');
+  KA.h2('Process Design & Resource Calculation', 'Matriks multi-skill (siapa boleh merangkap siapa) ada di sheet Value Stream Mapping.');
   KA.h3('Working day');
   KA.hdr(['Working day', 'Man Power', 'MHE', 'Satuan']);
   const kr: Record<string, number> = {};
@@ -115,7 +115,7 @@ export function tulisKeyAssumption(x: Ctx) {
   KA.field('Efficiency', { f: 'Efis', v: a.efisiensi }, 'pct', 'out', '', 'ubah di Efisiensi kerja (atas)');
   KA.field('Operating (alat dipakai bergantian)', { f: `MAX(1,SUM(J${w0}:J${w0 + 2}))`, v: pd.operating }, 'n0', 'out', 'shift', 'otomatis = jumlah shift aktif', 'Operating');
   KA.field('Shift aktif (beban gabungan > 0)', { f: `MAX(1,COUNTIF(BebanGab,">0"))`, v: pd.beban.filter(w => w > 0).length || 1 }, 'n0', 'out', 'shift', 'dipakai supervisor & peran tetap per shift', 'ShiftAktif');
-  KA.note('Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling (matriks rangkap di sheet Aktivitas & manpower).');
+  KA.note('Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling (matriks rangkap di sheet Value Stream Mapping).');
 }
 
 export function tulisVolume(x: Ctx) {
@@ -293,7 +293,7 @@ export function tulisVolume(x: Ctx) {
     VO.nm(`OrderBln_${k}`, 5);
     VO.r++;
   }
-  VO.note('Order/bln otomatis menjadi volume aktivitas admin (role Admin, UoM order/line) di sheet Aktivitas & manpower bila Volume/bln-nya kosong; dibagi rata bila ada beberapa aktivitas admin di satu arus.');
+  VO.note('Order/bln otomatis menjadi volume aktivitas admin (role Admin, UoM order/line) di sheet Value Stream Mapping bila Volume/bln-nya kosong; dibagi rata bila ada beberapa aktivitas admin di satu arus.');
   VO.r++;
   VO.h3(`Kapasitas kendaraan (bisa diubah / ditambah) · ${kend.length} jenis`);
   VO.hdr([['Kendaraan', true], ['Palet', true], ['CBM', true], ['Berat (kg)', true]]);

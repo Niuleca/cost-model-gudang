@@ -1,6 +1,6 @@
-// Sheet "Aktivitas & manpower" — semua hidup dari rumus:
+// Sheet "Value Stream Mapping" — semua hidup dari rumus:
 // VSM → Rincian per task (FTE) → daftar role & alat otomatis → multi-skill pooling per shift (rumus, ikut matriks)
-// → Man Power & MHE Summary (+ remarks otomatis) → Rincian biaya manpower → baris biaya di sheet Hasil.
+// → Man Power & MHE Summary (+ remarks otomatis) → Rincian biaya manpower → baris biaya di sheet Result.
 import { R, A, q, BUCKETS, ALOKASI, type Ctx } from '@/lib/exportWebUtil';
 import { rincianBiayaRole, LEVEL_JABATAN, LEVEL_GAJI_DEFAULT, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { labelTag } from '@/lib/porsiMuat';

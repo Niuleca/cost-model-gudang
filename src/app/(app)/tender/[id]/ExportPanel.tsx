@@ -8,12 +8,14 @@ const KET: Record<string, string> = {
   '0 Ringkasan': 'Hasil utama · 1-1 PNL (selling, cost, indirect, gross profit) · 2-1 manpower · 2-2 other cost · porsi kategori · opex vs capex · rate card',
   'Key assumption': 'Data tender, provinsi → kab/kota → UMK, shift, faktor, porsi palletize/loose, working day, workload per shift',
   'Volume': 'Volume & konversi, ringkasan order, parameter muatan, profil order inbound/outbound, kapasitas kendaraan',
-  'Aktivitas & manpower': 'Man Power & MHE Summary, skema kontrak, rincian biaya manpower, rincian per task, matriks multi-skill, indirect, VSM',
-  'Gudang, space & MHE': 'Gudang terpilih, space A–E, racking level, komposisi luas, biaya space & racking, kebutuhan MHE',
-  'Interest cost': 'Pilih capex yang dibiayai pinjaman, baris manual, working capital',
-  'IT': 'Kebutuhan IT format BAP (budget vs aktual), ringkasan biaya IT per bulan',
-  'Biaya lain': 'Per klasifikasi Price Inquiry, startup & implementation otomatis, listrik',
-  'Hasil': 'KPI, red flag, rate card & margin, simulasi, kurs, porsi kategori, opex/capex, kalender, rincian biaya per bulan',
+  'Produk': 'Daftar SKU, CBM & berat per palet, level rak maks dari aturan berat, cara simpan, turunan tertimbang',
+  'Value Stream Mapping': 'Man Power & MHE Summary, skema kontrak, rincian biaya manpower, rincian per task, matriks multi-skill, indirect & peran tetap, VSM',
+  'Warehouse Planning': 'Gudang terpilih, space A–E, racking level, komposisi luas, biaya space & racking',
+  'Loan & Interest Calculator': 'Pilih capex yang dibiayai pinjaman, baris manual, working capital',
+  'Technology & Equipment': 'Kebutuhan MHE, IT format BAP, office / consumable / pallet / HSE / services / asuransi / startup (otomatis)',
+  'Utilities Management': 'Listrik (simulasi / peralatan per titik) & air bersih',
+  'Cost Allocation': 'Matriks pembagian biaya per kategori ke Storage / Handling In / Handling Out (default simulasi, bisa diubah)',
+  'Result': 'KPI, red flag, rate card & margin, simulasi, kurs, porsi kategori, opex/capex, kalender, rincian biaya per bulan',
   'Quotation': 'Rate card penawaran & tagihan sekali',
   'Daftar': 'Sumber semua droplist (Data Validation) & data master yang dipakai rumus',
   'Data Input': 'Semua isian tender (path → nilai) terhubung ke sel input — dipakai untuk upload kembali ke Leca',
@@ -21,7 +23,7 @@ const KET: Record<string, string> = {
   'Data Mentah': 'Seluruh isi asumsi & hasil (path → nilai) untuk audit',
 };
 /** Sheet yang saling dirujuk rumus — selalu ikut diunduh. */
-const WAJIB = ['0 Ringkasan', 'Key assumption', 'Volume', 'Aktivitas & manpower', 'Gudang, space & MHE', 'Interest cost', 'IT', 'Biaya lain', 'Hasil', 'Quotation', 'Daftar', 'Data Input'];
+const WAJIB = ['0 Ringkasan', 'Key assumption', 'Volume', 'Produk', 'Value Stream Mapping', 'Warehouse Planning', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Daftar', 'Data Input'];
 const kolom = (c: number) => { let s = ''; c++; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
 const fmt = (v: string | number | null) => v == null ? '' : typeof v === 'number' ? (Math.abs(v) >= 10000 ? Math.round(v).toLocaleString('id-ID') : Number.isInteger(v) ? String(v) : v.toLocaleString('id-ID', { maximumFractionDigits: 4 })) : String(v);
 
@@ -59,6 +61,7 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
         <h2><T>Export Excel</T></h2>
         <div className="row">
           {pesan && <span className="small" role="status">{pesan}</span>}
+          <a className="btn ghost" href="/panduan-leca.docx" download="Read_Me_Leca.docx" title="Panduan: susunan sheet & cara review Excel (Bab 9)">Read me (Word)</a>
           <button className="ghost" onClick={muatReview} disabled={sibuk}>{pv ? '↻ Muat ulang review' : 'Siapkan review'}</button>
           <button onClick={unduh} disabled={!data || sibuk || !pilih.length}>⬇ Unduh {pv ? `${new Set([...pilih, ...WAJIB.filter(w => pv.some(x => x.nama === w))]).size} sheet` : ''} (.xlsx)</button>
         </div>
