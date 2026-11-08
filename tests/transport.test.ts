@@ -82,3 +82,14 @@ test('project analysis: variance, status & akar masalah', () => {
   const rata = rataAktual([a, { ...a, periode: '2026-10', biayaBulan: 540_000_000 }])!;
   assert.equal(rata.biayaBulan, 550_000_000);
 });
+
+import { workbookTransport } from '../src/lib/exportTransport.ts';
+test('export Excel transport: rumus lengkap + hasil sama dengan sistem', async () => {
+  const t = { kode: 'X', customer: 'C', industri: null, kab_kota: 'Jakarta', provinsi: '-', durasi_kontrak_bulan: 12, payment_term_hari: 30, status: 'draft' };
+  const tr = { marginGlobal: 0.15, rute: [{ id: 'a', origin: 'Jakarta', destination: 'Bandung', armada: 'CDD Box', basis: 'trip' as const, volumeBulan: 20, vendor: 'V', hargaBeli: 2_000_000 }] };
+  const wb = await workbookTransport(t, tr);
+  const r = wb.getWorksheet('Rute')!;
+  assert.match((r.getCell('M5').value as { formula: string }).formula, /ROUND\(J5\/\(1-MIN\(0\.95,MAX\(-1,L5\)\)\),2\)/);
+  assert.equal((r.getCell('M5').value as { result: number }).result, 2_352_941.18);
+  assert.deepEqual(wb.worksheets.map(w => w.name), ['Ringkasan', 'Rute', 'Perbandingan Margin', 'Review']);
+});

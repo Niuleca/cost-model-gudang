@@ -58,6 +58,8 @@ export default function TransportTender() {
           <span className={`pill ${pillStatus(t.status)}`}>{labelStatus(t.status)}</span>
           <span className="muted">{kotor ? 'Menyimpan otomatis…' : pesan ?? 'Tersimpan'}</span>
           <button className="ghost" onClick={() => simpanSekarang()}>Simpan</button>
+          <button className="ghost" title="Excel dengan rumus lengkap: rute, perbandingan margin, review — angka sama dengan sistem"
+            onClick={() => import('@/lib/exportTransport').then(m => m.unduhExcelTr('transportation', t, tr, rates)).catch(e => alert(`Export gagal: ${e instanceof Error ? e.message : e}`))}>⬇ Export Excel</button>
         </div>
       </div>
       {err && <p className="error">{err}</p>}
