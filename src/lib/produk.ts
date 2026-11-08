@@ -18,7 +18,8 @@ export interface ProdukTender {
   kode: string; nama: string;
   uom: string;                 // satuan simpan / handling: karton, pcs, roll, bag, pail, unit, …
   kelasBerat?: string;         // kode kelas berat dari master UoM (mis. bag-50, fibc-1000) — kosong = otomatis dari berat
-  p: number; l: number; t: number;   // dimensi per UOM (cm)
+  p: number; l: number; t: number;   // dimensi per UOM (satuan: satuanDim, default cm)
+  satuanDim?: 'cm' | 'mm';     // kosong = otomatis (angka > 2,5 m untuk palet / > 6 m untuk UOM lain dibaca mm)
   cbm?: number | null;         // CBM per UOM — dipakai bila P×L×T kosong
   beratKg: number;             // berat per UOM (kg)
   upp: number;                 // UPP = unit (UOM) per palet
@@ -58,6 +59,19 @@ const n = (x: unknown) => (Number.isFinite(Number(x)) ? Number(x) : 0);
 const isCase = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes((u ?? '').trim().toLowerCase());
 const isPalet = (u: string) => /^pal+et/i.test((u ?? '').trim());
 const PALET_CM = { p: 120, l: 100, tinggiKayu: 15 };
+/** Satuan dimensi yang dipakai: pilihan user, atau otomatis — dimensi yang tidak masuk akal dalam cm (palet > 2,5 m, lainnya > 6 m) dibaca mm. */
+export function satuanDimEfektif(x: Pick<ProdukTender, 'p' | 'l' | 't' | 'uom' | 'satuanDim'>): { satuan: 'cm' | 'mm'; otomatis: boolean } {
+  if (x.satuanDim) return { satuan: x.satuanDim, otomatis: false };
+  const maks = Math.max(n(x.p), n(x.l), n(x.t));
+  return { satuan: maks > (isPalet(x.uom) ? 250 : 600) ? 'mm' : 'cm', otomatis: true };
+}
+/** Dimensi dalam cm (konversi dari mm bila perlu). */
+export function dimCm(x: Pick<ProdukTender, 'p' | 'l' | 't' | 'uom' | 'satuanDim'>) {
+  const f = satuanDimEfektif(x).satuan === 'mm' ? 0.1 : 1;
+  return { p: n(x.p) * f, l: n(x.l) * f, t: n(x.t) * f };
+}
+/** UOM palet: 1 UOM = 1 palet (UPP = 1). */
+export const uppEfektif = (x: Pick<ProdukTender, 'uom' | 'upp'>) => (isPalet(x.uom) ? 1 : Math.max(0, n(x.upp)));
 
 export interface HitungProduk {
   cbmUnit: number; beratPaletKg: number; cbmPalet: number; palet: number; totalKg: number; totalCbm: number;
@@ -67,17 +81,22 @@ export interface HitungProduk {
 
 /** Hitungan turunan satu produk (CBM, berat per palet, level maks, tinggi muatan, cara simpan). */
 export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, bukaanMm?: number): HitungProduk {
-  const dimOk = n(x.p) > 0 && n(x.l) > 0 && n(x.t) > 0;
-  const cbmUnit = dimOk ? (n(x.p) * n(x.l) * n(x.t)) / 1e6 : n(x.cbm);
-  const upp = Math.max(0, n(x.upp));
-  const beratPaletKg = upp * n(x.beratKg) + (upp > 0 ? aturan.tarePaletKg : 0);
+  const d = dimCm(x), palUom = isPalet(x.uom);
+  const dimOk = d.p > 0 && d.l > 0 && d.t > 0;
+  const cbmUnit = dimOk ? (d.p * d.l * d.t) / 1e6 : n(x.cbm);
+  const upp = uppEfektif(x);
+  // UOM palet: berat / UOM = berat kotor 1 palet (sudah termasuk palet kayu) → tanpa tambahan tare
+  const beratPaletKg = palUom ? n(x.beratKg) : upp * n(x.beratKg) + (upp > 0 ? aturan.tarePaletKg : 0);
   const cbmPalet = upp * cbmUnit;
   const palet = upp > 0 ? Math.ceil(n(x.qty) / upp - 1e-9) : 0;
-  // susunan per layer di palet 120 × 100 cm (orientasi terbaik), tinggi muatan = layer × tinggi unit + palet
-  const perLayer = dimOk ? Math.max(Math.floor(PALET_CM.p / n(x.p)) * Math.floor(PALET_CM.l / n(x.l)), Math.floor(PALET_CM.p / n(x.l)) * Math.floor(PALET_CM.l / n(x.p))) : 0;
+  // susunan per layer di palet 120 × 100 cm (orientasi terbaik), tinggi muatan = layer × tinggi unit + palet.
+  // UOM palet: tinggi muatan = T (sudah termasuk palet kayu).
+  const perLayer = palUom ? (dimOk ? 1 : 0) : dimOk ? Math.max(Math.floor(PALET_CM.p / d.p) * Math.floor(PALET_CM.l / d.l), Math.floor(PALET_CM.p / d.l) * Math.floor(PALET_CM.l / d.p)) : 0;
   const layer = perLayer > 0 && upp > 0 ? Math.ceil(upp / perLayer - 1e-9) : 0;
-  const tinggiMuatanMm = layer > 0 ? (layer * n(x.t) + PALET_CM.tinggiKayu) * 10 : 0;
+  const tinggiMuatanMm = palUom ? (dimOk ? d.t * 10 : 0) : layer > 0 ? (layer * d.t + PALET_CM.tinggiKayu) * 10 : 0;
   const peringatan: string[] = [];
+  if (dimOk && !palUom && perLayer === 0) peringatan.push(`Unit ${d.p} × ${d.l} cm lebih besar dari palet 120 × 100 cm — cek dimensi / satuan (cm atau mm), atau pakai UOM palet / simpan di lantai.`);
+  if (dimOk && palUom && (Math.max(d.p, d.l) > 130 || Math.min(d.p, d.l) > 115)) peringatan.push(`Palet ${Math.round(d.p)} × ${Math.round(d.l)} cm lebih besar dari palet standar 120 × 100 cm — cek dimensi / satuan (cm atau mm).`);
 
   let levelMaks = 99, sumberLevel = 'semua level';
   if (x.levelMaks && x.levelMaks > 0) { levelMaks = x.levelMaks; sumberLevel = 'manual'; }
@@ -97,7 +116,7 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
   const tinggiProdukMm = tinggiMuatanMm > 0 ? tinggiMuatanMm - PALET_CM.tinggiKayu * 10 : 0;
   if (bukaanMm && tinggiProdukMm > bukaanMm + 0.5 && ['spr', 'ddr'].includes(caraSimpan)) peringatan.push(`Tinggi produk di palet ${Math.round(tinggiProdukMm)} mm > tinggi produk di rak ${Math.round(bukaanMm)} mm (Space) — kurangi UPP / layer atau naikkan bukaan rak.`);
   if (upp > 0 && perLayer > 0 && upp % perLayer && layer > 1) peringatan.push(`UPP ${upp} tidak pas kelipatan ${perLayer}/layer — layer teratas tidak penuh.`);
-  if (dimOk && cbmPalet > 2.2) peringatan.push(`CBM muatan ${cbmPalet.toFixed(2)} m³/palet tidak wajar untuk palet 1,2 × 1,0 m — cek UPP / dimensi.`);
+  if (dimOk && cbmPalet > 2.2) peringatan.push(`CBM muatan ${cbmPalet.toFixed(2)} m³/palet tidak wajar untuk palet 1,2 × 1,0 m — cek UPP / dimensi (satuan cm atau mm).`);
   if (!upp && n(x.qty) > 0) peringatan.push('UPP belum diisi — jumlah palet tidak bisa dihitung.');
   return { cbmUnit, beratPaletKg, cbmPalet, palet, totalKg: n(x.qty) * n(x.beratKg), totalCbm: n(x.qty) * cbmUnit, perLayer, layer, tinggiMuatanMm, levelMaks, sumberLevel, hanyaLantai, caraSimpan, peringatan };
 }
@@ -182,7 +201,7 @@ export function dariTempel(teks: string): ProdukTender[] {
 
 
 /** Produk manual (bukan baris otomatis) sudah ada → produk menjadi sumber data tender. */
-export const adaProdukNyata = (daftar: ProdukTender[] | undefined) => (daftar ?? []).some(x => !x.otomatis && Number(x.upp) > 0 && Number(x.qty) > 0);
+export const adaProdukNyata = (daftar: ProdukTender[] | undefined) => (daftar ?? []).some(x => !x.otomatis && uppEfektif(x) > 0 && Number(x.qty) > 0);
 
 export interface TurunanProduk {
   palet: number; qty: number; kgPerUnit: number; cbmPerUnit: number; upp: number; isiPcs: number | null;
@@ -190,7 +209,7 @@ export interface TurunanProduk {
 }
 /** Rata-rata tertimbang dari daftar produk: berat & CBM per unit (tertimbang qty), per palet (tertimbang palet), UPP = qty ÷ palet. */
 export function turunanProduk(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99): TurunanProduk | null {
-  const xs = daftar.filter(x => Number(x.upp) > 0 && Number(x.qty) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak) }));
+  const xs = daftar.filter(x => uppEfektif(x) > 0 && Number(x.qty) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak) }));
   if (!xs.length) return null;
   const qty = xs.reduce((a, r) => a + Number(r.x.qty), 0), palet = xs.reduce((a, r) => a + r.h.palet, 0);
   if (!(qty > 0) || !(palet > 0)) return null;

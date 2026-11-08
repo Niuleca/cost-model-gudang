@@ -5,7 +5,7 @@ import type { HasilTender } from '../engine/index';
 import type { TenderRow } from '../tender';
 import { kategoriOrang, jenisMhe, susunLayout, type LayoutGudang } from '../simulasi3d/layout';
 import { buatRng } from './dasar';
-import { ATURAN_BERAT_DEFAULT, hitungProduk, produkEfektif } from '../produk';
+import { ATURAN_BERAT_DEFAULT, hitungProduk, produkEfektif, uppEfektif } from '../produk';
 import { hitungLevelRak, lengkapiSpaceExcel } from '../engine/space';
 import type { JenisTugas, Kemampuan, Lokasi, Produktivitas, Skenario, Sku } from './tipe';
 
@@ -88,16 +88,16 @@ export function skenarioDariTender(t: TenderRow, h: HasilTender, o: OpsiSkenario
   const aturan = t.asumsi.aturanBerat ?? ATURAN_BERAT_DEFAULT;
   const levelRak = Math.max(1, hitungLevelRak(lengkapiSpaceExcel(t.asumsi.space?.excel).rak).level || 1);
   const produk = produkEfektif(t.asumsi.produk, vols, t.asumsi.profilVolume);
-  const produkNyata = (t.asumsi.produk ?? []).filter(x => !x.otomatis && Number(x.upp) > 0).length > 0;
+  const produkNyata = (t.asumsi.produk ?? []).filter(x => !x.otomatis && uppEfektif(x) > 0).length > 0;
   if (produkNyata) {
-    const xs = produk.filter(x => Number(x.upp) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak) }));
+    const xs = produk.filter(x => uppEfektif(x) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak) }));
     const totPal = xs.reduce((a, r) => a + Math.max(r.h.palet, 1), 0);
     // kelas ABC dari porsi palet (kumulatif 60 / 90 %)
     let kum = 0;
     for (const { x, h } of [...xs].sort((a, b) => b.h.palet - a.h.palet)) {
       no++; const porsi = Math.max(h.palet, 1) / totPal; kum += porsi;
       const exp = rng() < 0.5;
-      sku.push({ id: `SKU${String(no).padStart(3, '0')}`, kode: x.kode || `SKU-${no}`, nama: x.nama || x.kode || `Produk ${no}`, kartonPerPalet: Math.max(1, Math.round(Number(x.upp))),
+      sku.push({ id: `SKU${String(no).padStart(3, '0')}`, kode: x.kode || `SKU-${no}`, nama: x.nama || x.kode || `Produk ${no}`, kartonPerPalet: Math.max(1, Math.round(uppEfektif(x))),
         kontrol: exp ? 'expiry' : 'none', umurHari: exp ? 180 + Math.floor(rng() * 540) : 0, kelas: kum <= 0.6 + 1e-9 || no === 1 ? 'A' : kum <= 0.9 + 1e-9 ? 'B' : 'C', bobot: porsi,
         levelMaks: h.levelMaks < levelRak ? h.levelMaks : undefined, zona: x.zona?.trim() || undefined, beratPaletKg: h.beratPaletKg, uom: x.uom });
     }

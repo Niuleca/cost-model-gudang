@@ -12,7 +12,7 @@ import type { VolumeInput } from '@/lib/engine/types';
 import type { ProfilVolume } from '@/lib/profilVolume';
 import { hitungLevelRak, lengkapiSpaceExcel, type HasilSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
 import {
-  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
+  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, satuanDimEfektif, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
   type AturanBerat, type PerubahanTender, type ProdukTender,
 } from '@/lib/produk';
 
@@ -140,7 +140,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, alignItems: 'end' }}>
             <label style={{ gridColumn: 'span 1' }}>{lab('Kode')}<input aria-label={`Kode ${i + 1}`} value={x.kode} onChange={e => ubah(i, { kode: e.target.value }, false)} style={kecil} /></label>
             <label style={{ gridColumn: 'span 2', minWidth: 200 }}>{lab('Nama produk')}<input aria-label={`Nama ${i + 1}`} value={x.nama} placeholder="Nama produk" onChange={e => ubah(i, { nama: e.target.value }, false)} style={kecil} /></label>
-            <label>{lab('UOM')}<select aria-label={`UOM ${i + 1}`} value={uomDari(x.uom)?.kode ?? x.uom} onChange={e => ubah(i, { uom: e.target.value, kelasBerat: undefined })} style={kecil}>
+            <label>{lab('UOM')}<select aria-label={`UOM ${i + 1}`} value={uomDari(x.uom)?.kode ?? x.uom} onChange={e => ubah(i, { uom: e.target.value, kelasBerat: undefined, ...(/^pal+et/i.test(e.target.value) ? { upp: 1 } : {}) })} style={kecil}>
               {!uomDari(x.uom) && <option value={x.uom}>{x.uom || '—'}</option>}
               {KELOMPOK_UOM.map(g => <optgroup key={g} label={g}>{UOM_MASTER.filter(u => u.kelompok === g).map(u => <option key={u.kode} value={u.kode}>{u.nama}</option>)}</optgroup>)}
             </select></label>
@@ -151,14 +151,18 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
                 <option value="">{auto ? `Auto: ${auto.label}` : 'Auto (dari berat)'}</option>
                 {daftar.map(c => <option key={c.kode} value={c.kode}>{c.label}</option>)}
               </select></label>; })()}
-            <div style={{ gridColumn: 'span 2', minWidth: 200 }}>{lab(`P × L × T (cm)${x.dimEstimasi ? ' · perkiraan dari CBM' : ''}`)}
+            {(() => { const sd = satuanDimEfektif(x); return <div style={{ gridColumn: 'span 2', minWidth: 200 }}>
+              <span className="row" style={{ gap: 4, justifyContent: 'space-between' }}>{lab(`P × L × T${x.dimEstimasi ? ' · perkiraan dari CBM' : ''}${sd.otomatis && sd.satuan === 'mm' ? ' · dibaca mm (otomatis)' : ''}`)}
+                <select aria-label={`Satuan dimensi ${i + 1}`} value={sd.satuan} onChange={e => ubah(i, { satuanDim: e.target.value as 'cm' | 'mm' }, false)} style={{ ...kecil, width: 'auto', padding: '0 4px' }}>
+                  <option value="cm">cm</option><option value="mm">mm</option></select></span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-                {(['p', 'l', 't'] as const).map(k => <Angka key={k} aria-label={`${k.toUpperCase()} ${i + 1} (cm)`} placeholder={k.toUpperCase()} value={x[k]} onValue={v => ubah(i, { [k]: v })}
-                  style={{ ...kecil, ...(x.dimEstimasi ? { fontStyle: 'italic', color: 'var(--muted, #64748b)' } : {}) }} />)}</div></div>
+                {(['p', 'l', 't'] as const).map(k => <Angka key={k} aria-label={`${k.toUpperCase()} ${i + 1}`} placeholder={k.toUpperCase()} value={x[k]} onValue={v => ubah(i, { [k]: v })}
+                  style={{ ...kecil, ...(x.dimEstimasi ? { fontStyle: 'italic', color: 'var(--muted, #64748b)' } : {}) }} />)}</div></div>; })()}
             <label>{lab('CBM / UOM')}{x.p > 0 && x.l > 0 && x.t > 0 ? <input readOnly value={h.cbmUnit.toFixed(4)} style={{ ...kecil, background: 'transparent', border: '1px dashed var(--g200, #e2e8f0)' }} aria-label={`CBM ${i + 1}`} />
               : <Angka aria-label={`CBM ${i + 1}`} placeholder="0,04" value={x.cbm ?? 0} onValue={v => ubah(i, { cbm: v })} style={kecil} />}</label>
-            <label>{lab('Berat / UOM (kg)')}<Angka aria-label={`Berat ${i + 1}`} value={x.beratKg} onValue={v => ubah(i, { beratKg: v })} style={kecil} /></label>
-            <label title="Unit per palet">{lab('UPP (unit/palet)')}<Angka aria-label={`UPP ${i + 1}`} bulat value={x.upp} onValue={v => ubah(i, { upp: v })} style={kecil} /></label>
+            <label title={/^pal+et/i.test(x.uom) ? 'UOM palet: berat kotor 1 palet (barang + palet kayu)' : undefined}>{lab(/^pal+et/i.test(x.uom) ? 'Berat / palet kotor (kg)' : 'Berat / UOM (kg)')}<Angka aria-label={`Berat ${i + 1}`} value={x.beratKg} onValue={v => ubah(i, { beratKg: v })} style={kecil} /></label>
+            {/^pal+et/i.test(x.uom) ? <label title="UOM palet: 1 UOM = 1 palet">{lab('UPP (unit/palet)')}<input readOnly value="1 (UOM palet)" aria-label={`UPP ${i + 1}`} style={{ ...kecil, background: 'transparent', border: '1px dashed var(--g200, #e2e8f0)' }} /></label>
+              : <label title="Unit per palet">{lab('UPP (unit/palet)')}<Angka aria-label={`UPP ${i + 1}`} bulat value={x.upp} onValue={v => ubah(i, { upp: v })} style={kecil} /></label>}
             <label>{lab(`Qty stok (${x.uom || 'unit'})`)}<Angka aria-label={`Qty ${i + 1}`} bulat value={x.qty} onValue={v => ubah(i, { qty: v })} style={kecil} /></label>
             <div>{lab('Palet · berat/palet')}<b>{angka(h.palet)}</b> plt · <b style={{ color: h.hanyaLantai ? 'var(--bad, #c0392b)' : h.levelMaks < levelRak ? 'var(--warn, #b45309)' : undefined }}>{angka(h.beratPaletKg)} kg</b></div>
           </div>
