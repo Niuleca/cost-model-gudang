@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, bersihkanRoleTerhapus, type Asumsi, type TenderRow } from '@/lib/tender';
-import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko } from '@/lib/engine/index.ts';
+import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko, type TarifTambahanInput } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
 import { skemaVsmDefault, VSM_DEFAULT, tagDariDefault } from '@/lib/vsmDefault';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
@@ -298,7 +298,7 @@ export default function TenderPage() {
   }, [tab, !!t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Margin diubah di tab Hasil → hitung ulang otomatis (tanpa pindah tab)
-  const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}, t?.asumsi.alokasiKategori ?? null]);
+  const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}, t?.asumsi.alokasiKategori ?? null, t?.asumsi.layananJual ?? null, t?.asumsi.tarifTambahan ?? null]);
   useEffect(() => {
     if (!hasil || (tab !== 'Result' && tab !== 'Cost Allocation')) return;
     const id = setTimeout(() => { hitung(false); }, 400);
@@ -855,7 +855,8 @@ export default function TenderPage() {
       {tab === 'Result' && <HasilPanel belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
-        uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} onBukaAlokasi={() => setTab('Cost Allocation')} />}
+        uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} onBukaAlokasi={() => setTab('Cost Allocation')}
+        layananJual={a.layananJual ?? {}} onLayananJual={layananJual => setA({ layananJual })} tambahan={a.tarifTambahan ?? []} onTambahan={tarifTambahan => setA({ tarifTambahan })} />}
       {tab === 'Cost Allocation' && <CostAllocation h={hasil} tenderId={t.id} onKeResult={() => setTab('Result')}
         alokasiKategori={a.alokasiKategori ?? {}} onAlokasiKategori={alokasiKategori => setA({ alokasiKategori })} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
@@ -886,8 +887,10 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, onBukaAlokasi }: {
+function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan }: {
   onBukaAlokasi: () => void;
+  layananJual: Partial<Record<Bucket, 'jual' | 'termasuk'>>; onLayananJual: (x: Partial<Record<Bucket, 'jual' | 'termasuk'>>) => void;
+  tambahan: TarifTambahanInput[]; onTambahan: (x: TarifTambahanInput[]) => void;
   uomRateCard: Partial<Record<Bucket, string>>; onUomRateCard: (u: Partial<Record<Bucket, string>>) => void;
   belumDisimpan?: boolean; hasil: HasilTender | null; catatan: string[]; onSimpan: () => void; onHitung: () => void; gudang: { nama: string; luas_m2: number } | null | undefined;
   marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
@@ -936,7 +939,8 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
         <span className="small"><b>Pembagian biaya ke layanan:</b> {h.alokasiLayanan.matriks?.filter(r => r.override).length ? `${h.alokasiLayanan.matriks.filter(r => r.override).length} kategori diubah` : 'default simulasi (cost-to-serve)'}
           {' · '}{h.rateCard.map(r => `${BUCKET_LABEL[r.bucket]} ${persen(r.biayaBulan / (h.marginTotal.biayaBulan || 1))}`).join(' · ')}</span>
         <button className="ghost" onClick={onBukaAlokasi}>Atur di Cost Allocation →</button></div>}
-      <HasilKomersial h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} uomRateCard={uomRateCard} onUomRateCard={onUomRateCard} />
+      <HasilKomersial h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} uomRateCard={uomRateCard} onUomRateCard={onUomRateCard}
+        layananJual={layananJual} onLayananJual={onLayananJual} tambahan={tambahan} onTambahan={onTambahan} />
 
       <div className="grid2">
         <div className="card">

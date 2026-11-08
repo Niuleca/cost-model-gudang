@@ -49,3 +49,26 @@ test('matriks pembagian per kategori: default = simulasi, override per kategori,
   assert.ok(s1.redFlags.some(f => f.kode === 'ALOKASI_KAT_BUKAN_100'));
   assert.equal(s1.alokasiLayanan.matriks.filter(r => r.override).length, 1);
 });
+
+test('layanan termasuk: biaya dipindah ke layanan yang dijual, total & simulasi tetap; tarif tambahan dihitung', () => {
+  const d = hitungTender(contohTender, contohMaster);
+  const j = hitungTender({ ...contohTender, layananJual: { handling_in: 'termasuk' } }, contohMaster);
+  assert.ok(!j.rateCard.some(r => r.bucket === 'handling_in'));
+  assert.ok(Math.abs(tot(j) - tot(d)) <= 3);
+  assert.equal(j.layananTermasuk[0].bucket, 'handling_in');
+  assert.ok(biaya(j, 'storage') > biaya(d, 'storage') && biaya(j, 'handling_out') > biaya(d, 'handling_out'));
+  // proporsional biaya layanan yang dijual
+  const pindah = biaya(d, 'handling_in'), s0 = biaya(d, 'storage'), o0 = biaya(d, 'handling_out');
+  assert.ok(Math.abs(biaya(j, 'storage') - (s0 + pindah * s0 / (s0 + o0))) <= 2);
+  const t = hitungTender({ ...contohTender, tarifTambahan: [
+    { id: 'a', nama: 'Movement', satuan: 'per palet', dasar: 'aktivitas', menit: 6, orang: 1, alat: true },
+    { id: 'b', nama: 'Label', satuan: 'per pcs', dasar: 'manual', biaya: 350, gp: 0.3, volumeBulan: 1000 },
+  ] }, contohMaster);
+  const tt = t.tarifTambahan;
+  assert.deepEqual(t.rateCard.map(r => r.tarifPerUnit), d.rateCard.map(r => r.tarifPerUnit));
+  const mv = tt.items[0];
+  assert.ok(Math.abs(mv.biayaPerUnit - 0.1 * (tt.tarifJamOrang + tt.tarifJamAlat)) < 0.05);
+  const lb = tt.items[1];
+  assert.equal(lb.tarifPerUnit, 520);   // 350 ÷ 0,7 = 500 → gross-up PPh 2% (exclude) = 510,2 → dibulatkan 10 ke atas = 520
+  assert.ok(Math.abs(lb.pendapatanBulan - 520 * 1000 * 0.98) <= 1);
+});

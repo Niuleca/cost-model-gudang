@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { HasilTender, Bucket } from '@/lib/engine/index.ts';
 import { rp, angka, persen, BUCKET_LABEL } from '@/lib/format';
+import type { TarifTambahanInput } from '@/lib/engine/index.ts';
+import { LayananDijual, TarifTambahan } from './TarifTambahan';
 
 export interface Kurs { kode: string; rupiahPer: number; tanggal?: string }
 const MATA_UANG: { kode: string; nama: string }[] = [
@@ -16,7 +18,9 @@ const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { s
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
 export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard }: {
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, layananJual, onLayananJual, tambahan, onTambahan }: {
+  layananJual?: Partial<Record<Bucket, 'jual' | 'termasuk'>>; onLayananJual?: (x: Partial<Record<Bucket, 'jual' | 'termasuk'>>) => void;
+  tambahan?: TarifTambahanInput[]; onTambahan?: (x: TarifTambahanInput[]) => void;
   uomRateCard?: Partial<Record<Bucket, string>>; onUomRateCard?: (u: Partial<Record<Bucket, string>>) => void;
   h: HasilTender; marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
   kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number;
@@ -70,6 +74,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
           {' '}PPN {rp(ppnV)} {pajak.ppn === 'include' ? 'sudah di dalam tarif yang ditulis' : 'ditambahkan di invoice'} lalu disetor ke negara — tidak memengaruhi GP.</p>; })()}
       <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
         {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>
+      {onLayananJual && <LayananDijual h={h} nilai={layananJual ?? {}} onUbah={onLayananJual} />}
       <div className="tablewrap"><table>
         <thead><tr><th>Layanan</th><th>Satuan tarif / UoM</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">GP% (input)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
         <tbody>
@@ -116,6 +121,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       </table></div>
       <p className="small muted">Pendapatan = tarif sebelum PPN × volume, dikurangi PPh 23 {(pphPersen * 100).toFixed(1)}% (PPh {pajak.pph === 'exclude' ? 'ditanggung customer, sudah di-gross-up di tarif' : 'ditanggung kita → GP turun'}). Per tahun = per bulan × 12.</p>
     </div>
+    {onTambahan && <TarifTambahan h={h} nilai={tambahan ?? []} onUbah={onTambahan} ppnInclude={pajak.ppn === 'include'} />}
 
     <div className="card">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>

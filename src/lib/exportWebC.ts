@@ -213,7 +213,7 @@ export function tulisMhe(x: Ctx) {
       nilai: `${SN}$L$${r}`, qty: { f: `${SN}J${r}` }, harga: { f: `${SN}F${r}` }, umur: { f: `IF(${SN}E${r}="beli",MIN(IF(N(${SN}G${r})>0,${SN}G${r},Kontrak),Kontrak),"")` }, uom: 'unit', capex: mi?.mode === 'beli' });
     GD.r++;
   }
-  GD.nmR('MheHarga_Tool', 1, m0, GD.r - 1); GD.nmR('MheHarga_Biaya', 11, m0, GD.r - 1);
+  GD.nmR('MheHarga_Tool', 1, m0, GD.r - 1); GD.nmR('MheHarga_Biaya', 11, m0, GD.r - 1); GD.nmR('MheHarga_Unit', 10, m0, GD.r - 1);
   GD.put(1, 'Total estimasi biaya MHE / bulan', { j: 'tot' }); GD.put(11, { f: `SUM(K${m0}:K${GD.r - 1})` }, { j: 'tot', fmt: 'rp' }); GD.r++;
   GD.note('Alat baru di Aktivitas otomatis muncul di MHE Summary; agar dibiayai, isi nama alatnya di baris kosong tabel ini lalu pilih item harga / isi harga.');
 }

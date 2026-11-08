@@ -38,7 +38,7 @@ function normalisasi(a: Partial<Record<Bucket, number>> | undefined, fallback: P
 export function roundupHarga(x: number): number {
   if (!isFinite(x) || x <= 0) return 0;
   const step = x < 100 ? 1 : x < 1000 ? 10 : 100;  // tarif kecil (per pcs/case) dibulatkan halus agar tidak melonjak
-  return Math.ceil(x / step) * step;
+  return Math.ceil(x / step - 1e-9) * step;   // toleransi floating point (500,00000000000006 → 500, sama dengan Excel)
 }
 
 // ---------------------------------------------------------------------------
@@ -433,6 +433,17 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const g = pajak.pph === 'exclude' ? pphRate : 0;
   const ppn = Math.max(0, pajak.ppnPersen ?? 0.11);
   const bucketKeArus: Record<string, Arus> = { storage: 'storage', handling_in: 'inbound', handling_out: 'outbound', vas: 'vas' };
+  // Layanan yang tidak dijual terpisah ("termasuk"): biayanya dipindah ke layanan yang dijual, proporsional biaya masing-masing
+  const jualMode = t.layananJual ?? {};
+  const RK3 = ['Rendah', 'Sedang', 'Tinggi'] as KategoriRisiko[];
+  const termasuk = opsBuckets.filter(b => jualMode[b] === 'termasuk' && totB(b) > 0);
+  const dijual = opsBuckets.filter(b => jualMode[b] !== 'termasuk' && totB(b) > 0);
+  const layananTermasuk = termasuk.map(b => ({ bucket: b, biayaBulan: bulat(totB(b)), ke: dijual }));
+  if (termasuk.length && dijual.length) {
+    const totD = dijual.reduce((a2, b) => a2 + totB(b), 0);
+    const porsiD = Object.fromEntries(dijual.map(b => [b, totB(b) / totD])) as Record<Bucket, number>;
+    for (const b of termasuk) for (const k of RK3) { const x = biayaBucket[b][k]; for (const d of dijual) biayaBucket[d][k] += x * porsiD[d]; biayaBucket[b][k] = 0; }
+  } else if (termasuk.length) flags.push({ level: 'kritis', kode: 'SEMUA_TERMASUK', pesan: 'Semua layanan ditandai "termasuk" — minimal satu layanan harus dijual agar biaya tertagih.' });
   const rateCard = opsBuckets.map(b => {
     const biaya = Object.values(biayaBucket[b]).reduce((a, c) => a + c, 0);
     const hargaDefault = (['Rendah', 'Sedang', 'Tinggi'] as KategoriRisiko[]).reduce((sum, k) => sum + biayaBucket[b][k] * (1 + m.margin[k]), 0);
@@ -472,6 +483,41 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const marginTotal = { biayaBulan: bulat(totBiayaRc), hargaSebelumPph: bulat(totHargaRc), hargaBulan: bulat(rateCard.reduce((s2, rc) => s2 + rc.hargaBulan, 0)),
     margin: totBiayaRc > 0 ? bulat(totHargaRc / totBiayaRc - 1, 4) : 0,                 // markup gabungan
     gpPersen: totHargaRc > 0 ? bulat(1 - totBiayaRc / totHargaRc, 4) : 0 };              // GP% gabungan atas pendapatan
+
+  // ---- 11b. Tarif tambahan (additional charges): tidak mengubah rate card & simulasi utama ----
+  const jamOrangBln = pd?.kalender.mp.jamBulan || t.jamEfektifPerShift * 25;
+  const jamAlatBln = pd?.kalender.mhe.jamBulan || jamOrangBln;
+  const totalHc = manpower.reduce((a2, x) => a2 + x.headcount, 0);
+  const biayaMp = baris.filter(b => b.kelompok === 'Manpower').reduce((a2, b) => a2 + b.biayaBulan, 0);
+  const biayaMhe = baris.filter(b => b.kelompok === 'MHE').reduce((a2, b) => a2 + b.biayaBulan, 0);
+  const unitMhe = mhe.filter(x => x.harga > 0).reduce((a2, x) => a2 + x.unit, 0);
+  const tarifJamOrang = totalHc > 0 && jamOrangBln > 0 ? biayaMp / totalHc / jamOrangBln : 0;
+  const tarifJamAlat = unitMhe > 0 && jamAlatBln > 0 ? biayaMhe / unitMhe / jamAlatBln : 0;
+  const tarifTambahan = {
+    tarifJamOrang: bulat(tarifJamOrang, 2), tarifJamAlat: bulat(tarifJamAlat, 2), jamOrangBln: bulat(jamOrangBln, 2), jamAlatBln: bulat(jamAlatBln, 2),
+    items: (t.tarifTambahan ?? []).map(x => {
+      let biayaPU = 0, gpDef = marginTotal.gpPersen, dasarTeks = '';
+      if (x.dasar === 'turunan') {
+        const rc = rateCard.find(r2 => r2.bucket === x.bucket);
+        const o = rc?.opsiUom.find(o2 => o2.uom === x.uom) ?? rc?.opsiUom[0];
+        biayaPU = rc && o && o.volume > 0 ? rc.biayaBulan / o.volume : 0;
+        if (rc) gpDef = rc.gpPersen;
+        dasarTeks = rc && o ? `biaya ${x.bucket} Rp${bulat(rc.biayaBulan).toLocaleString('id-ID')} ÷ ${bulat(o.volume, 2).toLocaleString('id-ID')} ${o.uom}` : 'layanan dasar tidak dijual / tidak ada';
+      } else if (x.dasar === 'aktivitas') {
+        const menit = Math.max(0, Number(x.menit) || 0), orang = Math.max(0, Number(x.orang ?? 1) || 0), peng = Number(x.pengali) > 0 ? Number(x.pengali) : 1;
+        biayaPU = (menit / 60) * (orang * tarifJamOrang * peng + (x.alat ? tarifJamAlat : 0)) + Math.max(0, Number(x.material) || 0);
+        dasarTeks = `${menit} mnt × (${orang} org × Rp${bulat(tarifJamOrang).toLocaleString('id-ID')}/jam${peng !== 1 ? ` × ${peng}` : ''}${x.alat ? ` + alat Rp${bulat(tarifJamAlat).toLocaleString('id-ID')}/jam` : ''}) + material Rp${(Number(x.material) || 0).toLocaleString('id-ID')}`;
+      } else { biayaPU = Math.max(0, Number(x.biaya) || 0); dasarTeks = 'biaya per unit diisi manual'; }
+      const gp = x.gp != null && Number.isFinite(Number(x.gp)) ? Math.min(0.95, Number(x.gp)) : gpDef;
+      const hsp = gp < 1 ? biayaPU / (1 - gp) : 0;
+      const tarifX = biayaPU > 0 ? roundupHarga(hsp / (1 - g)) : 0;
+      const tarifI = roundupHarga(tarifX * (1 + ppn));
+      const vol = Math.max(0, Number(x.volumeBulan) || 0);
+      const pend = tarifX * vol * (1 - pphRate), bya = biayaPU * vol;
+      return { ...x, biayaPerUnit: bulat(biayaPU, 2), gpDipakai: bulat(gp, 4), gpManual: x.gp != null, dasarTeks, tarifPerUnit: tarifX, tarifInclPpn: tarifI, ppnPerUnit: tarifI - tarifX,
+        tarifQuote: pajak.ppn === 'include' ? tarifI : tarifX, pendapatanBulan: bulat(pend), biayaBulan: bulat(bya), gpBulan: bulat(pend - bya) };
+    }),
+  };
 
   // Tarif storage alternatif (per m², ton, CBM, liter) dari harga storage yang sama
   const st = rateCard.find(rc => rc.bucket === 'storage');
@@ -521,7 +567,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     totalHeadcount: payroll.reduce((sum, p) => sum + p.headcount, 0),
     sumberPinjaman, interestCost, perJenis,
     biaya: baris, perKelompok, totalBiayaBulan: bulat(totalBiaya), investasi: bulat(investasi),
-    biayaPerBucket: biayaBucket, alokasiLayanan, rateCard, marginTotal, pajak: { ...pajak, pphPersen: pphRate }, storageAlternatif, simulasi,
+    biayaPerBucket: biayaBucket, alokasiLayanan, layananTermasuk, rateCard, tarifTambahan, marginTotal, pajak: { ...pajak, pphPersen: pphRate }, storageAlternatif, simulasi,
     redFlags: flags,
   };
 }

@@ -116,7 +116,7 @@ export async function buatQuotationPdf(d: QuotationPdfData) {
   autoTable(doc, {
     ...tabelStyle, startY: y,
     head: [['No', 'Layanan', 'Satuan', d.termasukPpn ? `Tarif (incl. PPN ${Math.round((d.ppnPersen ?? 0.11) * 1000) / 10}%)` : 'Tarif (excl. PPN)', 'Keterangan']],
-    body: d.rateCard.map((r, i) => [String(i + 1), ascii(r.layanan), ascii(r.satuan), rp(r.tarif), ascii(r.catatan ?? '')]),
+    body: d.rateCard.map((r, i) => [String(i + 1), ascii(r.layanan), ascii(r.satuan), r.tarif > 0 ? rp(r.tarif) : 'Termasuk', ascii(r.catatan ?? '')]),
     columnStyles: { 0: { cellWidth: 9, halign: 'center' }, 1: { cellWidth: 38, fontStyle: 'bold' }, 2: { cellWidth: 38 }, 3: { cellWidth: 32, halign: 'right' } },
     didParseCell: c => { if (c.section === 'head' && c.column.index === 3) c.cell.styles.halign = 'right'; if (c.section === 'head' && c.column.index === 0) c.cell.styles.halign = 'center'; },
   });

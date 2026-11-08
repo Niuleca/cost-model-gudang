@@ -91,6 +91,12 @@ export default function QuotationPanel({ tender, profile, sumber }: { tender: Te
       catatan: `Minimum ${r.volumeKomitmen.toLocaleString('id-ID')} ${r.uom}/bulan` }));
     for (const alt of h.storageAlternatif.slice(1))
       rate.push({ layanan: 'Storage (alternatif)', satuan: `per ${alt.uom} per bulan`, tarif: alt.tarif, catatan: 'Pilih salah satu basis storage' });
+    // Layanan utama yang tidak ditagih terpisah
+    for (const x of h.layananTermasuk ?? [])
+      rate.push({ layanan: BUCKET_LABEL[x.bucket], satuan: 'termasuk', tarif: 0, catatan: `Termasuk dalam tarif ${x.ke.map(k => BUCKET_LABEL[k]).join(' & ')}` });
+    // Tarif tambahan (additional charges) — ditagih sesuai pemakaian
+    for (const x of h.tarifTambahan?.items ?? []) if (x.nama && x.tarifPerUnit > 0)
+      rate.push({ layanan: x.nama, satuan: x.satuan, tarif: inclPpn ? x.tarifInclPpn : x.tarifPerUnit, catatan: x.catatan || 'Tarif tambahan — ditagih sesuai pemakaian' });
     const sekali = ringkasIt(tender.asumsi.it ?? IT_SHEET_DEFAULT).tagihSekali;
     return { rate, sekali };
   }
@@ -257,7 +263,7 @@ export default function QuotationPanel({ tender, profile, sumber }: { tender: Te
               <tr key={i}>
                 <td><input aria-label="Layanan" value={r.layanan} onChange={e => ubahRate(i, { layanan: e.target.value })} /></td>
                 <td><input aria-label="Satuan" value={r.satuan} onChange={e => ubahRate(i, { satuan: e.target.value })} /></td>
-                <td className="num out">{rp(r.tarif)}</td>
+                <td className="num out">{r.tarif > 0 ? rp(r.tarif) : "Termasuk"}</td>
                 <td><input aria-label="Keterangan" value={r.catatan ?? ''} onChange={e => ubahRate(i, { catatan: e.target.value })} /></td>
                 <td><button className="danger" onClick={() => setDraft({ ...draft, rate_card: draft.rate_card.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}</tbody></table></div>

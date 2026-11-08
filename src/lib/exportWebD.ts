@@ -129,7 +129,7 @@ export function tulisHasil(x: Ctx) {
   HS.r++;
   HS.h3('Biaya per layanan & kategori risiko (dasar rate card)');
   HS.note('Σ biaya × alokasi % per layanan (Rincian biaya, kolom alokasi). Manajemen (biaya tetap) disebar ke layanan operasional sesuai porsi biayanya.');
-  HS.hdr(['Layanan', 'Rendah', 'Sedang', 'Tinggi', 'Total', 'Porsi ops', '+Man R', '+Man S', '+Man T', 'Rendah ef.', 'Sedang ef.', 'Tinggi ef.', 'Biaya/bln']);
+  HS.hdr(['Layanan', 'Rendah', 'Sedang', 'Tinggi', 'Total', 'Porsi ops', '+Man R', '+Man S', '+Man T', 'Rendah ef.', 'Sedang ef.', 'Tinggi ef.', 'Biaya/bln', ['Dijual?', true, 'Tidak = termasuk di layanan lain: biayanya dipindah ke layanan yang dijual, proporsional biaya'], 'Rendah final', 'Sedang final', 'Tinggi final', ['Biaya final/bln', false, 'Dasar rate card']]);
   const bk0 = HS.r;
   const bkRow: Record<string, number> = {};
   for (const [i, b] of BUCKETS.entries()) {
@@ -145,7 +145,12 @@ export function tulisHasil(x: Ctx) {
     if (b === 'manajemen') { for (let c = 6; c <= 13; c++) HS.put(c, '', { j: 'out' }, r); continue; }
     HS.put(6, { f: `IF(${opsTot}>0,E${r}/${opsTot},0)` }, { j: 'out', fmt: 'pct' }, r);
     RISK.forEach((_, j) => { HS.put(7 + j, { f: `${R(2 + j, bkRow.manajemen)}*F${r}` }, { j: 'out', fmt: 'rp' }, r); HS.put(10 + j, { f: `${R(2 + j, r)}+${R(7 + j, r)}` }, { j: 'out', fmt: 'rp' }, r); });
-    HS.put(13, { f: `SUM(J${r}:L${r})`, v: rcList.find(z => z.bucket === b)?.biayaBulan }, { j: 'out', fmt: 'rp', b: true }, r);
+    HS.put(13, { f: `SUM(J${r}:L${r})` }, { j: 'out', fmt: 'rp' }, r);
+    HS.put(14, a.layananJual?.[b] === 'termasuk' ? 'Tidak' : 'Ya', { j: 'in', al: 'center' }, r); HS.dd(14, 'L_YaTidak', true, r);
+    const nRg = `$N$${bk0}:$N$${bk0 + 3}`, mRg = `$M$${bk0}:$M$${bk0 + 3}`;
+    RISK.forEach((_, j) => { const c = String.fromCharCode(74 + j); // J/K/L
+      HS.put(15 + j, { f: `IF(N${r}="Ya",${c}${r}+IF(SUMPRODUCT((${nRg}="Ya")*${mRg})>0,SUMPRODUCT((${nRg}="Tidak")*$${c}$${bk0}:$${c}$${bk0 + 3})*M${r}/SUMPRODUCT((${nRg}="Ya")*${mRg}),0),0)` }, { j: 'out', fmt: 'rp' }, r); });
+    HS.put(18, { f: `SUM(O${r}:Q${r})`, v: rcList.find(z => z.bucket === b)?.biayaBulan }, { j: 'out', fmt: 'rp', b: true }, r);
   }
 
   // ===================== Opsi UoM tarif (dasar droplist "Satuan tarif")
@@ -193,11 +198,11 @@ export function tulisHasil(x: Ctx) {
     HS.put(1, LAYANAN[b], { j: 'txt', b: true });
     HS.put(2, rc.uom, { j: 'in' }); HS.dd(2, `$B$${o.r0}:$B$${o.r1}`);
     HS.put(3, { f: `INDEX($C$${o.r0}:$C$${o.r1},${idx})`, v: rc.volumeTarif }, { j: 'out', fmt: 'n2' });
-    HS.put(4, { f: `M${br}`, v: rc.biayaBulan }, { j: 'out', fmt: 'rp' });
+    HS.put(4, { f: `R${br}`, v: rc.biayaBulan }, { j: 'out', fmt: 'rp' });
     HS.put(5, { f: `IF(C${r}>0,D${r}/C${r},0)`, v: rc.biayaPerUnit }, { j: 'out', fmt: 'rp' });
     const mm = a.marginManual?.[b];
     HS.put(6, mm != null && Number.isFinite(mm) ? Number(mm) : null, { j: 'in', fmt: 'pct' });
-    HS.put(16, { f: `J${br}*(1+MRendah)+K${br}*(1+MSedang)+L${br}*(1+MTinggi)` }, { j: 'out', fmt: 'rp' });
+    HS.put(16, { f: `O${br}*(1+MRendah)+P${br}*(1+MSedang)+Q${br}*(1+MTinggi)` }, { j: 'out', fmt: 'rp' });
     HS.put(7, { f: `IF(P${r}>0,1-D${r}/P${r},0)`, v: rc.gpDefault }, { j: 'out', fmt: 'pct' });
     HS.put(8, { f: `IF(F${r}="",P${r},D${r}/(1-MIN(0.95,F${r})))`, v: rc.hargaSebelumPph }, { j: 'out', fmt: 'rp' });
     HS.put(9, { f: `H${r}/(1-GrossUp)`, v: rc.hargaBulan }, { j: 'out', fmt: 'rp' });
@@ -209,7 +214,7 @@ export function tulisHasil(x: Ctx) {
     HS.put(15, { f: `IF(AND(Km_${k}>0,N(N${r})=0),C${r}/Km_${k},1)` }, { j: 'out', fmt: 'x' });
     HS.put(17, { f: `IF(H${r}>0,1-D${r}/H${r},0)`, v: rc.gpPersen }, { j: 'out', fmt: 'pct' });
     x.rcRefCA = rcRef;
-    rcRef[b] = { uom: `${SN}B${r}`, vol: `${SN}C${r}`, tarif: `${SN}J${r}`, incl: `${SN}L${r}`, gp: `${SN}Q${r}`, bpu: `${SN}E${r}`, quote: `${SN}M${r}`, harga: `${SN}I${r}`, tetap: `${SN}N${r}`, rasio: `${SN}O${r}` };
+    rcRef[b] = { biaya: `${SN}D${r}`, uom: `${SN}B${r}`, vol: `${SN}C${r}`, tarif: `${SN}J${r}`, incl: `${SN}L${r}`, gp: `${SN}Q${r}`, bpu: `${SN}E${r}`, quote: `${SN}M${r}`, harga: `${SN}I${r}`, tetap: `${SN}N${r}`, rasio: `${SN}O${r}` };
     HS.r++;
   }
   const rc1 = HS.r - 1;
@@ -217,7 +222,7 @@ export function tulisHasil(x: Ctx) {
   HS.put(1, 'Total (gabungan semua layanan)', { j: 'sub' }); HS.put(2, '', { j: 'sub' }); HS.put(3, '', { j: 'sub' });
   HS.put(4, { f: `SUM(D${rc0}:D${rc1})`, v: mt.biayaBulan }, { j: 'sub', fmt: 'rp' }); HS.put(5, '', { j: 'sub' }); HS.put(6, '', { j: 'sub' }); HS.put(7, '', { j: 'sub' });
   HS.put(8, { f: `SUM(H${rc0}:H${rc1})`, v: mt.hargaSebelumPph }, { j: 'sub', fmt: 'rp' }); HS.put(9, { f: `SUM(I${rc0}:I${rc1})`, v: mt.hargaBulan }, { j: 'sub', fmt: 'rp' });
-  HS.put(17, { f: `IF(H${HS.r}>0,1-D${HS.r}/H${HS.r},0)`, v: mt.gpPersen }, { j: 'sub', fmt: 'pct' });
+  HS.put(17, { f: `IF(H${HS.r}>0,1-D${HS.r}/H${HS.r},0)`, v: mt.gpPersen }, { j: 'sub', fmt: 'pct' }); HS.nm('RcGpTotal', 17);
   HS.r++;
   HS.note('Kolom tebal "Tarif quotation" = tarif yang dipakai di quotation (excl./incl. PPN sesuai pilihan PPN). Satuan tarif: pilih dari opsi di atas.');
   const st = rcList.find(z => z.bucket === 'storage');
@@ -227,6 +232,50 @@ export function tulisHasil(x: Ctx) {
     HS.field('Storage alternatif · per kg', { f: `IF(StokTon>0,${fRoundup(`${hg}/(StokTon*1000)`)},"")` }, 'rp', 'out', 'Rp/kg/bln');
     HS.field('Storage alternatif · per CBM', { f: `IF(StokCbm>0,${fRoundup(`${hg}/StokCbm`)},"")` }, 'rp', 'out', 'Rp/CBM/bln');
     HS.field('Storage alternatif · per liter', { f: `IF(StokLiter>0,${fRoundup(`${hg}/StokLiter`)},"")` }, 'rp', 'out', 'Rp/liter/bln');
+  }
+
+  // ===================== Tarif tambahan (additional charges)
+  {
+    const tt = h.tarifTambahan;
+    HS.r++;
+    HS.h3('Tarif tambahan (additional charges)');
+    HS.note('Ditagih sesuai pemakaian; tidak mengubah biaya & GP rate card utama. Turunan = biaya layanan ÷ volume satuan lain; Aktivitas = menit ÷ 60 × (orang × tarif orang/jam × pengali + alat × tarif alat/jam) + material; Manual = biaya diisi.');
+    HS.field('Tarif orang per jam', { f: 'IFERROR(SUMIFS(Rinci_Biaya,Rinci_Kel,"Manpower")/TotalHeadcount/JamMP,0)', v: tt?.tarifJamOrang }, 'rp', 'out', 'Rp/jam', 'biaya manpower ÷ headcount ÷ jam kerja/bln', 'TT_JamOrang');
+    HS.field('Tarif alat (MHE) per jam', { f: 'IFERROR(SUMIFS(Rinci_Biaya,Rinci_Kel,"MHE")/SUMPRODUCT((MheHarga_Biaya>0)*MheHarga_Unit)/JamMHE,0)', v: tt?.tarifJamAlat }, 'rp', 'out', 'Rp/jam', 'biaya MHE ÷ unit ÷ jam MHE/bln', 'TT_JamAlat');
+    HS.hdr([['Layanan tambahan', true], ['Satuan', true], ['Dasar biaya', true, 'turunan / aktivitas / manual'], ['Layanan dasar', true, 'Untuk turunan: Storage / Handling In / Handling Out / VAS'], ['UoM dasar', true],
+      ['Menit/unit', true], ['Orang', true], ['Pakai alat', true], ['Pengali', true], ['Material/unit', true], ['Biaya manual', true], 'Biaya/unit', ['GP% (input)', true, 'Kosong = default (turunan: GP layanan dasar; lainnya: GP total rate card)'],
+      'GP dipakai', 'Harga sblm PPh', 'Tarif excl. PPN', 'Tarif incl. PPN', ['Est. vol/bln', true], 'Est. pendapatan/bln', 'Est. GP/bln']);
+    const t0 = HS.r;
+    const LBL: Record<string, string> = { storage: 'Storage', handling_in: 'Handling In', handling_out: 'Handling Out', vas: 'VAS' };
+    const items = [...(a.tarifTambahan ?? []), null, null, null];
+    for (const it of items) {
+      const r = HS.r, c = it ? tt?.items.find(z => z.id === it.id) : undefined;
+      HS.put(1, it?.nama ?? null, { j: 'in' }); HS.put(2, it?.satuan ?? null, { j: 'in' });
+      HS.put(3, it?.dasar ?? null, { j: 'in', al: 'center' }); HS.dd(3, '"turunan,aktivitas,manual"', true, r);
+      HS.put(4, it?.bucket ? LBL[it.bucket] : null, { j: 'in' }); HS.dd(4, '"Storage,Handling In,Handling Out,VAS"', true, r);
+      HS.put(5, it?.dasar === 'turunan' ? (it.uom ?? null) : null, { j: 'in' });
+      HS.put(6, it?.menit ?? null, { j: 'in', fmt: 'n2' }); HS.put(7, it ? (it.orang ?? (it.dasar === 'aktivitas' ? 1 : null)) : null, { j: 'in', fmt: 'n1' });
+      HS.put(8, it ? (it.alat ? 'Ya' : 'Tidak') : null, { j: 'in', al: 'center' }); HS.dd(8, 'L_YaTidak', true, r);
+      HS.put(9, it?.pengali ?? null, { j: 'in', fmt: 'n2' }); HS.put(10, it?.material ?? null, { j: 'in', fmt: 'rp' }); HS.put(11, it?.biaya ?? null, { j: 'in', fmt: 'rp' });
+      // turunan: biaya layanan (rate card) ÷ volume satuan pilihan (tabel opsi satuan)
+      const tur = rcList.map(rc => { const o = opsi[rc.bucket], z = rcRef[rc.bucket];
+        return `IF(D${r}=${q(LBL[rc.bucket])},IFERROR(${z.biaya}/INDEX($C$${o.r0}:$C$${o.r1},MATCH(LOWER(E${r}),$F$${o.r0}:$F$${o.r1},0)),0),`; }).join('') + '0' + ')'.repeat(rcList.length);
+      HS.put(12, { f: `IF(C${r}="turunan",${tur},IF(C${r}="aktivitas",N(F${r})/60*(IF(G${r}="",1,N(G${r}))*TT_JamOrang*IF(N(I${r})>0,I${r},1)+IF(H${r}="Ya",TT_JamAlat,0))+N(J${r}),IF(C${r}="manual",N(K${r}),0)))`, v: c?.biayaPerUnit }, { j: 'out', fmt: 'rp' });
+      HS.put(13, it?.gp ?? null, { j: 'in', fmt: 'pct' });
+      const gpTur = rcList.map(rc => `IF(D${r}=${q(LBL[rc.bucket])},${rcRef[rc.bucket].gp},`).join('') + 'RcGpTotal' + ')'.repeat(rcList.length);
+      HS.put(14, { f: `IF(M${r}<>"",MIN(0.95,M${r}),IF(C${r}="turunan",${gpTur},RcGpTotal))`, v: c?.gpDipakai }, { j: 'out', fmt: 'pct' });
+      HS.put(15, { f: `IF(N${r}<1,L${r}/(1-N${r}),0)` }, { j: 'out', fmt: 'rp' });
+      HS.put(16, { f: `IF(L${r}>0,${fRoundup(`O${r}/(1-GrossUp)`)},0)`, v: c?.tarifPerUnit }, { j: 'out', fmt: 'rp', b: true });
+      HS.put(17, { f: fRoundup(`P${r}*(1+PPN)`), v: c?.tarifInclPpn }, { j: 'out', fmt: 'rp' });
+      HS.put(18, it?.volumeBulan ?? null, { j: 'in', fmt: 'n0' });
+      HS.put(19, { f: `P${r}*N(R${r})*(1-PPh)`, v: c?.pendapatanBulan }, { j: 'out', fmt: 'rp' });
+      HS.put(20, { f: `S${r}-L${r}*N(R${r})`, v: c?.gpBulan }, { j: 'out', fmt: 'rp' });
+      HS.r++;
+    }
+    HS.nmR('TT_Nama', 1, t0, HS.r - 1); HS.nmR('TT_Satuan', 2, t0, HS.r - 1); HS.nmR('TT_TarifX', 16, t0, HS.r - 1); HS.nmR('TT_TarifI', 17, t0, HS.r - 1);
+    HS.put(1, 'Potensi pendapatan tambahan / bln (di luar simulasi utama)', { j: 'sub' });
+    HS.put(19, { f: `SUM(S${t0}:S${HS.r - 1})` }, { j: 'sub', fmt: 'rp' }); HS.put(20, { f: `SUM(T${t0}:T${HS.r - 1})` }, { j: 'sub', fmt: 'rp' }); HS.r++;
+    x.ttRows = { t0, t1: HS.r - 2 };
   }
 
   // ===================== Simulasi
@@ -411,6 +460,21 @@ export function tulisQuotation(x: Ctx) {
     QU.put(1, LAYANAN[rc.bucket], { j: 'txt', b: true }); QU.put(2, { f: sat[rc.bucket].replace('{u}', z.uom) }, { j: 'out' });
     QU.put(3, { f: z.quote, v: rc.tarifQuote }, { j: 'out', fmt: 'rp', b: true }); QU.put(4, { f: `"volume minimum "&FIXED(${z.vol},0)&" "&${z.uom}&" / bln"` }, { j: 'txt', size: 9 });
     QU.r++;
+  }
+  for (const tb of h.layananTermasuk ?? []) {
+    QU.put(1, LAYANAN[tb.bucket], { j: 'txt', b: true }); QU.put(2, 'termasuk', { j: 'out' }); QU.put(3, 'Termasuk', { j: 'out', al: 'right' });
+    QU.put(4, `Termasuk dalam tarif ${tb.ke.map(k => LAYANAN[k]).join(' & ')}`, { j: 'txt', size: 9 }); QU.r++;
+  }
+  const tr = x.ttRows as { t0: number; t1: number } | undefined;
+  if (tr) {
+    const HSN2 = `'${x.HS.nama}'!`;
+    QU.put(1, 'Tarif tambahan (ditagih sesuai pemakaian)', { j: 'sub' }); QU.put(2, '', { j: 'sub' }); QU.put(3, '', { j: 'sub' }); QU.put(4, '', { j: 'sub' }); QU.r++;
+    for (let rr = tr.t0; rr <= tr.t1; rr++) {
+      const c = h.tarifTambahan?.items[rr - tr.t0];
+      QU.put(1, { f: `IF(${HSN2}P${rr}>0,${HSN2}A${rr},"")`, v: c?.nama }, { j: 'out' }); QU.put(2, { f: `IF(${HSN2}P${rr}>0,${HSN2}B${rr},"")`, v: c?.satuan }, { j: 'out' });
+      QU.put(3, { f: `IF(${HSN2}P${rr}>0,IF(LEFT(PpnMode,7)="Include",${HSN2}Q${rr},${HSN2}P${rr}),"")`, v: c?.tarifQuote }, { j: 'out', fmt: 'rp', b: true });
+      QU.put(4, { f: `IF(${HSN2}P${rr}>0,"Tarif tambahan — sesuai pemakaian","")` }, { j: 'txt', size: 9 }); QU.r++;
+    }
   }
   QU.r++;
   QU.h3('Tagihan sekali (ditagih terpisah)');

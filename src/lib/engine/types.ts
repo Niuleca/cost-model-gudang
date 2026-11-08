@@ -176,6 +176,10 @@ export interface TenderInput {
   pajak?: { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number };
   /** Margin (markup atas biaya) per layanan, diinput user. Kosong = margin default per kategori risiko (master Finance). */
   marginManual?: Partial<Record<Bucket, number | null>>;
+  /** Layanan utama yang dijual; 'termasuk' = tidak ditagih terpisah, biayanya dipindah ke layanan lain yang dijual (proporsional biaya). */
+  layananJual?: Partial<Record<Bucket, 'jual' | 'termasuk'>>;
+  /** Tarif tambahan / additional charges (per karton, per pcs, movement, VAS, lembur, dll.) — tidak mengubah biaya & rate card utama. */
+  tarifTambahan?: TarifTambahanInput[];
   /** Matriks pembagian biaya per kategori (Fasilitas, Manpower, MHE, …) ke layanan; kategori yang diisi menggantikan alokasi per baris. Pecahan, total 1. */
   alokasiKategori?: Partial<Record<string, Partial<Record<Bucket, number>> | null>>;
   /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */
@@ -273,4 +277,13 @@ export interface InterestCost {
   items: InterestItem[];
   /** Ikutkan bunga working capital (payment term customer > AP hari) — default tidak. */
   workingCapital?: boolean;
+}
+
+/** Satu baris tarif tambahan. Dasar biaya: turunan = biaya layanan utama dalam satuan lain (mis. handling in per karton);
+ *  aktivitas = menit per unit × (orang × tarif/jam × pengali + alat × tarif/jam) + material; manual = biaya per unit diisi. */
+export interface TarifTambahanInput {
+  id: string; nama: string; satuan: string; dasar: 'turunan' | 'aktivitas' | 'manual';
+  bucket?: Bucket; uom?: string;
+  menit?: number; orang?: number; alat?: boolean; pengali?: number; material?: number;
+  biaya?: number; gp?: number | null; volumeBulan?: number; catatan?: string;
 }
