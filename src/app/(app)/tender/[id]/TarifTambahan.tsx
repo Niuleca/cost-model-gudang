@@ -5,7 +5,19 @@ import { rp, persen, BUCKET_LABEL } from '@/lib/format';
 
 type Jual = Partial<Record<Bucket, 'jual' | 'termasuk'>>;
 const OPS: Bucket[] = ['storage', 'handling_in', 'handling_out', 'vas'];
-const SATUAN = ['per karton', 'per pcs', 'per palet', 'per movement', 'per jam', 'per jam per orang', 'per DO', 'per dokumen', 'per label', 'per m²', 'per CBM', 'per kg', 'per order', 'per kontainer', 'per truk'];
+const SATUAN = ['per karton', 'per pcs', 'per palet', 'per container', 'per container 20ft', 'per container 40ft', 'per event', 'per movement', 'per jam', 'per jam per orang',
+  'per hari', 'per shipment', 'per DO', 'per order', 'per dokumen', 'per label', 'per SKU', 'per truk', 'per trip', 'per m²', 'per CBM', 'per kg', 'per ton', 'per bulan'];
+const KETIK = '__ketik__';
+
+/** Satuan: pilih dari daftar, atau "✎ ketik sendiri" untuk satuan bebas. */
+function PilihSatuan({ nilai, set }: { nilai: string; set: (v: string) => void }) {
+  const bebas = !!nilai && !SATUAN.includes(nilai) || nilai === '';
+  return <span style={{ display: 'grid', gap: 4 }}>
+    <select aria-label="Satuan" value={bebas ? KETIK : nilai} onChange={e => set(e.target.value === KETIK ? '' : e.target.value)} style={{ width: 150, minWidth: 150 }}>
+      {SATUAN.map(x => <option key={x} value={x}>{x}</option>)}<option value={KETIK}>✎ ketik sendiri…</option></select>
+    {bebas && <input aria-label="Satuan manual" value={nilai} placeholder="mis. per pallet-day" onChange={e => set(e.target.value)} style={{ width: 150, minWidth: 150 }} autoFocus={nilai === ''} />}
+  </span>;
+}
 const uid = () => `tt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** Layanan utama yang dijual terpisah atau "termasuk" (biayanya dipindah ke layanan lain). */
@@ -48,6 +60,11 @@ const PRESET: Preset[] = [
   { label: 'Cross-docking', buat: () => ({ nama: 'Cross-docking', satuan: 'per palet', dasar: 'aktivitas', menit: 6, orang: 1, alat: true }) },
   { label: 'Lembur / overtime', buat: () => ({ nama: 'Lembur (overtime) di luar jam operasional', satuan: 'per jam per orang', dasar: 'aktivitas', menit: 60, orang: 1, pengali: 1.5 }) },
   { label: 'Admin dokumen tambahan', buat: () => ({ nama: 'Admin dokumen tambahan', satuan: 'per dokumen', dasar: 'aktivitas', menit: 5, orang: 1 }) },
+  { label: 'Unloading per container 20ft', buat: () => ({ nama: 'Unloading container 20ft (curah / loose)', satuan: 'per container 20ft', dasar: 'aktivitas', menit: 60, orang: 4 }) },
+  { label: 'Unloading per container 40ft', buat: () => ({ nama: 'Unloading container 40ft / 40HC (curah / loose)', satuan: 'per container 40ft', dasar: 'aktivitas', menit: 120, orang: 4 }) },
+  { label: 'Stuffing per container', buat: () => ({ nama: 'Stuffing / loading container', satuan: 'per container', dasar: 'aktivitas', menit: 90, orang: 4, alat: true }) },
+  { label: 'Per event (stock opname, dll.)', buat: () => ({ nama: 'Stock opname tambahan / event khusus', satuan: 'per event', dasar: 'aktivitas', menit: 480, orang: 4 }) },
+  { label: 'Tarif manual (isi harga sendiri)', buat: () => ({ nama: '', satuan: '', dasar: 'tarif', tarif: 0 }) },
 ];
 
 const num = (v: string) => (v === '' ? undefined : Number(v));
@@ -77,9 +94,9 @@ export function TarifTambahan({ h, nilai, onUbah, ppnInclude }: { h: HasilTender
         const c = hit(x.id);
         return <tr key={x.id}>
           <td><input aria-label="Nama layanan tambahan" value={x.nama} placeholder="mis. Handling in per karton" onChange={e => ubah(x.id, { nama: e.target.value })} style={{ minWidth: 200 }} /></td>
-          <td><input aria-label="Satuan" list="satuan-tambahan" value={x.satuan} onChange={e => ubah(x.id, { satuan: e.target.value })} style={{ width: 130, minWidth: 130 }} /></td>
+          <td><PilihSatuan nilai={x.satuan} set={v => ubah(x.id, { satuan: v })} /></td>
           <td><select aria-label="Dasar biaya" value={x.dasar} onChange={e => ubah(x.id, { dasar: e.target.value as TarifTambahanInput['dasar'] })}>
-            <option value="turunan">Turunan layanan utama</option><option value="aktivitas">Aktivitas (menit × orang/alat)</option><option value="manual">Biaya manual</option></select></td>
+            <option value="turunan">Turunan layanan utama</option><option value="aktivitas">Aktivitas (menit × orang/alat)</option><option value="manual">Biaya manual (+ GP%)</option><option value="tarif">Tarif manual (isi harga jual)</option></select></td>
           <td className="small">
             {x.dasar === 'turunan' && <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
               <select aria-label="Layanan dasar" value={x.bucket ?? ''} onChange={e => ubah(x.id, { bucket: e.target.value as Bucket, uom: undefined })}>
@@ -93,11 +110,15 @@ export function TarifTambahan({ h, nilai, onUbah, ppnInclude }: { h: HasilTender
               <label className="row" style={{ gap: 2 }}><input type="checkbox" style={{ width: 'auto' }} checked={!!x.alat} onChange={e => ubah(x.id, { alat: e.target.checked })} />alat</label>
               <label>material Rp <input aria-label="Material per unit" type="number" value={x.material ?? ''} onChange={e => ubah(x.id, { material: num(e.target.value) })} {...inp(80)} /></label></span>}
             {x.dasar === 'manual' && <label>Rp <input aria-label="Biaya per unit" type="number" value={x.biaya ?? ''} onChange={e => ubah(x.id, { biaya: num(e.target.value) })} {...inp(100)} /> /unit</label>}
+            {x.dasar === 'tarif' && <span className="row" style={{ gap: 4 }}>
+              <label>tarif Rp <input aria-label="Tarif manual excl PPN" type="number" value={x.tarif ?? ''} onChange={e => ubah(x.id, { tarif: num(e.target.value) })} {...inp(110)} /></label>
+              <label>biaya Rp <input aria-label="Biaya per unit (opsional)" type="number" value={x.biaya ?? ''} placeholder="opsional" onChange={e => ubah(x.id, { biaya: num(e.target.value) })} {...inp(100)} /></label></span>}
             {c?.dasarTeks && <div className="dasar-def">{c.dasarTeks}</div>}</td>
           <td className="num">{c ? rp(c.biayaPerUnit) : '…'}</td>
-          <td className="num"><input aria-label="GP tarif tambahan" type="number" step="0.1" value={x.gp == null ? '' : Math.round(x.gp * 1000) / 10}
+          <td className="num">{x.dasar === 'tarif' ? <>{c && c.biayaPerUnit > 0 ? persen(c.gpDipakai) : '—'}<div className="dasar-def">dari tarif</div></> : <>
+            <input aria-label="GP tarif tambahan" type="number" step="0.1" value={x.gp == null ? '' : Math.round(x.gp * 1000) / 10}
             placeholder={c ? String(Math.round(c.gpDipakai * 1000) / 10) : ''} onChange={e => ubah(x.id, { gp: e.target.value === '' ? null : Number(e.target.value) / 100 })} {...inp(64)} />%
-            {x.gp == null && <div className="dasar-def">default</div>}</td>
+            {x.gp == null && <div className="dasar-def">default</div>}</>}</td>
           <td className={`num${ppnInclude ? '' : ' out'}`}><b>{c ? rp(c.tarifPerUnit) : '…'}</b></td>
           <td className={`num${ppnInclude ? ' out' : ''}`}>{c ? rp(c.tarifInclPpn) : '…'}</td>
           <td className="num"><input aria-label="Estimasi volume per bulan" type="number" value={x.volumeBulan ?? ''} onChange={e => ubah(x.id, { volumeBulan: num(e.target.value) })} {...inp(80)} /></td>
@@ -107,8 +128,7 @@ export function TarifTambahan({ h, nilai, onUbah, ppnInclude }: { h: HasilTender
       })}</tbody>
       {totPend > 0 && <tfoot><tr><td colSpan={9}><b>Potensi pendapatan tambahan / bln</b> <span className="small muted">(di luar simulasi utama)</span></td><td className="num"><b>{rp(totPend)}</b><div className="dasar-def">GP {rp(totGp)} · {persen(totPend > 0 ? totGp / totPend : 0)}</div></td><td /></tr></tfoot>}
     </table></div>}
-    <datalist id="satuan-tambahan">{SATUAN.map(s => <option key={s} value={s} />)}</datalist>
-    <p className="small muted" style={{ margin: 0 }}>Turunan = biaya layanan utama dibagi volume dalam satuan lain (sama dengan opsi satuan rate card), GP default = GP layanan itu. Aktivitas = menit/unit ÷ 60 × (orang × tarif orang/jam × pengali + tarif alat/jam bila pakai alat) + material; GP default = GP total rate card.
+    <p className="small muted" style={{ margin: 0 }}>Turunan = biaya layanan utama dibagi volume dalam satuan lain (sama dengan opsi satuan rate card), GP default = GP layanan itu. Aktivitas = menit/unit ÷ 60 × (orang × tarif orang/jam × pengali + tarif alat/jam bila pakai alat) + material; GP default = GP total rate card. Tarif manual = harga jual diisi langsung (isi biaya bila ingin melihat GP). Satuan bisa dipilih atau diketik sendiri (✎).
       {' '}Tarif = biaya ÷ (1 − GP%) {h.pajak?.pphPersen ? `÷ (1 − PPh ${(h.pajak.pphPersen * 100).toFixed(0)}%) bila PPh exclude` : ''}, dibulatkan ke atas.</p>
   </div>;
 }

@@ -280,9 +280,12 @@ export interface InterestCost {
 }
 
 /** Satu baris tarif tambahan. Dasar biaya: turunan = biaya layanan utama dalam satuan lain (mis. handling in per karton);
- *  aktivitas = menit per unit × (orang × tarif/jam × pengali + alat × tarif/jam) + material; manual = biaya per unit diisi. */
+ *  aktivitas = menit per unit × (orang × tarif/jam × pengali + alat × tarif/jam) + material; manual = biaya per unit diisi;
+ *  tarif = harga jual diisi langsung (biaya opsional, untuk melihat GP). */
 export interface TarifTambahanInput {
-  id: string; nama: string; satuan: string; dasar: 'turunan' | 'aktivitas' | 'manual';
+  id: string; nama: string; satuan: string; dasar: 'turunan' | 'aktivitas' | 'manual' | 'tarif';
+  /** dasar 'tarif': harga jual langsung (excl. PPN) per unit */
+  tarif?: number;
   bucket?: Bucket; uom?: string;
   menit?: number; orang?: number; alat?: boolean; pengali?: number; material?: number;
   biaya?: number; gp?: number | null; volumeBulan?: number; catatan?: string;
