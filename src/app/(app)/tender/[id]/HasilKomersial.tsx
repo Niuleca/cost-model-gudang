@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import type { HasilTender, Bucket } from '@/lib/engine/index.ts';
 import { rp, angka, persen, BUCKET_LABEL } from '@/lib/format';
 import type { TarifTambahanInput } from '@/lib/engine/index.ts';
-import { LayananDijual, TarifTambahan } from './TarifTambahan';
+import { LayananDijual, BarisTambahan } from './TarifTambahan';
 
 export interface Kurs { kode: string; rupiahPer: number; tanggal?: string }
 const MATA_UANG: { kode: string; nama: string }[] = [
@@ -122,7 +122,8 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
               <td className="num">{rp(r.ppnPerUnit ?? 0)}</td>
               <td className={`num${pajak.ppn === 'include' ? ' out' : ''}`}>{rp(r.tarifInclPpn ?? r.tarifPerUnit)}</td></tr>;
           })}
-          {mt && <tr className="pd-sub"><td colSpan={3}><b>Total (gabungan semua layanan)</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td><td></td>
+          {onTambahan && <BarisTambahan h={h} nilai={tambahan ?? []} onUbah={onTambahan} ppnInclude={pajak.ppn === 'include'} />}
+          {mt && <tr className="pd-sub"><td colSpan={3}><b>{tambahan?.length ? 'Total layanan utama' : 'Total (gabungan semua layanan)'}</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td><td></td>
             <td className="num"><b>{persen(mt.gpPersen ?? 0)}</b></td><td className="num"><b>{rp(mt.hargaBulan)}</b></td><td colSpan={3} className="small muted">kolom tebal = tarif yang dipakai di quotation ({pajak.ppn === 'include' ? 'incl.' : 'excl.'} PPN)</td></tr>}
         </tbody>
       </table></div>
@@ -141,7 +142,6 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       </table></div>
       <p className="small muted">Pendapatan = tarif sebelum PPN × volume, dikurangi PPh 23 {(pphPersen * 100).toFixed(1)}% (PPh {pajak.pph === 'exclude' ? 'ditanggung customer, sudah di-gross-up di tarif' : 'ditanggung kita → GP turun'}). Per tahun = per bulan × 12.</p>
     </div>
-    {onTambahan && <TarifTambahan h={h} nilai={tambahan ?? []} onUbah={onTambahan} ppnInclude={pajak.ppn === 'include'} />}
 
     <div className="card">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>

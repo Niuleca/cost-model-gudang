@@ -509,15 +509,19 @@ export function hitungTender(t: TenderInput, m: MasterData) {
         dasarTeks = `${menit} mnt × (${orang} org × Rp${bulat(tarifJamOrang).toLocaleString('id-ID')}/jam${peng !== 1 ? ` × ${peng}` : ''}${x.alat ? ` + alat Rp${bulat(tarifJamAlat).toLocaleString('id-ID')}/jam` : ''}) + material Rp${(Number(x.material) || 0).toLocaleString('id-ID')}`;
       } else if (x.dasar === 'tarif') { biayaPU = Math.max(0, Number(x.biaya) || 0); dasarTeks = 'tarif diisi manual' + (biayaPU > 0 ? '' : ' (isi biaya/unit bila ingin melihat GP)'); }
       else { biayaPU = Math.max(0, Number(x.biaya) || 0); dasarTeks = 'biaya per unit diisi manual'; }
-      const tarifManual = x.dasar === 'tarif' ? Math.max(0, Number(x.tarif) || 0) : 0;
-      const gp = x.dasar === 'tarif' ? (tarifManual > 0 && biayaPU > 0 ? 1 - biayaPU / (tarifManual * (1 - g)) : 0)
-        : x.gp != null && Number.isFinite(Number(x.gp)) ? Math.min(0.95, Number(x.gp)) : gpDef;
-      const hsp = x.dasar === 'tarif' ? tarifManual * (1 - g) : gp < 1 ? biayaPU / (1 - gp) : 0;
-      const tarifX = x.dasar === 'tarif' ? tarifManual : biayaPU > 0 ? roundupHarga(hsp / (1 - g)) : 0;
+      // Tarif diisi sendiri (dasar 'tarif', atau tarif override di dasar lain) → GP dihitung dari tarif
+      const tarifManual = Math.max(0, Number(x.tarif) || 0);
+      const pakaiTarif = x.dasar === 'tarif' || tarifManual > 0;
+      const gpHitung = gpDef;
+      const gpDefault = x.gp != null && Number.isFinite(Number(x.gp)) ? Math.min(0.95, Number(x.gp)) : gpHitung;
+      const tarifDefault = biayaPU > 0 && gpDefault < 1 ? roundupHarga(biayaPU / (1 - gpDefault) / (1 - g)) : 0;
+      const gp = pakaiTarif ? (tarifManual > 0 && biayaPU > 0 ? 1 - biayaPU / (tarifManual * (1 - g)) : 0) : gpDefault;
+      const hsp = pakaiTarif ? tarifManual * (1 - g) : gp < 1 ? biayaPU / (1 - gp) : 0;
+      const tarifX = pakaiTarif ? tarifManual : tarifDefault;
       const tarifI = roundupHarga(tarifX * (1 + ppn));
       const vol = Math.max(0, Number(x.volumeBulan) || 0);
       const pend = tarifX * vol * (1 - pphRate), bya = biayaPU * vol;
-      return { ...x, biayaPerUnit: bulat(biayaPU, 2), gpDipakai: bulat(gp, 4), gpManual: x.gp != null || x.dasar === 'tarif', dasarTeks, tarifPerUnit: tarifX, tarifInclPpn: tarifI, ppnPerUnit: tarifI - tarifX,
+      return { ...x, biayaPerUnit: bulat(biayaPU, 2), gpDipakai: bulat(gp, 4), gpManual: x.gp != null || pakaiTarif, tarifDiubah: pakaiTarif, tarifDefault, dasarTeks, tarifPerUnit: tarifX, tarifInclPpn: tarifI, ppnPerUnit: tarifI - tarifX,
         tarifQuote: pajak.ppn === 'include' ? tarifI : tarifX, pendapatanBulan: bulat(pend), biayaBulan: bulat(bya), gpBulan: bulat(pend - bya) };
     }),
   };

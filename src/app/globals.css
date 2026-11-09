@@ -683,3 +683,8 @@ table.tabel-aktual th { font-size: 11.5px; }
 .tabel-matriks tr.baris-ubah td:first-child { box-shadow: inset 3px 0 0 var(--warn, #b45309); }
 .tabel-matriks tfoot td { background: var(--g50, #fafafa); }
 tr.baris-otomatis td { background: var(--g50, #fafafa); }
+/* Rate card: baris layanan tambahan */
+tr.baris-sub-tt td { background: var(--g50, #f7f8fa); padding-top: 10px; }
+tr.baris-tt td { vertical-align: top; }
+tr.baris-tt-detail td { background: var(--g50, #f7f8fa); }
+tr.baris-tambah td { border-top: 1px dashed var(--line, #d6dbe3); }

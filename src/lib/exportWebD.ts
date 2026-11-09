@@ -251,7 +251,7 @@ export function tulisHasil(x: Ctx) {
     HS.field('Tarif alat (MHE) per jam', { f: 'IFERROR(SUMIFS(Rinci_Biaya,Rinci_Kel,"MHE")/SUMPRODUCT((MheHarga_Biaya>0)*MheHarga_Unit)/JamMHE,0)', v: tt?.tarifJamAlat }, 'rp', 'out', 'Rp/jam', 'biaya MHE ÷ unit ÷ jam MHE/bln', 'TT_JamAlat');
     HS.hdr([['Layanan tambahan', true], ['Satuan', true], ['Dasar biaya', true, 'turunan / aktivitas / manual'], ['Layanan dasar', true, 'Untuk turunan: Storage / Handling In / Handling Out / VAS'], ['UoM dasar', true],
       ['Menit/unit', true], ['Orang', true], ['Pakai alat', true], ['Pengali', true], ['Material/unit', true], ['Biaya manual', true, 'Dasar manual: biaya/unit · dasar tarif: biaya opsional untuk melihat GP'], 'Biaya/unit', ['GP% (input)', true, 'Kosong = default (turunan: GP layanan dasar; lainnya: GP total rate card). Dasar tarif: diabaikan'],
-      'GP dipakai', 'Harga sblm PPh', 'Tarif excl. PPN', 'Tarif incl. PPN', ['Est. vol/bln', true], 'Est. pendapatan/bln', 'Est. GP/bln', ['Tarif manual (excl. PPN)', true, 'Dasar tarif: harga jual diisi langsung']]);
+      'GP dipakai', 'Harga sblm PPh', 'Tarif excl. PPN', 'Tarif incl. PPN', ['Est. vol/bln', true], 'Est. pendapatan/bln', 'Est. GP/bln', ['Tarif diisi (excl. PPN)', true, 'Kosong = tarif default hasil hitungan; diisi = harga jual dipakai, GP dihitung dari tarif']]);
     const t0 = HS.r;
     const LBL: Record<string, string> = { storage: 'Storage', handling_in: 'Handling In', handling_out: 'Handling Out', vas: 'VAS' };
     const items = [...(a.tarifTambahan ?? []), null, null, null];
@@ -270,14 +270,14 @@ export function tulisHasil(x: Ctx) {
       HS.put(12, { f: `IF(C${r}="turunan",${tur},IF(C${r}="aktivitas",N(F${r})/60*(IF(G${r}="",1,N(G${r}))*TT_JamOrang*IF(N(I${r})>0,I${r},1)+IF(H${r}="Ya",TT_JamAlat,0))+N(J${r}),IF(OR(C${r}="manual",C${r}="tarif"),N(K${r}),0)))`, v: c?.biayaPerUnit }, { j: 'out', fmt: 'rp' });
       HS.put(13, it?.gp ?? null, { j: 'in', fmt: 'pct' });
       const gpTur = rcList.map(rc => `IF(D${r}=${q(LBL[rc.bucket])},${rcRef[rc.bucket].gp},`).join('') + 'RcGpTotal' + ')'.repeat(rcList.length);
-      HS.put(14, { f: `IF(C${r}="tarif",IF(AND(L${r}>0,N(U${r})>0),1-L${r}/(U${r}*(1-GrossUp)),0),IF(M${r}<>"",MIN(0.95,M${r}),IF(C${r}="turunan",${gpTur},RcGpTotal)))`, v: c?.gpDipakai }, { j: 'out', fmt: 'pct' });
-      HS.put(15, { f: `IF(C${r}="tarif",N(U${r})*(1-GrossUp),IF(N${r}<1,L${r}/(1-N${r}),0))` }, { j: 'out', fmt: 'rp' });
-      HS.put(16, { f: `IF(C${r}="tarif",N(U${r}),IF(L${r}>0,${fRoundup(`O${r}/(1-GrossUp)`)},0))`, v: c?.tarifPerUnit }, { j: 'out', fmt: 'rp', b: true });
+      HS.put(14, { f: `IF(OR(C${r}="tarif",N(U${r})>0),IF(AND(L${r}>0,N(U${r})>0),1-L${r}/(U${r}*(1-GrossUp)),0),IF(M${r}<>"",MIN(0.95,M${r}),IF(C${r}="turunan",${gpTur},RcGpTotal)))`, v: c?.gpDipakai }, { j: 'out', fmt: 'pct' });
+      HS.put(15, { f: `IF(OR(C${r}="tarif",N(U${r})>0),N(U${r})*(1-GrossUp),IF(N${r}<1,L${r}/(1-N${r}),0))` }, { j: 'out', fmt: 'rp' });
+      HS.put(16, { f: `IF(OR(C${r}="tarif",N(U${r})>0),N(U${r}),IF(L${r}>0,${fRoundup(`O${r}/(1-GrossUp)`)},0))`, v: c?.tarifPerUnit }, { j: 'out', fmt: 'rp', b: true });
       HS.put(17, { f: fRoundup(`P${r}*(1+PPN)`), v: c?.tarifInclPpn }, { j: 'out', fmt: 'rp' });
       HS.put(18, it?.volumeBulan ?? null, { j: 'in', fmt: 'n0' });
       HS.put(19, { f: `P${r}*N(R${r})*(1-PPh)`, v: c?.pendapatanBulan }, { j: 'out', fmt: 'rp' });
       HS.put(20, { f: `S${r}-L${r}*N(R${r})`, v: c?.gpBulan }, { j: 'out', fmt: 'rp' });
-      HS.put(21, it?.dasar === 'tarif' ? (it.tarif ?? 0) : null, { j: 'in', fmt: 'rp' });
+      HS.put(21, it?.dasar === 'tarif' || Number(it?.tarif) > 0 ? (it?.tarif ?? 0) : null, { j: 'in', fmt: 'rp' });
       HS.r++;
     }
     HS.nmR('TT_Nama', 1, t0, HS.r - 1); HS.nmR('TT_Satuan', 2, t0, HS.r - 1); HS.nmR('TT_TarifX', 16, t0, HS.r - 1); HS.nmR('TT_TarifI', 17, t0, HS.r - 1);

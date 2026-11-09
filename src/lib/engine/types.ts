@@ -286,7 +286,7 @@ export interface InterestCost {
  *  tarif = harga jual diisi langsung (biaya opsional, untuk melihat GP). */
 export interface TarifTambahanInput {
   id: string; nama: string; satuan: string; dasar: 'turunan' | 'aktivitas' | 'manual' | 'tarif';
-  /** dasar 'tarif': harga jual langsung (excl. PPN) per unit */
+  /** Harga jual (excl. PPN) per unit diisi sendiri — dasar 'tarif', atau menimpa tarif default hasil hitungan di dasar lain */
   tarif?: number;
   bucket?: Bucket; uom?: string;
   menit?: number; orang?: number; alat?: boolean; pengali?: number; material?: number;
