@@ -18,10 +18,11 @@ const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { s
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
 export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, layananJual, onLayananJual, tambahan, onTambahan }: {
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan }: {
   layananJual?: Partial<Record<Bucket, 'jual' | 'termasuk'>>; onLayananJual?: (x: Partial<Record<Bucket, 'jual' | 'termasuk'>>) => void;
   tambahan?: TarifTambahanInput[]; onTambahan?: (x: TarifTambahanInput[]) => void;
   uomRateCard?: Partial<Record<Bucket, string>>; onUomRateCard?: (u: Partial<Record<Bucket, string>>) => void;
+  uomManual?: Partial<Record<Bucket, { uom: string; volume: number }>>; onUomManual?: (u: Partial<Record<Bucket, { uom: string; volume: number }>>) => void;
   h: HasilTender; marginManual: Partial<Record<Bucket, number | null>>; onMargin: (m: Partial<Record<Bucket, number | null>>) => void;
   kurs: Kurs | null | undefined; onKurs: (k: Kurs | null) => void; kontrakBulan: number;
   pajak: Pajak; onPajak: (p: Pajak) => void;
@@ -80,16 +81,35 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
         <tbody>
           {h.rateCard.map(r => {
             const b = r.bucket as Bucket, v = marginManual[b];
+            const man = uomManual?.[b];
+            const pilihan = uomRateCard?.[b];
+            const manAktif = !!man && pilihan === man.uom;
+            const sama = (a2: string, c2: string) => a2.toLowerCase() === c2.toLowerCase();
             return <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td>{onUomRateCard
-                ? <select aria-label={`Satuan tarif ${BUCKET_LABEL[r.bucket]}`} value={r.uom} style={{ minWidth: 170 }}
-                    onChange={e => { const x = { ...(uomRateCard ?? {}) }; if (e.target.value === r.uomArus) delete x[b]; else x[b] = e.target.value; onUomRateCard(x); }}>
+                ? <><select aria-label={`Satuan tarif ${BUCKET_LABEL[r.bucket]}`} value={manAktif ? (man!.uom || '__ketik__') : r.uom} style={{ minWidth: 170 }}
+                    onChange={e => {
+                      const v = e.target.value, x = { ...(uomRateCard ?? {}) }, m = { ...(uomManual ?? {}) };
+                      const ada = (r.opsiUom ?? []).find(o => sama(o.uom, v) && o.dasar !== 'volume manual per bulan (diisi)');
+                      if (v === r.uomArus) delete x[b];
+                      else if (ada) x[b] = ada.uom;
+                      else { const nama = v === '__ketik__' ? '' : v; m[b] = { uom: nama, volume: man && sama(man.uom, nama) ? man.volume : 0 }; x[b] = nama; onUomManual?.(m); }
+                      onUomRateCard(x);
+                    }}>
                     {(() => {
-                      const ada = r.opsiUom ?? [];
-                      const sama = (a: string, c: string) => a.toLowerCase() === c.toLowerCase();
+                      const ada = (r.opsiUom ?? []).filter(o => o.dasar !== 'volume manual per bulan (diisi)');
                       const daftar = [...ada.map(o => o.uom), ...UOM_TARIF_STANDAR.filter(u => !ada.some(o => sama(o.uom, u)))];
-                      return daftar.map(u => { const o = ada.find(x => sama(x.uom, u));
-                        return <option key={u} value={o?.uom ?? u} disabled={!o}>per {u}{r.bucket === 'storage' ? '/bulan' : ''}{o ? ` · ${rp(o.tarifExcl)}` : ' — isi konversi dulu'}</option>; });
+                      if (man?.uom && !daftar.some(u => sama(u, man.uom))) daftar.push(man.uom);
+                      return [...daftar.map(u => { const o = ada.find(x2 => sama(x2.uom, u)); const om = man && sama(man.uom, u) ? r.opsiUom?.find(x2 => sama(x2.uom, u)) : undefined;
+                        return <option key={u} value={o?.uom ?? u}>per {u}{r.bucket === 'storage' ? '/bulan' : ''}{o ? ` · ${rp(o.tarifExcl)}` : om ? ` · ${rp(om.tarifExcl)} (manual)` : ' — isi volume'}</option>; }),
+                        <option key="__ketik__" value="__ketik__">✎ satuan lain (ketik)…</option>];
                     })()}</select>
+                  {manAktif && onUomManual && <div className="row small" style={{ gap: 4, marginTop: 4 }}>
+                    <input aria-label={`Nama satuan manual ${BUCKET_LABEL[r.bucket]}`} value={man!.uom} placeholder="nama satuan, mis. container" style={{ width: 130, minWidth: 130 }}
+                      onChange={e => { onUomManual({ ...(uomManual ?? {}), [b]: { uom: e.target.value, volume: man!.volume } }); onUomRateCard({ ...(uomRateCard ?? {}), [b]: e.target.value }); }} />
+                    <input aria-label={`Volume manual per bulan ${BUCKET_LABEL[r.bucket]}`} type="number" min={0} value={man!.volume || ''} placeholder="volume/bln" style={{ width: 90, minWidth: 90, textAlign: 'right' }}
+                      onChange={e => onUomManual({ ...(uomManual ?? {}), [b]: { uom: man!.uom, volume: Number(e.target.value) || 0 } })} />
+                    <span className="muted">/bln (komitmen)</span>
+                    {!(man!.volume > 0) && <span style={{ color: 'var(--warn)' }}>isi volume — sementara tarif per {r.uom}</span>}</div>}</>
                 : (r.bucket === 'storage' ? `${r.uom}/bulan` : r.uom)}
                 {r.opsiUom?.find(o => o.uom === r.uom)?.dasar && <div className="small muted">{r.opsiUom.find(o => o.uom === r.uom)!.dasar}</div>}</td>
               <td className="num">{angka(r.volumeKomitmen)}</td>

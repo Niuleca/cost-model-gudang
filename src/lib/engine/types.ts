@@ -192,6 +192,8 @@ export interface TenderInput {
   levelGaji?: Partial<Record<import('./biayaMp').LevelJabatan, number>>;
   /** UoM tarif per layanan di rate card (palet, case, pcs, CBM, ton, m²). Kosong = UoM volume arus. */
   uomRateCard?: Partial<Record<Bucket, string>>;
+  /** Satuan tarif manual per layanan (mis. container, event) + volume per bulan (komitmen) yang diisi sendiri. */
+  uomManual?: Partial<Record<Bucket, { uom: string; volume: number }>>;
   /** Revisi manual biaya/bln per baris rincian (kunci = deskripsi baris). */
   revisiBiaya?: Record<string, number>;
   interestCost?: InterestCost;

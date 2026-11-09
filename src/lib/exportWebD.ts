@@ -183,6 +183,13 @@ export function tulisHasil(x: Ctx) {
       if (r === r0) HS.put(6, { f: `IF(N(C${r})>0,LOWER(B${r}),"")` }, { j: 'out', size: 9 });
       HS.r++;
     }
+    { // satuan manual (container, event, dll.) — nama & volume per bulan diisi sendiri
+      const r = HS.r, m = (a.uomManual as Record<string, { uom: string; volume: number }> | undefined)?.[b];
+      HS.put(1, LAYANAN[b], { j: 'txt' }); HS.put(2, m?.uom || null, { j: 'in' }); HS.put(3, m?.uom ? (m.volume || 0) : null, { j: 'in', fmt: 'n2' });
+      HS.put(4, '"volume manual per bulan (diisi)" — isi nama satuan & volume', { j: 'txt', size: 9 }); HS.put(5, 0, { j: 'out', fmt: 'n0' });
+      HS.put(6, { f: `IF(AND(B${r}<>"",N(C${r})>0,COUNTIF(F$${r0}:F${r - 1},LOWER(TRIM(B${r})))=0),LOWER(TRIM(B${r})),"")` }, { j: 'out', size: 9 });
+      HS.r++;
+    }
     opsi[b] = { r0, r1: HS.r - 1 };
   }
 

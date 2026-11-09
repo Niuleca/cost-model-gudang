@@ -457,7 +457,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     const komitmen = v?.komitmenBulan ?? 0;
     if (biaya > 0 && komitmen <= 0) flags.push({ level: 'kritis', kode: 'KOMITMEN_NOL', pesan: `Biaya ${b} ada tetapi volume komitmen ${bucketKeArus[b]} = 0, tarif tidak bisa dihitung.` });
     // Opsi UoM tarif: volume komitmen dikonversi ke palet / case / pcs / CBM / ton (+ m² untuk storage)
-    const opsiUom = opsiUomRateCard(b, v, komitmen, space.totalM2, t.konversiPalet, { ton: t.stokTon, cbm: t.stokCbm, liter: t.stokLiter })
+    const opsiUom = opsiUomRateCard(b, v, komitmen, space.totalM2, t.konversiPalet, { ton: t.stokTon, cbm: t.stokCbm, liter: t.stokLiter }, t.uomManual?.[b])
       .map(o => ({ ...o, tarifExcl: o.volume > 0 ? roundupHarga(harga / o.volume) : 0 }));
     const dipilih = opsiUom.find(o => o.uom === t.uomRateCard?.[b]) ?? opsiUom[0];
     const volTarif = dipilih?.volume ?? komitmen;
@@ -593,7 +593,7 @@ export function biayaPerOrangDari(m: MasterData, j: JobLevel | undefined) {
 
 /** Opsi UoM untuk tarif layanan — volume per bulan dalam tiap UoM. */
 export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: string; per1: number; uom2: string; per2: number } } | undefined, komitmen: number,
-  luasM2: number, kp?: { cbmPerPalet: number; tonPerPalet: number }, stok?: { ton?: number; cbm?: number; liter?: number }) {
+  luasM2: number, kp?: { cbmPerPalet: number; tonPerPalet: number }, stok?: { ton?: number; cbm?: number; liter?: number }, manual?: { uom: string; volume: number }) {
   const out: { uom: string; volume: number; dasar: string; tetap?: boolean }[] = [];
   const u = v?.uom ?? 'unit';
   out.push({ uom: u, volume: komitmen, dasar: `volume komitmen ${u}` });
@@ -612,6 +612,8 @@ export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: 
     if (kp.cbmPerPalet) out.push({ uom: 'CBM', volume: komitmen * kp.cbmPerPalet, dasar: `palet × ${kp.cbmPerPalet} CBM` });
     if (kp.tonPerPalet) out.push({ uom: 'ton', volume: komitmen * kp.tonPerPalet, dasar: `palet × ${kp.tonPerPalet} ton` });
   }
+  // Satuan manual (container, event, dll.): volume komitmen per bulan diisi sendiri; ikut naik-turun dengan volume skenario
+  if (manual?.uom?.trim() && Number(manual.volume) > 0) out.push({ uom: manual.uom.trim(), volume: Number(manual.volume), dasar: 'volume manual per bulan (diisi)' });
   // Berat dipakai dalam kg (bukan ton)
   for (const o of out) if (o.uom === 'ton') { o.uom = 'kg'; o.volume *= 1000; o.dasar = o.dasar.replace(/ton/g, 'kg').replace(/× ([\d.,]+) kg/, (_m, x) => `× ${(Number(String(x).replace(',', '.')) * 1000).toLocaleString('id-ID')} kg`); }
   const seen = new Set<string>();
@@ -619,7 +621,8 @@ export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: 
 }
 
 /** Daftar standar satuan tarif untuk dropdown rate card. */
-export const UOM_TARIF_STANDAR = ['palet', 'case', 'karton', 'pcs', 'm²', 'CBM', 'kg', 'liter', 'bag', 'pack', 'roll', 'order', 'line', 'unit'];
+export const UOM_TARIF_STANDAR = ['palet', 'case', 'karton', 'pcs', 'm²', 'CBM', 'kg', 'liter', 'bag', 'pack', 'roll', 'order', 'line', 'unit',
+  'container', 'container 20ft', 'container 40ft', 'truk', 'trip', 'shipment', 'event'];
 
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 /** Skema kenaikan mengikuti kebijakan upah: naik setiap JANUARI (UMK baru) sebesar r, bertingkat tiap tahun.
