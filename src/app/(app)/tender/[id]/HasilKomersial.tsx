@@ -18,7 +18,8 @@ const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { s
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
 export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan }: {
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif }: {
+  hariTarif?: number; onHariTarif?: (n: number | undefined) => void;
   layananJual?: Partial<Record<Bucket, 'jual' | 'termasuk'>>; onLayananJual?: (x: Partial<Record<Bucket, 'jual' | 'termasuk'>>) => void;
   tambahan?: TarifTambahanInput[]; onTambahan?: (x: TarifTambahanInput[]) => void;
   uomRateCard?: Partial<Record<Bucket, string>>; onUomRateCard?: (u: Partial<Record<Bucket, string>>) => void;
@@ -100,7 +101,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
                       const daftar = [...ada.map(o => o.uom), ...UOM_TARIF_STANDAR.filter(u => !ada.some(o => sama(o.uom, u)))];
                       if (man?.uom && !daftar.some(u => sama(u, man.uom))) daftar.push(man.uom);
                       return [...daftar.map(u => { const o = ada.find(x2 => sama(x2.uom, u)); const om = man && sama(man.uom, u) ? r.opsiUom?.find(x2 => sama(x2.uom, u)) : undefined;
-                        return <option key={u} value={o?.uom ?? u}>per {u}{r.bucket === 'storage' ? '/bulan' : ''}{o ? ` · ${rp(o.tarifExcl)}` : om ? ` · ${rp(om.tarifExcl)} (manual)` : ' — isi volume'}</option>; }),
+                        return <option key={u} value={o?.uom ?? u}>per {u}{r.bucket === 'storage' && !/\/hari$/i.test(u) ? '/bulan' : ''}{o ? ` · ${rp(o.tarifExcl)}` : om ? ` · ${rp(om.tarifExcl)} (manual)` : ' — isi volume'}</option>; }),
                         <option key="__ketik__" value="__ketik__">✎ satuan lain (ketik)…</option>];
                     })()}</select>
                   {manAktif && onUomManual && <div className="row small" style={{ gap: 4, marginTop: 4 }}>
@@ -110,8 +111,12 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
                       onChange={e => onUomManual({ ...(uomManual ?? {}), [b]: { uom: man!.uom, volume: Number(e.target.value) || 0 } })} />
                     <span className="muted">/bln (komitmen)</span>
                     {!(man!.volume > 0) && <span style={{ color: 'var(--warn)' }}>isi volume — sementara tarif per {r.uom}</span>}</div>}</>
-                : (r.bucket === 'storage' ? `${r.uom}/bulan` : r.uom)}
-                {r.opsiUom?.find(o => o.uom === r.uom)?.dasar && <div className="small muted">{r.opsiUom.find(o => o.uom === r.uom)!.dasar}</div>}</td>
+                : (r.bucket === 'storage' && !/\/hari$/i.test(r.uom) ? `${r.uom}/bulan` : r.uom)}
+                {r.opsiUom?.find(o => o.uom === r.uom)?.dasar && <div className="small muted">{r.opsiUom.find(o => o.uom === r.uom)!.dasar}</div>}
+                {r.bucket === 'storage' && /\/hari$/i.test(r.uom) && <div className="row small" style={{ gap: 4, marginTop: 4, alignItems: 'center' }}>
+                  <span className="muted">tarif harian · 1 bulan =</span>
+                  {onHariTarif ? <input aria-label="Hari per bulan tarif harian" type="number" min={1} max={31} value={hariTarif ?? 30} style={{ width: 56, minWidth: 56, textAlign: 'right' }}
+                    onChange={e => { const n = Number(e.target.value); onHariTarif(n > 0 ? n : undefined); }} /> : <b>{hariTarif ?? 30}</b>}<span className="muted">hari</span></div>}</td>
               <td className="num">{angka(r.volumeKomitmen)}</td>
               <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaPerUnit)}</td>
               <td className="num"><input aria-label={`Margin ${BUCKET_LABEL[r.bucket]}`} type="number" step="0.1" value={v == null ? '' : Math.round(v * 1000) / 10}

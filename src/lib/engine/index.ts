@@ -457,7 +457,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
     const komitmen = v?.komitmenBulan ?? 0;
     if (biaya > 0 && komitmen <= 0) flags.push({ level: 'kritis', kode: 'KOMITMEN_NOL', pesan: `Biaya ${b} ada tetapi volume komitmen ${bucketKeArus[b]} = 0, tarif tidak bisa dihitung.` });
     // Opsi UoM tarif: volume komitmen dikonversi ke palet / case / pcs / CBM / ton (+ m² untuk storage)
-    const opsiUom = opsiUomRateCard(b, v, komitmen, space.totalM2, t.konversiPalet, { ton: t.stokTon, cbm: t.stokCbm, liter: t.stokLiter }, t.uomManual?.[b])
+    const opsiUom = opsiUomRateCard(b, v, komitmen, space.totalM2, t.konversiPalet, { ton: t.stokTon, cbm: t.stokCbm, liter: t.stokLiter }, t.uomManual?.[b], t.hariTarifHarian)
       .map(o => ({ ...o, tarifExcl: o.volume > 0 ? roundupHarga(harga / o.volume) : 0 }));
     const dipilih = opsiUom.find(o => o.uom === t.uomRateCard?.[b]) ?? opsiUom[0];
     const volTarif = dipilih?.volume ?? komitmen;
@@ -597,7 +597,7 @@ export function biayaPerOrangDari(m: MasterData, j: JobLevel | undefined) {
 
 /** Opsi UoM untuk tarif layanan — volume per bulan dalam tiap UoM. */
 export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: string; per1: number; uom2: string; per2: number } } | undefined, komitmen: number,
-  luasM2: number, kp?: { cbmPerPalet: number; tonPerPalet: number }, stok?: { ton?: number; cbm?: number; liter?: number }, manual?: { uom: string; volume: number }) {
+  luasM2: number, kp?: { cbmPerPalet: number; tonPerPalet: number }, stok?: { ton?: number; cbm?: number; liter?: number }, manual?: { uom: string; volume: number }, hariTarif?: number) {
   const out: { uom: string; volume: number; dasar: string; tetap?: boolean }[] = [];
   const u = v?.uom ?? 'unit';
   out.push({ uom: u, volume: komitmen, dasar: `volume komitmen ${u}` });
@@ -621,8 +621,19 @@ export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: 
   // Berat dipakai dalam kg (bukan ton)
   for (const o of out) if (o.uom === 'ton') { o.uom = 'kg'; o.volume *= 1000; o.dasar = o.dasar.replace(/ton/g, 'kg').replace(/× ([\d.,]+) kg/, (_m, x) => `× ${(Number(String(x).replace(',', '.')) * 1000).toLocaleString('id-ID')} kg`); }
   const seen = new Set<string>();
-  return out.filter(o => { const key = o.uom.toLowerCase(); if (seen.has(key) || !(o.volume > 0)) return false; seen.add(key); return true; });
+  const hasil = out.filter(o => { const key = o.uom.toLowerCase(); if (seen.has(key) || !(o.volume > 0)) return false; seen.add(key); return true; });
+  // Storage: opsi tarif per hari (mis. per palet/hari) = volume per bulan × hari per bulan (default 30)
+  if (b === 'storage') {
+    const hari = hariTarifHarian(hariTarif);
+    for (const o of hasil.filter(x => x.dasar !== 'volume manual per bulan (diisi)')) {
+      const key = `${o.uom}/hari`.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); hasil.push({ uom: `${o.uom}/hari`, volume: o.volume * hari, dasar: `${o.dasar} × ${hari} hari`, tetap: o.tetap }); }
+    }
+  }
+  return hasil;
 }
+/** Hari per bulan untuk tarif harian (default 30 hari kalender). */
+export const hariTarifHarian = (x?: number) => (Number(x) > 0 ? Number(x) : 30);
 
 /** Daftar standar satuan tarif untuk dropdown rate card. */
 export const UOM_TARIF_STANDAR = ['palet', 'case', 'karton', 'pcs', 'm²', 'CBM', 'kg', 'liter', 'bag', 'pack', 'roll', 'drum', 'pail', 'ibc', 'order', 'line', 'unit',

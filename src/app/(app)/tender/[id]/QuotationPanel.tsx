@@ -24,7 +24,7 @@ type Draft = Omit<Quo, 'id' | 'status' | 'approved_at' | 'created_at' | 'catatan
 interface Tc { id: number; nama: string; isi: string }
 
 const SATUAN: Record<string, (uom: string) => string> = {
-  storage: u => `per ${u} per bulan`, handling_in: u => `per ${u} masuk`, handling_out: u => `per ${u} keluar`, vas: u => `per ${u}`,
+  storage: u => (/\/hari$/i.test(u) ? `per ${u.replace(/\/hari$/i, '')} per hari` : `per ${u} per bulan`), handling_in: u => `per ${u} masuk`, handling_out: u => `per ${u} keluar`, vas: u => `per ${u}`,
 };
 
 /** Sumber tarif selain tender gudang (Transportation / Intermodal): rate card dihitung dari tender itu sendiri. */
@@ -88,7 +88,7 @@ export default function QuotationPanel({ tender, profile, sumber }: { tender: Te
   function dariHasil(h: HasilTender) {
     const inclPpn = (tender.asumsi.pajak?.ppn ?? 'exclude') === 'include';
     const rate: RateRow[] = h.rateCard.map(r => ({ layanan: BUCKET_LABEL[r.bucket], satuan: (SATUAN[r.bucket] ?? (u => u))(r.uom), tarif: inclPpn ? (r.tarifInclPpn ?? r.tarifPerUnit) : r.tarifPerUnit,
-      catatan: `Minimum ${r.volumeKomitmen.toLocaleString('id-ID')} ${r.uom}/bulan` }));
+      catatan: /\/hari$/i.test(r.uom) ? `Minimum ${r.volumeKomitmen.toLocaleString('id-ID')} ${r.uom.replace(/\/hari$/i, '')}-hari per bulan (${(tender.asumsi.hariTarifHarian || 30)} hari)` : `Minimum ${r.volumeKomitmen.toLocaleString('id-ID')} ${r.uom}/bulan` }));
     for (const alt of h.storageAlternatif.slice(1))
       rate.push({ layanan: 'Storage (alternatif)', satuan: `per ${alt.uom} per bulan`, tarif: alt.tarif, catatan: 'Pilih salah satu basis storage' });
     // Layanan utama yang tidak ditagih terpisah

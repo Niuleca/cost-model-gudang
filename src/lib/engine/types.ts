@@ -194,6 +194,8 @@ export interface TenderInput {
   uomRateCard?: Partial<Record<Bucket, string>>;
   /** Satuan tarif manual per layanan (mis. container, event) + volume per bulan (komitmen) yang diisi sendiri. */
   uomManual?: Partial<Record<Bucket, { uom: string; volume: number }>>;
+  /** Jumlah hari per bulan untuk tarif storage harian (per palet/hari dst.), default 30. */
+  hariTarifHarian?: number;
   /** Revisi manual biaya/bln per baris rincian (kunci = deskripsi baris). */
   revisiBiaya?: Record<string, number>;
   interestCost?: InterestCost;

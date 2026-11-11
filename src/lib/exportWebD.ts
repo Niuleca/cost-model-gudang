@@ -1,3 +1,4 @@
+import { hariTarifHarian } from '@/lib/engine';
 import type { MpBarisXl } from '@/lib/exportWebB';
 // Sheet "Hasil" (KPI, red flag, rate card & margin, simulasi, kurs, porsi kategori, opex/capex, kalender, space,
 // kebutuhan manpower & MHE, rincian biaya per bulan), "Quotation" dan "0 Ringkasan" (format PNL).
@@ -156,6 +157,7 @@ export function tulisHasil(x: Ctx) {
   // ===================== Opsi UoM tarif (dasar droplist "Satuan tarif")
   HS.r++;
   HS.h3('Opsi satuan tarif per layanan');
+  HS.field('Hari per bulan untuk tarif harian (storage per …/hari)', hariTarifHarian(a.hariTarifHarian), 'n0', 'in', 'hari', 'default 30 hari kalender', 'HariTarif');
   HS.note('Volume komitmen dikonversi ke tiap satuan (palet / case / pcs / CBM / kg, + m² untuk storage). "Tetap" = basis tidak ikut volume (m², stok rata-rata). Satuan tanpa konversi bernilai 0 (tidak bisa dipilih).');
   HS.hdr(['Layanan', 'UoM', 'Volume / bln', 'Dasar', 'Tetap', 'Kunci']);
   const opsi: Record<string, { r0: number; r1: number }> = {};
@@ -189,6 +191,16 @@ export function tulisHasil(x: Ctx) {
       HS.put(4, '"volume manual per bulan (diisi)" — isi nama satuan & volume', { j: 'txt', size: 9 }); HS.put(5, 0, { j: 'out', fmt: 'n0' });
       HS.put(6, { f: `IF(AND(B${r}<>"",N(C${r})>0,COUNTIF(F$${r0}:F${r - 1},LOWER(TRIM(B${r})))=0),LOWER(TRIM(B${r})),"")` }, { j: 'out', size: 9 });
       HS.r++;
+    }
+    if (b === 'storage') { // tarif harian: volume per bulan × hari per bulan (HariTarif) — dari baris opsi bulanan di atas (kecuali manual)
+      const rBase1 = HS.r - 2;
+      for (let rb = r0; rb <= rBase1; rb++) {
+        const r = HS.r;
+        HS.put(1, LAYANAN[b], { j: 'txt' }); HS.put(2, { f: `IF(B${rb}="","",B${rb}&"/hari")` }, { j: 'out' }); HS.put(3, { f: `IF(F${rb}<>"",C${rb}*HariTarif,0)` }, { j: 'out', fmt: 'n2' });
+        HS.put(4, { f: `D${rb}&" × "&HariTarif&" hari"` }, { j: 'out', size: 9 }); HS.put(5, { f: `E${rb}` }, { j: 'out', fmt: 'n0' });
+        HS.put(6, { f: `IF(AND(N(C${r})>0,B${r}<>""),LOWER(B${r}),"")` }, { j: 'out', size: 9 });
+        HS.r++;
+      }
     }
     opsi[b] = { r0, r1: HS.r - 1 };
   }

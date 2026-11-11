@@ -54,6 +54,7 @@ export interface Asumsi {
   marginManual?: TenderInput['marginManual'];
   alokasiKategori?: TenderInput['alokasiKategori'];
   uomManual?: TenderInput['uomManual'];
+  hariTarifHarian?: number;
   layananJual?: TenderInput['layananJual'];
   tarifTambahan?: TenderInput['tarifTambahan'];
   pajak?: TenderInput['pajak'];
@@ -133,7 +134,7 @@ export function keInput(t: TenderRow): TenderInput {
       sewaTetapBulan: a.gudang.sewaUtuh ? Number(a.gudang.harga_per_bulan ?? (a.gudang.harga_sewa_m2_bulan ?? 0) * a.gudang.luas_m2) : undefined } : a.space,
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT), ...airKeCostLines(a.air)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
-    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, alokasiKategori: a.alokasiKategori, layananJual: a.layananJual, tarifTambahan: a.tarifTambahan, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, rincianBiayaMp: a.rincianBiayaMp ?? {}, paramBiayaMp: a.paramBiayaMp ?? {}, levelGaji: a.levelGaji ?? {}, levelRole: a.levelRole ?? {}, uomRateCard: a.uomRateCard ?? {}, uomManual: a.uomManual ?? {}, revisiBiaya: a.revisiBiaya ?? {}, interestCost: a.interestCost,
+    listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, alokasiKategori: a.alokasiKategori, layananJual: a.layananJual, hariTarifHarian: a.hariTarifHarian, tarifTambahan: a.tarifTambahan, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, rincianBiayaMp: a.rincianBiayaMp ?? {}, paramBiayaMp: a.paramBiayaMp ?? {}, levelGaji: a.levelGaji ?? {}, levelRole: a.levelRole ?? {}, uomRateCard: a.uomRateCard ?? {}, uomManual: a.uomManual ?? {}, revisiBiaya: a.revisiBiaya ?? {}, interestCost: a.interestCost,
     konversiPalet: { cbmPerPalet: a.profilVolume?.param?.cbmPerPalet ?? 1.5, tonPerPalet: a.profilVolume?.param?.tonPerPalet ?? 0.8 }, eskalasiManpower: { ...ESKALASI_DEFAULT, ...(a.eskalasiManpower ?? {}), mulai: a.eskalasiManpower?.mulai || t.tanggal_go_live?.slice(0, 7) || null },
     ...(() => { const sp = stokDariPalet(volumeEfektif(a.volumes), a.profilVolume); return sp.palet > 0
       ? { stokTon: sp.ton || undefined, stokCbm: sp.cbm || undefined, stokLiter: sp.liter || undefined }
