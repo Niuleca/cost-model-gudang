@@ -56,8 +56,8 @@ export const namaAlok = (a: Partial<Record<Bucket, number>> | undefined, fb: Par
   const n = normAlok(a, fb); return ALOKASI.find(([, v]) => kunciAlok(normAlok(v, v)) === kunciAlok(n))?.[0] ?? null;
 };
 export const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
-export const UOM = ['palet', 'case', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pail', 'drum', 'pack', 'roll', 'order', 'line', 'lokasi'];
-export const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'drum', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
+export const UOM = ['palet', 'case', 'karton', 'pcs', 'bag', 'ton', 'cbm', 'liter', 'pail', 'drum', 'ibc', 'pack', 'roll', 'order', 'line', 'lokasi'];
+export const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'drum', 'ibc', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
 export { NAMA_KATEGORI as INDUSTRI } from './kategoriBisnis';
 export const MATA_UANG = ['USD', 'SGD', 'MYR', 'THB', 'VND', 'PHP', 'KRW', 'JPY', 'CNY', 'HKD', 'TWD', 'INR', 'AUD', 'EUR', 'GBP'];
 export const KELAS_UOM: [string, string][] = [['case', 'case'], ['karton', 'case'], ['dus', 'case'], ['carton', 'case'], ['ctn', 'case'], ['box', 'case'],

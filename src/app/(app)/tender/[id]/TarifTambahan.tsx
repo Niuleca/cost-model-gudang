@@ -6,7 +6,7 @@ import { rp, persen, BUCKET_LABEL } from '@/lib/format';
 
 type Jual = Partial<Record<Bucket, 'jual' | 'termasuk'>>;
 const OPS: Bucket[] = ['storage', 'handling_in', 'handling_out', 'vas'];
-const SATUAN = ['per karton', 'per pcs', 'per palet', 'per drum', 'per container', 'per container 20ft', 'per container 40ft', 'per event', 'per movement', 'per jam', 'per jam per orang',
+const SATUAN = ['per karton', 'per pcs', 'per palet', 'per drum', 'per IBC', 'per container', 'per container 20ft', 'per container 40ft', 'per event', 'per movement', 'per jam', 'per jam per orang',
   'per hari', 'per shipment', 'per DO', 'per order', 'per dokumen', 'per label', 'per SKU', 'per truk', 'per trip', 'per m²', 'per CBM', 'per kg', 'per ton', 'per bulan'];
 const KETIK = '__ketik__';
 
