@@ -34,9 +34,9 @@ export function tulisModelWeb(wb: WB, d: DataWeb) {
   const S0 = new S(wb, '0 Ringkasan', `${t.customer} — ${t.kode ?? ''}`, sub0, 'FF1F2A37');
   const KA = new S(wb, SH.ka, 'Key assumption', sub0);
   const VO = new S(wb, SH.vo, 'Volume', sub0);
+  const GD = new S(wb, SH.wp, 'Warehouse Planning — gudang, space & racking', sub0);
   const PR = new S(wb, SH.pr, 'Produk / SKU', sub0);
   const AK = new S(wb, SH.vsm, 'Value Stream Mapping — aktivitas & manpower', sub0);
-  const GD = new S(wb, SH.wp, 'Warehouse Planning — gudang, space & racking', sub0);
   const IC = new S(wb, SH.lic, 'Loan & Interest Calculator — simulasi pinjaman bank', sub0);
   const TE = new S(wb, SH.te, 'Technology & Equipment — MHE, IT & biaya lain', sub0);
   const UT = new S(wb, SH.um, 'Utilities Management — listrik & air', sub0);

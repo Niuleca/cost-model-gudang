@@ -12,7 +12,7 @@ import type { VolumeInput } from '@/lib/engine/types';
 import type { ProfilVolume } from '@/lib/profilVolume';
 import { hitungLevelRak, lengkapiSpaceExcel, type HasilSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
 import {
-  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, type OpsiUpp, type SaranUpp, satuanDimEfektif, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
+  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, paletDariSpace, type OpsiUpp, type SaranUpp, satuanDimEfektif, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
   type AturanBerat, type PerubahanTender, type ProdukTender,
 } from '@/lib/produk';
 
@@ -41,7 +41,8 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
   const lv = hitungLevelRak(sx.rak);
   const levelRak = Math.max(1, lv.level || 1);
   const daftar = useMemo(() => produkEfektif(produk, volumes, profil, namaCustomer), [produk, volumes, profil, namaCustomer]);
-  const hit = useMemo(() => daftar.map(x => hitungProduk(x, at, levelRak, sx.rak.productMm)), [daftar, at, levelRak, sx.rak.productMm]);
+  const dimPalet = useMemo(() => paletDariSpace(sx), [sx.palet.panjang, sx.palet.lebar, sx.rak.palletMm]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hit = useMemo(() => daftar.map(x => hitungProduk(x, at, levelRak, sx.rak.productMm, dimPalet)), [daftar, at, levelRak, sx.rak.productMm, dimPalet]);
   const [tempel, setTempel] = useState<string | null>(null);
   const [cari, setCari] = useState('');
   const [pesan, setPesan] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
   const tot = hit.reduce((s, h, i) => ({ qty: s.qty + (Number(daftar[i].qty) || 0), palet: s.palet + h.palet, kg: s.kg + h.totalKg, cbm: s.cbm + h.totalCbm }), { qty: 0, palet: 0, kg: 0, cbm: 0 });
   const stSt = volumes.find(v => v.arus === 'storage');
   const paletVolume = stSt && /^pal+et/i.test(stSt.uom) ? Number(stSt.peakBulan || stSt.rataRataBulan) || 0 : null;
-  const zona = ringkasZona(daftar, at, levelRak);
+  const zona = ringkasZona(daftar, at, levelRak, dimPalet);
   const warnaZ = new Map(zona.map((z, i) => [z.zona, WARNA_ZONA[i % WARNA_ZONA.length]]));
 
   // kapasitas posisi level 1 (rak beam terbawah + lantai) vs palet yang hanya boleh di level 1
@@ -120,7 +121,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
           onChange(ada >= 0 ? daftar.map((x, j) => j === ada ? { ...auto, id: x.id } : x) : [{ ...auto, id: `auto-${Date.now().toString(36)}` }, ...daftar]);
           kabar('Baris otomatis diisi ulang dari Key assumption.');
         }}>Isi otomatis dari Key assumption</button>
-        <button className="ghost" disabled={!daftar.length} onClick={() => { onChange(zonasiOtomatis(daftar, at, levelRak)); kabar('Zona diisi otomatis menurut kategori & kelas berat — ubah bila perlu.'); }}>Zonasi otomatis</button>
+        <button className="ghost" disabled={!daftar.length} onClick={() => { onChange(zonasiOtomatis(daftar, at, levelRak, dimPalet)); kabar('Zona diisi otomatis menurut kategori & kelas berat — ubah bila perlu.'); }}>Zonasi otomatis</button>
         <button onClick={tambah}>+ Tambah produk</button>
       </div>
       {pesan && <p className="small" role="status">{pesan}</p>}

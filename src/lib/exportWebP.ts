@@ -1,7 +1,8 @@
 // Sheet "Produk" — sama dengan tab Produk di web: daftar SKU (input) + turunan per baris (rumus), aturan berat → level rak,
 // ringkasan tertimbang. Rumus mengikuti src/lib/produk.ts (hitungProduk / turunanProduk).
 import { type Ctx } from '@/lib/exportWebUtil';
-import { ATURAN_BERAT_DEFAULT, SIMPAN, produkEfektif, hitungProduk } from '@/lib/produk';
+import { ATURAN_BERAT_DEFAULT, SIMPAN, produkEfektif, hitungProduk, paletDariSpace } from '@/lib/produk';
+import { lengkapiSpaceExcel } from '@/lib/engine/space';
 
 export function tulisProduk(x: Ctx) {
   const { PR, a, d } = x;
@@ -9,11 +10,15 @@ export function tulisProduk(x: Ctx) {
   const at = a.aturanBerat ?? ATURAN_BERAT_DEFAULT;
   const daftar = produkEfektif(a.produk, a.volumes, a.profilVolume, d.t.customer);
   const levelRak = Math.max(1, d.h.space.levelRak || 1);
+  const sx = lengkapiSpaceExcel(a.space.excel); const dimPalet = paletDariSpace(sx);
 
   PR.h2('Aturan berat per palet', 'Batas berat per palet → level rak tertinggi (level 1 = lantai / beam terbawah). Berat > kapasitas beam → hanya lantai (block / floor).');
   PR.field('Berat palet kayu kosong (tare)', at.tarePaletKg, 'n1', 'in', 'kg', 'ditambahkan ke berat muatan (kecuali UOM palet)', 'PrTare');
   PR.field('Kapasitas beam per posisi', at.kapPosisiKg, 'n0', 'in', 'kg/posisi', 'lebih berat → lantai saja', 'PrKap');
   PR.field('Level rak (Warehouse Planning)', { f: 'MAX(1,RackLevel)', v: levelRak }, 'n0', 'out', 'level', '', 'PrLevelRak');
+  PR.field('Palet — panjang', { f: 'PalP*100', v: dimPalet.pCm }, 'n1', 'out', 'cm', 'Key assumption / Warehouse Planning', 'PrPalP');
+  PR.field('Palet — lebar', { f: 'PalL*100', v: dimPalet.lCm }, 'n1', 'out', 'cm', 'Key assumption / Warehouse Planning', 'PrPalL');
+  PR.field('Palet — tebal (kayu)', { f: 'RkPallet/10', v: dimPalet.tinggiCm }, 'n1', 'out', 'cm', 'Racking level → Pallet', 'PrPalT');
   PR.hdr([['Berat maks / palet (kg)', true, 'Urutkan dari kecil ke besar'], ['Level maks', true, '99 = semua level']]);
   const batas = [...at.batas].sort((p, q) => p.kgMaks - q.kgMaks);
   const b0 = PR.r;
@@ -26,8 +31,8 @@ export function tulisProduk(x: Ctx) {
   PR.hdr([['Kode', true], ['Nama', true], ['UOM', true], ['P', true], ['L', true], ['T', true], ['Satuan dim', true, 'cm / mm / kosong = otomatis'], ['CBM/UOM manual', true, 'Dipakai bila P×L×T kosong'],
     ['Berat/UOM (kg)', true], ['UPP', true, 'UOM per palet'], ['Qty stok', true], ['Kategori', true], ['Zona', true], ['Cara simpan', true], ['Level maks manual', true],
     ['Satuan ef.', false, 'cm/mm efektif'], ['CBM/UOM', false, 'P×L×T (cm) ÷ 1.000.000'], ['UPP ef.', false, 'UOM palet → 1'], ['Berat/palet (kg)', false, 'UPP × berat + tare (palet: berat)'],
-    ['CBM/palet', false, 'UPP × CBM/UOM'], ['Palet', false, 'ROUNDUP(qty ÷ UPP)'], ['Total kg', false], ['Total CBM', false], ['Per layer', false, 'Susunan terbaik di palet 120 × 100 cm'],
-    ['Layer', false, 'ROUNDUP(UPP ÷ per layer)'], ['Tinggi muatan (mm)', false, '(layer × T + 15 cm palet) × 10'], ['Level maks', false, 'Aturan berat / manual, maks level rak'],
+    ['CBM/palet', false, 'UPP × CBM/UOM'], ['Palet', false, 'ROUNDUP(qty ÷ UPP)'], ['Total kg', false], ['Total CBM', false], ['Per layer', false, 'Susunan terbaik di palet P × L (PrPalP × PrPalL)'],
+    ['Layer', false, 'ROUNDUP(UPP ÷ per layer)'], ['Tinggi muatan (mm)', false, '(layer × T + tebal palet PrPalT) × 10'], ['Level maks', false, 'Aturan berat / manual, maks level rak'],
     ['Hanya lantai', false, 'Berat/palet > kapasitas beam'], ['Cara simpan ef.', false], ['Catatan (sistem)', false]]);
   const p0 = PR.r;
   const simpanL = (v?: string) => SIMPAN.find(s => s.v === (v ?? 'otomatis'))?.v ?? 'otomatis';
@@ -41,7 +46,7 @@ export function tulisProduk(x: Ctx) {
     const pal = `ISNUMBER(SEARCH("pal",LOWER(C${r})))`;
     const f = `IF(P${r}="mm",0.1,1)`;
     const dimOk = `AND(N(D${r})>0,N(E${r})>0,N(F${r})>0)`;
-    const h = z ? hitungProduk(z, at, levelRak) : null;
+    const h = z ? hitungProduk(z, at, levelRak, sx.rak.productMm, dimPalet) : null;
     PR.put(16, { f: `IF(A${r}&B${r}="","",IF(G${r}<>"",G${r},IF(MAX(N(D${r}),N(E${r}),N(F${r}))>IF(${pal},250,600),"mm","cm")))` }, { j: 'out', al: 'center' });
     PR.put(17, { f: `IF(P${r}="",0,IF(${dimOk},N(D${r})*${f}*N(E${r})*${f}*N(F${r})*${f}/1000000,N(H${r})))`, v: h?.cbmUnit }, { j: 'out', fmt: 'x' });
     PR.put(18, { f: `IF(P${r}="",0,IF(${pal},1,MAX(0,N(J${r}))))` }, { j: 'out', fmt: 'n0' });
@@ -51,9 +56,9 @@ export function tulisProduk(x: Ctx) {
     PR.put(22, { f: `N(K${r})*N(I${r})` }, { j: 'out', fmt: 'n0' });
     PR.put(23, { f: `N(K${r})*Q${r}` }, { j: 'out', fmt: 'n2' });
     const dp = `N(D${r})*${f}`, dl = `N(E${r})*${f}`;
-    PR.put(24, { f: `IF(P${r}="",0,IF(${pal},IF(${dimOk},1,0),IF(${dimOk},MAX(INT(120/(${dp}))*INT(100/(${dl})),INT(120/(${dl}))*INT(100/(${dp}))),0)))`, v: h?.perLayer }, { j: 'out', fmt: 'n0' });
+    PR.put(24, { f: `IF(P${r}="",0,IF(${pal},IF(${dimOk},1,0),IF(${dimOk},MAX(INT(PrPalP/(${dp})+1E-9)*INT(PrPalL/(${dl})+1E-9),INT(PrPalP/(${dl})+1E-9)*INT(PrPalL/(${dp})+1E-9)),0)))`, v: h?.perLayer }, { j: 'out', fmt: 'n0' });
     PR.put(25, { f: `IF(AND(X${r}>0,R${r}>0),ROUNDUP(R${r}/X${r}-1E-9,0),0)`, v: h?.layer }, { j: 'out', fmt: 'n0' });
-    PR.put(26, { f: `IF(P${r}="",0,IF(${pal},IF(${dimOk},N(F${r})*${f}*10,0),IF(Y${r}>0,(Y${r}*N(F${r})*${f}+15)*10,0)))`, v: h?.tinggiMuatanMm }, { j: 'out', fmt: 'n0' });
+    PR.put(26, { f: `IF(P${r}="",0,IF(${pal},IF(${dimOk},N(F${r})*${f}*10,0),IF(Y${r}>0,(Y${r}*N(F${r})*${f}+PrPalT)*10,0)))`, v: h?.tinggiMuatanMm }, { j: 'out', fmt: 'n0' });
     const lvBerat = `IF(S${r}>0,IFERROR(INDEX(PrBatasLv,MATCH(TRUE,INDEX((PrBatasKg>=S${r})*(PrBatasKg<>"")>0,0),0)),1),99)`;
     PR.put(28, { f: `IF(P${r}="","",IF(S${r}>PrKap,"Ya","Tidak"))` }, { j: 'out', al: 'center' });
     PR.put(27, { f: `IF(P${r}="",0,MIN(IF(AB${r}="Ya",1,IF(N(O${r})>0,O${r},${lvBerat})),PrLevelRak))`, v: h?.levelMaks }, { j: 'out', fmt: 'n0', b: true });

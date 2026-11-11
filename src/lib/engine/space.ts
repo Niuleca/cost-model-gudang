@@ -13,7 +13,9 @@ export interface SpaceExcel {
   sd: RakDim; dd: RakDim;                 // sd = SPR (selective pallet rack), dd = DDR (double deep rack)
   palet: { panjang: number; lebar: number };   // dimensi palet untuk block stack / pallet floor (m)
   block: LantaiDim; floor: LantaiDim;
-  rak: { centerMm: number; sideMm: number; beamMm: number; palletMm: number; productMm: number; clearanceMm: number; levelManual?: number | null };
+  rak: { centerMm: number; sideMm: number; beamMm: number; palletMm: number; productMm: number; clearanceMm: number; levelManual?: number | null;
+    /** Tinggi per level manual (mm, dari lantai/beam bawah s/d beam berikutnya); index 0 = level 1. Kosong / 0 = otomatis (level 1 / level 2+). */
+    tinggiLevel?: (number | null)[] };
   inbound: StagingIn; outbound: StagingIn;
   fasilitas: { nama: string; m2: number }[];
   pembulatan: number;                     // dibulatkan ke atas kelipatan (m²)
@@ -32,7 +34,7 @@ export const SPACE_EXCEL_DEFAULT: SpaceExcel = {
   floor: { tumpuk: 1, gangPersen: 0.3 },
   sd: { koridor: 1.7, depth: 1.15, width: 2.7, paletPerLevel: 2 },
   dd: { koridor: 1.85, depth: 2.4, width: 2.7, paletPerLevel: 2, deep: 2 },
-  rak: { centerMm: 13000, sideMm: 10000, beamMm: 100, palletMm: 150, productMm: 1250, clearanceMm: 100, levelManual: null },
+  rak: { centerMm: 13000, sideMm: 10000, beamMm: 100, palletMm: 150, productMm: 1250, clearanceMm: 100, levelManual: null, tinggiLevel: [] },
   inbound: { porsiMinggu: 0.25, hariPerMinggu: 7, sequence: 2, m2PerPalet: 1.4, tumpuk: 1, unitPerPalet: 1, volumePerShiftManual: null },
   outbound: { porsiMinggu: 0.45, hariPerMinggu: 6, sequence: 2, m2PerPalet: 1.4, tumpuk: 1, unitPerPalet: 1, volumePerShiftManual: null },
   fasilitas: [
@@ -57,13 +59,23 @@ export const lengkapiSpaceExcel = (x?: Partial<SpaceExcel> | null): SpaceExcel =
   fasilitas: x?.fasilitas ?? SPACE_EXCEL_DEFAULT.fasilitas, cad: x?.cad ?? [],
 });
 
+/** Batas jumlah level yang dihitung otomatis (sama dengan jumlah baris tabel tinggi per level di Excel). */
+export const MAKS_LEVEL_RAK = 40;
 export function hitungLevelRak(r: SpaceExcel['rak']) {
   const level1 = r.palletMm + r.productMm + r.clearanceMm;              // level lantai tanpa beam
   const levelN = r.beamMm + r.palletMm + r.productMm + r.clearanceMm;   // level 2 ke atas
-  const auto = r.sideMm >= level1 && levelN > 0 ? 1 + Math.floor((r.sideMm - level1) / levelN + 1e-9) : 0;
+  // tinggi level i (0 = level 1): manual bila diisi > 0, selain itu level 1 / level 2+
+  const manual = (i: number) => { const v = Number(r.tinggiLevel?.[i]); return v > 0 ? v : null; };
+  const tinggiKe = (i: number) => manual(i) ?? (i === 0 ? level1 : levelN);
+  let auto = 0;
+  if (levelN > 0) { let kum = 0; while (auto < MAKS_LEVEL_RAK && kum + tinggiKe(auto) <= r.sideMm + 1e-9) { kum += tinggiKe(auto); auto++; } }
   const level = r.levelManual && r.levelManual > 0 ? r.levelManual : auto;
-  const tinggi = level > 0 ? level1 + (level - 1) * levelN : 0;
-  return { level1, levelN, auto, level, tinggi, ok: tinggi <= r.sideMm };
+  const perLevel = Array.from({ length: Math.min(MAKS_LEVEL_RAK, Math.max(0, Math.round(level))) }, (_, i) => tinggiKe(i));
+  const dasar: number[] = []; let kum = 0;
+  for (const t of perLevel) { dasar.push(kum); kum += t; }
+  const tinggi = level > 0 ? kum + Math.max(0, level - perLevel.length) * levelN : 0;
+  const adaManual = (r.tinggiLevel ?? []).some(v => Number(v) > 0);
+  return { level1, levelN, auto, level, tinggi, ok: tinggi <= r.sideMm, perLevel, dasar, adaManual, manual: perLevel.map((_, i) => manual(i) != null) };
 }
 
 function rak(ppReq: number, d: RakDim, level: number) {

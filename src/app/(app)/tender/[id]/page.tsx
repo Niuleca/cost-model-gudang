@@ -34,11 +34,11 @@ import type { DriverListrik } from '@/lib/utilitas';
 import ProcessDesignPanel from './ProcessDesignPanel';
 import SpacePanel from './SpacePanel';
 import ProdukPanel from './ProdukPanel';
-import { ATURAN_BERAT_DEFAULT, adaProdukNyata, hitungProduk, produkEfektif, terapkanProduk, type AturanBerat, type PerubahanTender, type ProdukTender } from '@/lib/produk';
+import { ATURAN_BERAT_DEFAULT, adaProdukNyata, hitungProduk, paletDariSpace, produkEfektif, terapkanProduk, type AturanBerat, type PerubahanTender, type ProdukTender } from '@/lib/produk';
 import { hitungLevelRak } from '@/lib/engine/space';
 import MhePanel from './MhePanel';
 import BiayaSpacePanel from './BiayaSpacePanel';
-import { hitungSpaceExcel, lengkapiSpaceExcel } from '@/lib/engine/space';
+import { hitungSpaceExcel, lengkapiSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
 import { hitungProcessDesign, PD_DEFAULT } from '@/lib/engine/processDesign';
 import HistorisPanel from './HistorisPanel';
 import CostAllocation from './PembagianLayanan';
@@ -53,7 +53,7 @@ interface Tarif { golongan: string; tarif_kwh: number }
 interface Jab { role_name: string }
 
 const TAB_EXCEL = 'Data project (Excel)' as const;
-const TABS = ['Key assumption', 'Volume', 'Produk', 'Value Stream Mapping', 'Warehouse Planning', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Export'] as const;
+const TABS = ['Key assumption', 'Volume', 'Warehouse Planning', 'Produk', 'Value Stream Mapping', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Export'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'drum', 'ibc', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
@@ -208,17 +208,26 @@ export default function TenderPage() {
   };
   // Produk = sumber data tender: setiap perubahan produk / aturan berat langsung diterapkan ke Volume, Parameter muatan & Space
   const [dampakProduk, setDampakProduk] = useState<PerubahanTender[]>([]);
-  const ubahProduk = (produk: ProdukTender[] | undefined, aturanBerat: AturanBerat | undefined = t?.asumsi.aturanBerat, aktifkan = false) => {
+  const ubahProduk = (produk: ProdukTender[] | undefined, aturanBerat: AturanBerat | undefined = t?.asumsi.aturanBerat, aktifkan = false, basis: Partial<Asumsi> = {}) => {
     if (!t) return;
-    const a0 = t.asumsi; const sinkron = aktifkan || a0.produkSinkron !== false;
+    const a0 = { ...t.asumsi, ...basis }; const sinkron = aktifkan || a0.produkSinkron !== false;
     if (sinkron && adaProdukNyata(produk)) {
       // baris otomatis dibekukan dulu supaya tidak ikut berubah oleh parameter yang baru diterapkan
       const tetap = (produk ?? []).map(x => (x.otomatis ? { ...x, otomatis: false } : x));
       const levelRak = Math.max(1, hitungLevelRak(lengkapiSpaceExcel(a0.space.excel).rak).level || 1);
       const { patch, perubahan } = terapkanProduk(a0, tetap, aturanBerat ?? ATURAN_BERAT_DEFAULT, levelRak);
-      setA({ produk: tetap, aturanBerat, produkSinkron: true, ...(patch as Partial<Asumsi>) });
+      setA({ ...basis, produk: tetap, aturanBerat, produkSinkron: true, ...(patch as Partial<Asumsi>) });
       if (perubahan.length) setDampakProduk(d => { const m = new Map(d.map(x => [`${x.bagian}|${x.item}`, x])); for (const x of perubahan) { const k = `${x.bagian}|${x.item}`; const lama = m.get(k); m.set(k, lama ? { ...x, dari: lama.dari } : x); } return Array.from(m.values()); });
-    } else setA({ produk, aturanBerat, ...(aktifkan ? { produkSinkron: true } : {}) });
+    } else setA({ ...basis, produk, aturanBerat, ...(aktifkan ? { produkSinkron: true } : {}) });
+  };
+  // Space (Warehouse Planning / Key assumption): ukuran / tebal palet berubah → susunan produk per palet dihitung ulang (bila produk jadi sumber data)
+  const ubahSpaceExcel = (excel: SpaceExcel) => {
+    if (!t) return;
+    const s0 = lengkapiSpaceExcel(t.asumsi.space.excel);
+    const space = { ...t.asumsi.space, excel };
+    const paletBerubah = s0.palet.panjang !== excel.palet.panjang || s0.palet.lebar !== excel.palet.lebar || s0.rak.palletMm !== excel.rak.palletMm;
+    if (paletBerubah && t.asumsi.produk && adaProdukNyata(t.asumsi.produk)) ubahProduk(t.asumsi.produk, t.asumsi.aturanBerat, false, { space });
+    else setA({ space });
   };
 
   async function simpan(extra: Partial<TenderRow> = {}) {
@@ -271,7 +280,7 @@ export default function TenderPage() {
     if (!t || !adaProdukNyata(t.asumsi.produk)) return [];
     const sx = lengkapiSpaceExcel(t.asumsi.space.excel); const lvR = Math.max(1, hitungLevelRak(sx.rak).level || 1);
     const at = t.asumsi.aturanBerat ?? ATURAN_BERAT_DEFAULT;
-    const hs = produkEfektif(t.asumsi.produk, t.asumsi.volumes, t.asumsi.profilVolume).map(x => ({ x, h: hitungProduk(x, at, lvR, sx.rak.productMm) }));
+    const hs = produkEfektif(t.asumsi.produk, t.asumsi.volumes, t.asumsi.profilVolume).map(x => ({ x, h: hitungProduk(x, at, lvR, sx.rak.productMm, paletDariSpace(sx)) }));
     const out: string[] = [];
     const sH = spaceH; if (!sH) return out;
     const posL1 = sH.sd.bay * sH.sd.paletPerLevel + sH.dd.bay * sH.dd.paletPerLevel * (sH.dd.deep ?? 2) + Math.ceil(sH.floor.ppReq) + sH.block.tapak;
@@ -466,6 +475,7 @@ export default function TenderPage() {
             <Num id="cuti" label="Cuti tahunan per orang" suffix="hari" value={a.cutiTahunanHari} onChange={v => setA({ cutiTahunanHari: v })} hint="Masuk ke faktor pengganti headcount" />
             <Pct id="fp" label="Faktor produktivitas" value={a.faktorProduktivitas} onChange={v => setA({ faktorProduktivitas: v })} />
             <Pct id="ef" label="Efisiensi kerja" value={a.efisiensi} onChange={v => setA({ efisiensi: v })} />
+            <UkuranPalet excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel} />
           </div>
         </div>
       )}
@@ -806,7 +816,7 @@ export default function TenderPage() {
         <SpacePanel excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
           inboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).palet} outboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).palet}
           uomIn={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).ok ? 'palet' : volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).ok ? 'palet' : volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
-          jumlahShift={t.jumlah_shift} onChange={excel => setA({ space: { ...a.space, excel } })}
+          jumlahShift={t.jumlah_shift} onChange={ubahSpaceExcel}
           komersial={<BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
             posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
             posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
@@ -1011,4 +1021,33 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
       <div className="row hasil-aksi"><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
     </>
   );
+}
+
+const PALET_PRESET = [
+  { p: 1.2, l: 1.0, label: '1,2 × 1,0 m (standar)' }, { p: 1.2, l: 1.2, label: '1,2 × 1,2 m' },
+  { p: 1.1, l: 1.1, label: '1,1 × 1,1 m (JIS / Asia)' }, { p: 1.2, l: 0.8, label: '1,2 × 0,8 m (EUR)' },
+];
+/** Ukuran palet (Key assumption) — sumber yang sama dengan Warehouse Planning: susunan produk per palet, luas block stack / pallet floor, tebal palet di racking level. */
+function UkuranPalet({ excel, onChange }: { excel: SpaceExcel; onChange: (x: SpaceExcel) => void }) {
+  const pal = excel.palet;
+  const preset = PALET_PRESET.findIndex(p => Math.abs(p.p - pal.panjang) < 1e-6 && Math.abs(p.l - pal.lebar) < 1e-6);
+  const set = (panjang: number, lebar: number) => onChange({ ...excel, palet: { panjang, lebar } });
+  const kecil = { width: 70, minWidth: 70, textAlign: 'right' as const };
+  return <div className="f" style={{ gridColumn: 'span 2' }}>
+    <label htmlFor="palet-ukuran">Ukuran palet</label>
+    <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+      <select id="palet-ukuran" value={preset >= 0 ? String(preset) : 'custom'} style={{ minWidth: 190 }}
+        onChange={e => { const i = Number(e.target.value); if (e.target.value !== 'custom' && PALET_PRESET[i]) set(PALET_PRESET[i].p, PALET_PRESET[i].l); }}>
+        {PALET_PRESET.map((p, i) => <option key={i} value={i}>{p.label}</option>)}
+        <option value="custom">Custom (isi P × L)</option>
+      </select>
+      <AngkaInput aria-label="Panjang palet (m)" step="any" min={0} value={pal.panjang} style={kecil} onValue={v => set(v, pal.lebar)} />
+      <span>×</span>
+      <AngkaInput aria-label="Lebar palet (m)" step="any" min={0} value={pal.lebar} style={kecil} onValue={v => set(pal.panjang, v)} />
+      <span className="small">m · tebal</span>
+      <AngkaInput aria-label="Tebal palet (mm)" step="any" min={0} value={excel.rak.palletMm} style={kecil} onValue={v => onChange({ ...excel, rak: { ...excel.rak, palletMm: v } })} />
+      <span className="small">mm</span>
+    </div>
+    <span className="small muted">Dipakai untuk susunan produk per palet (tab Produk), luas block stack / pallet floor, dan tinggi palet di racking level (Warehouse Planning). Pilih Custom atau ketik langsung P × L.</span>
+  </div>;
 }

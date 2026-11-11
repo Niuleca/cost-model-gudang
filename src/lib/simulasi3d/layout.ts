@@ -25,7 +25,7 @@ export interface AktSim { no: number; aktivitas: string; tahap: string; tool: st
 /** Parameter simulasi — angka awal dari sheet Space tender, bisa direvisi di halaman simulasi (tidak mengubah tender). */
 export interface ParamSim {
   lebarM: number;
-  sideMm: number; centerMm: number; beamMm: number; palletMm: number; productMm: number; clearanceMm: number; levelManual: number | null;
+  sideMm: number; centerMm: number; beamMm: number; palletMm: number; productMm: number; clearanceMm: number; levelManual: number | null; tinggiLevel?: (number | null)[];
   porsi: { spr: number; ddr: number; block: number; floor: number };
   spr: { koridor: number; depth: number; width: number; ppl: number };
   ddr: { koridor: number; depth: number; width: number; ppl: number; deep: number };
@@ -89,7 +89,7 @@ export function paramAwal(t: TenderRow, h: HasilTender): ParamSim {
   return {
     lebarM: lebarIsi || Math.max(15, Math.round(Math.sqrt(Math.max(luas, 150) / 1.6))),
     sideMm: num(x.rak.sideMm, 10000), centerMm: num(x.rak.centerMm, 13000), beamMm: num(x.rak.beamMm, 100), palletMm: num(x.rak.palletMm, 150),
-    productMm: num(x.rak.productMm, 1250), clearanceMm: num(x.rak.clearanceMm, 100), levelManual: x.rak.levelManual && x.rak.levelManual > 0 ? x.rak.levelManual : null,
+    productMm: num(x.rak.productMm, 1250), clearanceMm: num(x.rak.clearanceMm, 100), levelManual: x.rak.levelManual && x.rak.levelManual > 0 ? x.rak.levelManual : null, tinggiLevel: x.rak.tinggiLevel ?? [],
     porsi: { spr: num(x.porsi?.spr), ddr: num(x.porsi?.ddr), block: num(x.porsi?.block), floor: num(x.porsi?.floor) },
     spr: { koridor: num(x.sd.koridor, 1.7), depth: num(x.sd.depth, 1.15), width: num(x.sd.width, 2.7), ppl: num(x.sd.paletPerLevel, 2) },
     ddr: { koridor: num(x.dd.koridor, 1.85), depth: num(x.dd.depth, 2.4), width: num(x.dd.width, 2.7), ppl: num(x.dd.paletPerLevel, 2), deep: num(x.dd.deep, 2) },
@@ -127,12 +127,12 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
   const luasRencana = num(h.space.totalM2);
   const W = Math.max(8, num(p.lebarM, 23));
   if (!num(t.asumsi.space?.excel?.lebarGudangM, 0) && !o.param?.lebarM) asumsi.push(`Lebar gudang (L) belum diisi di Warehouse Planning → Dimensi gedung → otomatis ${fmt(W)} m (rasio panjang : lebar ± 1,6 : 1).`);
-  const lv = hitungLevelRak({ centerMm: p.centerMm, sideMm: p.sideMm, beamMm: p.beamMm, palletMm: p.palletMm, productMm: p.productMm, clearanceMm: p.clearanceMm, levelManual: p.levelManual });
+  const lv = hitungLevelRak({ centerMm: p.centerMm, sideMm: p.sideMm, beamMm: p.beamMm, palletMm: p.palletMm, productMm: p.productMm, clearanceMm: p.clearanceMm, levelManual: p.levelManual, tinggiLevel: p.tinggiLevel });
   const level = Math.max(1, lv.level);
   const sideM = p.sideMm / 1000, centerM = Math.max(sideM, p.centerMm / 1000);
   const tinggiPalet = (p.palletMm + p.productMm) / 1000;
   const levelY = [0];
-  for (let l = 1; l < level; l++) levelY.push((lv.level1 + (l - 1) * lv.levelN + p.beamMm) / 1000);
+  for (let l = 1; l < level; l++) levelY.push(((lv.dasar[l] ?? lv.level1 + (l - 1) * lv.levelN) + p.beamMm) / 1000);
   const tinggiRak = Math.max(lv.tinggi / 1000, levelY[levelY.length - 1] + tinggiPalet + 0.1);
   const ppTotal = num(h.space.ppDesain, num(sx.ppTotal));
 

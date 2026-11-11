@@ -170,6 +170,22 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
               <tr className="sp-hitam"><td>Rack Level</td><td className="num">{angka(h.level.level, 1)}</td><td>Level</td></tr>
               <tr><td>Total height</td><td className="num">{f0(h.level.tinggi)}</td><td><span className={`pill ${h.level.ok ? 'ok' : 'bad'}`}>{h.level.ok ? 'OK' : 'Melebihi'}</span></td></tr>
             </tbody></table>
+            <details open={h.level.adaManual}>
+              <summary className="small" style={{ cursor: 'pointer' }}><b>Tinggi per level</b> (opsional){h.level.adaManual ? ' · ada level manual' : ' · semua otomatis'}</summary>
+              <p className="small muted" style={{ margin: '6px 0' }}>Isi kolom Manual hanya untuk level yang tingginya beda. Kosong = otomatis: level 1 = Pallet + Product + Clearance ({f0(h.level.level1)} mm), level 2+ = ditambah Beam ({f0(h.level.levelN)} mm). Tinggi level = dari lantai / beam bawah s/d beam berikutnya.</p>
+              <table className="sp-tabel sp-kecil"><tbody>
+                <tr className="sp-judul"><td>Level</td><td className="num">Otomatis</td><td className="num">Manual</td><td className="num">Dasar → puncak</td></tr>
+                {h.level.perLevel.map((t, i) => {
+                  const man = x.rak.tinggiLevel?.[i];
+                  const setMan = (v: number | null) => { const arr = [...(x.rak.tinggiLevel ?? [])]; while (arr.length <= i) arr.push(null); arr[i] = v && v > 0 ? v : null;
+                    while (arr.length && !(Number(arr[arr.length - 1]) > 0)) arr.pop(); set({ rak: { ...x.rak, tinggiLevel: arr } }); };
+                  return <tr key={i} className={h.level.manual[i] ? 'sp-hijau' : ''}><td>L{i + 1}</td><td className="num muted">{f0(i === 0 ? h.level.level1 : h.level.levelN)}</td>
+                    <td className="num">{inp(man ?? null, setMan, { w: 80, kosong: true, ph: 'auto' })}</td>
+                    <td className="num small">{f0(h.level.dasar[i]) === '–' ? '0' : f0(h.level.dasar[i])} → {f0(h.level.dasar[i] + t)}</td></tr>;
+                })}
+              </tbody></table>
+              {h.level.adaManual && <div className="row" style={{ marginTop: 6 }}><button className="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => set({ rak: { ...x.rak, tinggiLevel: [] } })}>Reset semua ke otomatis</button></div>}
+            </details>
           </div>
 
           <div className="card" style={{ gap: 8, padding: 12 }}>
@@ -203,7 +219,7 @@ function VisualRak({ x, lv }: { x: SpaceExcel; lv: ReturnType<typeof import('@/l
   const blokX = adaBlok ? (adaRak ? posisi.slice(2) : posisi) : [];
   const tumpuk = Math.max(1, (x.porsi?.block ?? 0) > 0 ? x.block?.tumpuk ?? 1 : 1);
   const tPaletMm = x.rak.palletMm + x.rak.productMm, tBlokMm = tumpuk * tPaletMm;
-  const tinggiLevel = (i: number) => (i === 0 ? 0 : lv.level1 + (i - 1) * lv.levelN);
+  const tinggiLevel = (i: number) => lv.dasar[i] ?? (i === 0 ? 0 : lv.level1 + (i - 1) * lv.levelN);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Rak ${lv.level} level, tinggi ${lv.tinggi} mm, tinggi sisi gudang ${x.rak.sideMm} mm`}>
       <polygon points={`${kiri},${dasar} ${kiri},${ySide} ${tengah},${yCenter} ${kanan},${ySide} ${kanan},${dasar}`} fill="var(--surface-2)" stroke="var(--line)" />
@@ -213,7 +229,10 @@ function VisualRak({ x, lv }: { x: SpaceExcel; lv: ReturnType<typeof import('@/l
           <rect x={rx} y={dasar - lv.tinggi * sk} width={44} height={lv.tinggi * sk} fill="none" stroke="#6b6b6b" strokeWidth={1.2} />
           {Array.from({ length: lv.level }, (_, i) => {
             const y0 = dasar - tinggiLevel(i) * sk;
-            const tProd = x.rak.productMm * sk, tPal = x.rak.palletMm * sk, tBeam = i === 0 ? 0 : x.rak.beamMm * sk;
+            // level manual: sisa tinggi setelah beam, palet & clearance = ruang produk
+            const tinggiLv = lv.perLevel[i] ?? (i === 0 ? lv.level1 : lv.levelN);
+            const prodMm = Math.max(0, tinggiLv - (i === 0 ? 0 : x.rak.beamMm) - x.rak.palletMm - x.rak.clearanceMm);
+            const tProd = prodMm * sk, tPal = x.rak.palletMm * sk, tBeam = i === 0 ? 0 : x.rak.beamMm * sk;
             return <g key={i}>
               {i > 0 && <rect x={rx} y={y0 - tBeam} width={44} height={Math.max(1, tBeam)} fill="#4a4a4a" />}
               <rect x={rx + 3} y={y0 - tBeam - tPal} width={38} height={Math.max(1, tPal)} fill="#a0a0a0" />

@@ -33,6 +33,7 @@ export function tulisKeyAssumption(x: Ctx) {
   KA.field('Cuti tahunan per orang', a.cutiTahunanHari, 'n0', 'in', 'hari', 'Masuk ke faktor pengganti headcount', 'Cuti');
   KA.field('Faktor produktivitas', a.faktorProduktivitas, 'pct', 'in', '', 'pengali produktivitas standar', 'FProd');
   KA.field('Efisiensi kerja', a.efisiensi, 'pct', 'in', '', 'Man hour = RfR ÷ efisiensi', 'Efis');
+  KA.field('Ukuran palet (P × L · tebal)', { f: 'FIXED(PalP,2)&" × "&FIXED(PalL,2)&" m · tebal "&FIXED(RkPallet,0)&" mm"' }, 'teks', 'out', '', 'input di sheet Warehouse Planning (Dimensi palet & Racking level → Pallet) — dipakai susunan produk per palet & luas block stack');
 
   // ---- Workload palletize vs loose
   const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };

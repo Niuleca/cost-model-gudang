@@ -24,7 +24,7 @@ export interface DataWeb { t: TenderRow; h: HasilTender; m: MasterData; inp: Ten
 /** Nama sheet = nama tab tender di web (urutan sama). */
 export const SH = { ka: 'Key assumption', vo: 'Volume', pr: 'Produk', vsm: 'Value Stream Mapping', wp: 'Warehouse Planning', lic: 'Loan & Interest Calculator',
   te: 'Technology & Equipment', um: 'Utilities Management', ca: 'Cost Allocation', rs: 'Result', qu: 'Quotation' } as const;
-export const SHEET_WEB = [SH.ka, SH.vo, SH.pr, SH.vsm, SH.wp, SH.lic, SH.te, SH.um, SH.ca, SH.rs, SH.qu] as const;
+export const SHEET_WEB = [SH.ka, SH.vo, SH.wp, SH.pr, SH.vsm, SH.lic, SH.te, SH.um, SH.ca, SH.rs, SH.qu] as const;
 export const MENU: [string, string][] = [['0 Ringkasan', 'Ringkasan'], ...SHEET_WEB.map(s => [s, s] as [string, string]), ['Daftar', 'Daftar (droplist)']];
 
 export const huruf = (c: number) => { let s = ''; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };

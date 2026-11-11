@@ -5,7 +5,7 @@ import type { HasilTender } from '../engine/index';
 import type { TenderRow } from '../tender';
 import { kategoriOrang, jenisMhe, susunLayout, type LayoutGudang } from '../simulasi3d/layout';
 import { buatRng } from './dasar';
-import { ATURAN_BERAT_DEFAULT, hitungProduk, produkEfektif, uppEfektif } from '../produk';
+import { ATURAN_BERAT_DEFAULT, hitungProduk, paletDariSpace, produkEfektif, uppEfektif } from '../produk';
 import { hitungLevelRak, lengkapiSpaceExcel } from '../engine/space';
 import type { JenisTugas, Kemampuan, Lokasi, Produktivitas, Skenario, Sku } from './tipe';
 
@@ -87,10 +87,11 @@ export function skenarioDariTender(t: TenderRow, h: HasilTender, o: OpsiSkenario
   const sku: Sku[] = []; let no = 0;
   const aturan = t.asumsi.aturanBerat ?? ATURAN_BERAT_DEFAULT;
   const levelRak = Math.max(1, hitungLevelRak(lengkapiSpaceExcel(t.asumsi.space?.excel).rak).level || 1);
+  const dimPalet = paletDariSpace(lengkapiSpaceExcel(t.asumsi.space?.excel));
   const produk = produkEfektif(t.asumsi.produk, vols, t.asumsi.profilVolume);
   const produkNyata = (t.asumsi.produk ?? []).filter(x => !x.otomatis && uppEfektif(x) > 0).length > 0;
   if (produkNyata) {
-    const xs = produk.filter(x => uppEfektif(x) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak) }));
+    const xs = produk.filter(x => uppEfektif(x) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak, undefined, dimPalet) }));
     const totPal = xs.reduce((a, r) => a + Math.max(r.h.palet, 1), 0);
     // kelas ABC dari porsi palet (kumulatif 60 / 90 %)
     let kum = 0;
@@ -106,7 +107,7 @@ export function skenarioDariTender(t: TenderRow, h: HasilTender, o: OpsiSkenario
   } else {
     const kelas: { k: Sku['kelas']; n: number; porsi: number }[] = [{ k: 'A', n: 4, porsi: 0.6 }, { k: 'B', n: 6, porsi: 0.3 }, { k: 'C', n: 10, porsi: 0.1 }];
     // aturan berat dari baris otomatis (key assumption) tetap berlaku untuk SKU contoh
-    const hAuto = produk[0] ? hitungProduk(produk[0], aturan, levelRak) : null;
+    const hAuto = produk[0] ? hitungProduk(produk[0], aturan, levelRak, undefined, dimPalet) : null;
     const lvAuto = hAuto && hAuto.levelMaks < levelRak ? hAuto.levelMaks : undefined;
     for (const c of kelas) for (let i = 0; i < c.n; i++) {
       no++;

@@ -1,6 +1,6 @@
 // Sheet "Warehouse Planning" (gudang, space, racking), "Technology & Equipment" (MHE, IT, biaya lain), "Utilities Management" (listrik, air) dan "Loan & Interest Calculator".
 import { R, q, BUCKETS, ALOKASI, normAlok, namaAlok, RISIKO_DEFAULT, type Ctx, type Line } from '@/lib/exportWebUtil';
-import { lengkapiSpaceExcel } from '@/lib/engine/space';
+import { MAKS_LEVEL_RAK, lengkapiSpaceExcel } from '@/lib/engine/space';
 import { KELOMPOK_ASET, basisDari, perlakuanDari, UMUR_IT_DEFAULT } from '@/lib/it';
 import { SEKSI_BIAYA, seksiDari } from '@/lib/biayaLain';
 
@@ -119,11 +119,28 @@ export function tulisGudang(x: Ctx) {
   GD.field('Clearance', sx.rak.clearanceMm, 'n0', 'in', 'mm', '', 'RkClear');
   GD.field('Total height / pallet (level 2 up)', { f: 'RkBeam+RkPallet+RkProduct+RkClear' }, 'n0', 'out', 'mm', '', 'RkLvN');
   GD.field('Total height / pallet (level 1)', { f: 'RkPallet+RkProduct+RkClear' }, 'n0', 'out', 'mm', '', 'RkLv1');
-  GD.field('Level otomatis', { f: 'IF(AND(RkSide>=RkLv1,RkLvN>0),1+INT((RkSide-RkLv1)/RkLvN+1E-9),0)' }, 'n0', 'out', 'level', '', 'RkAuto');
+  GD.field('Level otomatis', { f: `IF(RkLvN>0,COUNTIF(RkLvPuncak,"<="&(RkSide+1E-9)),0)` }, 'n0', 'out', 'level', 'jumlah level yang puncaknya ≤ side height (tabel tinggi per level)', 'RkAuto');
   GD.field('Level manual (opsional)', sx.rak.levelManual ?? null, 'n0', 'in', 'level', 'kosong = otomatis', 'RkManual');
   GD.field('Rack Level', { f: 'IF(N(RkManual)>0,RkManual,RkAuto)', v: h.space.levelRak }, 'n1', 'out', 'level', '', 'RackLevel');
-  GD.field('Total height', { f: 'IF(RackLevel>0,RkLv1+(RackLevel-1)*RkLvN,0)' }, 'n0', 'out', 'mm', '', 'RkTinggi');
+  GD.field('Total height', { f: `IF(RackLevel>0,SUMIF(RkLvNo,"<="&RackLevel,RkLvPakai)+MAX(0,RackLevel-${MAKS_LEVEL_RAK})*RkLvN,0)` }, 'n0', 'out', 'mm', '', 'RkTinggi');
   GD.field('Cek tinggi', { f: 'IF(RkTinggi<=RkSide,"OK","Melebihi tinggi sisi gudang")' }, 'teks', 'out');
+  // tinggi per level: otomatis = level 1 / level 2+, manual (opsional) menimpa level tersebut
+  GD.r++; GD.h3('Tinggi per level (opsional)');
+  GD.note('Isi kolom "Tinggi manual" untuk level yang tingginya beda (mis. level 1 lebih tinggi untuk barang besar). Kosong = otomatis. Tinggi level = dari lantai / beam bawah s/d beam berikutnya.');
+  GD.hdr([['Level', false], ['Tinggi otomatis (mm)', false, 'Level 1 = Pallet + Product + Clearance; level 2+ = + Beam'], ['Tinggi manual (mm)', true, 'Kosong = otomatis'], ['Tinggi dipakai (mm)', false], ['Dasar level (mm)', false, 'Elevasi bawah level'], ['Puncak (mm)', false], ['Terpakai', false, 'Level ≤ Rack Level']]);
+  const lv0 = GD.r;
+  for (let i = 0; i < MAKS_LEVEL_RAK; i++) {
+    const r = GD.r, man = Number(sx.rak.tinggiLevel?.[i]);
+    GD.put(1, i + 1, { j: 'txt', fmt: 'n0', al: 'center' });
+    GD.put(2, { f: i === 0 ? 'RkLv1' : 'RkLvN' }, { j: 'out', fmt: 'n0' });
+    GD.put(3, man > 0 ? man : null, { j: 'in', fmt: 'n0' });
+    GD.put(4, { f: `IF(N(C${r})>0,C${r},B${r})` }, { j: 'out', fmt: 'n0' });
+    GD.put(5, { f: i === 0 ? '0' : `F${r - 1}` }, { j: 'out', fmt: 'n0' });
+    GD.put(6, { f: `E${r}+D${r}` }, { j: 'out', fmt: 'n0' });
+    GD.put(7, { f: `IF(A${r}<=RackLevel,"Ya","")` }, { j: 'out', al: 'center' });
+    GD.r++;
+  }
+  GD.nmR('RkLvNo', 1, lv0, GD.r - 1); GD.nmR('RkLvPakai', 4, lv0, GD.r - 1); GD.nmR('RkLvPuncak', 6, lv0, GD.r - 1);
 
   GD.r++; GD.h3('Komposisi luas');
   GD.hdr(['Area', 'm²', '%']);
