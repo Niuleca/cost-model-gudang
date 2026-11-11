@@ -72,6 +72,43 @@ export default function VsmMapPanel({ tenderId, kode, customer, aktivitas, pd, v
     setSop(p.tahap, { file: null });
   }
 
+  /** Isi satu WI / SOP proses (tabel identitas, langkah kerja, KPI, K3, catatan). */
+  function isiWi(lane: string, p: ProsesVsm): BlokDocx[] {
+    const s = sopEfektif(p, wiPrefix, sopMap[p.tahap]);
+    const b: BlokDocx[] = [{ t: 'tabel', lebar: [0.24, 0.76], baris: [
+      ['Tujuan', s.tujuan], ['Ruang lingkup', s.lingkup], ['Penanggung jawab (PIC)', s.pic],
+      ['Manpower', s.manpower.join('\n') || '-'], ['MHE', s.mhe.join('\n') || 'Tidak ada (manual)'], ['Alat pendukung', s.alat.join('\n') || '-'],
+      ['Dokumen', s.dokumen], ['Sistem', s.sistem], ['Buffer / staging', adaBuffer(p, vsm) ? 'Ya — barang menunggu di area staging setelah proses ini' : 'Tidak'],
+      ['Lead time lane', vsm?.leadTime?.[lane] ?? leadTimeDefault(lane) ?? '-'],
+    ] }];
+    b.push({ t: 'h3', teks: 'Langkah kerja' }, { t: 'list', nomor: true, item: s.langkah.split('\n') });
+    b.push({ t: 'h3', teks: 'KPI / target' }, { t: 'list', item: s.kpi.split('\n') });
+    b.push({ t: 'h3', teks: 'K3 / keselamatan' }, { t: 'list', item: s.k3.split('\n') });
+    if (s.catatan.trim()) b.push({ t: 'h3', teks: 'Catatan' }, { t: 'p', teks: s.catatan });
+    return b;
+  }
+  /** Unduh WI satu proses: file upload (bila ada) atau dokumen Word / PDF dari SOP draft / editan. */
+  async function unduhWi(lane: string, p: ProsesVsm, format: 'docx' | 'pdf') {
+    const s = sopEfektif(p, wiPrefix, sopMap[p.tahap]);
+    setSibuk(true); setPesan(null);
+    try {
+      if (s.file) {
+        const { data, error } = await supabaseBrowser().storage.from(BUCKET).download(s.file.path);
+        if (error || !data) { setPesan(`Gagal mengunduh ${s.file.nama}: ${error?.message ?? ''}`); return; }
+        unduhBlob(data, `${aman(s.wi)} - ${aman(s.file.nama)}`); return;
+      }
+      const tgl = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      const blok: BlokDocx[] = [
+        { t: 'judul', teks: `Work Instruction ${s.wi}` },
+        { t: 'p', teks: `${lane} · ${p.label} — ${customer || 'Customer'} · tender ${kode || '-'}${vsm?.versi ? ` · versi ${vsm.versi}` : ''} · ${tgl}`, kecil: true },
+        ...isiWi(lane, p),
+      ];
+      const nama = `${aman(s.wi)} - ${aman(p.label)}`;
+      if (format === 'pdf') unduhBlob(await buatPdf(blok, `${s.wi} — ${p.label}`), `${nama}.pdf`);
+      else unduhBlob(await buatDocx(blok, `${s.wi} ${p.label}`), `${nama}.docx`);
+    } finally { setSibuk(false); }
+  }
+
   /** Dokumen Word SOP (semua proses aktif). */
   function blokSop(): BlokDocx[] {
     const b: BlokDocx[] = [
@@ -95,16 +132,7 @@ export default function VsmMapPanel({ tenderId, kode, customer, aktivitas, pd, v
         const s = sopEfektif(p, wiPrefix, sopMap[p.tahap]);
         b.push({ t: 'h2', teks: `${s.wi} — ${p.label}` });
         if (s.file) { b.push({ t: 'p', teks: `SOP proses ini mengikuti dokumen terlampir: ${s.file.nama} (file upload, disertakan di paket ZIP).`, miring: true }); continue; }
-        b.push({ t: 'tabel', lebar: [0.24, 0.76], baris: [
-          ['Tujuan', s.tujuan], ['Ruang lingkup', s.lingkup], ['Penanggung jawab (PIC)', s.pic],
-          ['Manpower', s.manpower.join('\n') || '-'], ['MHE', s.mhe.join('\n') || 'Tidak ada (manual)'], ['Alat pendukung', s.alat.join('\n') || '-'],
-          ['Dokumen', s.dokumen], ['Sistem', s.sistem], ['Buffer / staging', adaBuffer(p, vsm) ? 'Ya — barang menunggu di area staging setelah proses ini' : 'Tidak'],
-          ['Lead time lane', vsm?.leadTime?.[L.lane] ?? leadTimeDefault(L.lane) ?? '-'],
-        ] });
-        b.push({ t: 'h3', teks: 'Langkah kerja' }, { t: 'list', nomor: true, item: s.langkah.split('\n') });
-        b.push({ t: 'h3', teks: 'KPI / target' }, { t: 'list', item: s.kpi.split('\n') });
-        b.push({ t: 'h3', teks: 'K3 / keselamatan' }, { t: 'list', item: s.k3.split('\n') });
-        if (s.catatan.trim()) b.push({ t: 'h3', teks: 'Catatan' }, { t: 'p', teks: s.catatan });
+        b.push(...isiWi(L.lane, p));
       }
     }
     const mati = lanes.flatMap(L => L.proses.flatMap(p => p.items.filter(i => !i.aktif).map(i => `${L.lane} · ${p.label}: ${i.aktivitas}`)));
@@ -189,7 +217,8 @@ export default function VsmMapPanel({ tenderId, kode, customer, aktivitas, pd, v
                 <div className={`vsm-proses lm-proses${p.aktif ? '' : ' mati'}`}>
                   <div className="vsm-proses-head">
                     <label><input type="checkbox" disabled={!bisaEdit} checked={p.aktif} onChange={e => onAktif(p.items.map(i => i.idx), e.target.checked)} /> <b>{p.label}</b></label>
-                    <i className="vsm-chip wi" title={s.file ? `SOP file: ${s.file.nama}` : 'nomor WI / SOP'}>{s.wi}{s.file ? ' 📎' : ''}</i>
+                    <button type="button" className="vsm-chip wi lm-wi-btn" disabled={sibuk || !p.aktif} onClick={() => void unduhWi(L.lane, p, 'docx')}
+                      title={p.aktif ? (s.file ? `Unduh WI (file ${s.file.nama})` : 'Klik untuk unduh WI proses ini (Word). PDF ada di bagian SOP per proses.') : 'Proses tidak dipakai'}>{s.wi}{s.file ? ' 📎' : ''} ⬇</button>
                   </div>
                   {p.aktif && <>
                     <div className="lm-ikon">
@@ -254,6 +283,8 @@ export default function VsmMapPanel({ tenderId, kode, customer, aktivitas, pd, v
           <summary><b>{s.wi}</b> — {L.lane} · {p.label}{!p.aktif ? ' (tidak dipakai)' : ''}{s.file ? ` · 📎 ${s.file.nama}` : s.diubah ? ' · diedit' : ' · draft otomatis'}</summary>
           {!p.aktif ? <p className="small muted">Semua aktivitas proses ini dimatikan — tidak masuk SOP & biaya.</p> : <>
             <div className="row small" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0' }}>
+              <button style={{ padding: '3px 10px' }} disabled={sibuk} onClick={() => void unduhWi(L.lane, p, 'docx')}>⬇ Unduh WI {s.file ? '(file)' : '(Word)'}</button>
+              {!s.file && <button className="ghost" style={{ padding: '3px 10px' }} disabled={sibuk} onClick={() => void unduhWi(L.lane, p, 'pdf')}>⬇ WI (PDF)</button>}
               {s.file ? <>
                 <span>SOP memakai file <b>{s.file.nama}</b>{s.file.ukuran ? ` (${angka(s.file.ukuran / 1024, 0)} KB)` : ''}</span>
                 <button className="ghost" style={{ padding: '3px 10px' }} onClick={() => bukaFile(s.file!.path)}>Buka</button>

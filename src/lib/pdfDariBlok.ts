@@ -14,7 +14,10 @@ const bersih = (b: BlokDocx): BlokDocx => {
 export async function buatPdf(blokAsli: BlokDocx[], judulDok: string): Promise<Blob> {
   const blok = blokAsli.map(bersih); judulDok = aman(judulDok);
   const { jsPDF } = await import('jspdf');
-  const autoTable = (await import('jspdf-autotable')).default;
+  // interop ESM/CJS: fungsi bisa di .default, .default.default, atau .autoTable
+  const m = await import('jspdf-autotable') as unknown as Record<string, unknown> & { default?: unknown };
+  const d = m.default as (Record<string, unknown> & { default?: unknown }) | ((...a: unknown[]) => void) | undefined;
+  const autoTable = (typeof d === 'function' ? d : typeof d?.default === 'function' ? d.default : m.autoTable ?? (d as Record<string, unknown> | undefined)?.autoTable) as (doc: unknown, opt: Record<string, unknown>) => void;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const M = 16, W = 210 - 2 * M, BAWAH = 297 - 16;
   let y = M;

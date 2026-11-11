@@ -754,3 +754,7 @@ tr.akt-nonaktif td:first-child { opacity: 1; }
 .lm-lead-seg { flex-basis: 180px; display: flex; flex-direction: column; gap: 2px; padding: 4px 8px; border-right: 1px dashed var(--line); font-size: 13px; font-weight: 600; }
 .lm-lead-seg input { width: 70px; min-width: 70px; padding: 1px 6px; min-height: 0; text-align: right; }
 .lm-lead-tot { flex-basis: 100%; padding: 6px 8px 0; font-size: 13px; }
+
+.lm-wi-btn { cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; min-height: 0; line-height: 1.5; color: inherit; }
+.lm-wi-btn:hover:not(:disabled) { background: #ffe58a; }
+.lm-wi-btn:disabled { cursor: default; opacity: .6; }
