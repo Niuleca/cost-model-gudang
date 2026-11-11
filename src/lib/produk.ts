@@ -50,8 +50,9 @@ export function estimasiDimensi(cbm: number) {
 }
 
 /** Batas berat per palet → level rak tertinggi yang diizinkan (level 1 = lantai / beam terbawah). */
-export interface AturanBerat { tarePaletKg: number; kapPosisiKg: number; batas: { kgMaks: number; levelMaks: number }[] }
+export interface AturanBerat { tarePaletKg: number; kapPosisiKg: number; batas: { kgMaks: number; levelMaks: number }[]; kelasRak?: string }
 export const ATURAN_BERAT_DEFAULT: AturanBerat = {
+  kelasRak: 'medium',
   tarePaletKg: 25,       // berat palet kayu kosong
   kapPosisiKg: 1000,     // kapasitas beam per posisi palet (rak standar ±2.000 kg per pasang beam / 2 palet)
   batas: [
@@ -60,6 +61,45 @@ export const ATURAN_BERAT_DEFAULT: AturanBerat = {
     { kgMaks: 900, levelMaks: 2 },    // 750–900 kg: maks level 2
   ],                                  // > 900 kg (± 1 ton): hanya level 1 / lantai
 };
+
+/**
+ * Kelas rak selective standar (asumsi umum, konfirmasi ke vendor rak): kapasitas beam per posisi palet (sepasang beam
+ * menahan 2 palet → kapasitas pasang = 2 × per posisi) dan batas berat → level tertinggi. Semua angka bisa diedit.
+ */
+export const KELAS_RAK: { id: string; nama: string; ket: string; kapPosisiKg: number; batas: AturanBerat['batas'] }[] = [
+  { id: 'light', nama: 'Light duty (ringan)', ket: 'beam ± 1.000 kg/pasang · barang ringan, karton FMCG ringan',
+    kapPosisiKg: 500, batas: [{ kgMaks: 300, levelMaks: 99 }, { kgMaks: 400, levelMaks: 3 }, { kgMaks: 500, levelMaks: 2 }] },
+  { id: 'medium', nama: 'Medium duty (standar)', ket: 'beam ± 2.000 kg/pasang · rak selective umum',
+    kapPosisiKg: 1000, batas: [{ kgMaks: 500, levelMaks: 99 }, { kgMaks: 750, levelMaks: 3 }, { kgMaks: 900, levelMaks: 2 }] },
+  { id: 'heavy', nama: 'Heavy duty (berat)', ket: 'beam ± 3.000 kg/pasang · cairan, oli, kimia, minuman',
+    kapPosisiKg: 1500, batas: [{ kgMaks: 1000, levelMaks: 99 }, { kgMaks: 1250, levelMaks: 3 }, { kgMaks: 1500, levelMaks: 2 }] },
+  { id: 'extra', nama: 'Extra heavy duty', ket: 'beam ± 4.000 kg/pasang · semen, logam, IBC, drum penuh',
+    kapPosisiKg: 2000, batas: [{ kgMaks: 1500, levelMaks: 99 }, { kgMaks: 1800, levelMaks: 3 }, { kgMaks: 2000, levelMaks: 2 }] },
+];
+/** Kelas rak yang angkanya persis sama dengan aturan (null = sudah diubah / custom). */
+export function kelasRakDari(at: AturanBerat) {
+  const k = KELAS_RAK.find(x => x.id === (at.kelasRak ?? 'medium'));
+  const sama = !!k && k.kapPosisiKg === at.kapPosisiKg && k.batas.length === at.batas.length && k.batas.every((b, i) => b.kgMaks === at.batas[i]?.kgMaks && b.levelMaks === at.batas[i]?.levelMaks);
+  return { kelas: k ?? null, diubah: !sama };
+}
+/** Batas berat agar palet boleh di semua level (0 bila tidak ada aturan "semua level"). */
+const batasSemuaLevel = (batas: AturanBerat['batas']) => Math.max(0, ...batas.filter(b => b.levelMaks >= 99).map(b => b.kgMaks));
+/**
+ * Saran kelas rak dari palet terberat yang (boleh) disimpan di rak:
+ * minimal = kelas teringan yang beam-nya kuat (palet tidak dipaksa ke lantai); semuaLevel = kelas teringan yang membolehkan semua level.
+ */
+export function saranKelasRak(beratMaksKg: number, at: AturanBerat) {
+  const minimal = KELAS_RAK.find(k => beratMaksKg <= k.kapPosisiKg) ?? null;
+  const semuaLevel = KELAS_RAK.find(k => beratMaksKg <= batasSemuaLevel(k.batas)) ?? null;
+  const kuat = beratMaksKg <= at.kapPosisiKg, bebas = beratMaksKg <= batasSemuaLevel(at.batas);
+  const dupe = at.batas.map(b => b.kgMaks).filter((v, i, a) => a.indexOf(v) !== i);
+  return { beratMaksKg, minimal, semuaLevel, kuat, bebas, duplikat: Array.from(new Set(dupe)) };
+}
+/** Palet terberat dari produk yang disimpan / boleh disimpan di rak (cara simpan otomatis, SPR, DDR). */
+export function beratPaletKandidatRak(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, palet: PaletDim | PaletProduk = PALET_DEFAULT) {
+  const xs = daftar.filter(x => !x.simpan || ['otomatis', 'spr', 'ddr'].includes(x.simpan)).map(x => hitungProduk(x, aturan, 99, undefined, palet).beratPaletKg).filter(v => v > 0);
+  return xs.length ? Math.max(...xs) : 0;
+}
 
 const n = (x: unknown) => (Number.isFinite(Number(x)) ? Number(x) : 0);
 const isCase = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes((u ?? '').trim().toLowerCase());

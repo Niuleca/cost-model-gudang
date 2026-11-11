@@ -1,7 +1,7 @@
 // Sheet "Produk" — sama dengan tab Produk di web: daftar SKU (input) + turunan per baris (rumus), aturan berat → level rak,
 // ringkasan tertimbang. Rumus mengikuti src/lib/produk.ts (hitungProduk / turunanProduk).
 import { type Ctx } from '@/lib/exportWebUtil';
-import { ATURAN_BERAT_DEFAULT, SIMPAN, produkEfektif, hitungProduk, paletDariSpace, paletUntuk } from '@/lib/produk';
+import { ATURAN_BERAT_DEFAULT, SIMPAN, kelasRakDari, produkEfektif, hitungProduk, paletDariSpace, paletUntuk } from '@/lib/produk';
 import { lengkapiSpaceExcel } from '@/lib/engine/space';
 
 export function tulisProduk(x: Ctx) {
@@ -13,6 +13,7 @@ export function tulisProduk(x: Ctx) {
   const sx = lengkapiSpaceExcel(a.space.excel); const dimPalet = paletDariSpace(sx); const palDom = paletUntuk({}, dimPalet);
 
   PR.h2('Aturan berat per palet', 'Batas berat per palet → level rak tertinggi (level 1 = lantai / beam terbawah). Berat > kapasitas beam → hanya lantai (block / floor).');
+  { const kr = kelasRakDari(at); PR.field('Jenis rak (standar kapasitas)', `${kr.kelas?.nama ?? 'Custom'}${kr.diubah ? ' — angka diubah manual' : ''}`, 'teks', 'out', '', kr.kelas?.ket ?? ''); }
   PR.field('Berat palet kayu kosong (tare)', at.tarePaletKg, 'n1', 'in', 'kg', 'ditambahkan ke berat muatan (kecuali UOM palet)', 'PrTare');
   PR.field('Kapasitas beam per posisi', at.kapPosisiKg, 'n0', 'in', 'kg/posisi', 'lebih berat → lantai saja', 'PrKap');
   PR.field('Level rak (Warehouse Planning)', { f: 'MAX(1,RackLevel)', v: levelRak }, 'n0', 'out', 'level', '', 'PrLevelRak');

@@ -14,7 +14,7 @@ import type { VolumeInput } from '@/lib/engine/types';
 import type { ProfilVolume } from '@/lib/profilVolume';
 import { hitungLevelRak, lengkapiSpaceExcel, type HasilSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
 import {
-  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, dimCm, paletDariSpace, paletUntuk, uppEfektif, type OpsiUpp, type SaranUpp, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
+  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, KELAS_RAK, beratPaletKandidatRak, kelasRakDari, saranKelasRak, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, dimCm, paletDariSpace, paletUntuk, uppEfektif, type OpsiUpp, type SaranUpp, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
   type AturanBerat, type PerubahanTender, type ProdukTender,
 } from '@/lib/produk';
 
@@ -247,7 +247,26 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
 
     <div className="card">
       <h2>Aturan berat → level rak</h2>
-      <p className="small muted">Berat per palet = UPP × berat per UOM + palet kosong. Barang berat dibatasi ke level bawah (level 1 = lantai / beam terbawah). Jumlah level rak = {levelRak} (dari tab Gudang, space & MHE: tinggi sisi {angka(sx.rak.sideMm)} mm, bukaan produk {angka(sx.rak.productMm)} mm).</p>
+      <p className="small muted">Berat per palet = UPP × berat per UOM + palet kosong. Barang berat dibatasi ke level bawah (level 1 = lantai / beam terbawah). Jumlah level rak = {levelRak} (dari tab Gudang, space & MHE: tinggi sisi {pj(sx.rak.sideMm, 'mm')}, bukaan produk {pj(sx.rak.productMm, 'mm')}).</p>
+      {(() => {
+        const kr = kelasRakDari(at), sr = saranKelasRak(beratPaletKandidatRak(daftar, at, dimPalet), at);
+        const pakai = (id: string) => { const k = KELAS_RAK.find(x => x.id === id); if (k) onAturan({ ...at, kelasRak: k.id, kapPosisiKg: k.kapPosisiKg, batas: k.batas.map(b => ({ ...b })) }); };
+        return <div className="rak-kelas">
+          <label className="f" htmlFor="kelas-rak" style={{ maxWidth: 520 }}>Jenis rak (standar kapasitas)
+            <select id="kelas-rak" value={kr.kelas?.id ?? 'medium'} onChange={e => pakai(e.target.value)}>
+              {KELAS_RAK.map(k => <option key={k.id} value={k.id}>{k.nama} · {angka(k.kapPosisiKg)} kg/posisi</option>)}</select>
+            <span className="small muted">{kr.kelas?.ket}{kr.diubah ? <> · <b>angka sudah diubah manual</b> <button className="link-kecil" onClick={() => pakai(kr.kelas?.id ?? 'medium')}>kembalikan ke standar</button></> : ' · angka standar, bisa diedit di bawah'}</span>
+          </label>
+          {sr.beratMaksKg > 0 && (!sr.kuat
+            ? <div className="notice small" style={{ borderColor: 'var(--bad, #c0392b)' }}>⚠ Palet terberat <b>{angka(sr.beratMaksKg)} kg</b> melebihi kapasitas rak {kr.kelas?.nama ?? 'ini'} ({angka(at.kapPosisiKg)} kg/posisi) → palet itu dipaksa ke lantai.
+                {sr.minimal ? <> Disarankan <b>{sr.minimal.nama}</b> ({angka(sr.minimal.kapPosisiKg)} kg/posisi). <button style={{ padding: '3px 10px', fontSize: 12 }} onClick={() => pakai(sr.minimal!.id)}>Pakai {sr.minimal.nama}</button></> : ' Tidak ada rak standar yang cukup — simpan di lantai / block stack, atau isi kapasitas khusus dari vendor.'}</div>
+            : !sr.bebas
+              ? <div className="notice small">Palet terberat <b>{angka(sr.beratMaksKg)} kg</b> hanya boleh sampai level tertentu di rak ini (lihat matriks).
+                  {sr.semuaLevel && sr.semuaLevel.id !== kr.kelas?.id ? <> Supaya semua level bisa dipakai: <b>{sr.semuaLevel.nama}</b>. <button className="ghost" style={{ padding: '3px 10px', fontSize: 12 }} onClick={() => pakai(sr.semuaLevel!.id)}>Pakai {sr.semuaLevel.nama}</button></> : ''}</div>
+              : <div className="small" style={{ color: 'var(--ok)' }}>✓ Rak {kr.kelas?.nama ?? ''} cukup: palet terberat {angka(sr.beratMaksKg)} kg boleh di semua level.</div>)}
+          {sr.duplikat.length > 0 && <div className="notice small" style={{ borderColor: 'var(--warn, #b45309)' }}>⚠ Ada batas berat yang sama ({sr.duplikat.map(v => `${angka(v)} kg`).join(', ')}) — hanya baris pertama yang terpakai. Buat batas bertingkat (mis. 500 → 750 → 900 kg).</div>}
+        </div>;
+      })()}
       <div className="grid3">
         <Num id="tare" label="Berat palet kosong" suffix="kg" value={at.tarePaletKg} onChange={v => onAturan({ ...at, tarePaletKg: v })} />
         <Num id="kapbeam" label="Kapasitas beam per posisi palet" suffix="kg" value={at.kapPosisiKg} onChange={v => onAturan({ ...at, kapPosisiKg: v })} hint="Di atas ini palet hanya boleh di lantai" />
