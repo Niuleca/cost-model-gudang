@@ -1,4 +1,5 @@
 'use client';
+import { InputPanjang, useSatuanPanjang } from '@/lib/satuanPanjang';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useProfile } from '@/lib/useProfile';
@@ -59,6 +60,7 @@ export default function GudangManager() {
   const kotaList = useMemo(() => prov.filter(p => p.provinsi === form?.provinsi).map(p => p.kab_kota), [prov, form?.provinsi]);
 
   const set = (k: keyof Warehouse, v: unknown) => setForm(f => ({ ...(f ?? {}), [k]: v }));
+  const sp = useSatuanPanjang();
   const num = (v: string) => (v === '' ? null : Number(v));
 
   async function simpan() {
@@ -164,7 +166,7 @@ export default function GudangManager() {
             <label className="f" htmlFor="g-luas">Luas (m²)<input id="g-luas" type="number" value={form.luas_m2 ?? ''} onChange={e => set('luas_m2', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-hm2">Harga sewa per m² per bulan<input id="g-hm2" type="number" value={form.harga_sewa_m2_bulan ?? ''} onChange={e => set('harga_sewa_m2_bulan', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-hbl">Harga sewa per bulan (utuh)<input id="g-hbl" type="number" value={form.harga_per_bulan ?? ''} onChange={e => set('harga_per_bulan', num(e.target.value))} /></label>
-            <label className="f" htmlFor="g-tinggi">Tinggi bersih (m)<input id="g-tinggi" type="number" step="any" value={form.tinggi_bersih_m ?? ''} onChange={e => set('tinggi_bersih_m', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-tinggi">Tinggi bersih ({sp.satuan})<InputPanjang id="g-tinggi" nilai={form.tinggi_bersih_m ?? null} basis="m" kosong onNilai={v => set('tinggi_bersih_m', v)} /></label>
             <label className="f" htmlFor="g-lantai">Daya dukung lantai (ton/m²)<input id="g-lantai" type="number" step="any" value={form.daya_lantai_ton_m2 ?? ''} onChange={e => set('daya_lantai_ton_m2', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-dock">Jumlah dock<input id="g-dock" type="number" value={form.jumlah_dock ?? ''} onChange={e => set('jumlah_dock', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-gate">Jumlah gate<input id="g-gate" type="number" min={0} value={form.jumlah_gate ?? ''} onChange={e => set('jumlah_gate', num(e.target.value))} /></label>
@@ -210,7 +212,7 @@ export default function GudangManager() {
               <tr><td>Luas</td><td className="num">{angka(w.luas_m2)} m²</td></tr>
               <tr><td>Sewa per m²/bulan</td><td className="num">{adaHarga(w) ? rp(tarifM2(w)) : <span className="pill warn">harga belum ada</span>}</td></tr>
               <tr><td>Sewa utuh per bulan</td><td className="num">{adaHarga(w) ? rp(sewaBulanPenuh(w)) : '—'}</td></tr>
-              <tr><td>Tinggi bersih · dock · gate</td><td className="num">{w.tinggi_bersih_m != null ? `${w.tinggi_bersih_m} m` : '—'} · {w.jumlah_dock ?? '—'} · {w.jumlah_gate ?? '—'}</td></tr>
+              <tr><td>Tinggi bersih · dock · gate</td><td className="num">{w.tinggi_bersih_m != null ? sp.fmt(Number(w.tinggi_bersih_m), 'm') : '—'} · {w.jumlah_dock ?? '—'} · {w.jumlah_gate ?? '—'}</td></tr>
               <tr><td>Harga per</td><td className="num">{tanggal(w.tanggal_harga)}{w.berlaku_sampai ? ` · s.d. ${tanggal(w.berlaku_sampai)}` : ''}</td></tr>
               <tr><td>PIC</td><td className="num">{w.pic_nama ?? ''}</td></tr>
               <tr><td>No. telepon</td><td className="num">{w.pic_telepon ? <a href={`tel:${w.pic_telepon.replace(/[^\d+]/g, '')}`}>{w.pic_telepon}</a> : ''}</td></tr>

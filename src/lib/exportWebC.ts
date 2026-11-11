@@ -1,6 +1,7 @@
 // Sheet "Warehouse Planning" (gudang, space, racking), "Technology & Equipment" (MHE, IT, biaya lain), "Utilities Management" (listrik, air) dan "Loan & Interest Calculator".
 import { R, q, BUCKETS, ALOKASI, normAlok, namaAlok, RISIKO_DEFAULT, type Ctx, type Line } from '@/lib/exportWebUtil';
-import { MAKS_LEVEL_RAK, lengkapiSpaceExcel } from '@/lib/engine/space';
+import { kekuatanTender } from '@/lib/kekuatan';
+import { KAP_LANTAI_DEFAULT_KG_M2, KEKUATAN_DEFAULT, MAKS_LEVEL_RAK, lengkapiSpaceExcel } from '@/lib/engine/space';
 import { KELOMPOK_ASET, basisDari, perlakuanDari, UMUR_IT_DEFAULT } from '@/lib/it';
 import { SEKSI_BIAYA, seksiDari } from '@/lib/biayaLain';
 
@@ -142,6 +143,41 @@ export function tulisGudang(x: Ctx) {
     GD.r++;
   }
   GD.nmR('RkLvNo', 1, lv0, GD.r - 1); GD.nmR('RkLvPakai', 4, lv0, GD.r - 1); GD.nmR('RkLvPuncak', 6, lv0, GD.r - 1);
+
+  // ===================== Kekuatan rak & lantai
+  const kk = sx.kekuatan ?? {}, kkDef = KEKUATAN_DEFAULT;
+  const daya = Number(a.gudang?.daya_lantai_ton_m2) || 0;
+  const kkH = kekuatanTender(a, d.t.customer);
+  GD.r++; GD.h3('KEKUATAN RAK & LANTAI');
+  GD.note('Foot print per pallet = (lebar palet sepanjang beam + celah) × (kedalaman frame + celah belakang). Floor capacity usage = berat palet × level ÷ foot print ÷ daya dukung lantai. ≤ 90% OK · 90–100% mendekati batas · > 100% melebihi.');
+  GD.field('Berat per palet (manual)', Number(kk.beratPaletKg) > 0 ? kk.beratPaletKg! : null, 'n1', 'in', 'kg', 'kosong = palet rak terberat (Produk) / berat per palet Volume', 'KkBeratMan');
+  GD.field('Berat per palet otomatis', { f: 'IF(SUMPRODUCT(((PrSimpanEf="spr")+(PrSimpanEf="ddr"))*(PrBeratPal>0))>0,SUMPRODUCT(MAX(((PrSimpanEf="spr")+(PrSimpanEf="ddr"))*PrBeratPal)),KgPalet)' }, 'n1', 'out', 'kg', '', 'KkBeratDef');
+  GD.field('Berat per palet dipakai', { f: 'IF(N(KkBeratMan)>0,KkBeratMan,KkBeratDef)', v: kkH?.beratKg }, 'n1', 'out', 'kg', '', 'KkBerat');
+  GD.field('Jumlah level terisi (manual)', Number(kk.level) > 0 ? kk.level! : null, 'n0', 'in', 'level', 'kosong = Rack Level', 'KkLevelMan');
+  GD.field('Jumlah level dipakai', { f: 'IF(N(KkLevelMan)>0,KkLevelMan,RackLevel)' }, 'n0', 'out', 'level', '', 'KkLevel');
+  GD.field('Total beban per tapak', { f: 'KkBerat*KkLevel', v: kkH?.totalKg }, 'n0', 'out', 'kg', 'berat × level', 'KkTotal');
+  GD.field('Lebar palet sepanjang beam', { f: 'PalL*100' }, 'n0', 'out', 'cm', 'palet dominan', 'KkLebarPal');
+  GD.field('Celah per palet (upright + jarak antar palet)', kk.celahCm ?? kkDef.celahCm, 'n0', 'in', 'cm', '', 'KkCelah');
+  GD.field('Panjang tapak (manual)', Number(kk.panjangCm) > 0 ? kk.panjangCm! : null, 'n0', 'in', 'cm', 'kosong = lebar palet + celah', 'KkPanjangMan');
+  GD.field('Panjang tapak', { f: 'IF(N(KkPanjangMan)>0,KkPanjangMan,KkLebarPal+KkCelah)' }, 'n0', 'out', 'cm', '', 'KkPanjang');
+  GD.field('Kedalaman frame rak', kk.kedalamanFrameCm ?? kkDef.kedalamanFrameCm, 'n0', 'in', 'cm', '', 'KkFrame');
+  GD.field('Celah belakang (flue / back-to-back)', kk.celahBelakangCm ?? kkDef.celahBelakangCm, 'n0', 'in', 'cm', '', 'KkBelakang');
+  GD.field('Lebar tapak (manual)', Number(kk.lebarCm) > 0 ? kk.lebarCm! : null, 'n0', 'in', 'cm', 'kosong = frame + celah belakang', 'KkLebarMan');
+  GD.field('Lebar tapak', { f: 'IF(N(KkLebarMan)>0,KkLebarMan,KkFrame+KkBelakang)' }, 'n0', 'out', 'cm', '', 'KkLebar');
+  GD.field('Foot print per pallet', { f: 'KkPanjang*KkLebar/10000', v: kkH?.tapakM2 }, 'n2', 'out', 'm²', 'termasuk celah ke palet sebelah & rak belakang', 'KkTapak');
+  GD.field('Daya dukung lantai (floor capacity)', Number(kk.kapLantaiKgM2) > 0 ? kk.kapLantaiKgM2! : daya > 0 ? daya * 1000 : KAP_LANTAI_DEFAULT_KG_M2, 'n0', 'in', 'kg/m²', daya > 0 ? `gudang terpilih ${daya} ton/m²` : 'default 3.000 kg/m²', 'KkKapLantai');
+  GD.field('Beban per m² (workload)', { f: 'IF(KkTapak>0,KkTotal/KkTapak,0)', v: kkH?.bebanM2 }, 'n0', 'out', 'kg/m²', '', 'KkBebanM2');
+  GD.field('Floor capacity usage', { f: 'IF(KkKapLantai>0,KkBebanM2/KkKapLantai,0)', v: kkH?.pakaiLantai }, 'pct', 'out', '', '', 'KkPakai');
+  const st = (beban: string, kap: string) => `IF(N(${kap})<=0,"Belum diisi",IF(${beban}>${kap}+1E-9,"Melebihi",IF(${beban}>0.9*${kap},"Mendekati batas","OK")))`;
+  GD.field('Status lantai', { f: st('KkBebanM2', 'KkKapLantai') }, 'teks', 'out');
+  GD.field('Beban beam per level', { f: 'KkBerat*MAX(1,SprPpl)', v: kkH?.bebanBeamKg }, 'n0', 'out', 'kg', 'berat × palet per level', 'KkBebanBeam');
+  GD.field('Kapasitas sepasang beam (manual)', Number(kk.kapBeamKg) > 0 ? kk.kapBeamKg! : null, 'n0', 'in', 'kg', 'kosong = kapasitas per posisi (Produk) × palet per level', 'KkKapBeamMan');
+  GD.field('Kapasitas beam dipakai', { f: 'IF(N(KkKapBeamMan)>0,KkKapBeamMan,PrKap*MAX(1,SprPpl))', v: kkH?.kapBeamKg }, 'n0', 'out', 'kg', '', 'KkKapBeam');
+  GD.field('Status beam', { f: st('KkBebanBeam', 'KkKapBeam') }, 'teks', 'out');
+  GD.field('Beban frame / upright', { f: 'KkBebanBeam*KkLevel', v: kkH?.bebanFrameKg }, 'n0', 'out', 'kg', '1 frame = ½ bay kiri + ½ bay kanan = 1 bay penuh', 'KkBebanFrame');
+  GD.field('Kapasitas frame (vendor)', Number(kk.kapFrameKg) > 0 ? kk.kapFrameKg! : null, 'n0', 'in', 'kg', 'isi dari spesifikasi vendor rak', 'KkKapFrame');
+  GD.field('Status frame', { f: st('KkBebanFrame', 'KkKapFrame') }, 'teks', 'out');
+  GD.field('Block stack: beban per m²', { f: 'IF(PalLuas>0,KkBerat*MAX(1,BlkTumpuk)/PalLuas,0)', v: kkH?.bebanBlokM2 }, 'n0', 'out', 'kg/m²', 'berat × tumpuk ÷ luas palet rata-rata', 'KkBlok');
 
   GD.r++; GD.h3('Komposisi luas');
   GD.hdr(['Area', 'm²', '%']);

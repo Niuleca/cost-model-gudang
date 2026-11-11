@@ -1,4 +1,5 @@
 'use client';
+import { InputPanjang, useSatuanPanjang } from '@/lib/satuanPanjang';
 import { T, useT } from '@/lib/i18n';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -34,6 +35,7 @@ import type { DriverListrik } from '@/lib/utilitas';
 import ProcessDesignPanel from './ProcessDesignPanel';
 import SpacePanel from './SpacePanel';
 import ProdukPanel from './ProdukPanel';
+import { dasarKekuatan } from '@/lib/kekuatan';
 import { ATURAN_BERAT_DEFAULT, adaProdukNyata, hitungProduk, paletDariSpace, produkEfektif, terapkanProduk, type AturanBerat, type PerubahanTender, type ProdukTender } from '@/lib/produk';
 import { hitungLevelRak } from '@/lib/engine/space';
 import MhePanel from './MhePanel';
@@ -817,6 +819,7 @@ export default function TenderPage() {
           inboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).palet} outboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).palet}
           uomIn={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).ok ? 'palet' : volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).ok ? 'palet' : volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
           jumlahShift={t.jumlah_shift} onChange={ubahSpaceExcel}
+          kekuatan={dasarKekuatan(a, t.customer)}
           komersial={<BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
             posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
             posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
@@ -1024,11 +1027,11 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
 }
 
 const PALET_PRESET: (Omit<PaletTipe, 'id' | 'porsi'> & { label: string })[] = [
-  { label: 'Standar kayu · 1,2 × 1,0 m', nama: 'Standar kayu', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
-  { label: 'Jumbo · 1,2 × 1,2 m', nama: 'Jumbo', panjang: 1.2, lebar: 1.2, tebalMm: 150 },
-  { label: 'Plastik · 1,2 × 1,0 m', nama: 'Plastik', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
-  { label: 'JIS / Asia · 1,1 × 1,1 m', nama: 'JIS 1,1 × 1,1', panjang: 1.1, lebar: 1.1, tebalMm: 150 },
-  { label: 'EUR · 1,2 × 0,8 m', nama: 'EUR', panjang: 1.2, lebar: 0.8, tebalMm: 144 },
+  { label: 'Standar kayu · 1.200 × 1.000 mm', nama: 'Standar kayu', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
+  { label: 'Jumbo · 1.200 × 1.200 mm', nama: 'Jumbo', panjang: 1.2, lebar: 1.2, tebalMm: 150 },
+  { label: 'Plastik · 1.200 × 1.000 mm', nama: 'Plastik', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
+  { label: 'JIS / Asia · 1.100 × 1.100 mm', nama: 'JIS', panjang: 1.1, lebar: 1.1, tebalMm: 150 },
+  { label: 'EUR · 1.200 × 800 mm', nama: 'EUR', panjang: 1.2, lebar: 0.8, tebalMm: 144 },
   { label: 'Custom (isi sendiri)', nama: 'Palet custom', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
 ];
 const fmtN = (x: number, d = 2) => x.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: d });
@@ -1040,18 +1043,19 @@ function PaletTender({ excel, onChange }: { excel: SpaceExcel; onChange: (x: Spa
   const tambah = (k: number) => { const p = PALET_PRESET[k]; if (!p) return; const { label: _l, ...isi } = p;
     simpan([...list, { ...isi, id: `p${Date.now().toString(36)}`, porsi: Math.max(0, Math.round((1 - r.totalPorsi) * 1000) / 1000) }]); };
   const kecil = { width: 96, minWidth: 96, textAlign: 'right' as const };
+  const { satuan: sp, fmt } = useSatuanPanjang();
   const totOk = Math.abs(r.totalPorsi - 1) < 0.0005;
   return <div className="card">
     <h2>Jenis palet</h2>
     <p className="small muted">Palet yang dipakai di gudang ini + porsi pemakaiannya. Otomatis dipakai di: <b>Produk</b> (isi per layer & tinggi muatan, sesuai jenis palet tiap produk),
       <b> Warehouse Planning</b> (luas block stack / pallet floor = luas rata-rata tertimbang; Pallet di racking = tebal terbesar), dan <b>simulasi 3D</b>.</p>
     <div className="tablewrap"><table className="palet-tabel" style={{ width: 'auto', minWidth: '100%' }}>
-      <thead><tr><th>Nama palet</th><th className="num">Panjang (m)</th><th className="num">Lebar (m)</th><th className="num">Tebal (mm)</th><th className="num">Pemakaian (%)</th><th className="num">Luas (m²)</th><th className="num">Bobot</th><th>Default produk</th><th /></tr></thead>
+      <thead><tr><th>Nama palet</th><th className="num">Panjang ({sp})</th><th className="num">Lebar ({sp})</th><th className="num">Tebal ({sp})</th><th className="num">Pemakaian (%)</th><th className="num">Luas (m²)</th><th className="num">Bobot</th><th>Default produk</th><th /></tr></thead>
       <tbody>{list.map((p, i) => <tr key={p.id}>
         <td><input aria-label={`Nama palet ${i + 1}`} value={p.nama} onChange={e => ubah(i, { nama: e.target.value })} style={{ width: 200, minWidth: 160 }} /></td>
-        <td className="num"><AngkaInput aria-label={`Panjang palet ${i + 1}`} step="any" min={0} value={p.panjang} style={kecil} onValue={v => ubah(i, { panjang: v })} /></td>
-        <td className="num"><AngkaInput aria-label={`Lebar palet ${i + 1}`} step="any" min={0} value={p.lebar} style={kecil} onValue={v => ubah(i, { lebar: v })} /></td>
-        <td className="num"><AngkaInput aria-label={`Tebal palet ${i + 1}`} step="any" min={0} value={p.tebalMm} style={kecil} onValue={v => ubah(i, { tebalMm: v })} /></td>
+        <td className="num"><InputPanjang aria-label={`Panjang palet ${i + 1}`} min={0} nilai={p.panjang} basis="m" style={kecil} onNilai={v => ubah(i, { panjang: v ?? 0 })} /></td>
+        <td className="num"><InputPanjang aria-label={`Lebar palet ${i + 1}`} min={0} nilai={p.lebar} basis="m" style={kecil} onNilai={v => ubah(i, { lebar: v ?? 0 })} /></td>
+        <td className="num"><InputPanjang aria-label={`Tebal palet ${i + 1}`} min={0} nilai={p.tebalMm} basis="mm" style={kecil} onNilai={v => ubah(i, { tebalMm: v ?? 0 })} /></td>
         <td className="num"><AngkaInput aria-label={`Pemakaian palet ${i + 1}`} step="any" min={0} max={100} value={Math.round((p.porsi || 0) * 1000) / 10} style={kecil} onValue={v => ubah(i, { porsi: Math.max(0, v) / 100 })} /></td>
         <td className="num">{fmtN((p.panjang || 0) * (p.lebar || 0), 3)}</td>
         <td className="num muted">{fmtN(r.bobot[i] * 100, 1)}%</td>
@@ -1065,9 +1069,9 @@ function PaletTender({ excel, onChange }: { excel: SpaceExcel; onChange: (x: Spa
     <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <select aria-label="Tambah jenis palet" value="" onChange={e => { tambah(Number(e.target.value)); e.target.value = ''; }} style={{ width: 'auto' }}>
         <option value="" disabled>＋ Tambah palet…</option>
-        {PALET_PRESET.map((p, k) => <option key={k} value={k}>{p.label}</option>)}
+        {PALET_PRESET.map((p, k) => <option key={k} value={k}>{p.nama === 'Palet custom' ? p.label : `${p.label.split(' · ')[0]} · ${fmt(p.panjang, 'm', { tanpaSatuan: true })} × ${fmt(p.lebar, 'm')}`}</option>)}
       </select>
-      <span className="small muted">Luas rata-rata <b>{fmtN(r.luasRata, 3)} m²</b> → block stack / pallet floor · tebal terbesar <b>{fmtN(r.tebalMaks, 0)} mm</b> → racking · default produk <b>{r.dominan.nama || '—'}</b></span>
+      <span className="small muted">Luas rata-rata <b>{fmtN(r.luasRata, 3)} m²</b> → block stack / pallet floor · tebal terbesar <b>{fmt(r.tebalMaks, 'mm')}</b> → racking · default produk <b>{r.dominan.nama || '—'}</b></span>
     </div>
   </div>;
 }

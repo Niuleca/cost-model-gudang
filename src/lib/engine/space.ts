@@ -8,6 +8,58 @@ export interface StagingIn { porsiMinggu: number; hariPerMinggu: number; sequenc
 export interface Porsi { spr: number; ddr: number; block: number; floor: number }   // porsi PP per metode simpan (total = 100%)
 /** Jenis palet yang dipakai di gudang (Key assumption). Porsi = % pemakaian (dinormalkan bila total ≠ 100%). */
 export interface PaletTipe { id: string; nama: string; panjang: number; lebar: number; tebalMm: number; porsi: number }
+/** Input cek kekuatan rak & lantai (Warehouse Planning). Kosong / 0 = otomatis. */
+export interface KekuatanInput {
+  beratPaletKg?: number | null;     // berat per palet; kosong = palet rak terberat dari Produk (atau Parameter muatan)
+  level?: number | null;            // jumlah level terisi; kosong = Rack Level
+  celahCm?: number;                 // celah per palet sepanjang beam (upright + jarak antar palet)
+  kedalamanFrameCm?: number;        // kedalaman frame rak
+  celahBelakangCm?: number;         // celah belakang / flue (back-to-back) per sisi
+  panjangCm?: number | null;        // override panjang tapak per palet
+  lebarCm?: number | null;          // override lebar tapak per palet
+  kapLantaiKgM2?: number | null;    // daya dukung lantai; kosong = data gudang terpilih / 3.000 kg/m²
+  kapBeamKg?: number | null;        // kapasitas sepasang beam per level; kosong = kapasitas per posisi × palet per level
+  kapFrameKg?: number | null;       // kapasitas frame (upright) dari vendor; kosong = tidak dicek
+}
+export const KEKUATAN_DEFAULT = { celahCm: 40, kedalamanFrameCm: 100, celahBelakangCm: 30 };
+export const KAP_LANTAI_DEFAULT_KG_M2 = 3000;
+export type StatusBeban = 'ok' | 'dekat' | 'lebih' | 'kosong';
+const statusBeban = (beban: number, kap: number): StatusBeban => (!(kap > 0) ? 'kosong' : beban > kap + 1e-9 ? 'lebih' : beban > 0.9 * kap ? 'dekat' : 'ok');
+/**
+ * Kekuatan rak & lantai (format Excel Esa):
+ * tapak per palet = (lebar palet + celah) × (kedalaman frame + celah belakang); beban per m² = berat palet × level ÷ tapak → dibanding daya dukung lantai.
+ * Beam: berat palet × palet per level ≤ kapasitas sepasang beam. Frame: 1 frame menanggung ½ bay kiri + ½ bay kanan = 1 bay penuh (semua level).
+ * Block stack: berat palet × tumpuk ÷ luas palet rata-rata.
+ */
+export function hitungKekuatan(x: SpaceExcel, o: { beratDefaultKg: number; kapLantaiDefaultKgM2?: number | null; kapPosisiKg?: number }) {
+  const k = { ...KEKUATAN_DEFAULT, ...(x.kekuatan ?? {}) };
+  const n = (v: unknown) => Math.max(0, Number(v) || 0);
+  const lv = hitungLevelRak(x.rak);
+  const level = n(k.level) > 0 ? n(k.level) : lv.level;
+  const beratKg = n(k.beratPaletKg) > 0 ? n(k.beratPaletKg) : n(o.beratDefaultKg);
+  const lebarPaletCm = n(x.palet.lebar) * 100;
+  const panjangCm = n(k.panjangCm) > 0 ? n(k.panjangCm) : lebarPaletCm + n(k.celahCm);
+  const lebarCm = n(k.lebarCm) > 0 ? n(k.lebarCm) : n(k.kedalamanFrameCm) + n(k.celahBelakangCm);
+  const tapakM2 = (panjangCm * lebarCm) / 1e4;
+  const totalKg = beratKg * level;
+  const bebanM2 = tapakM2 > 0 ? totalKg / tapakM2 : 0;
+  const kapLantai = n(k.kapLantaiKgM2) > 0 ? n(k.kapLantaiKgM2) : n(o.kapLantaiDefaultKgM2) > 0 ? n(o.kapLantaiDefaultKgM2) : KAP_LANTAI_DEFAULT_KG_M2;
+  const ppl = Math.max(1, n(x.sd.paletPerLevel) || 1);
+  const bebanBeamKg = beratKg * ppl;
+  const kapBeamKg = n(k.kapBeamKg) > 0 ? n(k.kapBeamKg) : n(o.kapPosisiKg ?? 1000) * ppl;
+  const bebanFrameKg = beratKg * ppl * level;
+  const kapFrameKg = n(k.kapFrameKg);
+  const luasPalet = ringkasPalet(daftarPalet(x)).luasRata;
+  const tumpuk = Math.max(1, n(x.block.tumpuk) || 1);
+  const bebanBlokM2 = luasPalet > 0 ? (beratKg * tumpuk) / luasPalet : 0;
+  return {
+    k, level, levelOtomatis: !(n(k.level) > 0), beratKg, beratOtomatis: !(n(k.beratPaletKg) > 0), lebarPaletCm, panjangCm, lebarCm, tapakM2, totalKg, bebanM2, kapLantai,
+    pakaiLantai: kapLantai > 0 ? bebanM2 / kapLantai : 0, statusLantai: statusBeban(bebanM2, kapLantai),
+    ppl, bebanBeamKg, kapBeamKg, statusBeam: statusBeban(bebanBeamKg, kapBeamKg), bebanFrameKg, kapFrameKg, statusFrame: statusBeban(bebanFrameKg, kapFrameKg),
+    tumpuk, luasPalet, bebanBlokM2, statusBlok: statusBeban(bebanBlokM2, kapLantai),
+  };
+}
+export type HasilKekuatan = ReturnType<typeof hitungKekuatan>;
 export interface LantaiDim { tumpuk: number; gangPersen: number }                  // block stack / pallet floor
 export interface SpaceExcel {
   porsiSd: number;                        // (lama) porsi selective; dipakai bila `porsi` belum ada
@@ -15,6 +67,7 @@ export interface SpaceExcel {
   sd: RakDim; dd: RakDim;                 // sd = SPR (selective pallet rack), dd = DDR (double deep rack)
   palet: { panjang: number; lebar: number };   // dimensi palet dominan (m) — turunan dari paletTipe
   paletTipe?: PaletTipe[];                // jenis palet + porsi pemakaian (sumber utama)
+  kekuatan?: KekuatanInput;               // cek kekuatan rak (beam / frame) & daya dukung lantai
   block: LantaiDim; floor: LantaiDim;
   rak: { centerMm: number; sideMm: number; beamMm: number; palletMm: number; productMm: number; clearanceMm: number; levelManual?: number | null;
     /** Tinggi per level manual (mm, dari lantai/beam bawah s/d beam berikutnya); index 0 = level 1. Kosong / 0 = otomatis (level 1 / level 2+). */

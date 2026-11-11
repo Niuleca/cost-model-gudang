@@ -6,7 +6,7 @@ import { lengkapiSpaceExcel } from '@/lib/engine/space';
 
 export function tulisProduk(x: Ctx) {
   const { PR, a, d } = x;
-  PR.lebar(14, 30, 10, 9, 9, 9, 10, 10, 11, 9, 11, 14, 12, 18, 10, 10, 11, 9, 11, 11, 10, 12, 12, 9, 8, 11, 9, 10, 16, 44, 18);
+  PR.lebar(14, 30, 10, 9, 9, 9, 10, 10, 11, 9, 11, 14, 12, 18, 10, 10, 11, 9, 11, 11, 10, 12, 12, 9, 8, 11, 9, 10, 16, 44, 18, 12, 11);
   const at = a.aturanBerat ?? ATURAN_BERAT_DEFAULT;
   const daftar = produkEfektif(a.produk, a.volumes, a.profilVolume, d.t.customer);
   const levelRak = Math.max(1, d.h.space.levelRak || 1);
@@ -33,7 +33,7 @@ export function tulisProduk(x: Ctx) {
     ['Satuan ef.', false, 'cm/mm efektif'], ['CBM/UOM', false, 'P×L×T (cm) ÷ 1.000.000'], ['UPP ef.', false, 'UOM palet → 1'], ['Berat/palet (kg)', false, 'UPP × berat + tare (palet: berat)'],
     ['CBM/palet', false, 'UPP × CBM/UOM'], ['Palet', false, 'ROUNDUP(qty ÷ UPP)'], ['Total kg', false], ['Total CBM', false], ['Per layer', false, 'Susunan terbaik di palet jenis terpilih (kolom AE; kosong = dominan)'],
     ['Layer', false, 'ROUNDUP(UPP ÷ per layer)'], ['Tinggi muatan (mm)', false, '(layer × T + tebal palet PrPalT) × 10'], ['Level maks', false, 'Aturan berat / manual, maks level rak'],
-    ['Hanya lantai', false, 'Berat/palet > kapasitas beam'], ['Cara simpan ef.', false], ['Catatan (sistem)', false], ['Jenis palet', true, 'Nama dari Key assumption → Jenis palet; kosong = dominan']]);
+    ['Hanya lantai', false, 'Berat/palet > kapasitas beam'], ['Cara simpan ef.', false], ['Catatan (sistem)', false], ['Jenis palet', true, 'Nama dari Key assumption → Jenis palet; kosong = dominan'], ['Isi / layer manual', true, 'Konfigurasi palet; kosong = otomatis (kolom X)'], ['Layer manual', true, 'Konfigurasi palet; kosong = ROUNDUP(UPP ÷ isi/layer)']]);
   const p0 = PR.r;
   const simpanL = (v?: string) => SIMPAN.find(s => s.v === (v ?? 'otomatis'))?.v ?? 'otomatis';
   for (const z of [...daftar, null, null, null]) {
@@ -44,7 +44,7 @@ export function tulisProduk(x: Ctx) {
     PR.put(9, z?.beratKg ?? null, { j: 'in', fmt: 'n2' }); PR.put(10, z?.upp ?? null, { j: 'in', fmt: 'n0' }); PR.put(11, z?.qty ?? null, { j: 'in', fmt: 'n0' });
     PR.put(12, z?.kategori ?? null, { j: 'in' }); PR.put(13, z?.zona ?? null, { j: 'in' }); PR.put(14, z ? simpanL(z.simpan) : null, { j: 'in' }); PR.put(15, z?.levelMaks || null, { j: 'in', fmt: 'n0' });
     const pal = `ISNUMBER(SEARCH("pal",LOWER(C${r})))`;
-    const f = `IF(P${r}="mm",0.1,1)`;
+    const f = `IF(P${r}="mm",0.1,IF(P${r}="m",100,1))`;
     const dimOk = `AND(N(D${r})>0,N(E${r})>0,N(F${r})>0)`;
     const h = z ? hitungProduk(z, at, levelRak, sx.rak.productMm, dimPalet) : null;
     PR.put(16, { f: `IF(A${r}&B${r}="","",IF(G${r}<>"",G${r},IF(MAX(N(D${r}),N(E${r}),N(F${r}))>IF(${pal},250,600),"mm","cm")))` }, { j: 'out', al: 'center' });
@@ -58,10 +58,11 @@ export function tulisProduk(x: Ctx) {
     const dp = `N(D${r})*${f}`, dl = `N(E${r})*${f}`;
     const jp = z?.paletTipe ? dimPalet.tipe.find(t => t.id === z.paletTipe)?.nama ?? null : null;
     PR.put(31, jp, { j: 'in' }); PR.dd(31, 'PalTipeNama', true, r);
+    PR.put(32, z && Number(z.perLayer) > 0 ? z.perLayer! : null, { j: 'in', fmt: 'n0' }); PR.put(33, z && Number(z.layer) > 0 ? z.layer! : null, { j: 'in', fmt: 'n0' });
     const pP = `(IFERROR(INDEX(PalTipeP,MATCH(AE${r},PalTipeNama,0)),PalP)*100)`, pL = `(IFERROR(INDEX(PalTipeL,MATCH(AE${r},PalTipeNama,0)),PalL)*100)`;
     const pT = `(IFERROR(INDEX(PalTipeT,MATCH(AE${r},PalTipeNama,0))/10,PrPalT))`;
-    PR.put(24, { f: `IF(P${r}="",0,IF(${pal},IF(${dimOk},1,0),IF(${dimOk},MAX(INT(${pP}/(${dp})+1E-9)*INT(${pL}/(${dl})+1E-9),INT(${pP}/(${dl})+1E-9)*INT(${pL}/(${dp})+1E-9)),0)))`, v: h?.perLayer }, { j: 'out', fmt: 'n0' });
-    PR.put(25, { f: `IF(AND(X${r}>0,R${r}>0),ROUNDUP(R${r}/X${r}-1E-9,0),0)`, v: h?.layer }, { j: 'out', fmt: 'n0' });
+    PR.put(24, { f: `IF(P${r}="",0,IF(${pal},IF(${dimOk},1,0),IF(N(AF${r})>0,AF${r},IF(${dimOk},MAX(INT(${pP}/(${dp})+1E-9)*INT(${pL}/(${dl})+1E-9),INT(${pP}/(${dl})+1E-9)*INT(${pL}/(${dp})+1E-9)),0))))`, v: h?.perLayer }, { j: 'out', fmt: 'n0' });
+    PR.put(25, { f: `IF(AND(NOT(${pal}),N(AG${r})>0),AG${r},IF(AND(X${r}>0,R${r}>0),ROUNDUP(R${r}/X${r}-1E-9,0),0))`, v: h?.layer }, { j: 'out', fmt: 'n0' });
     PR.put(26, { f: `IF(P${r}="",0,IF(${pal},IF(${dimOk},N(F${r})*${f}*10,0),IF(Y${r}>0,(Y${r}*N(F${r})*${f}+${pT})*10,0)))`, v: h?.tinggiMuatanMm }, { j: 'out', fmt: 'n0' });
     const lvBerat = `IF(S${r}>0,IFERROR(INDEX(PrBatasLv,MATCH(TRUE,INDEX((PrBatasKg>=S${r})*(PrBatasKg<>"")>0,0),0)),1),99)`;
     PR.put(28, { f: `IF(P${r}="","",IF(S${r}>PrKap,"Ya","Tidak"))` }, { j: 'out', al: 'center' });
@@ -71,6 +72,7 @@ export function tulisProduk(x: Ctx) {
     PR.r++;
   }
   const p1 = PR.r - 1;
+  PR.nmR('PrBeratPal', 19, p0, p1); PR.nmR('PrSimpanEf', 29, p0, p1);
   PR.put(1, 'Total', { j: 'tot' }); PR.put(2, { f: `COUNTIF(B${p0}:B${p1},"?*")&" SKU"` }, { j: 'tot' });
   for (const c of [21, 22, 23]) PR.put(c, { f: `SUM(${String.fromCharCode(64 + c)}${p0}:${String.fromCharCode(64 + c)}${p1})` }, { j: 'tot', fmt: c === 23 ? 'n2' : 'n0' });
   PR.r += 2;

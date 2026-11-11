@@ -1,4 +1,5 @@
 'use client';
+import { PilihSatuanPanjang } from '@/lib/satuanPanjang';
 import Link from 'next/link';
 import LecaMark from './LecaMark';
 import { usePathname, useRouter } from 'next/navigation';
@@ -138,6 +139,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <label className="bahasa-pilih" title={t('Bahasa')}><span aria-hidden="true">🌐</span>
             <select aria-label={t('Bahasa')} value={bahasa} onChange={e => setBahasa(e.target.value as Bahasa)}>
               {BAHASA.map(b => <option key={b.v} value={b.v}>{b.short} · {b.l}</option>)}</select></label>
+          <PilihSatuanPanjang className="bahasa-pilih" />
           {Dropdown({ id: 'akun', kanan: true, item: profile && profile.status && profile.status !== 'aktif' ? [] : AKUN,
             label: `${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${profile.is_master ? 'Super Admin' : ROLE_LABEL[profile.role]}` : ''}${nPending ? ` (${nPending})` : ''}` })}
         </nav>

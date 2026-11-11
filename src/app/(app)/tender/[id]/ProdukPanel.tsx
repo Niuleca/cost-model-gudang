@@ -3,6 +3,8 @@
 // Baris pertama otomatis dari Key assumption & Volume; bisa diedit, ditambah, atau ditempel dari Excel.
 // Produk manual = sumber data tender: Parameter muatan, isi per palet, stok storage, tinggi produk di rak & porsi pallet floor
 // ikut diperbarui (bisa dimatikan). Turunan: level rak maksimal per berat, zonasi area, dan SKU di Simulasi Warehouse.
+import { InputPanjang, useSatuanPanjang, konversiPanjang } from '@/lib/satuanPanjang';
+import { pj, pj2 } from '@/lib/satuanPanjangInti';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Num } from '@/components/fields';
 import { KELAS_UMUM, UOM_MASTER, kelasDariBerat, uomDari, type KelompokUom } from '@/lib/uom';
@@ -12,7 +14,7 @@ import type { VolumeInput } from '@/lib/engine/types';
 import type { ProfilVolume } from '@/lib/profilVolume';
 import { hitungLevelRak, lengkapiSpaceExcel, type HasilSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
 import {
-  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, paletDariSpace, paletUntuk, type OpsiUpp, type SaranUpp, satuanDimEfektif, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
+  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, dimCm, paletDariSpace, paletUntuk, uppEfektif, type OpsiUpp, type SaranUpp, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
   type AturanBerat, type PerubahanTender, type ProdukTender,
 } from '@/lib/produk';
 
@@ -41,8 +43,9 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
   const lv = hitungLevelRak(sx.rak);
   const levelRak = Math.max(1, lv.level || 1);
   const daftar = useMemo(() => produkEfektif(produk, volumes, profil, namaCustomer), [produk, volumes, profil, namaCustomer]);
+  const { satuan: U } = useSatuanPanjang();
   const dimPalet = useMemo(() => paletDariSpace(sx), [JSON.stringify(sx.paletTipe)]); // eslint-disable-line react-hooks/exhaustive-deps
-  const hit = useMemo(() => daftar.map(x => hitungProduk(x, at, levelRak, sx.rak.productMm, dimPalet)), [daftar, at, levelRak, sx.rak.productMm, dimPalet]);
+  const hit = useMemo(() => daftar.map(x => hitungProduk(x, at, levelRak, sx.rak.productMm, dimPalet)), [daftar, at, levelRak, sx.rak.productMm, dimPalet, U]); // U: teks peringatan ikut satuan
   const [tempel, setTempel] = useState<string | null>(null);
   const [cari, setCari] = useState('');
   const [pesan, setPesan] = useState<string | null>(null);
@@ -152,18 +155,20 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
                 <option value="">{auto ? `Auto: ${auto.label}` : 'Auto (dari berat)'}</option>
                 {daftar.map(c => <option key={c.kode} value={c.kode}>{c.label}</option>)}
               </select></label>; })()}
-            {(() => { const sd = satuanDimEfektif(x); return <div style={{ gridColumn: 'span 2', minWidth: 200 }}>
-              <span className="row" style={{ gap: 4, justifyContent: 'space-between' }}>{lab(`P × L × T${x.dimEstimasi ? ' · perkiraan dari CBM' : ''}${sd.otomatis && sd.satuan === 'mm' ? ' · dibaca mm (otomatis)' : ''}`)}
-                <select aria-label={`Satuan dimensi ${i + 1}`} value={sd.satuan} onChange={e => ubah(i, { satuanDim: e.target.value as 'cm' | 'mm' }, false)} style={{ ...kecil, width: 'auto', padding: '0 4px' }}>
-                  <option value="cm">cm</option><option value="mm">mm</option></select></span>
+            {(() => { const dc = dimCm(x);
+              // dimensi tampil & diketik dalam satuan global; disimpan dalam satuan global juga (satuanDim = satuan aktif)
+              const setDim = (k: 'p' | 'l' | 't', vCm: number | null) => { const b = { ...dc, [k]: vCm ?? 0 }; const r6 = (v: number) => Math.round(konversiPanjang(v, 'cm', U) * 1e6) / 1e6;
+                ubah(i, { p: r6(b.p), l: r6(b.l), t: r6(b.t), satuanDim: U }); };
+              return <div style={{ gridColumn: 'span 2', minWidth: 200 }}>
+              {lab(`P × L × T (${U})${x.dimEstimasi ? ' · perkiraan dari CBM' : ''}`)}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-                {(['p', 'l', 't'] as const).map(k => <Angka key={k} aria-label={`${k.toUpperCase()} ${i + 1}`} placeholder={k.toUpperCase()} value={x[k]} onValue={v => ubah(i, { [k]: v })}
+                {(['p', 'l', 't'] as const).map(k => <InputPanjang key={k} aria-label={`${k.toUpperCase()} ${i + 1}`} placeholder={k.toUpperCase()} nilai={dc[k] || null} basis="cm" kosong onNilai={v => setDim(k, v)}
                   style={{ ...kecil, ...(x.dimEstimasi ? { fontStyle: 'italic', color: 'var(--muted, #64748b)' } : {}) }} />)}</div></div>; })()}
             <label>{lab('CBM / UOM')}{x.p > 0 && x.l > 0 && x.t > 0 ? <input readOnly value={h.cbmUnit.toFixed(4)} style={{ ...kecil, background: 'transparent', border: '1px dashed var(--g200, #e2e8f0)' }} aria-label={`CBM ${i + 1}`} />
               : <Angka aria-label={`CBM ${i + 1}`} placeholder="0,04" value={x.cbm ?? 0} onValue={v => ubah(i, { cbm: v })} style={kecil} />}</label>
             <label title={/^pal+et/i.test(x.uom) ? 'UOM palet: berat kotor 1 palet (barang + palet kayu)' : undefined}>{lab(/^pal+et/i.test(x.uom) ? 'Berat / palet kotor (kg)' : 'Berat / UOM (kg)')}<Angka aria-label={`Berat ${i + 1}`} value={x.beratKg} onValue={v => ubah(i, { beratKg: v })} style={kecil} /></label>
             {/^pal+et/i.test(x.uom) ? <label title="UOM palet: 1 UOM = 1 palet">{lab('UPP (unit/palet)')}<input readOnly value="1 (UOM palet)" aria-label={`UPP ${i + 1}`} style={{ ...kecil, background: 'transparent', border: '1px dashed var(--g200, #e2e8f0)' }} /></label>
-              : <label title="Unit per palet">{lab('UPP (unit/palet)')}<Angka aria-label={`UPP ${i + 1}`} bulat value={x.upp} onValue={v => ubah(i, { upp: v })} style={kecil} /></label>}
+              : <label title="Unit per palet">{lab('UPP (unit/palet)')}<Angka aria-label={`UPP ${i + 1}`} bulat value={x.upp} onValue={v => ubah(i, { upp: v, layer: null })} style={kecil} /></label>}
             <label>{lab(`Qty stok (${x.uom || 'unit'})`)}<Angka aria-label={`Qty ${i + 1}`} bulat value={x.qty} onValue={v => ubah(i, { qty: v })} style={kecil} /></label>
             <div>{lab('Palet · berat/palet')}<b>{angka(h.palet)}</b> plt · <b style={{ color: h.hanyaLantai ? 'var(--bad, #c0392b)' : h.levelMaks < levelRak ? 'var(--warn, #b45309)' : undefined }}>{angka(h.beratPaletKg)} kg</b></div>
           </div>
@@ -173,18 +178,29 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
               {Array.from({ length: levelRak }, (_, k) => k + 1).map(l => <option key={l} value={l}>Manual: L1–L{l}</option>)}</select></label>
             <label>{lab('Cara simpan')}<select aria-label={`Cara simpan ${i + 1}`} value={x.simpan ?? 'otomatis'} onChange={e => ubah(i, { simpan: e.target.value as ProdukTender['simpan'] }, false)} style={kecil}>
               {SIMPAN.map(s => <option key={s.v} value={s.v}>{s.v === 'otomatis' ? `Otomatis → ${LABEL_SIMPAN[h.caraSimpan].split(' (')[0]}` : s.l}</option>)}</select></label>
+            {!/^pal+et/i.test(x.uom) && <div title="Konfigurasi palet: isi per layer × jumlah layer. Kosong = otomatis dari dimensi produk & palet. Mengisi jumlah layer mengubah UPP = isi/layer × layer.">{lab('Isi/layer × layer')}
+              <div className="row" style={{ gap: 4, flexWrap: 'nowrap', alignItems: 'center' }}>
+                <Angka aria-label={`Isi per layer ${i + 1}`} bulat value={h.perLayerManual ? x.perLayer : null} placeholder={h.perLayerAuto ? String(h.perLayerAuto) : 'auto'}
+                  onValue={v => { const per = v > 0 ? v : h.perLayerAuto; ubah(i, { perLayer: v > 0 ? v : null, ...(h.layerManual && per > 0 ? { upp: per * h.layer } : {}) }); }} style={{ ...kecil, width: 64, minWidth: 64 }} />
+                <span className="small">×</span>
+                <Angka aria-label={`Jumlah layer ${i + 1}`} bulat value={h.layerManual ? x.layer : null} placeholder={h.layerAuto ? String(h.layerAuto) : 'auto'}
+                  onValue={v => ubah(i, v > 0 ? { layer: v, ...(h.perLayer > 0 ? { upp: h.perLayer * v } : {}) } : { layer: null })} style={{ ...kecil, width: 56, minWidth: 56 }} />
+                <span className="small" style={{ whiteSpace: 'nowrap' }}>= <b>{angka(h.perLayer * h.layer)}</b>{h.perLayer * h.layer !== uppEfektif(x) ? <span className="muted"> (UPP {angka(uppEfektif(x))})</span> : ''}</span>
+              </div>
+              <span className="small muted">{h.perLayerManual || h.layerManual ? <>manual · sistem {h.perLayerAuto}/layer × {h.layerAuto} <button className="link-kecil" onClick={() => ubah(i, { perLayer: null, layer: null })}>reset</button></> : 'otomatis dari dimensi'}</span>
+            </div>}
             {!/^pal+et/i.test(x.uom) && <label title="Ukuran palet untuk susunan per layer & tinggi muatan">{lab('Jenis palet')}<select aria-label={`Jenis palet ${i + 1}`} value={x.paletTipe ?? ''} onChange={e => ubah(i, { paletTipe: e.target.value || undefined })} style={kecil}>
               <option value="">Default: {paletUntuk({}, dimPalet).nama ?? 'standar'}</option>
-              {dimPalet.tipe.map(p => <option key={p.id} value={p.id}>{p.nama} · {angka(p.pCm / 100, 2)} × {angka(p.lCm / 100, 2)} m</option>)}</select></label>}
+              {dimPalet.tipe.map(p => <option key={p.id} value={p.id}>{p.nama} · {pj2(p.pCm, p.lCm, 'cm')}</option>)}</select></label>}
             <label>{lab('Kategori')}<select aria-label={`Kategori ${i + 1}`} value={x.kategori ?? 'Umum'} onChange={e => ubah(i, { kategori: e.target.value }, false)} style={kecil}>
               {Array.from(new Set([...KATEGORI_PRODUK, x.kategori ?? 'Umum'])).map(k => <option key={k}>{k}</option>)}</select></label>
             <label>{lab('Zona')}<input aria-label={`Zona ${i + 1}`} list="dl-zona-produk" value={x.zona ?? ''} onChange={e => ubah(i, { zona: e.target.value }, false)} style={kecil} /></label>
             <div className="small muted">{x.otomatis && <span className="pill info" title="Dari Key assumption — ikut berubah sampai angkanya diedit" style={{ marginRight: 6 }}>otomatis</span>}
-              {h.cbmPalet > 0 && <>{h.cbmPalet.toFixed(2)} CBM/plt</>}{h.tinggiMuatanMm > 0 && <> · {h.perLayer}/layer × {h.layer} layer · tinggi {angka(h.tinggiMuatanMm)} mm</>}{(x.isiPcs ?? 0) > 0 && <> · 1 {x.uom} = {angka(x.isiPcs!)} pcs</>}</div>
+              {h.cbmPalet > 0 && <>{h.cbmPalet.toFixed(2)} CBM/plt</>}{h.tinggiMuatanMm > 0 && <> · {h.perLayer}/layer × {h.layer} layer · tinggi {pj(h.tinggiMuatanMm, 'mm')}</>}{(x.isiPcs ?? 0) > 0 && <> · 1 {x.uom} = {angka(x.isiPcs!)} pcs</>}</div>
             <div style={{ textAlign: 'right' }}><button className="danger" onClick={() => hapus(i)} aria-label={`Hapus ${x.nama || x.kode}`}>Hapus</button></div>
           </div>
           {h.peringatan.length > 0 && <div className="small" style={{ color: 'var(--warn, #b45309)', marginTop: 6 }}>{h.peringatan.map(p => <div key={p}>⚠ {p}</div>)}</div>}
-          {h.saranUpp && <SaranUppBaris s={h.saranUpp} uom={x.uom} tinggiSkrMm={h.tinggiMuatanMm} onUpp={u => ubah(i, { upp: u, uppAsli: null })} onTetap={tetap => ubah(i, { uppAsli: tetap ? x.upp : null }, false)} />}
+          {h.saranUpp && <SaranUppBaris s={h.saranUpp} uom={x.uom} tinggiSkrMm={h.tinggiMuatanMm} onUpp={u => ubah(i, { upp: u, uppAsli: null, layer: null })} onTetap={tetap => ubah(i, { uppAsli: tetap ? x.upp : null }, false)} />}
         </div>)}
         {!daftar.length && <p className="muted">Belum ada produk. Isi Volume & Parameter muatan di tab Volume untuk baris otomatis, atau tambah / tempel produk.</p>}
       </div>
@@ -255,7 +271,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
 function SaranUppBaris({ s, uom, tinggiSkrMm, onUpp, onTetap }: { s: SaranUpp; uom: string; tinggiSkrMm: number; onUpp: (u: number) => void; onTetap: (tetap: boolean) => void }) {
   const u = uom || 'unit';
   const ket = (o: OpsiUpp) => {
-    const tinggi = Math.abs(o.tinggiMuatanMm - tinggiSkrMm) < 1 ? 'tinggi sama' : `tinggi ${angka(o.tinggiMuatanMm)} mm (${o.tinggiMuatanMm < tinggiSkrMm ? '−' : '+'}${angka(Math.abs(o.tinggiMuatanMm - tinggiSkrMm))} mm)`;
+    const tinggi = Math.abs(o.tinggiMuatanMm - tinggiSkrMm) < 1 ? 'tinggi sama' : `tinggi ${pj(o.tinggiMuatanMm, 'mm')} (${o.tinggiMuatanMm < tinggiSkrMm ? '−' : '+'}${pj(Math.abs(o.tinggiMuatanMm - tinggiSkrMm), 'mm')})`;
     return `${o.layer} layer penuh · ${tinggi} · ${o.selisih > 0 ? '+' : '−'}${Math.abs(o.selisih)} ${u}/palet · ${angka(o.beratPaletKg)} kg`;
   };
   const tombol = (o: OpsiUpp | null, utama: boolean) => o && (

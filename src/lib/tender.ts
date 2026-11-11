@@ -25,6 +25,7 @@ export interface GudangTerpilih {
   id: string; nama: string; alamat: string | null; kab_kota: string; provinsi: string; gmaps_url: string | null;
   luas_m2: number; harga_sewa_m2_bulan: number | null; harga_per_bulan: number | null; tinggi_bersih_m: number | null;
   jumlah_dock: number | null; jumlah_gate?: number | null; tipe: string; foto: string[]; sewaUtuh: boolean;
+  daya_lantai_ton_m2?: number | null;   // daya dukung lantai gudang (ton/m²) → default cek kekuatan lantai
 }
 
 // Bagian input yang disimpan di tenders.asumsi

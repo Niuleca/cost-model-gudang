@@ -3,6 +3,7 @@
 // Layout otomatis dari parameter Space tender (bisa direvisi & disusun ulang) → edit komponen gudang (rak, block stack, staging, dock,
 // fasilitas, kolom, jalur, zona), atur jarak & tinggi, kapasitas dihitung ulang, 3D mengikuti. Simpan beberapa versi per project;
 // versi tersimpan dipakai sebagai gudang di Leca Game. Export PNG / PDF. Latar denah gambar / DXF.
+import { useSatuanPanjang } from '@/lib/satuanPanjang';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -48,11 +49,14 @@ function BentangInput({ l, v, set }: { l: string; v: number[]; set: (x: number[]
 
 /** Isian angka di panel properti. */
 function Angka({ l, v, set, step = 0.1, min, u }: { l: string; v: number; set: (x: number) => void; step?: number; min?: number; u?: string }) {
-  const [teks, setTeks] = useState(String(v));
-  useEffect(() => { setTeks(String(v)); }, [v]);
+  // u = "m": panjang → tampil & diketik dalam satuan global (m / cm / mm), disimpan tetap dalam meter
+  const sp = useSatuanPanjang(); const pjg = u === 'm';
+  const keTeks = (x: number) => String(pjg ? sp.tampil(x, 'm') : x);
+  const [teks, setTeks] = useState(keTeks(v));
+  useEffect(() => { const n = Number(teks); if (!Number.isFinite(n) || Math.abs((pjg ? sp.simpan(n, 'm') : n) - v) > 1e-9) setTeks(keTeks(v)); }, [v, sp.satuan]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <label className="f">{l}{u ? ` (${u})` : ''}
-      <input type="number" step={step} min={min} value={teks} onChange={e => { setTeks(e.target.value); const x = Number(e.target.value); if (e.target.value !== '' && Number.isFinite(x)) set(x); }} />
+    <label className="f">{l}{u ? ` (${pjg ? sp.satuan : u})` : ''}
+      <input type="number" step={pjg ? 'any' : step} min={min} value={teks} onChange={e => { setTeks(e.target.value); const x = Number(e.target.value); if (e.target.value !== '' && Number.isFinite(x)) set(pjg ? sp.simpan(x, 'm') : x); }} />
     </label>
   );
 }

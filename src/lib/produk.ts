@@ -5,6 +5,7 @@
 import type { VolumeInput } from '@/lib/engine/types';
 import { PARAM_DEFAULT, type ProfilVolume } from '@/lib/profilVolume';
 import { daftarPalet, ringkasPalet, type SpaceExcel } from '@/lib/engine/space';
+import { pj, pj2 } from '@/lib/satuanPanjangInti';
 
 export const UOM_PRODUK = ['karton', 'case', 'pcs', 'unit', 'roll', 'bag', 'sak', 'pail', 'drum', 'jerigen', 'botol', 'kaleng', 'pack', 'bundle', 'coil', 'ibc', 'palet'] as const;
 export const KATEGORI_PRODUK = ['Umum', 'Berat', 'Fragile / mudah pecah', 'B3 / kimia', 'Cair', 'Cold / chiller', 'High value'] as const;
@@ -20,7 +21,7 @@ export interface ProdukTender {
   uom: string;                 // satuan simpan / handling: karton, pcs, roll, bag, pail, unit, …
   kelasBerat?: string;         // kode kelas berat dari master UoM (mis. bag-50, fibc-1000) — kosong = otomatis dari berat
   p: number; l: number; t: number;   // dimensi per UOM (satuan: satuanDim, default cm)
-  satuanDim?: 'cm' | 'mm';     // kosong = otomatis (angka > 2,5 m untuk palet / > 6 m untuk UOM lain dibaca mm)
+  satuanDim?: 'cm' | 'mm' | 'm';     // kosong = otomatis (angka > 2,5 m untuk palet / > 6 m untuk UOM lain dibaca mm)
   cbm?: number | null;         // CBM per UOM — dipakai bila P×L×T kosong
   beratKg: number;             // berat per UOM (kg)
   upp: number;                 // UPP = unit (UOM) per palet
@@ -34,6 +35,8 @@ export interface ProdukTender {
   otomatis?: boolean;          // baris dari key assumption — ikut berubah selama belum diedit
   dimEstimasi?: boolean;       // P×L×T diperkirakan dari CBM per case (belum diukur)
   paletTipe?: string;          // id jenis palet (Key assumption); kosong = jenis dominan
+  perLayer?: number | null;    // konfigurasi palet: isi (UOM) per layer — kosong = otomatis dari P × L palet
+  layer?: number | null;       // konfigurasi palet: jumlah layer — kosong = ROUNDUP(UPP ÷ isi per layer)
   uppAsli?: number | null;     // UPP yang sengaja dipertahankan sesuai kondisi asli (layer atas tidak penuh) — peringatan disembunyikan selama UPP sama
   catatan?: string;
 }
@@ -78,16 +81,15 @@ export function paletUntuk(x: Pick<ProdukTender, 'paletTipe'>, p: PaletDim | Pal
   if (!('tipe' in p)) return p;
   return p.tipe.find(t => t.id === x.paletTipe) ?? p.tipe.find(t => t.id === p.dominan) ?? p.tipe[0] ?? PALET_DEFAULT;
 }
-const cm = (x: number) => Math.round(x * 10) / 10;
 /** Satuan dimensi yang dipakai: pilihan user, atau otomatis — dimensi yang tidak masuk akal dalam cm (palet > 2,5 m, lainnya > 6 m) dibaca mm. */
-export function satuanDimEfektif(x: Pick<ProdukTender, 'p' | 'l' | 't' | 'uom' | 'satuanDim'>): { satuan: 'cm' | 'mm'; otomatis: boolean } {
+export function satuanDimEfektif(x: Pick<ProdukTender, 'p' | 'l' | 't' | 'uom' | 'satuanDim'>): { satuan: 'cm' | 'mm' | 'm'; otomatis: boolean } {
   if (x.satuanDim) return { satuan: x.satuanDim, otomatis: false };
   const maks = Math.max(n(x.p), n(x.l), n(x.t));
   return { satuan: maks > (isPalet(x.uom) ? 250 : 600) ? 'mm' : 'cm', otomatis: true };
 }
 /** Dimensi dalam cm (konversi dari mm bila perlu). */
 export function dimCm(x: Pick<ProdukTender, 'p' | 'l' | 't' | 'uom' | 'satuanDim'>) {
-  const f = satuanDimEfektif(x).satuan === 'mm' ? 0.1 : 1;
+  const su = satuanDimEfektif(x).satuan, f = su === 'mm' ? 0.1 : su === 'm' ? 100 : 1;
   return { p: n(x.p) * f, l: n(x.l) * f, t: n(x.t) * f };
 }
 /** UOM palet: 1 UOM = 1 palet (UPP = 1). */
@@ -95,7 +97,7 @@ export const uppEfektif = (x: Pick<ProdukTender, 'uom' | 'upp'>) => (isPalet(x.u
 
 export interface HitungProduk {
   cbmUnit: number; beratPaletKg: number; cbmPalet: number; palet: number; totalKg: number; totalCbm: number;
-  perLayer: number; layer: number; tinggiMuatanMm: number;
+  perLayer: number; layer: number; tinggiMuatanMm: number; perLayerAuto: number; layerAuto: number; perLayerManual: boolean; layerManual: boolean;
   levelMaks: number; sumberLevel: string; hanyaLantai: boolean; caraSimpan: CaraSimpan; peringatan: string[];
   saranUpp: SaranUpp | null;
 }
@@ -117,12 +119,18 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
   const palet = upp > 0 && n(x.qty) > 0 ? Math.ceil(n(x.qty) / upp - 1e-9) : 0;   // qty kosong → 0 (bukan -0)
   // susunan per layer di palet P × L (default 120 × 100 cm, orientasi terbaik), tinggi muatan = layer × tinggi unit + palet.
   // UOM palet: tinggi muatan = T (sudah termasuk palet kayu).
-  const perLayer = palUom ? (dimOk ? 1 : 0) : dimOk ? Math.max(Math.floor(PALET_CM.p / d.p + 1e-9) * Math.floor(PALET_CM.l / d.l + 1e-9), Math.floor(PALET_CM.p / d.l + 1e-9) * Math.floor(PALET_CM.l / d.p + 1e-9)) : 0;
-  const layer = perLayer > 0 && upp > 0 ? Math.ceil(upp / perLayer - 1e-9) : 0;
+  const perLayerAuto = palUom ? (dimOk ? 1 : 0) : dimOk ? Math.max(Math.floor(PALET_CM.p / d.p + 1e-9) * Math.floor(PALET_CM.l / d.l + 1e-9), Math.floor(PALET_CM.p / d.l + 1e-9) * Math.floor(PALET_CM.l / d.p + 1e-9)) : 0;
+  // konfigurasi palet manual (per produk): isi per layer & jumlah layer — UOM palet selalu 1 × 1
+  const perLayerManual = !palUom && n(x.perLayer) > 0, layerManual = !palUom && n(x.layer) > 0;
+  const perLayer = perLayerManual ? n(x.perLayer) : perLayerAuto;
+  const layerAuto = perLayer > 0 && upp > 0 ? Math.ceil(upp / perLayer - 1e-9) : 0;
+  const layer = layerManual ? n(x.layer) : layerAuto;
   const tinggiMuatanMm = palUom ? (dimOk ? d.t * 10 : 0) : layer > 0 ? (layer * d.t + PALET_CM.tinggiKayu) * 10 : 0;
   const peringatan: string[] = [];
-  if (dimOk && !palUom && perLayer === 0) peringatan.push(`Unit ${d.p} × ${d.l} cm lebih besar dari palet ${cm(PALET_CM.p)} × ${cm(PALET_CM.l)} cm — cek dimensi / satuan (cm atau mm), atau pakai UOM palet / simpan di lantai.`);
-  if (dimOk && palUom && (Math.max(d.p, d.l) > Math.max(PALET_CM.p, PALET_CM.l) + 10 || Math.min(d.p, d.l) > Math.min(PALET_CM.p, PALET_CM.l) + 15)) peringatan.push(`Palet ${Math.round(d.p)} × ${Math.round(d.l)} cm lebih besar dari palet ${cm(PALET_CM.p)} × ${cm(PALET_CM.l)} cm — cek dimensi / satuan (cm atau mm).`);
+  if (perLayerManual && perLayerAuto > 0 && perLayer > perLayerAuto) peringatan.push(`Isi per layer manual ${perLayer} > hitungan sistem ${perLayerAuto} (palet ${pj2(PALET_CM.p, PALET_CM.l, 'cm')}) — muatan bisa melebihi tepi palet (overhang).`);
+  if (layerManual && perLayer > 0 && upp > perLayer * layer) peringatan.push(`UPP ${upp} > ${perLayer}/layer × ${layer} layer = ${perLayer * layer} — tambah layer atau kurangi UPP.`);
+  if (dimOk && !palUom && perLayerAuto === 0 && !perLayerManual) peringatan.push(`Unit ${pj2(d.p, d.l, 'cm')} lebih besar dari palet ${pj2(PALET_CM.p, PALET_CM.l, 'cm')} — cek dimensi / satuan, atau pakai UOM palet / simpan di lantai.`);
+  if (dimOk && palUom && (Math.max(d.p, d.l) > Math.max(PALET_CM.p, PALET_CM.l) + 10 || Math.min(d.p, d.l) > Math.min(PALET_CM.p, PALET_CM.l) + 15)) peringatan.push(`Palet ${pj2(d.p, d.l, 'cm')} lebih besar dari palet ${pj2(PALET_CM.p, PALET_CM.l, 'cm')} — cek dimensi / satuan.`);
 
   let levelMaks = 99, sumberLevel = 'semua level';
   if (x.levelMaks && x.levelMaks > 0) { levelMaks = x.levelMaks; sumberLevel = 'manual'; }
@@ -140,7 +148,7 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
   if (x.simpan === 'otomatis' || !x.simpan) caraSimpan = hanyaLantai ? 'floor' : 'spr';
   // bukaan di Space = tinggi produk saja (palet kayu dihitung terpisah)
   const tinggiProdukMm = tinggiMuatanMm > 0 ? tinggiMuatanMm - PALET_CM.tinggiKayu * 10 : 0;
-  if (bukaanMm && tinggiProdukMm > bukaanMm + 0.5 && ['spr', 'ddr'].includes(caraSimpan)) peringatan.push(`Tinggi produk di palet ${Math.round(tinggiProdukMm)} mm > bukaan rak ${Math.round(bukaanMm)} mm (Warehouse Planning → Product) — kurangi UPP / layer atau naikkan Product di Warehouse Planning.`);
+  if (bukaanMm && tinggiProdukMm > bukaanMm + 0.5 && ['spr', 'ddr'].includes(caraSimpan)) peringatan.push(`Tinggi produk di palet ${pj(tinggiProdukMm, 'mm')} > bukaan rak ${pj(bukaanMm, 'mm')} (Warehouse Planning → Product) — kurangi UPP / layer atau naikkan Product di Warehouse Planning.`);
   let saranUpp: SaranUpp | null = null;
   if (!palUom && upp > 0 && perLayer > 0 && upp % perLayer && layer > 1) {
     const sisaAtas = upp % perLayer, diterima = Number(x.uppAsli) === upp;
@@ -150,15 +158,15 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
       const tProdMm = tMm - PALET_CM.tinggiKayu * 10;
       const diRak = ['spr', 'ddr'].includes(caraSimpan);
       const alasan = diRak && kg > aturan.kapPosisiKg ? `berat ${Math.round(kg)} kg > kapasitas beam ${aturan.kapPosisiKg} kg`
-        : diRak && bukaanMm && tProdMm > bukaanMm + 0.5 && tProdMm > tinggiProdukMm ? `tinggi ${Math.round(tProdMm)} mm > bukaan rak ${Math.round(bukaanMm)} mm` : undefined;
+        : diRak && bukaanMm && tProdMm > bukaanMm + 0.5 && tProdMm > tinggiProdukMm ? `tinggi ${pj(tProdMm, 'mm')} > bukaan rak ${pj(bukaanMm, 'mm')}` : undefined;
       return { upp: u, layer: ly, tinggiMuatanMm: tMm, beratPaletKg: kg, selisih: u - upp, ok: !alasan, alasan };
     };
     saranUpp = { upp, perLayer, sisaAtas, diterima, bawah: opsi(Math.floor(upp / perLayer) * perLayer), atas: opsi(Math.ceil(upp / perLayer) * perLayer) };
     if (!diterima) peringatan.push(`UPP ${upp} tidak pas kelipatan ${perLayer}/layer — layer teratas hanya ${sisaAtas} dari ${perLayer} ${x.uom || 'unit'}.`);
   }
-  if (dimOk && cbmPalet > (PALET_CM.p * PALET_CM.l / 1e4) * 1.85) peringatan.push(`CBM muatan ${cbmPalet.toFixed(2)} m³/palet tidak wajar untuk palet ${cm(PALET_CM.p)} × ${cm(PALET_CM.l)} cm — cek UPP / dimensi (satuan cm atau mm).`);
+  if (dimOk && cbmPalet > (PALET_CM.p * PALET_CM.l / 1e4) * 1.85) peringatan.push(`CBM muatan ${cbmPalet.toFixed(2)} m³/palet tidak wajar untuk palet ${pj2(PALET_CM.p, PALET_CM.l, 'cm')} — cek UPP / dimensi.`);
   if (!upp && n(x.qty) > 0) peringatan.push('UPP belum diisi — jumlah palet tidak bisa dihitung.');
-  return { cbmUnit, beratPaletKg, cbmPalet, palet, totalKg: n(x.qty) * n(x.beratKg), totalCbm: n(x.qty) * cbmUnit, perLayer, layer, tinggiMuatanMm, levelMaks, sumberLevel, hanyaLantai, caraSimpan, peringatan, saranUpp };
+  return { cbmUnit, beratPaletKg, cbmPalet, palet, totalKg: n(x.qty) * n(x.beratKg), totalCbm: n(x.qty) * cbmUnit, perLayer, layer, tinggiMuatanMm, perLayerAuto, layerAuto, perLayerManual, layerManual, levelMaks, sumberLevel, hanyaLantai, caraSimpan, peringatan, saranUpp };
 }
 
 /** Satu baris produk otomatis dari Key assumption: Volume (UoM & konversi) + Parameter muatan (berat/CBM per case & per palet). */
@@ -276,7 +284,7 @@ function spaceDariProduk(space: object, tinggiRakMm: number, porsiLantai: number
     const tinggi = tinggiRakMm > 0 ? Math.ceil(tinggiRakMm / 50 - 1e-9) * 50 : 0;   // tinggi produk saja (tanpa tebal palet), dibulatkan 50 mm
     excel = { ...sx };
     if (tinggi > 0 && tinggi !== Number(rak.productMm ?? 1250)) {
-      per.push({ bagian: 'Warehouse Planning', item: 'Tinggi produk di rak (bukaan level)', dari: `${f(Number(rak.productMm ?? 1250), 0)} mm`, ke: `${f(tinggi, 0)} mm` });
+      per.push({ bagian: 'Warehouse Planning', item: 'Tinggi produk di rak (bukaan level)', dari: pj(Number(rak.productMm ?? 1250), 'mm'), ke: pj(tinggi, 'mm') });
       excel.rak = { ...rak, productMm: tinggi };
     }
     const pr0 = sx.porsi as Record<string, number> | undefined;
@@ -349,4 +357,10 @@ export function terapkanProduk<A extends { volumes: VolumeInput[]; profilVolume?
   const excel = spaceDariProduk(a.space, tinggiRakMm, d.porsiLantai, per);
   const patch = { profilVolume, volumes, ...(excel ? { space: { ...a.space, excel } } : {}) } as unknown as Partial<A>;
   return { patch, perubahan: per };
+}
+
+/** Berat palet terberat yang disimpan di rak (SPR / DDR) — dasar cek kekuatan rak & lantai. null bila tidak ada produk rak. */
+export function beratPaletRakMaks(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, palet: PaletDim | PaletProduk = PALET_DEFAULT): number | null {
+  const xs = daftar.map(x => hitungProduk(x, aturan, levelRak, undefined, palet)).filter(h => (h.caraSimpan === 'spr' || h.caraSimpan === 'ddr') && h.beratPaletKg > 0);
+  return xs.length ? Math.max(...xs.map(h => h.beratPaletKg)) : null;
 }
