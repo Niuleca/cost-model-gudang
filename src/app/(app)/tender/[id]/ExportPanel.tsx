@@ -6,7 +6,7 @@ import type { DataExport } from '@/lib/exportTender';
 type Pratinjau = { nama: string; baris: number; kolom: number; rows: (string | number | null)[][]; gaya?: ({ bg?: string; b?: boolean; pct?: boolean; c?: string; al?: 'left' | 'center' | 'right' } | null)[][] };
 const KET: Record<string, string> = {
   '0 Ringkasan': 'Hasil utama · 1-1 PNL (selling, cost, indirect, gross profit) · 2-1 manpower · 2-2 other cost · porsi kategori · opex vs capex · rate card',
-  'Key assumption': 'Data tender, provinsi → kab/kota → UMK, shift, faktor, porsi palletize/loose, working day, workload per shift',
+  'Key Assumption': 'Data tender, provinsi → kab/kota → UMK, shift, faktor, porsi palletize/loose, working day, workload per shift',
   'Volume': 'Volume & konversi, ringkasan order, parameter muatan, profil order inbound/outbound, kapasitas kendaraan',
   'Produk': 'Daftar SKU, CBM & berat per palet, level rak maks dari aturan berat, cara simpan, turunan tertimbang',
   'Value Stream Mapping': 'Man Power & MHE Summary, skema kontrak, rincian biaya manpower, rincian per task, matriks multi-skill, indirect & peran tetap, VSM',
@@ -23,7 +23,7 @@ const KET: Record<string, string> = {
   'Data Mentah': 'Seluruh isi asumsi & hasil (path → nilai) untuk audit',
 };
 /** Sheet yang saling dirujuk rumus — selalu ikut diunduh. */
-const WAJIB = ['0 Ringkasan', 'Key assumption', 'Volume', 'Produk', 'Value Stream Mapping', 'Warehouse Planning', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Daftar', 'Data Input'];
+const WAJIB = ['0 Ringkasan', 'Key Assumption', 'Volume', 'Produk', 'Value Stream Mapping', 'Warehouse Planning', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Daftar', 'Data Input'];
 const kolom = (c: number) => { let s = ''; c++; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
 const fmt = (v: string | number | null) => v == null ? '' : typeof v === 'number' ? (Math.abs(v) >= 10000 ? Math.round(v).toLocaleString('id-ID') : Number.isInteger(v) ? String(v) : v.toLocaleString('id-ID', { maximumFractionDigits: 4 })) : String(v);
 

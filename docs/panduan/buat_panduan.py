@@ -121,7 +121,7 @@ def bangun(out):
                  ['Menu akun (kanan atas)', 'Pengguna & role · Approval akun · Master data · Profil & password · Keluar'],
                  ['Pemilih bahasa (ikon bola dunia)', 'Indonesia · English · Korea · Jepang'],
                  ['Baca saya sebelum mulai', 'Tombol di halaman New Tender untuk membuka panduan ini']], [42 * mm, 128 * mm]),
-          Spacer(1, 6), kotak('Di halaman tender, menu tab (Key assumption, Volume, Aktivitas &amp; manpower, …) tetap menempel di atas saat halaman di-scroll, '
+          Spacer(1, 6), kotak('Di halaman tender, menu tab (Key Assumption, Volume, Aktivitas &amp; manpower, …) tetap menempel di atas saat halaman di-scroll, '
                               'dan bar <b>Undo · Redo · Simpan input · Hitung</b> menempel di bawah layar.', 'Navigasi tender')]
 
     # ---- 2
@@ -180,7 +180,7 @@ def bangun(out):
     # ---- 5
     s += [PageBreak(), P('BAB 5', 'eyebrow'), P('Mengisi tender langkah demi langkah', 'h1'),
           alur([('Asumsi', 'key assumption'), ('Volume', 'palet/order'), ('Aktivitas', '& manpower'), ('Gudang', 'space & MHE'), ('Interest', 'pinjaman'), ('IT', 'sistem'), ('Biaya lain', 'opex/capex'), ('Hasil', 'cek')]),
-          P('1 · Key assumption', 'h2'),
+          P('1 · Key Assumption', 'h2'),
           *L(['Customer, industri, provinsi &amp; area (UMK), skema, skenario aset, kontrak, go-live, shift, hari &amp; jam kerja, payment term, cuti, faktor produktivitas &amp; efisiensi.',
               '<b>Workload palletize vs loose</b> per proses — isi % palletize, loose = sisanya. Aktivitas yang "Ikut porsi" otomatis memakai angka ini.',
               '<b>Process Design</b>: working day (hari kerja, cuti, libur, jam efektif) untuk Man Power &amp; MHE, dan <b>workload per shift terpisah Inbound / Outbound / Storage-VAS</b> '
@@ -214,7 +214,7 @@ def bangun(out):
               'replenishment RT → input picking → picking case / palet → staging outbound → checker outbound → loading curah / paletan → goods issue &amp; print HO → checker serahkan HO. '
               'Tombol <i>Ganti dengan skema default</i> / <i>Tambahkan di bawah</i>.',
               'Urutan baris digeser dengan <b>▲ ▼</b> atau seret nomor baris.',
-              'Kolom <b>% volume</b>: <i>% manual</i> atau <i>Porsi … · palletize/loose</i> (mengikuti Key assumption). Pengali UoM "auto ÷60" = dibagi isi per palet.',
+              'Kolom <b>% volume</b>: <i>% manual</i> atau <i>Porsi … · palletize/loose</i> (mengikuti Key Assumption). Pengali UoM "auto ÷60" = dibagi isi per palet.',
               'Bila data di database Productivity diubah (mis. role Checker → Checker IB/OB), muncul tombol <b>Sinkronkan dengan database</b>.',
               'Process Design: workload → RfR → man hour → <b>FTE</b> → headcount (multi-skill pooling per shift). <b>Man Power Summary</b> menampilkan jumlah orang <b>per shift</b>.',
               '<b>Indirect &amp; peran tetap</b>: role supervisor hanya role SPV/Leader/Manager; span &lt; 5 diberi peringatan. Peran tetap berbasis <b>per shift</b> '

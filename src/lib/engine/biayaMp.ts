@@ -42,7 +42,7 @@ export function rincianBiayaRole(role: string, qty: number, m: MasterData | null
   level?: { levelGaji?: Partial<Record<LevelJabatan, number>>; levelRole?: Record<string, LevelJabatan> }) {
   const j: JobLevel | undefined = m?.jobLevels.find(x => x.roleName === role);
   const lv = faktorGajiRole(role, level?.levelGaji, level?.levelRole);
-  // Gaji pokok default = UMK area project (Key assumption) × % level jabatan
+  // Gaji pokok default = UMK area project (Key Assumption) × % level jabatan
   const gajiDefault = m ? Math.round(m.upahMinimum * lv.faktor) : 0;
   const gajiPokok = input?.gajiPokok && input.gajiPokok > 0 ? input.gajiPokok : gajiDefault;
   const hariKerja = input?.hariKerja && input.hariKerja > 0 ? input.hariKerja : hariDefault;

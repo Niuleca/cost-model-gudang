@@ -56,7 +56,7 @@ interface Tarif { golongan: string; tarif_kwh: number }
 interface Jab { role_name: string }
 
 const TAB_EXCEL = 'Data project (Excel)' as const;
-const TABS = ['Key assumption', 'Volume', 'Warehouse Planning', 'Produk', 'Value Stream Mapping', 'Landmark VSM', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Export'] as const;
+const TABS = ['Key Assumption', 'Volume', 'Warehouse Planning', 'Produk', 'Value Stream Mapping', 'Landmark VSM', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Export'] as const;
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'drum', 'ibc', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
@@ -105,7 +105,7 @@ export default function TenderPage() {
       });
   }, []);
   const [basisRingkas, setBasisRingkas] = useState<'peakBulan' | 'rataRataBulan' | 'komitmenBulan'>('peakBulan');
-  const [tab, setTab] = useTabUrl<(typeof TABS)[number] | typeof TAB_EXCEL>([TAB_EXCEL, ...TABS], 'Key assumption');
+  const [tab, setTab] = useTabUrl<(typeof TABS)[number] | typeof TAB_EXCEL>([TAB_EXCEL, ...TABS], 'Key Assumption');
   const [prods, setProds] = useState<Prod[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [tarif, setTarif] = useState<Tarif[]>([]);
@@ -223,7 +223,7 @@ export default function TenderPage() {
       if (perubahan.length) setDampakProduk(d => { const m = new Map(d.map(x => [`${x.bagian}|${x.item}`, x])); for (const x of perubahan) { const k = `${x.bagian}|${x.item}`; const lama = m.get(k); m.set(k, lama ? { ...x, dari: lama.dari } : x); } return Array.from(m.values()); });
     } else setA({ ...basis, produk, aturanBerat, ...(aktifkan ? { produkSinkron: true } : {}) });
   };
-  // Space (Warehouse Planning / Key assumption): ukuran / tebal palet berubah → susunan produk per palet dihitung ulang (bila produk jadi sumber data)
+  // Space (Warehouse Planning / Key Assumption): ukuran / tebal palet berubah → susunan produk per palet dihitung ulang (bila produk jadi sumber data)
   const ubahSpaceExcel = (excel: SpaceExcel) => {
     if (!t) return;
     const s0 = lengkapiSpaceExcel(t.asumsi.space.excel);
@@ -441,9 +441,9 @@ export default function TenderPage() {
       {tab === TAB_EXCEL && a.historis && <HistorisPanel h={a.historis} nama={(t.kode ?? t.customer).replace(/[^\w]+/g, '_')} />}
 
       <fieldset className="ro-fieldset" disabled={!bisaEdit}>
-      {tab === 'Key assumption' && (
+      {tab === 'Key Assumption' && (
         <div className="card">
-          <h2><T>Key assumption</T></h2>
+          <h2><T>Key Assumption</T></h2>
           <div className="grid3 ka-grid">
             <Txt id="cust" label="Customer" value={t.customer} onChange={v => setKol('customer', v)} />
             <Sel id="ind" label="Business category (produktivitas)" value={t.industri ?? ''} options={Array.from(new Set(['', ...INDUSTRI, t.industri ?? ''])).map(v => ({ v, l: v || '—' }))} onChange={v => setKol('industri', v || null)} />
@@ -482,8 +482,8 @@ export default function TenderPage() {
           </div>
         </div>
       )}
-      {tab === 'Key assumption' && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel} />}
-      {tab === 'Key assumption' && (() => {
+      {tab === 'Key Assumption' && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel} />}
+      {tab === 'Key Assumption' && (() => {
         const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };
         const dipakai = (pr: string) => a.aktivitas.filter(x => x.porsiMuat?.proses === pr);
         return <div className="card">
@@ -506,7 +506,7 @@ export default function TenderPage() {
           {a.porsiMuat && <div className="row"><button className="ghost" onClick={() => setA({ porsiMuat: undefined })}>Kembalikan ke default</button></div>}
         </div>;
       })()}
-      {tab === 'Key assumption' && <ProcessDesignPanel bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+      {tab === 'Key Assumption' && <ProcessDesignPanel bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
           jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />}
 
       {tab === 'Volume' && (
@@ -644,7 +644,7 @@ export default function TenderPage() {
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
           <ProcessDesignPanel bagian="matriks" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
-          <p className="small muted">Working day, workload shift, dan faktor produktivitas ada di tab <b>Key assumption</b>.</p>
+          <p className="small muted">Working day, workload shift, dan faktor produktivitas ada di tab <b>Key Assumption</b>.</p>
         </>}
         <div className="card">
           <h2><T>Indirect & peran tetap</T></h2>
@@ -798,7 +798,7 @@ export default function TenderPage() {
                     {!ef?.volumeDariProfil && isAktivitasAdmin(x) && x.volumeManual == null && <div className="small muted" title="Isi Profil order di tab Volume agar volume admin terisi otomatis">isi profil order</div>}</td>
                   <td className="num"><div className="sel-persen">
                     {x.porsiMuat
-                      ? <div className="nilai" title="Ikut porsi palletize/loose di Key assumption">{angka(persenDariPorsi(x.porsiMuat, a.porsiMuat) * 100, 1)}%</div>
+                      ? <div className="nilai" title="Ikut porsi palletize/loose di Key Assumption">{angka(persenDariPorsi(x.porsiMuat, a.porsiMuat) * 100, 1)}%</div>
                       : <div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}><input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /><span className="small">%</span></div>}
                     <select aria-label="Sumber % volume" title={x.porsiMuat ? `Ikut porsi: ${labelTag(x.porsiMuat)}` : '% diisi manual'} value={x.porsiMuat ? `${x.porsiMuat.proses}:${x.porsiMuat.muat}` : ''}
                       onChange={e => { const o = OPSI_TAG.find(q => q.k === e.target.value); ub(o ? { porsiMuat: o.t } : { porsiMuat: undefined, persenVolume: x.porsiMuat ? persenDariPorsi(x.porsiMuat, a.porsiMuat) : x.persenVolume }); }}>
@@ -1041,7 +1041,7 @@ const PALET_PRESET: (Omit<PaletTipe, 'id' | 'porsi'> & { label: string })[] = [
   { label: 'Custom (isi sendiri)', nama: 'Palet custom', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
 ];
 const fmtN = (x: number, d = 2) => x.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: d });
-/** Jenis palet (Key assumption) — satu sumber untuk semua ukuran palet: Produk (susunan per palet), block stack / pallet floor (luas rata-rata), racking (tebal terbesar), simulasi 3D. */
+/** Jenis palet (Key Assumption) — satu sumber untuk semua ukuran palet: Produk (susunan per palet), block stack / pallet floor (luas rata-rata), racking (tebal terbesar), simulasi 3D. */
 function PaletTender({ excel, onChange }: { excel: SpaceExcel; onChange: (x: SpaceExcel) => void }) {
   const list = daftarPalet(excel), r = ringkasPalet(list);
   const simpan = (xs: PaletTipe[]) => onChange({ ...excel, paletTipe: xs });

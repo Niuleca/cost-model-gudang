@@ -58,7 +58,7 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
     const d = x[k];
     const setL = (patch: Partial<typeof d>) => set({ [k]: { ...d, ...patch } } as Partial<SpaceExcel>);
     return <>
-      <Baris l="Luas palet rata-rata" v={<span title={`${(x.paletTipe ?? []).map(p => `${p.nama} ${p.panjang} × ${p.lebar} m · ${Math.round((p.porsi || 0) * 100)}%`).join('\n')}`}>{angka(r.luasPalet, 3)}</span>} u={`m² · ${(x.paletTipe ?? []).length || 1} jenis palet (Key assumption)`} />
+      <Baris l="Luas palet rata-rata" v={<span title={`${(x.paletTipe ?? []).map(p => `${p.nama} ${p.panjang} × ${p.lebar} m · ${Math.round((p.porsi || 0) * 100)}%`).join('\n')}`}>{angka(r.luasPalet, 3)}</span>} u={`m² · ${(x.paletTipe ?? []).length || 1} jenis palet (Key Assumption)`} />
       {k === 'block' ? <Baris l="Tumpukan (stacking)" input={inp(d.tumpuk, v => setL({ tumpuk: Math.max(1, v ?? 1) }), { w: 64 })} u="level" />
         : <Baris l="Tumpukan" v="1" u="level (palet di lantai, tidak ditumpuk)" />}
       <Baris l="Allowance gang / akses" input={<>{inp(Math.round(d.gangPersen * 1000) / 10, v => setL({ gangPersen: (v ?? 0) / 100 }), { w: 64 })}%</>} u="dari luas palet" />
@@ -174,7 +174,7 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
               <tr className="sp-judul"><td>Dimensi</td><td className="num">Number</td><td>UoM</td></tr>
               {([['Center height', 'centerMm'], ['Side height', 'sideMm'], ['Beam', 'beamMm'], ['Pallet', 'palletMm'], ['Product', 'productMm'], ['Clearance', 'clearanceMm']] as const).map(([l, k]) => (
                 <tr key={k} className={k === 'clearanceMm' ? 'sp-hijau' : ''}><td>{l}</td><td className="num">{k === 'palletMm'
-                  ? <span title="Tebal palet terbesar dari Key assumption → Jenis palet">{sp.fmt(x.rak.palletMm, 'mm', { tanpaSatuan: true })}</span>
+                  ? <span title="Tebal palet terbesar dari Key Assumption → Jenis palet">{sp.fmt(x.rak.palletMm, 'mm', { tanpaSatuan: true })}</span>
                   : pjn(x.rak[k], 'mm', v => set({ rak: { ...x.rak, [k]: Math.round((v ?? 0) * 1000) / 1000 } }), { w: 90 })}</td><td>{k === 'palletMm' ? <span className="small muted">{U} · dari Jenis palet</span> : U}</td></tr>))}
               <tr><td>Total height / pallet (level 2 up)</td><td className="num">{sp.fmt(h.level.levelN, 'mm', { tanpaSatuan: true })}</td><td>{U}</td></tr>
               <tr><td>Total height / pallet (level 1)</td><td className="num">{sp.fmt(h.level.level1, 'mm', { tanpaSatuan: true })}</td><td>{U}</td></tr>

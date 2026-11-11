@@ -38,7 +38,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
       <div className="umk-box">
         <div><div className="small muted">UMK area project</div><b style={{ fontSize: 18 }}>{umk ? rp(umk) : 'memuat…'}</b><span className="small muted"> /bln</span></div>
         <div><div className="small muted">Area</div><b>{lokasi || '—'}</b></div>
-        <div className="small muted" style={{ flex: 1, minWidth: 220 }}>Diambil dari <b>Area / kab-kota</b> di Key assumption. Ganti area di sana untuk mengubah UMK; semua jabatan di tabel ini ikut area project.</div>
+        <div className="small muted" style={{ flex: 1, minWidth: 220 }}>Diambil dari <b>Area / kab-kota</b> di Key Assumption. Ganti area di sana untuk mengubah UMK; semua jabatan di tabel ini ikut area project.</div>
       </div>
       <h3><T>% gaji pokok per level jabatan</T></h3>
       <div className="tablewrap"><table>

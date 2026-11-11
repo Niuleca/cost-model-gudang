@@ -33,7 +33,7 @@ const K: Kamus = {
   'cost model, tender & quotation gudang': ['warehouse cost model, tender & quotation', '창고 원가 모델·입찰·견적', '倉庫コストモデル・入札・見積'],
   'Dibuat oleh': ['Built by', '제작', '制作'],
   // Tab tender
-  'Key assumption': ['Key assumptions', '주요 가정', '主要前提'],
+  'Key Assumption': ['Key Assumptions', '주요 가정', '主要前提'],
   'Volume': ['Volume', '물량', '物量'],
   'Produk': ['Products', '제품', '製品'],
   'Aktivitas & manpower': ['Activities & manpower', '작업 및 인력', '作業と人員'],
@@ -60,7 +60,7 @@ const K: Kamus = {
   'Hapus': ['Delete', '삭제', '削除'],
   'Salin': ['Copy', '복사', 'コピー'],
   'Tambah': ['Add', '추가', '追加'],
-  // Key assumption
+  // Key Assumption
   'Customer': ['Customer', '고객사', '顧客'],
   'Industri (benchmark produktivitas)': ['Industry (productivity benchmark)', '산업 (생산성 기준)', '業種（生産性ベンチマーク）'],
   'PIC / account': ['PIC / account', '담당자', '担当者'],

@@ -1,6 +1,6 @@
 'use client';
 // Workbook model ber-RUMUS: setiap angka hasil di web bisa ditelusuri di Excel.
-// Urutan sheet = urutan langkah di web: Key assumption → Volume → Process Design → Biaya Manpower → Space & MHE
+// Urutan sheet = urutan langkah di web: Key Assumption → Volume → Process Design → Biaya Manpower → Space & MHE
 // → Interest cost → IT & Biaya lain → Rincian biaya → Rate card & Hasil → Ringkasan.
 // Warna: header rumus/hasil silver C0C0C0 · header input abu-abu muda E7E6E6 · sel input putih tulang FAF8F2 · sel hasil abu-abu D9D9D9.
 import type { HasilTender } from '@/lib/engine/index.ts';
@@ -136,8 +136,8 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
   const S0 = new Lembar(wb, '0 Ringkasan', 'RINGKASAN', `${t.customer} — ${t.kode ?? ''}`,
     `${t.kab_kota}, ${t.provinsi} · ${t.skenario_aset} · ${t.jumlah_shift} shift · kontrak ${n} bln · diekspor ${new Date().toLocaleString('id-ID')}`, 'FF1F2A37');
 
-  // ================= 1. Key assumption =================
-  const S1 = new Lembar(wb, '1 Key Assumption', 'LANGKAH 1 · KEY ASSUMPTION', 'Key assumption', 'Sel putih tulang = input (boleh diubah untuk simulasi) · sel abu-abu = hasil rumus');
+  // ================= 1. Key Assumption =================
+  const S1 = new Lembar(wb, '1 Key Assumption', 'LANGKAH 1 · KEY ASSUMPTION', 'Key Assumption', 'Sel putih tulang = input (boleh diubah untuk simulasi) · sel abu-abu = hasil rumus');
   S1.setLebar(44, 18, 12, 70);
   S1.bagian('Data tender');
   S1.param('Customer', t.customer, 'teks', 'input');

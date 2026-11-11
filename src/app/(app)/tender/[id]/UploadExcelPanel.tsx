@@ -34,7 +34,7 @@ export default function UploadExcelPanel({ t, bisaEdit, onTerapkan }: {
   }
   const tampil = hasil?.perubahan.filter(p => !cari || p.path.toLowerCase().includes(cari.toLowerCase())) ?? [];
   const bagian = (p: string) => p.replace(/\[\d+\].*$/, '').split('.')[0];
-  const perBagian = hasil ? Object.entries(hasil.perubahan.reduce<Record<string, number>>((o, p) => { const k = p.sumber === 'tender' ? 'Key assumption' : bagian(p.path); o[k] = (o[k] ?? 0) + 1; return o; }, {})) : [];
+  const perBagian = hasil ? Object.entries(hasil.perubahan.reduce<Record<string, number>>((o, p) => { const k = p.sumber === 'tender' ? 'Key Assumption' : bagian(p.path); o[k] = (o[k] ?? 0) + 1; return o; }, {})) : [];
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -44,7 +44,7 @@ export default function UploadExcelPanel({ t, bisaEdit, onTerapkan }: {
           : <span className="small muted">Hanya pembuat draft / tim tender yang bisa mengubah.</span>}
       </div>
       <p className="small muted" style={{ margin: 0 }}>
-        Alur: <b>Unduh</b> file di atas → ubah di Excel (sel putih tulang di sheet <b>Key assumption</b>, tabel <b>Volume</b>, atau kolom Nilai di sheet <b>Data Input</b> untuk isian lain) → simpan → upload di sini.
+        Alur: <b>Unduh</b> file di atas → ubah di Excel (sel putih tulang di sheet <b>Key Assumption</b>, tabel <b>Volume</b>, atau kolom Nilai di sheet <b>Data Input</b> untuk isian lain) → simpan → upload di sini.
         Leca membandingkan setiap isian dengan data sistem dan menampilkan <b>pratinjau perubahan</b>; setelah diterapkan, tender dihitung ulang dengan rumus yang sama dengan web, jadi hasilnya identik dengan Excel.
       </p>
       {pesan && <p className="small" role="status" style={{ margin: 0 }}>{pesan}</p>}
@@ -55,7 +55,7 @@ export default function UploadExcelPanel({ t, bisaEdit, onTerapkan }: {
         <div className="tablewrap fit" style={{ maxHeight: '50vh' }}><table className="tabel-fit">
           <thead><tr><th>Bagian</th><th>Isian (path)</th><th>Di sistem</th><th>Di Excel (baru)</th></tr></thead>
           <tbody>{tampil.slice(0, 300).map(p => <tr key={`${p.sumber}-${p.path}`}>
-            <td className="small">{p.sumber === 'tender' ? 'Key assumption' : bagian(p.path)}</td>
+            <td className="small">{p.sumber === 'tender' ? 'Key Assumption' : bagian(p.path)}</td>
             <td className="small"><code>{p.path}</code></td>
             <td className="small muted">{ringkas(p.lama)}</td><td className="small"><b>{ringkas(p.baru)}</b></td></tr>)}</tbody>
         </table></div>

@@ -75,7 +75,7 @@ p { margin: 0; }
 .small { font-size: 12px; }
 
 label.f { display: grid; gap: 4px; font-size: 12px; color: var(--muted); align-content: start; }
-/* Key assumption: label 1–2 baris memakai tinggi sama → kotak input sejajar per baris */
+/* Key Assumption: label 1–2 baris memakai tinggi sama → kotak input sejajar per baris */
 .ka-grid { align-items: start; }
 .ka-grid label.f { grid-template-rows: minmax(2.7em, auto); align-items: end; line-height: 1.35; }
 .ka-grid label.f > input, .ka-grid label.f > select { height: 38px; }

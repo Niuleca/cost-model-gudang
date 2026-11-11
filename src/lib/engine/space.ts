@@ -6,7 +6,7 @@
 export interface RakDim { koridor: number; depth: number; width: number; paletPerLevel: number; deep?: number }
 export interface StagingIn { porsiMinggu: number; hariPerMinggu: number; sequence: number; m2PerPalet: number; tumpuk: number; unitPerPalet: number; volumePerShiftManual?: number | null }
 export interface Porsi { spr: number; ddr: number; block: number; floor: number }   // porsi PP per metode simpan (total = 100%)
-/** Jenis palet yang dipakai di gudang (Key assumption). Porsi = % pemakaian (dinormalkan bila total ≠ 100%). */
+/** Jenis palet yang dipakai di gudang (Key Assumption). Porsi = % pemakaian (dinormalkan bila total ≠ 100%). */
 export interface PaletTipe { id: string; nama: string; panjang: number; lebar: number; tebalMm: number; porsi: number }
 /** Input cek kekuatan rak & lantai (Warehouse Planning). Kosong / 0 = otomatis. */
 export interface KekuatanInput {

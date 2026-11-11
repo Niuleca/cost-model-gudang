@@ -19,7 +19,7 @@ export interface DriverBiaya {
   orderInBulan: number;     // order / dokumen inbound per bulan (profil order)
   orderOutBulan: number;    // order / DO outbound per bulan (profil order)
   hariKerjaBulan: number;
-  kategori: string;         // kategori bisnis (Key assumption)
+  kategori: string;         // kategori bisnis (Key Assumption)
   umk: number;              // UMK lokasi (0 = belum ada di master)
   skenarioAset: string;     // Rental / Own Asset / Built-to-Suit
   tipeGudang: string;

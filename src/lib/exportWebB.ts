@@ -94,7 +94,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.put(9, '', { j: 'tot' }); AK.put(10, { f: `J${rSubD}+J${rSubI}` }, { j: 'tot', fmt: 'rp' });
   AK.r++;
   AK.field('Direct per shift (dasar supervisor)', { f: `SUMPRODUCT((MpRes>0)*ROUNDUP(MpRes/ShiftAktif-1E-9,0))`, v: pd.indirect.directPerShift }, 'n0', 'out', 'orang', 'Σ ROUNDUP(resources role ÷ shift aktif)', 'DirectPerShift');
-  AK.note('FTE (Full Time Equivalent) = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan (Man hours per bulan di Key assumption).');
+  AK.note('FTE (Full Time Equivalent) = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan (Man hours per bulan di Key Assumption).');
 
   // ===================== MHE Summary
   AK.r++;
@@ -148,7 +148,7 @@ export function tulisAktivitas(x: Ctx) {
   const lg = { ...LEVEL_GAJI_DEFAULT, ...(a.levelGaji ?? {}) };
   AK.r++;
   AK.h2('Rincian biaya manpower', 'Baris jabatan otomatis dari Man Power Summary (direct), supervisor & peran tetap. Isian khusus per jabatan (gaji, hari kerja, lisensi, sharing, level) diisi di tabel "Isian manual per jabatan"; kosong = default.');
-  AK.field('UMK area project', { f: 'UMK', v: m.upahMinimum }, 'rp', 'out', 'Rp/bln', 'ganti area di Key assumption');
+  AK.field('UMK area project', { f: 'UMK', v: m.upahMinimum }, 'rp', 'out', 'Rp/bln', 'ganti area di Key Assumption');
   AK.field('Area', { f: 'Kab', v: t.kab_kota }, 'teks', 'out');
   AK.h3('% gaji pokok per level jabatan');
   AK.hdr(['Level', 'Contoh jabatan', ['% dari UMK', true], ['Gaji pokok/bln', false, 'UMK × % level'], 'Jabatan di tender ini']);
@@ -271,7 +271,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.r++;
   AK.h2('Rincian per task', 'Satu baris per resource: equipment, tiap alat pendukung, lalu role. Workload = volume × % · RfR = workload ÷ (prod × faktor) · Man hour = RfR ÷ efisiensi · FTE = man hour ÷ (man hours tersedia × operating).');
   AK.hdr(['No', 'Task', 'Workload driver', 'Equipment / role', 'Resources', 'Arus', ['Volume/bln', false, 'Volume dipakai di Aktivitas (VSM)'], 'UoM', ['%', false, '% volume dipakai di VSM'], ['Workload', false, 'Volume × %'],
-    ['Productivity', false, 'Prod/jam × faktor produktivitas'], ['RfR (MH)', false, 'Workload ÷ productivity'], 'Efficiency', ['Man hour', false, 'RfR ÷ efisiensi'], ['Man hours tersedia', false, 'Man Power: JamMP · Equipment: JamMHE (Key assumption)'],
+    ['Productivity', false, 'Prod/jam × faktor produktivitas'], ['RfR (MH)', false, 'Workload ÷ productivity'], 'Efficiency', ['Man hour', false, 'RfR ÷ efisiensi'], ['Man hours tersedia', false, 'Man Power: JamMP · Equipment: JamMHE (Key Assumption)'],
     ['Operating', false, 'Equipment: jumlah shift aktif (alat dipakai bergantian) · Man Power: 1'], ['FTE', false, 'Man hour ÷ (man hours tersedia × operating)'], 'Prod. per man', ['Alat pertama?', false, '1 = baris pertama alat ini (dasar daftar MHE Summary)'], 'No alat']);
   const pr0 = AK.r;
   const pending: { r: number; i: number; jenis: 'E' | 'A' | 'M'; k: number }[] = [];
@@ -286,7 +286,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.put(14, { f: `SUM(N${pr0}:N${pr1})` }, { j: 'tot', fmt: 'n0' }); AK.put(17, { f: `SUM(Q${pr0}:Q${pr1})` }, { j: 'tot', fmt: 'n2' });
   AK.r++;
   AK.field('Jumlah alat dari aktivitas', { f: 'IFERROR(MAX(PD_EqIdx),0)' }, 'n0', 'out', 'alat', '', 'PdEqN');
-  AK.field('Man hour inbound', { f: 'SUMIFS(PD_MH,PD_Arus,"inbound",PD_Res,"<>")' }, 'n1', 'out', 'jam', 'dipakai bobot workload gabungan per shift (Key assumption)', 'JamArus_in');
+  AK.field('Man hour inbound', { f: 'SUMIFS(PD_MH,PD_Arus,"inbound",PD_Res,"<>")' }, 'n1', 'out', 'jam', 'dipakai bobot workload gabungan per shift (Key Assumption)', 'JamArus_in');
   AK.field('Man hour outbound', { f: 'SUMIFS(PD_MH,PD_Arus,"outbound",PD_Res,"<>")' }, 'n1', 'out', 'jam', '', 'JamArus_out');
   AK.field('Man hour storage', { f: 'SUMIFS(PD_MH,PD_Arus,"storage",PD_Res,"<>")' }, 'n1', 'out', 'jam', '', 'JamArus_sto');
   AK.field('Man hour VAS', { f: 'SUMIFS(PD_MH,PD_Arus,"vas",PD_Res,"<>")' }, 'n1', 'out', 'jam', '', 'JamArus_vas');
@@ -451,7 +451,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.r++;
   AK.h2('Aktivitas (VSM) & manpower', 'Kolom input (putih tulang) bisa diubah; semua kolom hasil (abu-abu) & sheet lain ikut berubah otomatis. Volume/bln kosong = volume peak arus × pengali efektif (admin: order dari Profil order). Kolom bantu di kanan menunjukkan langkah rumusnya.');
   AK.hdr(['Urutan', ['Task / tahap', true], ['Aktivitas (workload driver)', true], ['Equipment', true], ['Alat pendukung', true, 'Pisahkan dengan koma'], ['Role (man power)', true], ['Prod/jam', true], ['UoM', true], ['Arus', true],
-    ['Volume/bln (manual)', true, 'Kosong = volume auto'], ['Sumber % volume', true, '% manual atau ikut porsi palletize/loose (Key assumption)'], ['% manual', true], ['% volume dipakai', false, '% manual, atau porsi proses (palet / loose = 1 − palet; replenishment × (1 − porsi picking palet))'],
+    ['Volume/bln (manual)', true, 'Kosong = volume auto'], ['Sumber % volume', true, '% manual atau ikut porsi palletize/loose (Key Assumption)'], ['% manual', true], ['% volume dipakai', false, '% manual, atau porsi proses (palet / loose = 1 − palet; replenishment × (1 − porsi picking palet))'],
     ['Pengali UoM', true, '≠ 1 dipakai langsung; 1 = pakai konversi di sheet Volume'], ['Volume auto', false, 'Admin (order/line): order/bln profil ÷ jumlah aktivitas admin di arus itu · lainnya: peak arus × pengali efektif'], ['Volume dipakai', false, 'Manual bila diisi, kosong = volume auto'],
     ['Prod DB', false, 'Produktivitas di database Productivity (bila aktivitas dari DB)'], 'Status vs DB', 'Id DB', ['Admin?', false, 'Role mengandung "admin", UoM order/line/dokumen, arus inbound/outbound'], 'Proses', 'Muat',
     ['Baris volume', false, 'Nomor baris arus ini di tabel Volume'], ['UoM arus', false, 'UoM volume arus (dinormalkan: case/karton/dus = case)'], ['UoM aktivitas', false, 'UoM aktivitas (dinormalkan)'], ['Isi palet', false, '1 palet = … case (Volume)'],

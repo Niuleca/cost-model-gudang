@@ -1,4 +1,4 @@
-// Sheet "Key assumption" & "Volume" — urutan kartu sama dengan tab web.
+// Sheet "Key Assumption" & "Volume" — urutan kartu sama dengan tab web.
 import { R, A, q, isCase, type Ctx } from '@/lib/exportWebUtil';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT } from '@/lib/porsiMuat';
 import { PARAM_DEFAULT, KENDARAAN_DEFAULT, KENDARAAN_AWAL, MODA, MUATAN, isKontainer, muatanBaris } from '@/lib/profilVolume';
@@ -10,7 +10,7 @@ export function tulisKeyAssumption(x: Ctx) {
   const { KA, d, a, pdIn, pd } = x;
   const t = d.t, inp = d.inp;
   KA.lebar(46, 24, 14, 16, 16, 14, 12, 12, 12, 12, 12);
-  KA.h2('Key assumption', 'Sel putih tulang = input (boleh diubah) · sel abu-abu = hasil rumus · droplist sama dengan web');
+  KA.h2('Key Assumption', 'Sel putih tulang = input (boleh diubah) · sel abu-abu = hasil rumus · droplist sama dengan web');
   KA.field('Customer', t.customer, 'teks', 'in', '', '', 'Cust');
   KA.field('Industri (benchmark produktivitas)', t.industri || '—', 'teks', 'in', '', '', 'Industri', 'L_Industri');
   KA.field('PIC / account', t.pic ?? '', 'teks', 'in', '', '', 'PIC');
@@ -209,7 +209,7 @@ export function tulisVolume(x: Ctx) {
     VO.put(10, { f: `M${rv}` }, { j: 'out' });
     VO.r++;
   });
-  VO.note('Per hari = per bulan ÷ Working Days (Process Design, sheet Key assumption); per tahun = per bulan × 12. Storage = stok tersimpan (posisi), bukan arus.');
+  VO.note('Per hari = per bulan ÷ Working Days (Process Design, sheet Key Assumption); per tahun = per bulan × 12. Storage = stok tersimpan (posisi), bukan arus.');
 
   // ---- Parameter muatan
   const pp = { ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}) };

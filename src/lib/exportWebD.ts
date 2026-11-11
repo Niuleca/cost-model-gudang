@@ -364,7 +364,7 @@ export function tulisHasil(x: Ctx) {
   // ===================== Kalender & volume desain
   HS.r++;
   HS.h2('Kalender & volume desain');
-  HS.field('Hari kerja kalender', { f: 'NETWORKDAYS.INTL(DATE(Tahun,1,1),DATE(Tahun,12,31),WeekendKode)', v: h.kalender.hariKalenderKerja }, 'n0', 'out', 'hari', 'hari kerja per minggu di Key assumption', 'HariKalKerja');
+  HS.field('Hari kerja kalender', { f: 'NETWORKDAYS.INTL(DATE(Tahun,1,1),DATE(Tahun,12,31),WeekendKode)', v: h.kalender.hariKalenderKerja }, 'n0', 'out', 'hari', 'hari kerja per minggu di Key Assumption', 'HariKalKerja');
   HS.field('Libur nasional & cuti bersama di hari kerja', { f: 'SUM(D_LiburHK)', v: h.kalender.liburDiHariKerja }, 'n0', 'out', 'hari', 'dari master hari libur (sheet Daftar)', 'LiburHK');
   HS.field('Hari operasional gudang', { f: 'HariKalKerja-LiburHK', v: h.kalender.hariOperasional }, 'n0', 'out', 'hari', '', 'HariOps');
   HS.field('Hari operasional / bulan', { f: 'HariOps/12', v: h.kalender.hariOperasionalBulan }, 'n2', 'out', 'hari', 'dipakai listrik & volume desain', 'HariOpsBln');
@@ -552,7 +552,7 @@ export function tulisRingkasan(x: Ctx) {
   const ho0 = baris(['', 'Jumlah manpower', { f: 'TotalHeadcount', v: h.totalHeadcount }], [undefined, undefined, 'n0']);
   const ho1 = baris(['', 'Luas gudang (m²)', { f: 'LuasM2', v: h.space.totalM2 }], [undefined, undefined, 'n0']);
   gabung(ho0, ho1, 'Operasional');
-  S0.note('Semua angka merujuk sheet web (Key assumption … Result) — ubah input (sel putih tulang) di sana, ringkasan ikut berubah');
+  S0.note('Semua angka merujuk sheet web (Key Assumption … Result) — ubah input (sel putih tulang) di sana, ringkasan ikut berubah');
   S0.r += 2;
 
   // 1-1 PNL
@@ -672,7 +672,7 @@ export function tulisRingkasan(x: Ctx) {
   // 6. Alur & legenda
   judulTabel('6. Alur perhitungan (sama dengan tab web)', 8, '');
   header(['Sheet', 'Isi']); ws0.mergeCells(S0.r - 1, 2, S0.r - 1, nK);
-  const alur = ['Key assumption — data tender, UMK, shift, faktor, porsi palletize/loose, working day & workload shift', 'Volume — volume, konversi, ringkasan order, parameter muatan, profil order & kendaraan',
+  const alur = ['Key Assumption — data tender, UMK, shift, faktor, porsi palletize/loose, working day & workload shift', 'Volume — volume, konversi, ringkasan order, parameter muatan, profil order & kendaraan',
     'Produk — daftar SKU, CBM & berat per palet, level rak maks, zonasi, turunan tertimbang',
     'Value Stream Mapping — summary, skema kontrak, rincian biaya manpower, rincian per task, matriks multi-skill, indirect & peran tetap, VSM',
     'Warehouse Planning — gudang, space A–E, racking level, komposisi luas, biaya space & racking',

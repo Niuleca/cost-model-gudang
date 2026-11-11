@@ -62,7 +62,7 @@ export function tulisGudang(x: Ctx) {
   GD.r++; GD.h3('C2  Block stack');
   B('Palet dominan — panjang', { f: 'INDEX(PalTipeP,MATCH(PalDominan,PalTipeNama,0))', v: sx.palet.panjang }, 'n2', 'out', 'm', 'PalP');
   B('Palet dominan — lebar', { f: 'INDEX(PalTipeL,MATCH(PalDominan,PalTipeNama,0))', v: sx.palet.lebar }, 'n2', 'out', 'm', 'PalL');
-  B('Luas palet rata-rata (Key assumption)', { f: 'PalLuas' }, 'n3', 'out', 'm²');
+  B('Luas palet rata-rata (Key Assumption)', { f: 'PalLuas' }, 'n3', 'out', 'm²');
   B('Tumpukan (stacking)', sx.block.tumpuk, 'n0', 'in', 'level', 'BlkTumpuk');
   B('Allowance gang / akses', sx.block.gangPersen, 'pct', 'in', 'dari luas palet', 'BlkGang');
   B('Space required per pallet position', { f: 'PalLuas/MAX(1,BlkTumpuk)*(1+MAX(0,BlkGang))' }, 'n3', 'out', 'm²', 'BlkM2pp');
@@ -116,7 +116,7 @@ export function tulisGudang(x: Ctx) {
   GD.field('Center height', sx.rak.centerMm, 'n0', 'in', 'mm', '', 'RkCenter');
   GD.field('Side height', sx.rak.sideMm, 'n0', 'in', 'mm', '', 'RkSide');
   GD.field('Beam', sx.rak.beamMm, 'n0', 'in', 'mm', '', 'RkBeam');
-  GD.field('Pallet', { f: 'PalTebal', v: sx.rak.palletMm }, 'n0', 'out', 'mm', 'tebal palet terbesar (Key assumption → Jenis palet)', 'RkPallet');
+  GD.field('Pallet', { f: 'PalTebal', v: sx.rak.palletMm }, 'n0', 'out', 'mm', 'tebal palet terbesar (Key Assumption → Jenis palet)', 'RkPallet');
   GD.field('Product', sx.rak.productMm, 'n0', 'in', 'mm', '', 'RkProduct');
   GD.field('Clearance', sx.rak.clearanceMm, 'n0', 'in', 'mm', '', 'RkClear');
   GD.field('Total height / pallet (level 2 up)', { f: 'RkBeam+RkPallet+RkProduct+RkClear' }, 'n0', 'out', 'mm', '', 'RkLvN');

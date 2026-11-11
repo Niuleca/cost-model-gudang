@@ -1,6 +1,6 @@
 'use client';
 // Tab Produk (sebelah Volume): master produk / SKU tender — nama, kode, P×L×T, CBM, berat, UPP, qty, UOM.
-// Baris pertama otomatis dari Key assumption & Volume; bisa diedit, ditambah, atau ditempel dari Excel.
+// Baris pertama otomatis dari Key Assumption & Volume; bisa diedit, ditambah, atau ditempel dari Excel.
 // Produk manual = sumber data tender: Parameter muatan, isi per palet, stok storage, tinggi produk di rak & porsi pallet floor
 // ikut diperbarui (bisa dimatikan). Turunan: level rak maksimal per berat, zonasi area, dan SKU di Simulasi Warehouse.
 import { InputPanjang, useSatuanPanjang, konversiPanjang } from '@/lib/satuanPanjang';
@@ -86,7 +86,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
     <div className="card">
       <h2>Produk / SKU</h2>
       <p className="small muted">Master produk tender: nama, kode, dimensi P × L × T (cm), CBM, berat, <b>UPP</b> (unit per palet), qty stok dan UOM (karton, pcs, roll, bag, pail, unit, dll.).
-        Baris pertama <b>otomatis</b> dari Key assumption (Volume + Parameter muatan). Setelah Anda mengisi / mengubah produk, data produk menjadi <b>sumber data tender</b>:
+        Baris pertama <b>otomatis</b> dari Key Assumption (Volume + Parameter muatan). Setelah Anda mengisi / mengubah produk, data produk menjadi <b>sumber data tender</b>:
         Parameter muatan, isi per palet & stok storage di tab Volume, serta tinggi produk di rak & porsi pallet floor di tab Gudang ikut diperbarui. Perubahan disimpan otomatis.</p>
 
       <div className="kpis">
@@ -118,12 +118,12 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
         <input aria-label="Cari produk" placeholder="Cari kode, nama, zona…" value={cari} onChange={e => setCari(e.target.value)} style={{ maxWidth: 240 }} />
         <span style={{ flex: 1 }} />
         <button className="ghost" onClick={() => setTempel(tempel == null ? '' : null)}>{tempel == null ? 'Tempel dari Excel' : 'Tutup tempel'}</button>
-        <button className="ghost" disabled={!auto} title="Tambahkan / segarkan baris otomatis dari Key assumption" onClick={() => {
+        <button className="ghost" disabled={!auto} title="Tambahkan / segarkan baris otomatis dari Key Assumption" onClick={() => {
           if (!auto) return;
           const ada = daftar.findIndex(x => x.otomatis);
           onChange(ada >= 0 ? daftar.map((x, j) => j === ada ? { ...auto, id: x.id } : x) : [{ ...auto, id: `auto-${Date.now().toString(36)}` }, ...daftar]);
-          kabar('Baris otomatis diisi ulang dari Key assumption.');
-        }}>Isi otomatis dari Key assumption</button>
+          kabar('Baris otomatis diisi ulang dari Key Assumption.');
+        }}>Isi otomatis dari Key Assumption</button>
         <button className="ghost" disabled={!daftar.length} onClick={() => { onChange(zonasiOtomatis(daftar, at, levelRak, dimPalet)); kabar('Zona diisi otomatis menurut kategori & kelas berat — ubah bila perlu.'); }}>Zonasi otomatis</button>
         <button onClick={tambah}>+ Tambah produk</button>
       </div>
@@ -195,7 +195,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
             <label>{lab('Kategori')}<select aria-label={`Kategori ${i + 1}`} value={x.kategori ?? 'Umum'} onChange={e => ubah(i, { kategori: e.target.value }, false)} style={kecil}>
               {Array.from(new Set([...KATEGORI_PRODUK, x.kategori ?? 'Umum'])).map(k => <option key={k}>{k}</option>)}</select></label>
             <label>{lab('Zona')}<input aria-label={`Zona ${i + 1}`} list="dl-zona-produk" value={x.zona ?? ''} onChange={e => ubah(i, { zona: e.target.value }, false)} style={kecil} /></label>
-            <div className="small muted">{x.otomatis && <span className="pill info" title="Dari Key assumption — ikut berubah sampai angkanya diedit" style={{ marginRight: 6 }}>otomatis</span>}
+            <div className="small muted">{x.otomatis && <span className="pill info" title="Dari Key Assumption — ikut berubah sampai angkanya diedit" style={{ marginRight: 6 }}>otomatis</span>}
               {h.cbmPalet > 0 && <>{h.cbmPalet.toFixed(2)} CBM/plt</>}{h.tinggiMuatanMm > 0 && <> · {h.perLayer}/layer × {h.layer} layer · tinggi {pj(h.tinggiMuatanMm, 'mm')}</>}{(x.isiPcs ?? 0) > 0 && <> · 1 {x.uom} = {angka(x.isiPcs!)} pcs</>}</div>
             <div style={{ textAlign: 'right' }}><button className="danger" onClick={() => hapus(i)} aria-label={`Hapus ${x.nama || x.kode}`}>Hapus</button></div>
           </div>

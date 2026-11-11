@@ -1,5 +1,5 @@
 // Master produk / SKU per tender (tab "Produk" di sebelah Volume).
-// Isi awal otomatis dari Key assumption & Volume (parameter muatan + konversi), lalu bisa diedit / ditambah / ditempel dari Excel.
+// Isi awal otomatis dari Key Assumption & Volume (parameter muatan + konversi), lalu bisa diedit / ditambah / ditempel dari Excel.
 // Dipakai sebagai acuan: berat per palet → level rak maksimal (barang berat hanya di level bawah), tinggi muatan vs tinggi
 // bukaan rak, zonasi area per kelompok produk, dan SKU nyata di Simulasi Warehouse (putaway mematuhi level & zona).
 import type { VolumeInput } from '@/lib/engine/types';
@@ -34,7 +34,7 @@ export interface ProdukTender {
   tumpukMaks?: number | null;  // khusus lantai: maksimal tumpuk palet
   otomatis?: boolean;          // baris dari key assumption — ikut berubah selama belum diedit
   dimEstimasi?: boolean;       // P×L×T diperkirakan dari CBM per case (belum diukur)
-  paletTipe?: string;          // id jenis palet (Key assumption); kosong = jenis dominan
+  paletTipe?: string;          // id jenis palet (Key Assumption); kosong = jenis dominan
   perLayer?: number | null;    // konfigurasi palet: isi (UOM) per layer — kosong = otomatis dari P × L palet
   layer?: number | null;       // konfigurasi palet: jumlah layer — kosong = ROUNDUP(UPP ÷ isi per layer)
   uppAsli?: number | null;     // UPP yang sengaja dipertahankan sesuai kondisi asli (layer atas tidak penuh) — peringatan disembunyikan selama UPP sama
@@ -104,12 +104,12 @@ export function beratPaletKandidatRak(daftar: ProdukTender[], aturan: AturanBera
 const n = (x: unknown) => (Number.isFinite(Number(x)) ? Number(x) : 0);
 const isCase = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes((u ?? '').trim().toLowerCase());
 const isPalet = (u: string) => /^pal+et/i.test((u ?? '').trim());
-/** Dimensi palet (cm): panjang × lebar dari Key assumption / Warehouse Planning, tinggi = tebal palet kayu (Pallet di Racking level). */
+/** Dimensi palet (cm): panjang × lebar dari Key Assumption / Warehouse Planning, tinggi = tebal palet kayu (Pallet di Racking level). */
 export interface PaletDim { pCm: number; lCm: number; tinggiCm: number }
 export const PALET_DEFAULT: PaletDim = { pCm: 120, lCm: 100, tinggiCm: 15 };
-/** Semua jenis palet tender (Key assumption) + jenis default (dominan) untuk produk yang belum memilih. */
+/** Semua jenis palet tender (Key Assumption) + jenis default (dominan) untuk produk yang belum memilih. */
 export interface PaletProduk { tipe: (PaletDim & { id: string; nama: string })[]; dominan: string }
-/** Jenis palet dari Space / Key assumption (P, L dalam m; tebal mm) → cm. Kosong → 120 × 100 cm, tebal 15 cm. */
+/** Jenis palet dari Space / Key Assumption (P, L dalam m; tebal mm) → cm. Kosong → 120 × 100 cm, tebal 15 cm. */
 export function paletDariSpace(sx?: Partial<SpaceExcel> | null): PaletProduk {
   const r = ringkasPalet(daftarPalet(sx));
   const tipe = r.list.map(p => ({ id: p.id, nama: p.nama, pCm: Number(p.panjang) > 0 ? Number(p.panjang) * 100 : PALET_DEFAULT.pCm,
@@ -209,7 +209,7 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
   return { cbmUnit, beratPaletKg, cbmPalet, palet, totalKg: n(x.qty) * n(x.beratKg), totalCbm: n(x.qty) * cbmUnit, perLayer, layer, tinggiMuatanMm, perLayerAuto, layerAuto, perLayerManual, layerManual, levelMaks, sumberLevel, hanyaLantai, caraSimpan, peringatan, saranUpp };
 }
 
-/** Satu baris produk otomatis dari Key assumption: Volume (UoM & konversi) + Parameter muatan (berat/CBM per case & per palet). */
+/** Satu baris produk otomatis dari Key Assumption: Volume (UoM & konversi) + Parameter muatan (berat/CBM per case & per palet). */
 export function produkOtomatis(volumes: VolumeInput[], profil: ProfilVolume | undefined, nama?: string): ProdukTender | null {
   const pr = { ...PARAM_DEFAULT, ...(profil?.param ?? {}) };
   const vSt = volumes.find(v => v.arus === 'storage'), vOut = volumes.find(v => v.arus === 'outbound'), vIn = volumes.find(v => v.arus === 'inbound');
@@ -230,7 +230,7 @@ export function produkOtomatis(volumes: VolumeInput[], profil: ProfilVolume | un
   const kgPalet = upp * beratKg;
   const selisih = pr.tonPerPalet > 0 && kgPalet > 0 && Math.abs(kgPalet - pr.tonPerPalet * 1000) / (pr.tonPerPalet * 1000) > 0.2
     ? `Berat per palet di Parameter muatan ${Math.round(pr.tonPerPalet * 1000)} kg ≠ UPP ${Math.round(upp)} × ${beratKg} kg = ${Math.round(kgPalet)} kg — periksa salah satunya.` : undefined;
-  return { id: 'auto-1', kode: 'AUTO-01', nama: nama ? `Produk utama — ${nama}` : 'Produk utama (dari Key assumption)', uom, ...dim, dimEstimasi: dim.p > 0, cbm: Math.round(cbm * 1e5) / 1e5,
+  return { id: 'auto-1', kode: 'AUTO-01', nama: nama ? `Produk utama — ${nama}` : 'Produk utama (dari Key Assumption)', uom, ...dim, dimEstimasi: dim.p > 0, cbm: Math.round(cbm * 1e5) / 1e5,
     beratKg: Math.round(beratKg * 100) / 100, upp: Math.round(upp), qty: Math.round(qty), isiPcs, kategori: 'Umum', zona: 'A', simpan: 'otomatis', otomatis: true, catatan: selisih };
 }
 

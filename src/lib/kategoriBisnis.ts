@@ -1,4 +1,4 @@
-// Kategori bisnis (business category) — dipakai di Key assumption (industri tender), menu Productivity (drop list pertama),
+// Kategori bisnis (business category) — dipakai di Key Assumption (industri tender), menu Productivity (drop list pertama),
 // benchmark produktivitas, dan filter analitik. Disusun dari industri tender & sektor di data customer (Business Trend Intelligence).
 
 export interface KategoriBisnis {

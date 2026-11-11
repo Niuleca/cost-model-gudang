@@ -17,7 +17,7 @@ export function tulisProduk(x: Ctx) {
   PR.field('Berat palet kayu kosong (tare)', at.tarePaletKg, 'n1', 'in', 'kg', 'ditambahkan ke berat muatan (kecuali UOM palet)', 'PrTare');
   PR.field('Kapasitas beam per posisi', at.kapPosisiKg, 'n0', 'in', 'kg/posisi', 'lebih berat → lantai saja', 'PrKap');
   PR.field('Level rak (Warehouse Planning)', { f: 'MAX(1,RackLevel)', v: levelRak }, 'n0', 'out', 'level', '', 'PrLevelRak');
-  PR.field('Palet default (dominan) — panjang', { f: 'PalP*100', v: palDom.pCm }, 'n1', 'out', 'cm', 'Key assumption → Jenis palet', 'PrPalP');
+  PR.field('Palet default (dominan) — panjang', { f: 'PalP*100', v: palDom.pCm }, 'n1', 'out', 'cm', 'Key Assumption → Jenis palet', 'PrPalP');
   PR.field('Palet default (dominan) — lebar', { f: 'PalL*100', v: palDom.lCm }, 'n1', 'out', 'cm', 'dipakai bila kolom Jenis palet kosong', 'PrPalL');
   PR.field('Palet default (dominan) — tebal', { f: 'INDEX(PalTipeT,MATCH(PalDominan,PalTipeNama,0))/10', v: palDom.tinggiCm }, 'n1', 'out', 'cm', '', 'PrPalT');
   PR.hdr([['Berat maks / palet (kg)', true, 'Urutkan dari kecil ke besar'], ['Level maks', true, '99 = semua level']]);
@@ -34,7 +34,7 @@ export function tulisProduk(x: Ctx) {
     ['Satuan ef.', false, 'cm/mm efektif'], ['CBM/UOM', false, 'P×L×T (cm) ÷ 1.000.000'], ['UPP ef.', false, 'UOM palet → 1'], ['Berat/palet (kg)', false, 'UPP × berat + tare (palet: berat)'],
     ['CBM/palet', false, 'UPP × CBM/UOM'], ['Palet', false, 'ROUNDUP(qty ÷ UPP)'], ['Total kg', false], ['Total CBM', false], ['Per layer', false, 'Susunan terbaik di palet jenis terpilih (kolom AE; kosong = dominan)'],
     ['Layer', false, 'ROUNDUP(UPP ÷ per layer)'], ['Tinggi muatan (mm)', false, '(layer × T + tebal palet PrPalT) × 10'], ['Level maks', false, 'Aturan berat / manual, maks level rak'],
-    ['Hanya lantai', false, 'Berat/palet > kapasitas beam'], ['Cara simpan ef.', false], ['Catatan (sistem)', false], ['Jenis palet', true, 'Nama dari Key assumption → Jenis palet; kosong = dominan'], ['Isi / layer manual', true, 'Konfigurasi palet; kosong = otomatis (kolom X)'], ['Layer manual', true, 'Konfigurasi palet; kosong = ROUNDUP(UPP ÷ isi/layer)']]);
+    ['Hanya lantai', false, 'Berat/palet > kapasitas beam'], ['Cara simpan ef.', false], ['Catatan (sistem)', false], ['Jenis palet', true, 'Nama dari Key Assumption → Jenis palet; kosong = dominan'], ['Isi / layer manual', true, 'Konfigurasi palet; kosong = otomatis (kolom X)'], ['Layer manual', true, 'Konfigurasi palet; kosong = ROUNDUP(UPP ÷ isi/layer)']]);
   const p0 = PR.r;
   const simpanL = (v?: string) => SIMPAN.find(s => s.v === (v ?? 'otomatis'))?.v ?? 'otomatis';
   for (const z of [...daftar, null, null, null]) {
@@ -86,5 +86,5 @@ export function tulisProduk(x: Ctx) {
   PR.field('CBM rata-rata per palet', { f: `IF(PrPalet>0,SUMPRODUCT((R${p0}:R${p1}>0)*U${p0}:U${p1}*T${p0}:T${p1})/PrPalet,0)` }, 'n3', 'out', 'm³', 'tertimbang palet');
   PR.field('UPP rata-rata', { f: 'IF(PrPalet>0,PrQty/PrPalet,0)' }, 'n1', 'out', 'UOM/palet', 'qty ÷ palet');
   PR.field('Porsi palet di lantai', { f: `IF(PrPalet>0,SUMPRODUCT((R${p0}:R${p1}>0)*U${p0}:U${p1}*((AB${p0}:AB${p1}="Ya")+(AC${p0}:AC${p1}="floor")+(AC${p0}:AC${p1}="block")>0))/PrPalet,0)` }, 'pct', 'out', '', 'hanya lantai / floor / block');
-  PR.note(daftar.some(z => z.otomatis) ? 'Baris otomatis = dari Key assumption & Volume (belum ada produk manual di web).' : 'Daftar = produk yang diisi di tab Produk web.');
+  PR.note(daftar.some(z => z.otomatis) ? 'Baris otomatis = dari Key Assumption & Volume (belum ada produk manual di web).' : 'Daftar = produk yang diisi di tab Produk web.');
 }

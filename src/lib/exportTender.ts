@@ -46,7 +46,7 @@ export async function exportTenderLengkap(p: DataExport, sheets?: string[]) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-export const SHEET_EXPORT = ['0 Ringkasan', 'Key assumption', 'Volume', 'Produk', 'Value Stream Mapping', 'Warehouse Planning', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Daftar', 'Data Input', 'Master Data', 'Data Mentah'] as const;
+export const SHEET_EXPORT = ['0 Ringkasan', 'Key Assumption', 'Volume', 'Produk', 'Value Stream Mapping', 'Warehouse Planning', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Daftar', 'Data Input', 'Master Data', 'Data Mentah'] as const;
 
 /** Pratinjau isi workbook: per sheet → baris nilai (formula ditampilkan hasilnya). */
 export type GayaSel = { bg?: string; b?: boolean; pct?: boolean; c?: string; al?: 'left' | 'center' | 'right'; span?: number } | null;

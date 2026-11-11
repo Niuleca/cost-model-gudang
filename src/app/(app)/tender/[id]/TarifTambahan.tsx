@@ -55,6 +55,7 @@ const PRESET: Preset[] = [
   { label: 'Handling out per pcs', buat: turunanAtau('Handling out (pcs picking)', 'per pcs', 'handling_out', /^pcs$|pieces|unit/i, 0.15) },
   { label: 'Movement / relokasi produk', buat: () => ({ nama: 'Movement product charge (relokasi internal)', satuan: 'per palet', dasar: 'aktivitas', menit: 5, orang: 1, alat: true }) },
   { label: 'Labeling / stickering', buat: () => ({ nama: 'VAS — labeling / stickering', satuan: 'per pcs', dasar: 'aktivitas', menit: 0.3, orang: 1, material: 100 }) },
+  { label: 'Banding strap', buat: () => ({ nama: 'VAS — banding strap (strapping palet / karton)', satuan: 'per palet', dasar: 'aktivitas', menit: 2, orang: 1, material: 6000 }) },
   { label: 'Wrapping', buat: () => ({ nama: 'VAS — wrapping stretch film', satuan: 'per palet', dasar: 'aktivitas', menit: 3, orang: 1, material: 15000 }) },
   { label: 'Repacking', buat: () => ({ nama: 'VAS — repacking', satuan: 'per karton', dasar: 'aktivitas', menit: 2, orang: 1, material: 3000 }) },
   { label: 'Palletizing curah', buat: () => ({ nama: 'Palletizing barang curah', satuan: 'per palet', dasar: 'aktivitas', menit: 15, orang: 2 }) },
@@ -70,7 +71,7 @@ const PRESET: Preset[] = [
 const GRUP: [string, string[]][] = [
   ['Handling', ['Handling in per karton', 'Handling in per pcs', 'Handling out per karton', 'Handling out per pcs', 'Movement / relokasi produk', 'Cross-docking', 'Palletizing curah']],
   ['Container & event', ['Unloading per container 20ft', 'Unloading per container 40ft', 'Stuffing per container', 'Per event (stock opname, dll.)']],
-  ['VAS', ['Labeling / stickering', 'Wrapping', 'Repacking']],
+  ['VAS', ['Labeling / stickering', 'Wrapping', 'Banding strap', 'Repacking']],
   ['Lainnya', ['Lembur / overtime', 'Admin dokumen tambahan', 'Tarif manual (isi harga sendiri)']],
 ];
 

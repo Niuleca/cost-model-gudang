@@ -1,6 +1,6 @@
 // Excel ⇄ sistem (UAT B14): sheet "Data Input" berisi SEMUA isian tender (kolom tender + seluruh asumsi, path → nilai).
-// - Isian yang ada di sheet bergaya web (Key assumption, tabel Volume) ditulis sebagai RUMUS yang menunjuk sel input itu,
-//   jadi mengubah angka di Key assumption / Volume otomatis ikut ke Data Input (satu sumber kebenaran).
+// - Isian yang ada di sheet bergaya web (Key Assumption, tabel Volume) ditulis sebagai RUMUS yang menunjuk sel input itu,
+//   jadi mengubah angka di Key Assumption / Volume otomatis ikut ke Data Input (satu sumber kebenaran).
 // - Isian lain diubah langsung di kolom Nilai sheet Data Input (sel putih tulang).
 // - Upload: baca Data Input (+ tabel Volume lengkap, termasuk baris baru) → pratinjau perubahan → terapkan → hitung ulang.
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -9,7 +9,7 @@ import { C } from '@/lib/exportRumus';
 
 export const SHEET_INPUT = 'Data Input';
 
-/** Kolom tender (bukan asumsi) yang bisa diubah lewat Excel → nama sel di Key assumption. */
+/** Kolom tender (bukan asumsi) yang bisa diubah lewat Excel → nama sel di Key Assumption. */
 const KOLOM_TENDER: { kolom: keyof TenderRow; nama?: string; jenis: 'teks' | 'angka' | 'tanggal' }[] = [
   { kolom: 'customer', nama: 'Cust', jenis: 'teks' }, { kolom: 'industri', nama: 'Industri', jenis: 'teks' }, { kolom: 'pic', nama: 'PIC', jenis: 'teks' },
   { kolom: 'alamat_lokasi', nama: 'Alamat', jenis: 'teks' }, { kolom: 'provinsi', nama: 'Prov', jenis: 'teks' }, { kolom: 'kab_kota', nama: 'Kab', jenis: 'teks' },
@@ -19,7 +19,7 @@ const KOLOM_TENDER: { kolom: keyof TenderRow; nama?: string; jenis: 'teks' | 'an
   { kolom: 'jam_kerja_per_shift', nama: 'JamKerja', jenis: 'angka' }, { kolom: 'jam_efektif_per_shift', nama: 'JamEfektif', jenis: 'angka' },
   { kolom: 'payment_term_hari', nama: 'PaymentTerm', jenis: 'angka' },
 ];
-/** Path asumsi → nama sel di Key assumption. */
+/** Path asumsi → nama sel di Key Assumption. */
 const NAMA_ASUMSI: Record<string, string> = { cutiTahunanHari: 'Cuti', faktorProduktivitas: 'FProd', efisiensi: 'Efis' };
 /** Kolom input tabel Volume (urutan kolom di sheet Volume) → field VolumeInput. */
 const KOLOM_VOLUME: { c: number; path: string; jenis: 'teks' | 'angka' }[] = [
