@@ -277,7 +277,7 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
     const ps = r.perShift ? r.perShift.map(v => Math.round(num(v))) : [0, 1, 2].map(i => (i === (shiftAktif[0] ?? 0) ? num(r.qty) : 0));
     orang.push({ nama: r.nama, kategori: kategoriOrang(r.nama), perShift: ps, total: num(r.qty), jenis: 'Indirect' });
   }
-  const aktivitas: AktSim[] = (t.asumsi.aktivitas ?? []).map((a, i) => ({ no: i + 1, aktivitas: a.aktivitas, tahap: a.tahap, tool: a.tool, role: a.roleName, uom: a.uom, arus: a.arus,
+  const aktivitas: AktSim[] = (t.asumsi.aktivitas ?? []).filter(a => !a.nonaktif).map((a, i) => ({ no: i + 1, aktivitas: a.aktivitas, tahap: a.tahap, tool: a.tool, role: a.roleName, uom: a.uom, arus: a.arus,
     prod: num(a.prodPerJam), productivityId: (a as { productivityId?: number }).productivityId })).filter(a => a.aktivitas || a.role);
 
   const nSpr = rak.filter(r => r.jenis === 'spr').reduce((s, r) => s + r.nBay * r.level * r.ppl, 0);

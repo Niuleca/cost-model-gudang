@@ -1,6 +1,7 @@
 // Sheet "Value Stream Mapping" — semua hidup dari rumus:
 // VSM → Rincian per task (FTE) → daftar role & alat otomatis → multi-skill pooling per shift (rumus, ikut matriks)
 // → Man Power & MHE Summary (+ remarks otomatis) → Rincian biaya manpower → baris biaya di sheet Result.
+import { aktivitasAktif } from '@/lib/tender';
 import { R, A, q, BUCKETS, ALOKASI, type Ctx } from '@/lib/exportWebUtil';
 import { rincianBiayaRole, LEVEL_JABATAN, LEVEL_GAJI_DEFAULT, PARAM_BIAYA_MP_DEFAULT } from '@/lib/engine/biayaMp';
 import { labelTag } from '@/lib/porsiMuat';
@@ -31,7 +32,7 @@ export function tulisAktivitas(x: Ctx) {
   const { h, m, inp, t } = d;
   const SN = `'${AK.nama}'!`;
   AK.lebar(30, 40, 12, 12, 12, 12, 12, 12, 14, 14, 13, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 11, 13, 10, 15, 16, 16, 11, 10, 9, 9, 9, 9, 9, 10);
-  const aktRows = [...a.aktivitas, ...Array.from({ length: 5 }, () => null)];
+  const aktRows = [...aktivitasAktif(a.aktivitas), ...Array.from({ length: 5 }, () => null)];
   const nAlat = aktRows.map(z => Math.max(1, (z?.alatTambahan ?? []).filter(Boolean).length));
   const ptRows = [...a.peranTetap, null, null, null];
   const N = Math.max(3, pd.mp.length + 3);          // slot role direct (otomatis dari VSM)
@@ -501,7 +502,7 @@ export function tulisAktivitas(x: Ctx) {
     AK.r++;
   });
   AK.nmR('VSM_Role', 6, vs0, vs1); AK.nmR('VSM_RoleNo', 35, vs0, vs1); AK.nmR('VSM_Tool', 4, vs0, vs1); AK.nmR('VSM_Arus', 9, vs0, vs1); AK.nmR('VSM_Bobot', 36, vs0, vs1);
-  AK.note(`${a.aktivitas.length} aktivitas + 5 baris kosong untuk tambahan. Role / alat baru di VSM otomatis masuk Man Power Summary, MHE Summary, pooling & biaya (selama slot masih ada: ${N} role, ${M} alat).`);
+  AK.note(`${aktivitasAktif(a.aktivitas).length} aktivitas aktif${a.aktivitas.length > aktivitasAktif(a.aktivitas).length ? ` (${a.aktivitas.length - aktivitasAktif(a.aktivitas).length} dimatikan di Landmark VSM, tidak dihitung)` : ''} + 5 baris kosong untuk tambahan. Role / alat baru di VSM otomatis masuk Man Power Summary, MHE Summary, pooling & biaya (selama slot masih ada: ${N} role, ${M} alat).`);
   // Rincian per task — rumus (rujuk baris VSM)
   for (const p of pending) {
     const r = p.r, v = vs0 + p.i;

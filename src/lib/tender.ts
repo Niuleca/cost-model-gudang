@@ -1,3 +1,4 @@
+import type { VsmInput } from '@/lib/vsmSop';
 import { airKeCostLines, type AirInput } from './air';
 import { aktivitasDenganOrderAdmin, stokDariPalet } from '@/lib/profilVolume';
 import { volumeEfektif } from '@/lib/engine/types';
@@ -73,6 +74,7 @@ export interface Asumsi {
   aturanBerat?: import('@/lib/produk').AturanBerat;
   /** false = data produk tidak mengubah Volume / Parameter muatan / Space (default: ikut) */
   produkSinkron?: boolean;
+  vsm?: VsmInput;                    // Landmark VSM: SOP per proses (tahap), lead time per lane, prefix WI
   biayaOrangManual?: Record<string, number>;
   rincianBiayaMp?: Record<string, import('@/lib/engine/biayaMp').InputBiayaRole>;
   paramBiayaMp?: Partial<import('@/lib/engine/biayaMp').ParamBiayaMp>;
@@ -117,6 +119,9 @@ export const ASUMSI_DEFAULT: Asumsi = {
   it: IT_SHEET_DEFAULT, gudang: null, metodeManpower: 'excel', processDesign: PD_DEFAULT,
 };
 
+/** Aktivitas yang aktif (tidak dimatikan di VSM Map) — hanya ini yang masuk perhitungan biaya. */
+export const aktivitasAktif = <T extends { nonaktif?: boolean }>(xs: T[] | undefined): T[] => (xs ?? []).filter(x => !x.nonaktif);
+
 export function keInput(t: TenderRow): TenderInput {
   const a = { ...ASUMSI_DEFAULT, ...(t.asumsi ?? {}) };
   const tahun = t.tanggal_go_live ? new Date(t.tanggal_go_live).getFullYear() : new Date().getFullYear();
@@ -124,7 +129,7 @@ export function keInput(t: TenderRow): TenderInput {
     customer: t.customer, provinsi: t.provinsi, kabKota: t.kab_kota, tahun,
     durasiKontrakBulan: t.durasi_kontrak_bulan, jumlahShift: t.jumlah_shift, jamEfektifPerShift: Number(t.jam_efektif_per_shift),
     hariKerjaPerMinggu: t.hari_kerja_per_minggu, cutiTahunanHari: a.cutiTahunanHari, skenarioAset: t.skenario_aset,
-    paymentTermHari: t.payment_term_hari, volumes: volumeEfektif(a.volumes), aktivitas: aktivitasDenganOrderAdmin(terapkanPorsiMuat(a.aktivitas, a.porsiMuat), volumeEfektif(a.volumes), a.profilVolume, a.processDesign?.hariKerjaBulan ?? 25), peranTetap: a.peranTetap, alatSupervisor: a.alatSupervisor ?? [],
+    paymentTermHari: t.payment_term_hari, volumes: volumeEfektif(a.volumes), aktivitas: aktivitasDenganOrderAdmin(terapkanPorsiMuat(aktivitasAktif(a.aktivitas), a.porsiMuat), volumeEfektif(a.volumes), a.profilVolume, a.processDesign?.hariKerjaBulan ?? 25), peranTetap: a.peranTetap, alatSupervisor: a.alatSupervisor ?? [],
     spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, faktorProduktivitas: a.faktorProduktivitas,
     efisiensi: a.efisiensi, mhe: a.mhe, listrik: a.listrik,
     space: a.gudang ? { ...a.space, luasTersediaM2: Number(a.gudang.luas_m2), namaGudang: a.gudang.nama,
