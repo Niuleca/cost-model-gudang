@@ -32,6 +32,7 @@ export interface ProdukTender {
   tumpukMaks?: number | null;  // khusus lantai: maksimal tumpuk palet
   otomatis?: boolean;          // baris dari key assumption — ikut berubah selama belum diedit
   dimEstimasi?: boolean;       // P×L×T diperkirakan dari CBM per case (belum diukur)
+  uppAsli?: number | null;     // UPP yang sengaja dipertahankan sesuai kondisi asli (layer atas tidak penuh) — peringatan disembunyikan selama UPP sama
   catatan?: string;
 }
 
@@ -77,7 +78,11 @@ export interface HitungProduk {
   cbmUnit: number; beratPaletKg: number; cbmPalet: number; palet: number; totalKg: number; totalCbm: number;
   perLayer: number; layer: number; tinggiMuatanMm: number;
   levelMaks: number; sumberLevel: string; hanyaLantai: boolean; caraSimpan: CaraSimpan; peringatan: string[];
+  saranUpp: SaranUpp | null;
 }
+/** Usulan UPP bila layer teratas tidak penuh: dibulatkan ke bawah / ke atas ke kelipatan isi per layer. */
+export interface OpsiUpp { upp: number; layer: number; tinggiMuatanMm: number; beratPaletKg: number; selisih: number; ok: boolean; alasan?: string }
+export interface SaranUpp { upp: number; perLayer: number; sisaAtas: number; diterima: boolean; bawah: OpsiUpp | null; atas: OpsiUpp | null }
 
 /** Hitungan turunan satu produk (CBM, berat per palet, level maks, tinggi muatan, cara simpan). */
 export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, bukaanMm?: number): HitungProduk {
@@ -115,10 +120,24 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
   // bukaan di Space = tinggi produk saja (palet kayu dihitung terpisah)
   const tinggiProdukMm = tinggiMuatanMm > 0 ? tinggiMuatanMm - PALET_CM.tinggiKayu * 10 : 0;
   if (bukaanMm && tinggiProdukMm > bukaanMm + 0.5 && ['spr', 'ddr'].includes(caraSimpan)) peringatan.push(`Tinggi produk di palet ${Math.round(tinggiProdukMm)} mm > bukaan rak ${Math.round(bukaanMm)} mm (Warehouse Planning → Product) — kurangi UPP / layer atau naikkan Product di Warehouse Planning.`);
-  if (upp > 0 && perLayer > 0 && upp % perLayer && layer > 1) peringatan.push(`UPP ${upp} tidak pas kelipatan ${perLayer}/layer — layer teratas tidak penuh.`);
+  let saranUpp: SaranUpp | null = null;
+  if (!palUom && upp > 0 && perLayer > 0 && upp % perLayer && layer > 1) {
+    const sisaAtas = upp % perLayer, diterima = Number(x.uppAsli) === upp;
+    const opsi = (u: number): OpsiUpp | null => {
+      if (!(u > 0)) return null;
+      const ly = Math.ceil(u / perLayer - 1e-9), tMm = (ly * d.t + PALET_CM.tinggiKayu) * 10, kg = u * n(x.beratKg) + aturan.tarePaletKg;
+      const tProdMm = tMm - PALET_CM.tinggiKayu * 10;
+      const diRak = ['spr', 'ddr'].includes(caraSimpan);
+      const alasan = diRak && kg > aturan.kapPosisiKg ? `berat ${Math.round(kg)} kg > kapasitas beam ${aturan.kapPosisiKg} kg`
+        : diRak && bukaanMm && tProdMm > bukaanMm + 0.5 && tProdMm > tinggiProdukMm ? `tinggi ${Math.round(tProdMm)} mm > bukaan rak ${Math.round(bukaanMm)} mm` : undefined;
+      return { upp: u, layer: ly, tinggiMuatanMm: tMm, beratPaletKg: kg, selisih: u - upp, ok: !alasan, alasan };
+    };
+    saranUpp = { upp, perLayer, sisaAtas, diterima, bawah: opsi(Math.floor(upp / perLayer) * perLayer), atas: opsi(Math.ceil(upp / perLayer) * perLayer) };
+    if (!diterima) peringatan.push(`UPP ${upp} tidak pas kelipatan ${perLayer}/layer — layer teratas hanya ${sisaAtas} dari ${perLayer} ${x.uom || 'unit'}.`);
+  }
   if (dimOk && cbmPalet > 2.2) peringatan.push(`CBM muatan ${cbmPalet.toFixed(2)} m³/palet tidak wajar untuk palet 1,2 × 1,0 m — cek UPP / dimensi (satuan cm atau mm).`);
   if (!upp && n(x.qty) > 0) peringatan.push('UPP belum diisi — jumlah palet tidak bisa dihitung.');
-  return { cbmUnit, beratPaletKg, cbmPalet, palet, totalKg: n(x.qty) * n(x.beratKg), totalCbm: n(x.qty) * cbmUnit, perLayer, layer, tinggiMuatanMm, levelMaks, sumberLevel, hanyaLantai, caraSimpan, peringatan };
+  return { cbmUnit, beratPaletKg, cbmPalet, palet, totalKg: n(x.qty) * n(x.beratKg), totalCbm: n(x.qty) * cbmUnit, perLayer, layer, tinggiMuatanMm, levelMaks, sumberLevel, hanyaLantai, caraSimpan, peringatan, saranUpp };
 }
 
 /** Satu baris produk otomatis dari Key assumption: Volume (UoM & konversi) + Parameter muatan (berat/CBM per case & per palet). */

@@ -12,7 +12,7 @@ import type { VolumeInput } from '@/lib/engine/types';
 import type { ProfilVolume } from '@/lib/profilVolume';
 import { hitungLevelRak, lengkapiSpaceExcel, type HasilSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
 import {
-  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, satuanDimEfektif, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
+  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, type OpsiUpp, type SaranUpp, satuanDimEfektif, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
   type AturanBerat, type PerubahanTender, type ProdukTender,
 } from '@/lib/produk';
 
@@ -180,6 +180,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
             <div style={{ textAlign: 'right' }}><button className="danger" onClick={() => hapus(i)} aria-label={`Hapus ${x.nama || x.kode}`}>Hapus</button></div>
           </div>
           {h.peringatan.length > 0 && <div className="small" style={{ color: 'var(--warn, #b45309)', marginTop: 6 }}>{h.peringatan.map(p => <div key={p}>⚠ {p}</div>)}</div>}
+          {h.saranUpp && <SaranUppBaris s={h.saranUpp} uom={x.uom} tinggiSkrMm={h.tinggiMuatanMm} onUpp={u => ubah(i, { upp: u, uppAsli: null })} onTetap={tetap => ubah(i, { uppAsli: tetap ? x.upp : null }, false)} />}
         </div>)}
         {!daftar.length && <p className="muted">Belum ada produk. Isi Volume & Parameter muatan di tab Volume untuk baris otomatis, atau tambah / tempel produk.</p>}
       </div>
@@ -244,4 +245,27 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
         {aturan && <button className="ghost" onClick={() => onAturan(undefined)}>Kembalikan ke default</button>}</div>
     </div>
   </>;
+}
+
+/** Usulan UPP bila layer teratas tidak penuh — opsional: bisa dipakai, atau tetap ikut kondisi asli. */
+function SaranUppBaris({ s, uom, tinggiSkrMm, onUpp, onTetap }: { s: SaranUpp; uom: string; tinggiSkrMm: number; onUpp: (u: number) => void; onTetap: (tetap: boolean) => void }) {
+  const u = uom || 'unit';
+  const ket = (o: OpsiUpp) => {
+    const tinggi = Math.abs(o.tinggiMuatanMm - tinggiSkrMm) < 1 ? 'tinggi sama' : `tinggi ${angka(o.tinggiMuatanMm)} mm (${o.tinggiMuatanMm < tinggiSkrMm ? '−' : '+'}${angka(Math.abs(o.tinggiMuatanMm - tinggiSkrMm))} mm)`;
+    return `${o.layer} layer penuh · ${tinggi} · ${o.selisih > 0 ? '+' : '−'}${Math.abs(o.selisih)} ${u}/palet · ${angka(o.beratPaletKg)} kg`;
+  };
+  const tombol = (o: OpsiUpp | null, utama: boolean) => o && (
+    <button key={o.upp} className={utama && o.ok ? undefined : 'ghost'} disabled={!o.ok} onClick={() => onUpp(o.upp)} title={o.alasan ?? ket(o)}
+      style={{ padding: '4px 10px', fontSize: 12 }}>Pakai UPP {o.upp}<span style={{ fontWeight: 400, opacity: 0.8 }}> — {o.ok ? ket(o) : `tidak bisa: ${o.alasan}`}</span></button>);
+  if (s.diterima) return (
+    <div className="small muted" style={{ marginTop: 6 }}>✓ UPP {s.upp} dipertahankan sesuai kondisi asli (layer teratas {s.sisaAtas}/{s.perLayer} {u}).{' '}
+      <button className="link-kecil" onClick={() => onTetap(false)}>Tampilkan usulan lagi</button></div>);
+  // usulan utama: ke atas (tinggi sama, isi lebih banyak) bila masih aman; selain itu ke bawah
+  const utamaAtas = !!s.atas?.ok;
+  return (
+    <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
+      <span className="small" style={{ fontWeight: 600 }}>Usulan (opsional):</span>
+      {utamaAtas ? <>{tombol(s.atas, true)}{tombol(s.bawah, false)}</> : <>{tombol(s.bawah, true)}{tombol(s.atas, false)}</>}
+      <button className="ghost" onClick={() => onTetap(true)} style={{ padding: '4px 10px', fontSize: 12 }} title="Tetap pakai UPP sekarang; peringatan disembunyikan selama UPP tidak diubah">Tetap UPP {s.upp} (kondisi asli)</button>
+    </div>);
 }
