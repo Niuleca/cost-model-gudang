@@ -625,7 +625,7 @@ export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: 
 }
 
 /** Daftar standar satuan tarif untuk dropdown rate card. */
-export const UOM_TARIF_STANDAR = ['palet', 'case', 'karton', 'pcs', 'm²', 'CBM', 'kg', 'liter', 'bag', 'pack', 'roll', 'order', 'line', 'unit',
+export const UOM_TARIF_STANDAR = ['palet', 'case', 'karton', 'pcs', 'm²', 'CBM', 'kg', 'liter', 'bag', 'pack', 'roll', 'drum', 'pail', 'order', 'line', 'unit',
   'container', 'container 20ft', 'container 40ft', 'truk', 'trip', 'shipment', 'event'];
 
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
