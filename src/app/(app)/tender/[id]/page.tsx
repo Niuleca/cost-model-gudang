@@ -38,7 +38,7 @@ import { ATURAN_BERAT_DEFAULT, adaProdukNyata, hitungProduk, paletDariSpace, pro
 import { hitungLevelRak } from '@/lib/engine/space';
 import MhePanel from './MhePanel';
 import BiayaSpacePanel from './BiayaSpacePanel';
-import { hitungSpaceExcel, lengkapiSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
+import { hitungSpaceExcel, lengkapiSpaceExcel, ringkasPalet, daftarPalet, type SpaceExcel, type PaletTipe } from '@/lib/engine/space';
 import { hitungProcessDesign, PD_DEFAULT } from '@/lib/engine/processDesign';
 import HistorisPanel from './HistorisPanel';
 import CostAllocation from './PembagianLayanan';
@@ -225,7 +225,7 @@ export default function TenderPage() {
     if (!t) return;
     const s0 = lengkapiSpaceExcel(t.asumsi.space.excel);
     const space = { ...t.asumsi.space, excel };
-    const paletBerubah = s0.palet.panjang !== excel.palet.panjang || s0.palet.lebar !== excel.palet.lebar || s0.rak.palletMm !== excel.rak.palletMm;
+    const paletBerubah = JSON.stringify(s0.paletTipe) !== JSON.stringify(excel.paletTipe) || s0.palet.panjang !== excel.palet.panjang || s0.palet.lebar !== excel.palet.lebar || s0.rak.palletMm !== excel.rak.palletMm;
     if (paletBerubah && t.asumsi.produk && adaProdukNyata(t.asumsi.produk)) ubahProduk(t.asumsi.produk, t.asumsi.aturanBerat, false, { space });
     else setA({ space });
   };
@@ -440,7 +440,7 @@ export default function TenderPage() {
       {tab === 'Key assumption' && (
         <div className="card">
           <h2><T>Key assumption</T></h2>
-          <div className="grid3">
+          <div className="grid3 ka-grid">
             <Txt id="cust" label="Customer" value={t.customer} onChange={v => setKol('customer', v)} />
             <Sel id="ind" label="Business category (produktivitas)" value={t.industri ?? ''} options={Array.from(new Set(['', ...INDUSTRI, t.industri ?? ''])).map(v => ({ v, l: v || '—' }))} onChange={v => setKol('industri', v || null)} />
             <Txt id="pic" label="PIC / account" value={t.pic ?? ''} onChange={v => setKol('pic', v)} />
@@ -475,10 +475,10 @@ export default function TenderPage() {
             <Num id="cuti" label="Cuti tahunan per orang" suffix="hari" value={a.cutiTahunanHari} onChange={v => setA({ cutiTahunanHari: v })} hint="Masuk ke faktor pengganti headcount" />
             <Pct id="fp" label="Faktor produktivitas" value={a.faktorProduktivitas} onChange={v => setA({ faktorProduktivitas: v })} />
             <Pct id="ef" label="Efisiensi kerja" value={a.efisiensi} onChange={v => setA({ efisiensi: v })} />
-            <UkuranPalet excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel} />
           </div>
         </div>
       )}
+      {tab === 'Key assumption' && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel} />}
       {tab === 'Key assumption' && (() => {
         const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };
         const dipakai = (pr: string) => a.aktivitas.filter(x => x.porsiMuat?.proses === pr);
@@ -1023,31 +1023,51 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
   );
 }
 
-const PALET_PRESET = [
-  { p: 1.2, l: 1.0, label: '1,2 × 1,0 m (standar)' }, { p: 1.2, l: 1.2, label: '1,2 × 1,2 m' },
-  { p: 1.1, l: 1.1, label: '1,1 × 1,1 m (JIS / Asia)' }, { p: 1.2, l: 0.8, label: '1,2 × 0,8 m (EUR)' },
+const PALET_PRESET: (Omit<PaletTipe, 'id' | 'porsi'> & { label: string })[] = [
+  { label: 'Standar kayu · 1,2 × 1,0 m', nama: 'Standar kayu', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
+  { label: 'Jumbo · 1,2 × 1,2 m', nama: 'Jumbo', panjang: 1.2, lebar: 1.2, tebalMm: 150 },
+  { label: 'Plastik · 1,2 × 1,0 m', nama: 'Plastik', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
+  { label: 'JIS / Asia · 1,1 × 1,1 m', nama: 'JIS 1,1 × 1,1', panjang: 1.1, lebar: 1.1, tebalMm: 150 },
+  { label: 'EUR · 1,2 × 0,8 m', nama: 'EUR', panjang: 1.2, lebar: 0.8, tebalMm: 144 },
+  { label: 'Custom (isi sendiri)', nama: 'Palet custom', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
 ];
-/** Ukuran palet (Key assumption) — sumber yang sama dengan Warehouse Planning: susunan produk per palet, luas block stack / pallet floor, tebal palet di racking level. */
-function UkuranPalet({ excel, onChange }: { excel: SpaceExcel; onChange: (x: SpaceExcel) => void }) {
-  const pal = excel.palet;
-  const preset = PALET_PRESET.findIndex(p => Math.abs(p.p - pal.panjang) < 1e-6 && Math.abs(p.l - pal.lebar) < 1e-6);
-  const set = (panjang: number, lebar: number) => onChange({ ...excel, palet: { panjang, lebar } });
-  const kecil = { width: 70, minWidth: 70, textAlign: 'right' as const };
-  return <div className="f" style={{ gridColumn: 'span 2' }}>
-    <label htmlFor="palet-ukuran">Ukuran palet</label>
-    <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-      <select id="palet-ukuran" value={preset >= 0 ? String(preset) : 'custom'} style={{ minWidth: 190 }}
-        onChange={e => { const i = Number(e.target.value); if (e.target.value !== 'custom' && PALET_PRESET[i]) set(PALET_PRESET[i].p, PALET_PRESET[i].l); }}>
-        {PALET_PRESET.map((p, i) => <option key={i} value={i}>{p.label}</option>)}
-        <option value="custom">Custom (isi P × L)</option>
+const fmtN = (x: number, d = 2) => x.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: d });
+/** Jenis palet (Key assumption) — satu sumber untuk semua ukuran palet: Produk (susunan per palet), block stack / pallet floor (luas rata-rata), racking (tebal terbesar), simulasi 3D. */
+function PaletTender({ excel, onChange }: { excel: SpaceExcel; onChange: (x: SpaceExcel) => void }) {
+  const list = daftarPalet(excel), r = ringkasPalet(list);
+  const simpan = (xs: PaletTipe[]) => onChange({ ...excel, paletTipe: xs });
+  const ubah = (i: number, patch: Partial<PaletTipe>) => simpan(list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  const tambah = (k: number) => { const p = PALET_PRESET[k]; if (!p) return; const { label: _l, ...isi } = p;
+    simpan([...list, { ...isi, id: `p${Date.now().toString(36)}`, porsi: Math.max(0, Math.round((1 - r.totalPorsi) * 1000) / 1000) }]); };
+  const kecil = { width: 96, minWidth: 96, textAlign: 'right' as const };
+  const totOk = Math.abs(r.totalPorsi - 1) < 0.0005;
+  return <div className="card">
+    <h2>Jenis palet</h2>
+    <p className="small muted">Palet yang dipakai di gudang ini + porsi pemakaiannya. Otomatis dipakai di: <b>Produk</b> (isi per layer & tinggi muatan, sesuai jenis palet tiap produk),
+      <b> Warehouse Planning</b> (luas block stack / pallet floor = luas rata-rata tertimbang; Pallet di racking = tebal terbesar), dan <b>simulasi 3D</b>.</p>
+    <div className="tablewrap"><table className="palet-tabel" style={{ width: 'auto', minWidth: '100%' }}>
+      <thead><tr><th>Nama palet</th><th className="num">Panjang (m)</th><th className="num">Lebar (m)</th><th className="num">Tebal (mm)</th><th className="num">Pemakaian (%)</th><th className="num">Luas (m²)</th><th className="num">Bobot</th><th>Default produk</th><th /></tr></thead>
+      <tbody>{list.map((p, i) => <tr key={p.id}>
+        <td><input aria-label={`Nama palet ${i + 1}`} value={p.nama} onChange={e => ubah(i, { nama: e.target.value })} style={{ width: 200, minWidth: 160 }} /></td>
+        <td className="num"><AngkaInput aria-label={`Panjang palet ${i + 1}`} step="any" min={0} value={p.panjang} style={kecil} onValue={v => ubah(i, { panjang: v })} /></td>
+        <td className="num"><AngkaInput aria-label={`Lebar palet ${i + 1}`} step="any" min={0} value={p.lebar} style={kecil} onValue={v => ubah(i, { lebar: v })} /></td>
+        <td className="num"><AngkaInput aria-label={`Tebal palet ${i + 1}`} step="any" min={0} value={p.tebalMm} style={kecil} onValue={v => ubah(i, { tebalMm: v })} /></td>
+        <td className="num"><AngkaInput aria-label={`Pemakaian palet ${i + 1}`} step="any" min={0} max={100} value={Math.round((p.porsi || 0) * 1000) / 10} style={kecil} onValue={v => ubah(i, { porsi: Math.max(0, v) / 100 })} /></td>
+        <td className="num">{fmtN((p.panjang || 0) * (p.lebar || 0), 3)}</td>
+        <td className="num muted">{fmtN(r.bobot[i] * 100, 1)}%</td>
+        <td>{p.id === r.dominan.id && <span className="pill info" title="Pemakaian terbesar — dipakai produk yang belum memilih jenis palet">✓ default</span>}</td>
+        <td><button className="danger" style={{ padding: '4px 10px' }} disabled={list.length <= 1} title={list.length <= 1 ? 'Minimal satu jenis palet' : 'Hapus jenis palet'} onClick={() => simpan(list.filter((_, j) => j !== i))}>Hapus</button></td>
+      </tr>)}</tbody>
+      <tfoot><tr><td><b>Total</b></td><td /><td /><td /><td className="num"><b style={{ color: totOk ? undefined : 'var(--warn, #b45309)' }}>{fmtN(r.totalPorsi * 100, 1)}%</b></td>
+        <td className="num"><b>{fmtN(r.luasRata, 3)}</b><div className="small muted">rata-rata</div></td><td /><td /><td /></tr></tfoot>
+    </table></div>
+    {!totOk && <p className="small" style={{ color: 'var(--warn, #b45309)', margin: 0 }}>Total pemakaian {fmtN(r.totalPorsi * 100, 1)}% (bukan 100%) — {r.totalPorsi > 0 ? 'dihitung proporsional (kolom Bobot)' : 'semua 0 → dibagi rata'}.</p>}
+    <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <select aria-label="Tambah jenis palet" value="" onChange={e => { tambah(Number(e.target.value)); e.target.value = ''; }} style={{ width: 'auto' }}>
+        <option value="" disabled>＋ Tambah palet…</option>
+        {PALET_PRESET.map((p, k) => <option key={k} value={k}>{p.label}</option>)}
       </select>
-      <AngkaInput aria-label="Panjang palet (m)" step="any" min={0} value={pal.panjang} style={kecil} onValue={v => set(v, pal.lebar)} />
-      <span>×</span>
-      <AngkaInput aria-label="Lebar palet (m)" step="any" min={0} value={pal.lebar} style={kecil} onValue={v => set(pal.panjang, v)} />
-      <span className="small">m · tebal</span>
-      <AngkaInput aria-label="Tebal palet (mm)" step="any" min={0} value={excel.rak.palletMm} style={kecil} onValue={v => onChange({ ...excel, rak: { ...excel.rak, palletMm: v } })} />
-      <span className="small">mm</span>
+      <span className="small muted">Luas rata-rata <b>{fmtN(r.luasRata, 3)} m²</b> → block stack / pallet floor · tebal terbesar <b>{fmtN(r.tebalMaks, 0)} mm</b> → racking · default produk <b>{r.dominan.nama || '—'}</b></span>
     </div>
-    <span className="small muted">Dipakai untuk susunan produk per palet (tab Produk), luas block stack / pallet floor, dan tinggi palet di racking level (Warehouse Planning). Pilih Custom atau ketik langsung P × L.</span>
   </div>;
 }

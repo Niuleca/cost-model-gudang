@@ -3,6 +3,7 @@ import { R, A, q, isCase, type Ctx } from '@/lib/exportWebUtil';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT } from '@/lib/porsiMuat';
 import { PARAM_DEFAULT, KENDARAAN_DEFAULT, KENDARAAN_AWAL, MODA, MUATAN, isKontainer, muatanBaris } from '@/lib/profilVolume';
 import { volumeEfektif } from '@/lib/engine/types';
+import { daftarPalet, ringkasPalet } from '@/lib/engine/space';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function tulisKeyAssumption(x: Ctx) {
@@ -33,7 +34,26 @@ export function tulisKeyAssumption(x: Ctx) {
   KA.field('Cuti tahunan per orang', a.cutiTahunanHari, 'n0', 'in', 'hari', 'Masuk ke faktor pengganti headcount', 'Cuti');
   KA.field('Faktor produktivitas', a.faktorProduktivitas, 'pct', 'in', '', 'pengali produktivitas standar', 'FProd');
   KA.field('Efisiensi kerja', a.efisiensi, 'pct', 'in', '', 'Man hour = RfR ÷ efisiensi', 'Efis');
-  KA.field('Ukuran palet (P × L · tebal)', { f: 'FIXED(PalP,2)&" × "&FIXED(PalL,2)&" m · tebal "&FIXED(RkPallet,0)&" mm"' }, 'teks', 'out', '', 'input di sheet Warehouse Planning (Dimensi palet & Racking level → Pallet) — dipakai susunan produk per palet & luas block stack');
+
+  // ---- Jenis palet (sumber semua ukuran palet: Produk, block stack / floor, racking)
+  const pls = ringkasPalet(daftarPalet(a.space.excel));
+  KA.h2('Jenis palet', 'Jenis palet yang dipakai + % pemakaian. Luas rata-rata tertimbang → block stack / pallet floor; tebal terbesar → Pallet di Racking level; tiap produk memakai jenis palet pilihannya (kosong = jenis dengan pemakaian terbesar).');
+  KA.hdr([['Nama palet', true], ['Panjang (m)', true], ['Lebar (m)', true], ['Tebal (mm)', true], ['Pemakaian %', true, 'Dinormalkan bila total ≠ 100%; total 0 = dibagi rata'], ['Luas (m²)', false], ['Bobot', false]]);
+  const pa0 = KA.r;
+  for (const pt of [...pls.list, null, null, null]) {
+    const r = KA.r;
+    KA.put(1, pt?.nama ?? null, { j: 'in' }); KA.put(2, pt ? Number(pt.panjang) || 0 : null, { j: 'in', fmt: 'n2' }); KA.put(3, pt ? Number(pt.lebar) || 0 : null, { j: 'in', fmt: 'n2' });
+    KA.put(4, pt ? Number(pt.tebalMm) || 0 : null, { j: 'in', fmt: 'n0' }); KA.put(5, pt ? Number(pt.porsi) || 0 : null, { j: 'in', fmt: 'pct' });
+    KA.put(6, { f: `N(B${r})*N(C${r})` }, { j: 'out', fmt: 'n3' });
+    KA.put(7, { f: `IF(A${r}="",0,IF(SUM(PalTipePorsi)>0,N(E${r})/SUM(PalTipePorsi),1/MAX(1,COUNTA(PalTipeNama))))` }, { j: 'out', fmt: 'pct' });
+    KA.r++;
+  }
+  const pa1 = KA.r - 1;
+  KA.nmR('PalTipeNama', 1, pa0, pa1); KA.nmR('PalTipeP', 2, pa0, pa1); KA.nmR('PalTipeL', 3, pa0, pa1); KA.nmR('PalTipeT', 4, pa0, pa1); KA.nmR('PalTipePorsi', 5, pa0, pa1); KA.nmR('PalTipeBobot', 7, pa0, pa1);
+  KA.put(1, 'Total', { j: 'tot' }); KA.put(5, { f: `SUM(E${pa0}:E${pa1})` }, { j: 'tot', fmt: 'pct' }); KA.r++;
+  KA.field('Luas palet rata-rata (tertimbang)', { f: `SUMPRODUCT(PalTipeBobot,F${pa0}:F${pa1})`, v: pls.luasRata }, 'n3', 'out', 'm²', '→ block stack / pallet floor', 'PalLuas');
+  KA.field('Tebal palet terbesar', { f: 'MAX(PalTipeT)', v: pls.tebalMaks }, 'n0', 'out', 'mm', '→ Pallet di Racking level', 'PalTebal');
+  KA.field('Jenis dominan', { f: 'INDEX(PalTipeNama,MATCH(MAX(PalTipePorsi),PalTipePorsi,0))', v: pls.dominan.nama }, 'teks', 'out', '', 'pemakaian terbesar → default produk', 'PalDominan');
 
   // ---- Workload palletize vs loose
   const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };

@@ -74,7 +74,12 @@ p { margin: 0; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 
-label.f { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+label.f { display: grid; gap: 4px; font-size: 12px; color: var(--muted); align-content: start; }
+/* Key assumption: label 1–2 baris memakai tinggi sama → kotak input sejajar per baris */
+.ka-grid { align-items: start; }
+.ka-grid label.f { grid-template-rows: minmax(2.7em, auto); align-items: end; line-height: 1.35; }
+.ka-grid label.f > input, .ka-grid label.f > select { height: 38px; }
+.palet-tabel td { vertical-align: middle; }
 input, select, textarea {
   font: 14px var(--body); color: var(--ink); background: var(--input); border: 1px solid var(--line-strong);
   padding: 8px 10px; border-radius: 7px; width: 100%; min-width: 0; transition: border-color .12s, box-shadow .12s;

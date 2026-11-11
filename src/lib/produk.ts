@@ -4,6 +4,7 @@
 // bukaan rak, zonasi area per kelompok produk, dan SKU nyata di Simulasi Warehouse (putaway mematuhi level & zona).
 import type { VolumeInput } from '@/lib/engine/types';
 import { PARAM_DEFAULT, type ProfilVolume } from '@/lib/profilVolume';
+import { daftarPalet, ringkasPalet, type SpaceExcel } from '@/lib/engine/space';
 
 export const UOM_PRODUK = ['karton', 'case', 'pcs', 'unit', 'roll', 'bag', 'sak', 'pail', 'drum', 'jerigen', 'botol', 'kaleng', 'pack', 'bundle', 'coil', 'ibc', 'palet'] as const;
 export const KATEGORI_PRODUK = ['Umum', 'Berat', 'Fragile / mudah pecah', 'B3 / kimia', 'Cair', 'Cold / chiller', 'High value'] as const;
@@ -32,6 +33,7 @@ export interface ProdukTender {
   tumpukMaks?: number | null;  // khusus lantai: maksimal tumpuk palet
   otomatis?: boolean;          // baris dari key assumption — ikut berubah selama belum diedit
   dimEstimasi?: boolean;       // P×L×T diperkirakan dari CBM per case (belum diukur)
+  paletTipe?: string;          // id jenis palet (Key assumption); kosong = jenis dominan
   uppAsli?: number | null;     // UPP yang sengaja dipertahankan sesuai kondisi asli (layer atas tidak penuh) — peringatan disembunyikan selama UPP sama
   catatan?: string;
 }
@@ -62,10 +64,19 @@ const isPalet = (u: string) => /^pal+et/i.test((u ?? '').trim());
 /** Dimensi palet (cm): panjang × lebar dari Key assumption / Warehouse Planning, tinggi = tebal palet kayu (Pallet di Racking level). */
 export interface PaletDim { pCm: number; lCm: number; tinggiCm: number }
 export const PALET_DEFAULT: PaletDim = { pCm: 120, lCm: 100, tinggiCm: 15 };
-/** Ambil dimensi palet dari Space (palet: m, rak.palletMm: mm); kosong → 120 × 100 cm, tebal 15 cm. */
-export function paletDariSpace(sx?: { palet?: { panjang?: number; lebar?: number }; rak?: { palletMm?: number } } | null): PaletDim {
-  const pM = Number(sx?.palet?.panjang), lM = Number(sx?.palet?.lebar), tMm = Number(sx?.rak?.palletMm);
-  return { pCm: pM > 0 ? pM * 100 : PALET_DEFAULT.pCm, lCm: lM > 0 ? lM * 100 : PALET_DEFAULT.lCm, tinggiCm: tMm > 0 ? tMm / 10 : PALET_DEFAULT.tinggiCm };
+/** Semua jenis palet tender (Key assumption) + jenis default (dominan) untuk produk yang belum memilih. */
+export interface PaletProduk { tipe: (PaletDim & { id: string; nama: string })[]; dominan: string }
+/** Jenis palet dari Space / Key assumption (P, L dalam m; tebal mm) → cm. Kosong → 120 × 100 cm, tebal 15 cm. */
+export function paletDariSpace(sx?: Partial<SpaceExcel> | null): PaletProduk {
+  const r = ringkasPalet(daftarPalet(sx));
+  const tipe = r.list.map(p => ({ id: p.id, nama: p.nama, pCm: Number(p.panjang) > 0 ? Number(p.panjang) * 100 : PALET_DEFAULT.pCm,
+    lCm: Number(p.lebar) > 0 ? Number(p.lebar) * 100 : PALET_DEFAULT.lCm, tinggiCm: Number(p.tebalMm) > 0 ? Number(p.tebalMm) / 10 : PALET_DEFAULT.tinggiCm }));
+  return { tipe, dominan: r.dominan.id };
+}
+/** Dimensi palet untuk satu produk: jenis yang dipilih produk, selain itu jenis dominan. */
+export function paletUntuk(x: Pick<ProdukTender, 'paletTipe'>, p: PaletDim | PaletProduk = PALET_DEFAULT): PaletDim & { id?: string; nama?: string } {
+  if (!('tipe' in p)) return p;
+  return p.tipe.find(t => t.id === x.paletTipe) ?? p.tipe.find(t => t.id === p.dominan) ?? p.tipe[0] ?? PALET_DEFAULT;
 }
 const cm = (x: number) => Math.round(x * 10) / 10;
 /** Satuan dimensi yang dipakai: pilihan user, atau otomatis — dimensi yang tidak masuk akal dalam cm (palet > 2,5 m, lainnya > 6 m) dibaca mm. */
@@ -93,7 +104,8 @@ export interface OpsiUpp { upp: number; layer: number; tinggiMuatanMm: number; b
 export interface SaranUpp { upp: number; perLayer: number; sisaAtas: number; diterima: boolean; bawah: OpsiUpp | null; atas: OpsiUpp | null }
 
 /** Hitungan turunan satu produk (CBM, berat per palet, level maks, tinggi muatan, cara simpan). */
-export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, bukaanMm?: number, dimPalet: PaletDim = PALET_DEFAULT): HitungProduk {
+export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, bukaanMm?: number, sumberPalet: PaletDim | PaletProduk = PALET_DEFAULT): HitungProduk {
+  const dimPalet = paletUntuk(x, sumberPalet);
   const PALET_CM = { p: dimPalet.pCm, l: dimPalet.lCm, tinggiKayu: dimPalet.tinggiCm };
   const d = dimCm(x), palUom = isPalet(x.uom);
   const dimOk = d.p > 0 && d.l > 0 && d.t > 0;
@@ -182,7 +194,7 @@ export function produkEfektif(daftar: ProdukTender[] | undefined, volumes: Volum
 }
 
 /** Zonasi otomatis: kelompokkan produk menurut kategori & kelas berat; zona diberi huruf A, B, C … */
-export function zonasiOtomatis(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, palet: PaletDim = PALET_DEFAULT): ProdukTender[] {
+export function zonasiOtomatis(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, palet: PaletDim | PaletProduk = PALET_DEFAULT): ProdukTender[] {
   const kunci = (x: ProdukTender) => {
     const h = hitungProduk(x, aturan, levelRak, undefined, palet);
     const kat = x.kategori && x.kategori !== 'Umum' && x.kategori !== 'Berat' ? x.kategori : h.levelMaks <= 1 ? 'Berat (level 1 / lantai)' : h.levelMaks < 99 && h.levelMaks < levelRak ? `Menengah (≤ level ${h.levelMaks})` : 'Umum';
@@ -197,7 +209,7 @@ export function zonasiOtomatis(daftar: ProdukTender[], aturan: AturanBerat = ATU
 
 export interface RingkasZona { zona: string; sku: number; palet: number; kg: number; cbm: number; levelMaks: number; paletLevel1: number }
 /** Ringkasan per zona + kebutuhan posisi level 1 (produk yang hanya boleh di level 1 / lantai). */
-export function ringkasZona(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, palet: PaletDim = PALET_DEFAULT): RingkasZona[] {
+export function ringkasZona(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, palet: PaletDim | PaletProduk = PALET_DEFAULT): RingkasZona[] {
   const m = new Map<string, RingkasZona>();
   for (const x of daftar) {
     const h = hitungProduk(x, aturan, levelRak, undefined, palet); const z = x.zona?.trim() || '(tanpa zona)';
@@ -236,7 +248,7 @@ export interface TurunanProduk {
   kgPerPalet: number; cbmPerPalet: number; tinggiMaksMm: number; porsiLantai: number;
 }
 /** Rata-rata tertimbang dari daftar produk: berat & CBM per unit (tertimbang qty), per palet (tertimbang palet), UPP = qty ÷ palet. */
-export function turunanProduk(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, dimPalet: PaletDim = PALET_DEFAULT): TurunanProduk | null {
+export function turunanProduk(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, dimPalet: PaletDim | PaletProduk = PALET_DEFAULT): TurunanProduk | null {
   const xs = daftar.filter(x => uppEfektif(x) > 0 && Number(x.qty) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak, undefined, dimPalet) }));
   if (!xs.length) return null;
   const qty = xs.reduce((a, r) => a + Number(r.x.qty), 0), palet = xs.reduce((a, r) => a + r.h.palet, 0);
@@ -261,7 +273,7 @@ function spaceDariProduk(space: object, tinggiRakMm: number, porsiLantai: number
   let excel: Record<string, unknown> | undefined;
   if (sx && typeof sx === 'object') {
     const rak = { ...(sx.rak ?? {}) } as Record<string, number>;
-    const tinggi = tinggiRakMm > 0 ? Math.ceil((tinggiRakMm - paletDariSpace(sx as never).tinggiCm * 10) / 50 - 1e-9) * 50 : 0;   // tanpa tebal palet kayu
+    const tinggi = tinggiRakMm > 0 ? Math.ceil(tinggiRakMm / 50 - 1e-9) * 50 : 0;   // tinggi produk saja (tanpa tebal palet), dibulatkan 50 mm
     excel = { ...sx };
     if (tinggi > 0 && tinggi !== Number(rak.productMm ?? 1250)) {
       per.push({ bagian: 'Warehouse Planning', item: 'Tinggi produk di rak (bukaan level)', dari: `${f(Number(rak.productMm ?? 1250), 0)} mm`, ke: `${f(tinggi, 0)} mm` });
@@ -293,9 +305,9 @@ export function terapkanProduk<A extends { volumes: VolumeInput[]; profilVolume?
 ): { patch: Partial<A>; perubahan: PerubahanTender[] } {
   const palet = paletDariSpace((a.space as { excel?: never }).excel);
   const d = turunanProduk(daftar, aturan, levelRak, palet);
-  // tinggi produk di rak (bukaan) tidak bergantung qty: ambil dari semua produk rak yang dimensi & UPP-nya lengkap
-  const tinggiRakMm = daftar.filter(x => uppEfektif(x) > 0).map(x => hitungProduk(x, aturan, levelRak, undefined, palet))
-    .filter(h => h.caraSimpan === 'spr' || h.caraSimpan === 'ddr').reduce((a, h) => Math.max(a, h.tinggiMuatanMm), 0);
+  // tinggi produk di rak (bukaan) tidak bergantung qty: tinggi produk (tanpa palet) tertinggi dari produk rak yang dimensi & UPP-nya lengkap
+  const tinggiRakMm = daftar.filter(x => uppEfektif(x) > 0).map(x => ({ h: hitungProduk(x, aturan, levelRak, undefined, palet), tebalMm: paletUntuk(x, palet).tinggiCm * 10 }))
+    .filter(r => (r.h.caraSimpan === 'spr' || r.h.caraSimpan === 'ddr') && r.h.tinggiMuatanMm > 0).reduce((a, r) => Math.max(a, r.h.tinggiMuatanMm - r.tebalMm), 0);   // tinggi produk tanpa palet
   const per: PerubahanTender[] = [];
   if (!d) {
     // belum ada qty: hanya tinggi bukaan rak yang bisa diterapkan

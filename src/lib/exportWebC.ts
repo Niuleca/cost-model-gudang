@@ -59,18 +59,19 @@ export function tulisGudang(x: Ctx) {
   rak('sd', 'B  Racking space (SPR · Selective Pallet Rack)', 'Spr', 'PorsiSpr');
   rak('dd', 'C  Racking space (DDR · Double Deep Rack)', 'Ddr', 'PorsiDdr');
   GD.r++; GD.h3('C2  Block stack');
-  B('Dimensi palet — panjang', sx.palet.panjang, 'n2', 'in', 'm', 'PalP');
-  B('Dimensi palet — lebar', sx.palet.lebar, 'n2', 'in', 'm', 'PalL');
+  B('Palet dominan — panjang', { f: 'INDEX(PalTipeP,MATCH(PalDominan,PalTipeNama,0))', v: sx.palet.panjang }, 'n2', 'out', 'm', 'PalP');
+  B('Palet dominan — lebar', { f: 'INDEX(PalTipeL,MATCH(PalDominan,PalTipeNama,0))', v: sx.palet.lebar }, 'n2', 'out', 'm', 'PalL');
+  B('Luas palet rata-rata (Key assumption)', { f: 'PalLuas' }, 'n3', 'out', 'm²');
   B('Tumpukan (stacking)', sx.block.tumpuk, 'n0', 'in', 'level', 'BlkTumpuk');
   B('Allowance gang / akses', sx.block.gangPersen, 'pct', 'in', 'dari luas palet', 'BlkGang');
-  B('Space required per pallet position', { f: 'PalP*PalL/MAX(1,BlkTumpuk)*(1+MAX(0,BlkGang))' }, 'n3', 'out', 'm²', 'BlkM2pp');
+  B('Space required per pallet position', { f: 'PalLuas/MAX(1,BlkTumpuk)*(1+MAX(0,BlkGang))' }, 'n3', 'out', 'm²', 'BlkM2pp');
   B('Capacity required', { f: 'PP*MAX(0,PorsiBlock)' }, 'n1', 'out', 'PP', 'BlkReq');
   B('Tapak palet', { f: 'MAX(0,ROUNDUP(BlkReq/MAX(1,BlkTumpuk)-1E-9,0))' }, 'n0', 'out', 'tapak');
   B('Foot print', { f: 'BlkReq*BlkM2pp' }, 'n1', 'out', 'm²', 'BlkFp');
   GD.r++; GD.h3('C3  Pallet floor');
   GD.field('Tumpukan', 1, 'n0', 'out', 'level', 'palet di lantai, tidak ditumpuk');
   B('Allowance gang / akses', sx.floor.gangPersen, 'pct', 'in', 'dari luas palet', 'FlrGang');
-  B('Space required per pallet position', { f: 'PalP*PalL*(1+MAX(0,FlrGang))' }, 'n3', 'out', 'm²', 'FlrM2pp');
+  B('Space required per pallet position', { f: 'PalLuas*(1+MAX(0,FlrGang))' }, 'n3', 'out', 'm²', 'FlrM2pp');
   B('Capacity required', { f: 'PP*MAX(0,PorsiFloor)' }, 'n1', 'out', 'PP', 'FlrReq');
   B('Foot print', { f: 'FlrReq*FlrM2pp' }, 'n1', 'out', 'm²', 'FlrFp');
   const stg = (k: 'inbound' | 'outbound', judul: string, pre: string, vol: string) => {
@@ -114,7 +115,7 @@ export function tulisGudang(x: Ctx) {
   GD.field('Center height', sx.rak.centerMm, 'n0', 'in', 'mm', '', 'RkCenter');
   GD.field('Side height', sx.rak.sideMm, 'n0', 'in', 'mm', '', 'RkSide');
   GD.field('Beam', sx.rak.beamMm, 'n0', 'in', 'mm', '', 'RkBeam');
-  GD.field('Pallet', sx.rak.palletMm, 'n0', 'in', 'mm', '', 'RkPallet');
+  GD.field('Pallet', { f: 'PalTebal', v: sx.rak.palletMm }, 'n0', 'out', 'mm', 'tebal palet terbesar (Key assumption → Jenis palet)', 'RkPallet');
   GD.field('Product', sx.rak.productMm, 'n0', 'in', 'mm', '', 'RkProduct');
   GD.field('Clearance', sx.rak.clearanceMm, 'n0', 'in', 'mm', '', 'RkClear');
   GD.field('Total height / pallet (level 2 up)', { f: 'RkBeam+RkPallet+RkProduct+RkClear' }, 'n0', 'out', 'mm', '', 'RkLvN');

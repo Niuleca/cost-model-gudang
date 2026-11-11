@@ -6,12 +6,15 @@
 export interface RakDim { koridor: number; depth: number; width: number; paletPerLevel: number; deep?: number }
 export interface StagingIn { porsiMinggu: number; hariPerMinggu: number; sequence: number; m2PerPalet: number; tumpuk: number; unitPerPalet: number; volumePerShiftManual?: number | null }
 export interface Porsi { spr: number; ddr: number; block: number; floor: number }   // porsi PP per metode simpan (total = 100%)
+/** Jenis palet yang dipakai di gudang (Key assumption). Porsi = % pemakaian (dinormalkan bila total ≠ 100%). */
+export interface PaletTipe { id: string; nama: string; panjang: number; lebar: number; tebalMm: number; porsi: number }
 export interface LantaiDim { tumpuk: number; gangPersen: number }                  // block stack / pallet floor
 export interface SpaceExcel {
   porsiSd: number;                        // (lama) porsi selective; dipakai bila `porsi` belum ada
   porsi?: Porsi;
   sd: RakDim; dd: RakDim;                 // sd = SPR (selective pallet rack), dd = DDR (double deep rack)
-  palet: { panjang: number; lebar: number };   // dimensi palet untuk block stack / pallet floor (m)
+  palet: { panjang: number; lebar: number };   // dimensi palet dominan (m) — turunan dari paletTipe
+  paletTipe?: PaletTipe[];                // jenis palet + porsi pemakaian (sumber utama)
   block: LantaiDim; floor: LantaiDim;
   rak: { centerMm: number; sideMm: number; beamMm: number; palletMm: number; productMm: number; clearanceMm: number; levelManual?: number | null;
     /** Tinggi per level manual (mm, dari lantai/beam bawah s/d beam berikutnya); index 0 = level 1. Kosong / 0 = otomatis (level 1 / level 2+). */
@@ -46,15 +49,35 @@ export const SPACE_EXCEL_DEFAULT: SpaceExcel = {
   dasarLuas: 'spaceRent', gangwayM: 3.5, lebarGudangM: 23,
 };
 
+/** Daftar jenis palet; data lama (belum ada paletTipe) → 1 jenis dari palet + tebal Pallet di racking. */
+export function daftarPalet(x?: Partial<SpaceExcel> | null): PaletTipe[] {
+  if (x?.paletTipe?.length) return x.paletTipe;
+  return [{ id: 'std', nama: 'Standar', panjang: Number(x?.palet?.panjang) || 1.2, lebar: Number(x?.palet?.lebar) || 1.0, tebalMm: Number(x?.rak?.palletMm) || 150, porsi: 1 }];
+}
+/** Ringkasan palet: bobot (porsi dinormalkan; total 0 → rata), luas rata-rata tertimbang, tebal maks (untuk racking), jenis dominan. */
+export function ringkasPalet(list: PaletTipe[]) {
+  const xs = list.length ? list : daftarPalet(null);
+  const tot = xs.reduce((a, p) => a + Math.max(0, Number(p.porsi) || 0), 0);
+  const bobot = xs.map(p => (tot > 0 ? Math.max(0, Number(p.porsi) || 0) / tot : 1 / xs.length));
+  const luasRata = xs.reduce((a, p, i) => a + bobot[i] * (Number(p.panjang) || 0) * (Number(p.lebar) || 0), 0);
+  const tebalMaks = Math.max(0, ...xs.map(p => Number(p.tebalMm) || 0));
+  const dominan = xs.reduce((m, p) => ((Number(p.porsi) || 0) > (Number(m.porsi) || 0) ? p : m), xs[0]);
+  return { list: xs, bobot, totalPorsi: tot, luasRata, tebalMaks, dominan };
+}
+function turunanPalet(x?: Partial<SpaceExcel> | null): Pick<SpaceExcel, 'palet' | 'paletTipe' | 'rak'> {
+  const list = daftarPalet(x), r = ringkasPalet(list);
+  return { paletTipe: list, palet: { panjang: r.dominan.panjang, lebar: r.dominan.lebar },
+    rak: { ...SPACE_EXCEL_DEFAULT.rak, ...(x?.rak ?? {}), palletMm: r.tebalMaks || Number(x?.rak?.palletMm) || SPACE_EXCEL_DEFAULT.rak.palletMm } };
+}
+
 export const lengkapiSpaceExcel = (x?: Partial<SpaceExcel> | null): SpaceExcel => ({
   ...SPACE_EXCEL_DEFAULT, ...(x ?? {}),
   // data lama hanya punya porsiSd → SPR = porsiSd, DDR = sisanya
   porsi: x?.porsi ? { ...{ spr: 0, ddr: 0, block: 0, floor: 0 }, ...x.porsi }
     : x?.porsiSd != null ? { spr: x.porsiSd, ddr: 1 - x.porsiSd, block: 0, floor: 0 } : { ...SPACE_EXCEL_DEFAULT.porsi! },
-  palet: { ...SPACE_EXCEL_DEFAULT.palet, ...(x?.palet ?? {}) },
   block: { ...SPACE_EXCEL_DEFAULT.block, ...(x?.block ?? {}) }, floor: { ...SPACE_EXCEL_DEFAULT.floor, ...(x?.floor ?? {}), tumpuk: 1 },
   sd: { ...SPACE_EXCEL_DEFAULT.sd, ...(x?.sd ?? {}) }, dd: { ...SPACE_EXCEL_DEFAULT.dd, ...(x?.dd ?? {}) },
-  rak: { ...SPACE_EXCEL_DEFAULT.rak, ...(x?.rak ?? {}) },
+  ...turunanPalet(x),
   inbound: { ...SPACE_EXCEL_DEFAULT.inbound, ...(x?.inbound ?? {}) }, outbound: { ...SPACE_EXCEL_DEFAULT.outbound, ...(x?.outbound ?? {}) },
   fasilitas: x?.fasilitas ?? SPACE_EXCEL_DEFAULT.fasilitas, cad: x?.cad ?? [],
 });
@@ -86,8 +109,8 @@ function rak(ppReq: number, d: RakDim, level: number) {
 }
 
 /** Block stack / pallet floor: m² per PP = luas palet ÷ tumpuk × (1 + gang%). */
-function lantai(ppReq: number, p: SpaceExcel['palet'], d: LantaiDim) {
-  const luasPalet = p.panjang * p.lebar, tumpuk = Math.max(1, d.tumpuk || 1);
+function lantai(ppReq: number, luasPalet: number, d: LantaiDim) {
+  const tumpuk = Math.max(1, d.tumpuk || 1);
   const m2PerPP = (luasPalet / tumpuk) * (1 + Math.max(0, d.gangPersen));
   return { ...d, tumpuk, luasPalet, m2PerPP, ppReq, tapak: Math.ceil(ppReq / tumpuk - 1e-9), footprint: ppReq * m2PerPP };
 }
@@ -109,8 +132,9 @@ export function hitungSpaceExcel(x: SpaceExcel, ppTotal: number, inboundBulan: n
   const totalPorsi = c(pr.spr) + c(pr.ddr) + c(pr.block) + c(pr.floor);
   const sd = rak(ppTotal * c(pr.spr), x.sd, lv.level);
   const dd = rak(ppTotal * c(pr.ddr), { ...x.dd, deep: x.dd.deep ?? 2 }, lv.level);
-  const block = lantai(ppTotal * c(pr.block), x.palet, x.block);
-  const floor = lantai(ppTotal * c(pr.floor), x.palet, { ...x.floor, tumpuk: 1 });
+  const luasPalet = ringkasPalet(daftarPalet(x)).luasRata;
+  const block = lantai(ppTotal * c(pr.block), luasPalet, x.block);
+  const floor = lantai(ppTotal * c(pr.floor), luasPalet, { ...x.floor, tumpuk: 1 });
   const inbound = staging(inboundBulan, x.inbound, jumlahShift);
   const outbound = staging(outboundBulan, x.outbound, jumlahShift);
   const fasilitasM2 = x.fasilitas.reduce((s, f) => s + Number(f.m2 || 0), 0);

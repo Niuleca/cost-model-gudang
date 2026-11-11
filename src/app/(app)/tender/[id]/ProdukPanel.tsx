@@ -12,7 +12,7 @@ import type { VolumeInput } from '@/lib/engine/types';
 import type { ProfilVolume } from '@/lib/profilVolume';
 import { hitungLevelRak, lengkapiSpaceExcel, type HasilSpaceExcel, type SpaceExcel } from '@/lib/engine/space';
 import {
-  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, paletDariSpace, type OpsiUpp, type SaranUpp, satuanDimEfektif, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
+  ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, paletDariSpace, paletUntuk, type OpsiUpp, type SaranUpp, satuanDimEfektif, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
   type AturanBerat, type PerubahanTender, type ProdukTender,
 } from '@/lib/produk';
 
@@ -41,7 +41,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
   const lv = hitungLevelRak(sx.rak);
   const levelRak = Math.max(1, lv.level || 1);
   const daftar = useMemo(() => produkEfektif(produk, volumes, profil, namaCustomer), [produk, volumes, profil, namaCustomer]);
-  const dimPalet = useMemo(() => paletDariSpace(sx), [sx.palet.panjang, sx.palet.lebar, sx.rak.palletMm]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dimPalet = useMemo(() => paletDariSpace(sx), [JSON.stringify(sx.paletTipe)]); // eslint-disable-line react-hooks/exhaustive-deps
   const hit = useMemo(() => daftar.map(x => hitungProduk(x, at, levelRak, sx.rak.productMm, dimPalet)), [daftar, at, levelRak, sx.rak.productMm, dimPalet]);
   const [tempel, setTempel] = useState<string | null>(null);
   const [cari, setCari] = useState('');
@@ -173,6 +173,9 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
               {Array.from({ length: levelRak }, (_, k) => k + 1).map(l => <option key={l} value={l}>Manual: L1–L{l}</option>)}</select></label>
             <label>{lab('Cara simpan')}<select aria-label={`Cara simpan ${i + 1}`} value={x.simpan ?? 'otomatis'} onChange={e => ubah(i, { simpan: e.target.value as ProdukTender['simpan'] }, false)} style={kecil}>
               {SIMPAN.map(s => <option key={s.v} value={s.v}>{s.v === 'otomatis' ? `Otomatis → ${LABEL_SIMPAN[h.caraSimpan].split(' (')[0]}` : s.l}</option>)}</select></label>
+            {!/^pal+et/i.test(x.uom) && <label title="Ukuran palet untuk susunan per layer & tinggi muatan">{lab('Jenis palet')}<select aria-label={`Jenis palet ${i + 1}`} value={x.paletTipe ?? ''} onChange={e => ubah(i, { paletTipe: e.target.value || undefined })} style={kecil}>
+              <option value="">Default: {paletUntuk({}, dimPalet).nama ?? 'standar'}</option>
+              {dimPalet.tipe.map(p => <option key={p.id} value={p.id}>{p.nama} · {angka(p.pCm / 100, 2)} × {angka(p.lCm / 100, 2)} m</option>)}</select></label>}
             <label>{lab('Kategori')}<select aria-label={`Kategori ${i + 1}`} value={x.kategori ?? 'Umum'} onChange={e => ubah(i, { kategori: e.target.value }, false)} style={kecil}>
               {Array.from(new Set([...KATEGORI_PRODUK, x.kategori ?? 'Umum'])).map(k => <option key={k}>{k}</option>)}</select></label>
             <label>{lab('Zona')}<input aria-label={`Zona ${i + 1}`} list="dl-zona-produk" value={x.zona ?? ''} onChange={e => ubah(i, { zona: e.target.value }, false)} style={kecil} /></label>

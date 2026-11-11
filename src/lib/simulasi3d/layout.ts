@@ -212,7 +212,9 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
   bangunRak('spr', 11); bangunRak('ddr', 23);
 
   // ---------- 3. Block stack & pallet floor (blok palet, gang di antara blok)
-  const pl = 1.2, lb = 1.0;
+  // ukuran palet dominan dari Key assumption → Jenis palet
+  const palDom = lengkapiSpaceExcel(t.asumsi.space?.excel).palet;
+  const pl = Math.max(0.6, Number(palDom.panjang) || 1.2), lb = Math.max(0.6, Number(palDom.lebar) || 1.0);
   const bangunLantai = (jenis: 'block' | 'floor', porsi: number, tumpuk: number, label: string) => {
     const n = ppTotal * Math.max(0, porsi); if (n <= 0) return;
     const tapak = ceil(n / tumpuk);
