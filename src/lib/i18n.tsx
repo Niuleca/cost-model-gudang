@@ -19,7 +19,7 @@ const K: Kamus = {
   'Tender': ['Tender', '입찰', '入札'],
   'New Tender': ['New Tender', '신규 입찰', '新規入札'],
   'Draft Tender': ['Draft Tenders', '입찰 초안', '入札ドラフト'],
-  'Comparation Tender': ['Tender Comparison', '입찰 비교', '入札比較'],
+  'Tender Comparison': ['Tender Comparison', '입찰 비교', '入札比較'],
   'Riwayat Tender': ['Tender History', '입찰 이력', '入札履歴'],
   'Implementation / Project Charter': ['Implementation / Project Charter', '구현 / 프로젝트 차터', '導入 / プロジェクト憲章'],
   'Price Inquiry': ['Price Inquiry', '단가 조회', '価格照会'],

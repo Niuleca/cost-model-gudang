@@ -760,9 +760,7 @@ tr.akt-nonaktif td:first-child { opacity: 1; }
 .lm-wi-btn:disabled { cursor: default; opacity: .6; }
 
 /* =====================================================================================
-   Tema "Rak & lantai gudang" — warna dari rak selective (upright biru, beam oranye) dan
-   marka lantai (garis kuning-hitam). Satu elemen menonjol: penanda tab / menu aktif seperti
-   lakban marka lantai. Sisanya tenang: abu beton, garis tipis, angka tabular.
+   Tema minimalis: abu muda, garis tipis, satu warna aksi (biru rak), angka tabular.
    ===================================================================================== */
 :root {
   --bg: #eef0f3; --surface: #ffffff; --surface-2: #f6f7f9;
@@ -780,17 +778,16 @@ a { color: var(--rak); }
 
 /* ---------- Header: satu baris, ringkas ---------- */
 .topbar { flex-wrap: nowrap; gap: 16px; min-height: 56px; background: rgba(255,255,255,.96); box-shadow: 0 1px 0 var(--line); }
-.topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px; height: 3px; background: var(--marka-garis); opacity: .9; }
-.topnav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; }
-.topnav::-webkit-scrollbar { display: none; }
+.topnav { flex-wrap: nowrap; align-items: center; min-width: 0; }
 .ddbtn { padding: 17px 10px 15px; font-size: 14px; }
-.ddbtn.on { border-bottom: 3px solid var(--beam); color: var(--ink); }
+.ddbtn.on { border-bottom: 2px solid var(--ink); color: var(--ink); }
 .bahasa-pilih { margin-right: 2px; flex: none; }
-.bahasa-pilih select { max-width: 150px; padding: 4px 22px 4px 7px; font-size: 12px; text-overflow: ellipsis; }
+.bahasa-pilih select { width: auto; padding: 4px 22px 4px 8px; font-size: 12px; }
 .bahasa-pilih select[aria-label='Satuan panjang'] { max-width: 64px; }
-.dd:last-child .ddbtn { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+.ddlabel { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .ddmenu { z-index: 70; }
-@media (max-width: 1180px) { .brand-oleh { display: none; } .ddbtn { padding-left: 8px; padding-right: 8px; } .dd:last-child .ddbtn { max-width: 160px; } }
+@media (max-width: 1240px) { .brand-oleh { display: none; } .ddbtn { padding-left: 8px; padding-right: 8px; } .ddlabel { max-width: 150px; } }
+@media (max-width: 800px) { .topbar { flex-wrap: wrap; } .topnav { flex-wrap: wrap; } }
 
 /* ---------- Tombol ---------- */
 button, .btn { border-radius: 8px; font-weight: 600; }
@@ -801,16 +798,15 @@ button.danger:hover:not(:disabled) { background: #fdf0ef; border-color: var(--ba
 input:focus, select:focus, textarea:focus { border-color: var(--rak); box-shadow: 0 0 0 3px rgba(31,95,168,.14); }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--rak); }
 
-/* ---------- Tab tender: penanda aktif = lakban marka lantai ---------- */
+/* ---------- Tab ---------- */
 .tabs { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 2px; width: 100%; }
-.tabs button { color: var(--muted); font-weight: 500; padding: 7px 13px 10px; border-radius: 8px; position: relative; font-size: 13.5px; }
+.tabs button { color: var(--muted); font-weight: 500; padding: 7px 13px; border-radius: 8px; position: relative; font-size: 13.5px; }
 .tabs button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
 .tabs button.on, .tabs button.on:hover:not(:disabled) { background: var(--ink); color: #fff; box-shadow: none; font-weight: 600; }
-.tabs button.on::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 3px; height: 3px; border-radius: 2px; background: var(--marka-garis); }
 
 /* ---------- Kartu & judul ---------- */
 .card { box-shadow: var(--shadow); border-color: var(--line); }
-.card > h2:first-child, .card > .row:first-child > h2 { padding-left: 10px; border-left: 4px solid var(--rak); line-height: 1.25; }
+
 
 /* ---------- Tabel: ringkas, angka tabular, teks panjang dipotong (klik untuk lihat semua) ---------- */
 .tablewrap { border-radius: 10px; }
@@ -837,14 +833,19 @@ td button { padding: 4px 10px; font-size: 12.5px; }
 .flag { background: #fff; border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 8px 12px; }
 .flag .solusi { margin-top: 4px; font-size: 13px; color: var(--ink); }
 .flag .solusi b { color: var(--rak-gelap); }
-.kpi { background: #fff; border-color: var(--line); border-top: 3px solid var(--rak); }
+.kpi { background: #fff; border-color: var(--line); }
 .kpi b { color: var(--ink); }
-.notice { background: #fff; border-color: var(--line); border-left: 4px solid var(--marka); }
+.notice { background: #fff; border-color: var(--line); border-left: 3px solid var(--rak); }
 .saran-gudang { display: grid; gap: 8px; }
 .saran-gudang .saran { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .saran-gudang .saran i { font-style: normal; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--rak-muda); color: var(--rak-gelap); font-weight: 700; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 td .row > span, td .row > label { white-space: nowrap; }
 .flag.kritis, .flag.peringatan, .flag.info { border-color: var(--line); }
-.flag.kritis { border-left-color: var(--bad); background: #fffafa; } .flag.peringatan { border-left-color: var(--marka); } .flag.info { border-left-color: var(--line-strong); }
+.flag.kritis { border-left-color: var(--bad); background: #fffafa; } .flag.peringatan { border-left-color: #d9a400; } .flag.info { border-left-color: var(--line-strong); }
 .flag > b.small { color: var(--muted); letter-spacing: .02em; }
+/* akun di ujung kanan menyusut (nama dipotong …) supaya header tetap satu baris */
+.topnav .dd:last-child { min-width: 0; flex: 0 1 auto; }
+.topnav .dd:last-child .ddbtn { min-width: 0; max-width: 100%; }
+.topnav .dd:last-child .ddlabel { min-width: 0; flex: 0 1 auto; }
+.topnav > .dd:not(:last-child), .topnav > .bahasa-pilih { flex-shrink: 0; }

@@ -25,7 +25,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
   { id: 'tender', label: 'Logistics Tender', item: [
     { href: '/tender/baru', label: 'New Tender', roles: TIM_TENDER, grup: 'Warehouse Tender' },
     { href: '/tender?grup=draft', label: 'Draft Tender', roles: TIM_TENDER, grup: 'Warehouse Tender' },
-    { href: '/perbandingan', label: 'Comparation Tender', roles: TIM_TENDER, grup: 'Warehouse Tender' },
+    { href: '/perbandingan', label: 'Tender Comparison', roles: TIM_TENDER, grup: 'Warehouse Tender' },
     { href: '/riwayat', label: 'Tender History', roles: TIM_TENDER, grup: 'Warehouse Tender' },
     { href: '/approval-quotation', label: 'Approval quotation', roles: ['admin', 'manager'], grup: 'Warehouse Tender' },
     { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua', grup: 'Warehouse Tender' },
@@ -41,7 +41,7 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/simulasi/game', label: 'Leca Game (simulasi operasi)', roles: 'semua' },
   ] },
   { id: 'price', label: 'Price Inquiry', item: [...PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })),
-    { href: '/price/perbandingan', label: 'Comparation Price (vendor)', roles: 'semua' as const, pisah: true }] },
+    { href: '/price/perbandingan', label: 'Price Comparison (vendor)', roles: 'semua' as const, pisah: true }] },
   { id: 'prod', label: 'Productivity', item: [
     ...KATEGORI_BISNIS.map(k => ({ href: `/produktivitas?kategori=${encodeURIComponent(k.nama)}`, label: k.nama, roles: 'semua' as const, grup: 'Business category' })),
     { href: '/produktivitas/referensi-uom', label: 'UoM & weight class reference', roles: 'semua', grup: 'Reference' },
@@ -132,7 +132,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           // Desktop: klik selalu membuka (tidak menutup menu yang baru terbuka oleh hover); layar sentuh: buka/tutup
           setBuka(hover() ? id : buka === id ? null : id);
         }}>
-          {t(label)} <span aria-hidden="true" className="caret">▾</span>
+          <span className="ddlabel" title={t(label)}>{t(label)}</span> <span aria-hidden="true" className="caret">▾</span>
         </button>
         {buka === id && (
           <div className={`ddmenu${kanan ? ' kanan' : ''}`} role="menu">
@@ -156,7 +156,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="sela" />
           <label className="bahasa-pilih" title={t('Bahasa')}><span aria-hidden="true">🌐</span>
             <select aria-label={t('Bahasa')} value={bahasa} onChange={e => setBahasa(e.target.value as Bahasa)}>
-              {BAHASA.map(b => <option key={b.v} value={b.v}>{b.short} · {b.l}</option>)}</select></label>
+              {BAHASA.map(b => <option key={b.v} value={b.v} title={b.l}>{b.short}</option>)}</select></label>
           <PilihSatuanPanjang className="bahasa-pilih" />
           {Dropdown({ id: 'akun', kanan: true, item: profile && profile.status && profile.status !== 'aktif' ? [] : AKUN,
             label: `${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${profile.is_master ? 'Super Admin' : ROLE_LABEL[profile.role]}` : ''}${nPending ? ` (${nPending})` : ''}` })}
