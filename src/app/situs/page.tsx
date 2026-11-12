@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import LecaMark from '@/components/LecaMark';
 import { supabaseServer } from '@/lib/supabase/server';
 import Kontak from './Kontak';
+import MenuHp from './MenuHp';
+import Pamer3D from './Pamer3D';
 import './situs.css';
 
 export const metadata: Metadata = {
@@ -20,9 +22,10 @@ export default async function Situs() {
         <div className="ld-wrap ld-nav-isi">
           <a href="#beranda" className="ld-merek" aria-label="Leca — beranda"><LecaMark size={30} /><span>Leca</span></a>
           <nav aria-label="Menu utama">
-            <a href="#beranda">Beranda</a>
-            <a href="#kontak">Contact</a>
+            <a href="#beranda" className="ld-link">Beranda</a>
+            <a href="#kontak" className="ld-link">Contact</a>
             <a href={masuk ? '/' : '/login'} className="ld-masuk">{masuk ? 'Buka Leca' : 'Login'}</a>
+            <MenuHp masuk={masuk} />
           </nav>
         </div>
       </header>
@@ -39,6 +42,7 @@ export default async function Situs() {
                 <a href={masuk ? '/' : '/login'} className="ld-tombol utama">{masuk ? 'Buka Leca' : 'Masuk ke Leca'}</a>
                 <a href="#kontak" className="ld-tombol garis">Hubungi kami</a>
               </div>
+              <a href="#tiga-d" className="ld-baru"><span>Baru</span>Simulasi gudang 3D &amp; mode jelajah</a>
             </div>
             <KartuContoh />
           </div>
@@ -49,7 +53,7 @@ export default async function Situs() {
           <div className="ld-wrap">
             <h2 id="bisa">Dari volume customer sampai quotation</h2>
             <p className="ld-lead">Semua yang biasanya tersebar di belasan sheet Excel, kini saling terhubung. Ubah satu angka, seluruh hitungan ikut menyesuaikan.</p>
-            <div className="ld-kemampuan">
+            <div className="ld-kemampuan ld-geser">
               {KEMAMPUAN.map(k => (
                 <article key={k.judul}>
                   <Ikon jenis={k.ikon} />
@@ -58,6 +62,7 @@ export default async function Situs() {
                 </article>
               ))}
             </div>
+            <p className="ld-geser-hint" aria-hidden="true">Geser ke samping untuk melihat lainnya</p>
           </div>
         </section>
 
@@ -89,15 +94,25 @@ export default async function Situs() {
           </div>
         </section>
 
+        {/* ---------- sorotan 3D & mode jelajah */}
+        <section className="ld-bagian ld-gelap" id="tiga-d" aria-labelledby="tiga-d-judul">
+          <div className="ld-wrap">
+            <h2 id="tiga-d-judul">Lihat, jalankan, dan jelajahi gudang Anda dalam 3D</h2>
+            <p className="ld-lead terang">Desain dari denah 2D langsung menjadi gudang 3D lengkap dengan rak, palet, truk, MHE, dan operator. Jalankan operasi harian untuk menguji kapasitas, atau masuk sendiri ke lorongnya.</p>
+            <Pamer3D />
+          </div>
+        </section>
+
         {/* ---------- kelebihan */}
-        <section className="ld-bagian ld-gelap" aria-labelledby="kenapa">
+        <section className="ld-bagian ld-kertas" aria-labelledby="kenapa">
           <div className="ld-wrap">
             <h2 id="kenapa">Kenapa tim solution design memakai Leca</h2>
-            <div className="ld-kelebihan">
+            <div className="ld-kelebihan ld-geser">
               {KELEBIHAN.map(k => (
                 <div key={k.judul}><b>{k.judul}</b><p>{k.isi}</p></div>
               ))}
             </div>
+            <p className="ld-geser-hint" aria-hidden="true">Geser ke samping untuk melihat lainnya</p>
           </div>
         </section>
 
@@ -118,6 +133,12 @@ export default async function Situs() {
         </section>
       </main>
 
+      {/* bilah aksi HP */}
+      <div className="ld-bawah" role="navigation" aria-label="Aksi cepat">
+        <a href="https://wa.me/6288291919234" target="_blank" rel="noopener noreferrer" className="ld-tombol garis gelap">WhatsApp</a>
+        <a href={masuk ? '/' : '/login'} className="ld-tombol utama">{masuk ? 'Buka Leca' : 'Login'}</a>
+      </div>
+
       <footer className="ld-kaki">
         <div className="ld-wrap ld-kaki-isi">
           <span className="ld-merek kecil"><LecaMark size={22} /><span>Leca</span></span>
@@ -131,7 +152,7 @@ export default async function Situs() {
 
 const KEMAMPUAN: { ikon: JenisIkon; judul: string; isi: string }[] = [
   { ikon: 'biaya', judul: 'Cost model gudang', isi: 'Space, manpower, MHE, IT, overhead hingga margin dihitung dari volume customer, lengkap dengan red flag dan cara memperbaikinya.' },
-  { ikon: 'denah', judul: 'Warehouse planning 2D/3D', isi: 'Kapasitas palet, level rak, kelas rak, kekuatan lantai, dan denah yang bisa diedit lalu dilihat dalam 3D.' },
+  { ikon: 'denah', judul: 'Warehouse planning & 3D', isi: 'Kapasitas palet, level rak, kekuatan lantai, denah 2D gaya CAD, gudang 3D, simulasi operasi, dan mode jelajah.' },
   { ikon: 'orang', judul: 'Manpower, MHE & VSM', isi: 'Aktivitas, produktivitas, matriks multi-skill, Landmark VSM, serta SOP dan WI per proses dalam Word atau PDF.' },
   { ikon: 'harga', judul: 'Rate card & quotation', isi: 'Tarif per palet, per hari, per UoM (karton, drum, IBC), VAS, alokasi biaya, sampai quotation siap kirim.' },
   { ikon: 'truk', judul: 'Transport & intermodal', isi: 'Tender trucking dan intermodal di platform yang sama, dengan perbandingan harga vendor.' },
