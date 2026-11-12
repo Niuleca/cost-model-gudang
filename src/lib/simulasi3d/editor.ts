@@ -39,6 +39,14 @@ export interface SpekArea {
   kelonggaran?: number;            // adaptif: jarak bebas rak ke kolom tiap sisi (m), spacer = lebar kolom + 2 × ini
   bebasRintangan?: number;         // adaptif: jarak bebas rak ke office / ramp / staging / rintangan lain (m)
   bebasDinding?: number;           // adaptif: jarak bebas rak ke dinding (m)
+  /**
+   * Sisa ruang melintang (adaptif, di antara garis kolom) ditaruh di mana:
+   * akhir (default) = lorong pas sesuai isian, sisa masuk ke lorong terakhir tiap segmen; awal = ke lorong pertama;
+   * rata = dibagi rata ke semua lorong (lorong melebar).
+   */
+  sisaLorong?: 'akhir' | 'awal' | 'rata';
+  /** Geser manual baris rak (melintang, m) per nomor baris (urutan dari tepi area) — seperti move di CAD. */
+  geserBaris?: Record<string, number>;
 }
 /**
  * Pola block stack (tumpuk palet di lantai): baris palet memanjang di sumbu `arah`; melintang dari dinding ke dinding:
@@ -84,6 +92,7 @@ export interface Komponen {
   rak?: SpekRak;
   area?: SpekArea;
   induk?: string;                               // baris rak hasil urai area → id area
+  barisKe?: number;                             // baris rak hasil urai area → nomor baris di area (untuk geser baris)
   tumpuk?: number;                              // block / staging
   blok?: SpekBlok;                              // block stack berpola (baris, row deep, lorong)
   gridKolom?: SpekGridKolom;                    // area kolom (grid pilar)
@@ -390,14 +399,14 @@ const JENIS_RINTANGAN = ['kolom', 'fasilitas', 'block', 'stagingIn', 'stagingOut
  * (lebar spacer = lebar kolom + kelonggaran kiri-kanan) dengan lorong melebar seperlunya (≥ lebar minimum),
  * dan baris dipotong di sekitar kolom / office / ramp / rintangan lain sehingga rak tetap berdiri maksimal.
  */
-export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
-  const a = k.area; if (!a) return [];
+function susunBaris(k: Komponen, e?: KonteksArea) {
+  const a = k.area; if (!a) return null;
   const s = a.rak; const ax = s.arah === 'x'; const adaptif = a.mode === 'adaptif';
   let B0 = ax ? k.z : k.x, B1 = B0 + (ax ? k.d : k.w);
   const D = Math.max(0.3, a.dalam), Lor = Math.max(0, s.lebarLorong), gap0 = Math.max(0, a.b2b);
   const kel = Math.max(0, a.kelonggaran ?? 0.1), bebas = Math.max(0, a.bebasRintangan ?? 0.3);
   if (adaptif && e) { const m = Math.max(0, a.bebasDinding ?? 0.5), Wb = ax ? e.gedung.W : e.gedung.L; B0 = Math.max(B0, m); B1 = Math.min(B1, Wb - m); }
-  const c = celahArea(k, e); if (!c) return [];
+  const c = celahArea(k, e); if (!c) return null;
   const seg: { p: number; pj: number }[] = []; for (let i = 0, p = c.a0 + c.awal; i < c.bay.length; p += c.bay[i] * s.bayW + c.tengah, i++) seg.push({ p, pj: c.bay[i] * s.bayW });
   // rintangan (mode adaptif): kotak di koordinat A (sepanjang baris) & B (melintang), sudah ditambah kelonggaran
   const { A0 } = rentangA(k, e); const A1 = A0 + rentangA(k, e).A;
@@ -424,7 +433,7 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
     for (const g of [...garisKolom].reverse()) if (g.b1 >= B1 - dekat && g.b0 - kel < B1) B1 = g.b0 - kel;
     for (let i = garisKolom.length - 1; i >= 0; i--) if (garisKolom[i].b1 <= B0 || garisKolom[i].b0 >= B1) garisKolom.splice(i, 1);
   }
-  const B = B1 - B0; if (D > B + 1e-6) return [];
+  const B = B1 - B0; if (D > B + 1e-6) return null;
   // melintang: [tepi tunggal] lorong [pasangan / tunggal] lorong ... [sisa tunggal]
   const baris: { b: number; hadap: 1 | -1 }[] = [];
   const pair = 2 * D + gap0;
@@ -446,10 +455,12 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
       // sisa yang tidak cukup untuk pasangan: isi baris single (masing-masing dengan lorongnya sendiri)
       const m = Math.max(0, Math.floor((sisa + 1e-6) / (D + Lor))); sisa -= m * (D + Lor);
       const akhirS = tepiAkhir && sisa >= D - 1e-6; if (akhirS) sisa -= D;
-      const lor = Lor + sisa / (n + m + 1);
+      // sisa ruang: pas (lorong = isian, sisa ke lorong terakhir / pertama) atau dibagi rata
+      const cara = a.sisaLorong ?? 'akhir';
+      const lor = cara === 'rata' ? Lor + sisa / (n + m + 1) : Lor;
       let q2 = lo;
       if (tetap) { baris.push({ b: q2, hadap: 1 }); q2 += D; }
-      q2 += lor;
+      q2 += lor + (cara === 'awal' ? sisa : 0);
       for (let i = 0; i < n; i++) { baris.push({ b: q2, hadap: -1 }, { b: q2 + D + gap0, hadap: 1 }); q2 += pair + lor; }
       for (let i = 0; i < m; i++) { baris.push({ b: q2, hadap: -1 }); q2 += D + lor; }
       if (akhirS) baris.push({ b: q2, hadap: -1 });
@@ -468,10 +479,54 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
     }
     if (q + D <= B1 + 1e-6) baris.push({ b: q, hadap: -1 });             // sisa: tunggal menghadap lorong sebelumnya
   }
+  // geser manual per baris (melintang) — dari panel / seret baris di denah
+  const gb = a.geserBaris ?? {};
+  const asli = baris.map(br => br.b);
+  baris.forEach((br, ix) => { const d0 = Number(gb[ix]) || 0; if (d0) br.b += d0; });
+  return { a, s, ax, D, Lor, rint, seg, baris, asli };
+}
+
+/** Baris rak di area (posisi melintang setelah geser manual) — dipakai seret / panel baris. */
+export function barisArea(k: Komponen, e?: KonteksArea): { b: number; hadap: 1 | -1; asli: number }[] {
+  const h = susunBaris(k, e); if (!h) return [];
+  return h.baris.map((br, i) => ({ b: br.b, hadap: br.hadap, asli: h.asli[i] }));
+}
+
+/** Nomor baris yang satu unit dengan baris `i` (pasangan back-to-back: celah < lebar lorong). */
+export function unitBaris(k: Komponen, e: KonteksArea, i: number): number[] {
+  const h = susunBaris(k, e); if (!h || !h.baris[i]) return [i];
+  const out = [i]; const bs = h.baris;
+  const celah = (p: number, q: number) => bs[q].b - (bs[p].b + h.D);
+  if (i > 0 && bs[i].hadap === 1 && bs[i - 1].hadap === -1 && celah(i - 1, i) < h.Lor - 0.05) out.unshift(i - 1);
+  if (i + 1 < bs.length && bs[i].hadap === -1 && bs[i + 1].hadap === 1 && celah(i, i + 1) < h.Lor - 0.05) out.push(i + 1);
+  return out;
+}
+
+/**
+ * Celah melintang di depan & di belakang unit baris `idx` (pasangan / tunggal): sebelum = dari baris sebelumnya,
+ * sesudah = ke baris berikutnya (null bila tidak ada). awal / akhir = tepi unit (koordinat melintang).
+ */
+export function celahBaris(k: Komponen, e: KonteksArea, idx: number[]): { sebelum: number | null; sesudah: number | null; awal: number; akhir: number; prevAkhir: number | null; nextAwal: number | null } | null {
+  const h = susunBaris(k, e); if (!h || !idx.length) return null;
+  const bs = h.baris; const i0 = Math.min(...idx), i1 = Math.max(...idx); if (!bs[i0] || !bs[i1]) return null;
+  const awal = bs[i0].b, akhir = bs[i1].b + h.D;
+  const prevAkhir = i0 > 0 ? bs[i0 - 1].b + h.D : null, nextAwal = i1 + 1 < bs.length ? bs[i1 + 1].b : null;
+  return { sebelum: prevAkhir == null ? null : r2(awal - prevAkhir), sesudah: nextAwal == null ? null : r2(nextAwal - akhir), awal, akhir, prevAkhir, nextAwal };
+}
+/** Tambah geser manual (m, melintang) ke baris-baris `idx`; nilai ≈ 0 dibuang. */
+export function geserBarisArea(a: SpekArea, idx: number[], delta: number, dasar?: Record<string, number>): SpekArea {
+  const g = { ...(a.geserBaris ?? {}) };
+  for (const i of idx) { const v = r2((Number((dasar ?? a.geserBaris ?? {})[i]) || 0) + delta); if (Math.abs(v) < 0.005) delete g[i]; else g[i] = v; }
+  return { ...a, geserBaris: Object.keys(g).length ? g : undefined };
+}
+
+export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
+  const h = susunBaris(k, e); if (!h) return [];
+  const { a, s, ax, D, rint, seg, baris } = h;
   // sepanjang baris: potong segmen di sekitar rintangan yang menyentuh baris ini (mode adaptif), bay penuh, tanpa panjang minimum
   const out: Komponen[] = []; let i = 0;
   const tinggi = r2(tinggiRak(s));
-  for (const br of baris) {
+  for (const [bk, br] of baris.entries()) {
     const kena = rint.filter(r => r.b1 > br.b + 1e-6 && r.b0 < br.b + D - 1e-6);
     for (const sa of seg) {
       let bebasA: [number, number][] = [[sa.p, sa.p + sa.pj]];
@@ -480,7 +535,7 @@ export function uraiArea(k: Komponen, e?: KonteksArea): Komponen[] {
         const nb = Math.floor((x1 - x0) / s.bayW + 1e-6); if (nb < 1) continue;
         const pj = r2(nb * s.bayW);
         const pos = ax ? { x: r2(x0), z: r2(br.b), w: pj, d: r2(D) } : { x: r2(br.b), z: r2(x0), w: r2(D), d: pj };
-        out.push({ id: `${k.id}~${i++}`, jenis: a.jenisRak, label: k.label, ...pos, tinggi, rak: { ...s, hadap: br.hadap }, induk: k.id });
+        out.push({ id: `${k.id}~${i++}`, jenis: a.jenisRak, label: k.label, ...pos, tinggi, rak: { ...s, hadap: br.hadap }, induk: k.id, barisKe: bk });
       }
     }
   }
@@ -497,7 +552,7 @@ export const ringkasArea = (k: Komponen, e?: KonteksArea) => {
  * Lorong & row spacer aktual di dalam area (dari baris yang terbentuk): lebar melintang, posisi garis ukur sepanjang baris.
  * jenis 'lorong' = jarak antarbaris ≥ lebar lorong minimum; 'spacer' = celah back-to-back (termasuk spacer kolom).
  */
-export function lorongArea(k: Komponen, e?: KonteksArea): { jenis: 'lorong' | 'spacer'; b0: number; b1: number; lebar: number; a: number }[] {
+export function lorongArea(k: Komponen, e?: KonteksArea): { jenis: 'lorong' | 'spacer' | 'sisa'; b0: number; b1: number; lebar: number; a: number }[] {
   const a = k.area; if (!a) return [];
   const ax = a.rak.arah === 'x'; const D = Math.max(0.3, a.dalam); const Lor = Math.max(0, a.rak.lebarLorong);
   const strip = new Map<number, { b: number; a0: number; a1: number; hadap: number }>();
@@ -507,22 +562,35 @@ export function lorongArea(k: Komponen, e?: KonteksArea): { jenis: 'lorong' | 's
   }
   const st = [...strip.values()].sort((p, q) => p.b - q.b); const out: ReturnType<typeof lorongArea> = [];
   const tepi = e ? (ax ? e.gedung.W : e.gedung.L) : Infinity;
-  const tambah = (jenis: 'lorong' | 'spacer', b0: number, b1: number, a0: number, a1: number) => {
+  const tambah = (jenis: 'lorong' | 'spacer' | 'sisa', b0: number, b1: number, a0: number, a1: number) => {
     const lebar = r2(b1 - b0); if (lebar < 0.01) return;
     out.push({ jenis, b0, b1, lebar, a: a1 - a0 > 2.4 ? a0 + 1.2 : (a0 + a1) / 2 });
   };
-  if (st.length && st[0].hadap === -1 && st[0].b >= Lor - 0.05 && st[0].b < Lor * 3) tambah('lorong', 0, st[0].b, st[0].a0, st[0].a1);
+  // lorong ke dinding: bagian selebar isian menempel muka rak, sisanya ditandai sisa
+  const keDinding = (b0: number, b1: number, mukaDiAkhir: boolean, a0: number, a1: number) => {
+    if (a.sisaLorong === 'rata' || b1 - b0 <= Lor + 0.05) { tambah('lorong', b0, b1, a0, a1); return; }
+    if (mukaDiAkhir) { tambah('sisa', b0, b1 - Lor, a0, a1); tambah('lorong', b1 - Lor, b1, a0, a1); }
+    else { tambah('lorong', b0, b0 + Lor, a0, a1); tambah('sisa', b0 + Lor, b1, a0, a1); }
+  };
+  if (st.length && st[0].hadap === -1 && st[0].b >= Lor - 0.05 && st[0].b < Lor * 3) keDinding(0, st[0].b, true, st[0].a0, st[0].a1);
   for (let i = 0; i + 1 < st.length; i++) {
     const p = st[i], q = st[i + 1]; const b0 = p.b + D, b1 = q.b; if (b1 - b0 < 0.01) continue;
     const a0 = Math.max(p.a0, q.a0), a1 = Math.min(p.a1, q.a1);
-    tambah(b1 - b0 >= Lor - 0.05 ? 'lorong' : 'spacer', b0, b1, a1 > a0 ? a0 : p.a0, a1 > a0 ? a1 : p.a1);
+    const pa0 = a1 > a0 ? a0 : p.a0, pa1 = a1 > a0 ? a1 : p.a1;
+    if (b1 - b0 < Lor - 0.05) { tambah('spacer', b0, b1, pa0, pa1); continue; }
+    // lorong lebih lebar dari isian (sisa ruang melintang): tampil sebagai lorong = isian + sisa, kecuali mode "dibagi rata"
+    if (a.sisaLorong !== 'rata' && b1 - b0 > Lor + 0.05) {
+      const sisaDulu = a.sisaLorong === 'awal';
+      if (sisaDulu) { tambah('sisa', b0, b1 - Lor, pa0, pa1); tambah('lorong', b1 - Lor, b1, pa0, pa1); }
+      else { tambah('lorong', b0, b0 + Lor, pa0, pa1); tambah('sisa', b0 + Lor, b1, pa0, pa1); }
+    } else tambah('lorong', b0, b1, pa0, pa1);
   }
   const l = st[st.length - 1];
-  if (l && l.hadap === 1 && tepi - (l.b + D) >= Lor - 0.05 && tepi - (l.b + D) < Lor * 3) tambah('lorong', l.b + D, tepi, l.a0, l.a1);
+  if (l && l.hadap === 1 && tepi - (l.b + D) >= Lor - 0.05 && tepi - (l.b + D) < Lor * 3) keDinding(l.b + D, tepi, false, l.a0, l.a1);
   return out;
 }
 /** Area rak → baris rak satuan (bisa diedit satu per satu). */
-export const pecahArea = (k: Komponen, e?: KonteksArea): Komponen[] => uraiArea(k, e).map(r => ({ ...r, id: uid(), induk: undefined, label: r.jenis === 'ddr' ? 'Rak DDR' : 'Rak SPR' }));
+export const pecahArea = (k: Komponen, e?: KonteksArea): Komponen[] => uraiArea(k, e).map(r => ({ ...r, id: uid(), induk: undefined, barisKe: undefined, label: r.jenis === 'ddr' ? 'Rak DDR' : 'Rak SPR' }));
 
 /**
  * Rak satuan → area rak: semua rak sejenis & searah yang sekolom dengan rak terpilih (rentang sepanjang baris sama)

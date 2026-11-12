@@ -1,8 +1,10 @@
 'use client';
 // Editor denah 2D (SVG): tampak atas, X = panjang gudang (dock di kiri), Z = lebar gudang (ke bawah).
 // Pilih, geser (drag), ubah ukuran (handle), ukur jarak, garis ukur otomatis ke rintangan / dinding, latar denah gambar / DXF.
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { BLOK_DEFAULT, aturSisiGate, dindingMiring, poligonLuar, rentangZ, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, uraiGridKolom, denganKolom, asGridKolom, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { BLOK_DEFAULT, aturSisiGate, dindingMiring, poligonLuar, rentangZ, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, uraiGridKolom, denganKolom, asGridKolom,
+  uraiKomponen, celahBaris, geserBarisArea, unitBaris, uid, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import { LAPISAN_AWAL, lapisDari, type Lapisan } from './lapisan';
 
 export type Mode = 'pilih' | 'blok' | 'ukur' | 'geser' | 'kolom';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
@@ -34,7 +36,28 @@ type Seret =
   | { jenis: 'pan'; sx: number; sy: number; v0: { x: number; z: number; w: number } }
   | { jenis: 'grup'; ax: number; az: number; awal: Record<string, { x: number; z: number }> }
   | { jenis: 'kotak'; ax: number; az: number; tambah: boolean; id?: string }
+  | { jenis: 'baris'; area: string; idx: number[]; ab: number; g0: Record<string, number>; awal: number; akhir: number; prevAkhir: number | null; nextAwal: number | null; lor: number }
   | null;
+
+type Pt = { x: number; z: number };
+/** Perintah gaya CAD: MOVE / COPY (pilih objek → titik dasar → titik kedua). */
+type Cmd = { jenis: 'move' | 'copy'; tahap: 'pilih' | 'dasar' | 'tujuan'; dasar?: Pt } | null;
+type JenisSnap = 'ujung' | 'tengah' | 'pusat';
+const PERINTAH: Record<string, string> = {
+  M: 'move', MOVE: 'move', CO: 'copy', CP: 'copy', COPY: 'copy', RO: 'rotate', ROTATE: 'rotate', E: 'erase', ERASE: 'erase', DEL: 'erase',
+  DI: 'dist', DIST: 'dist', Z: 'zoom', ZOOM: 'zoom', ZE: 'zoom', U: 'undo', UNDO: 'undo', REDO: 'redo', P: 'pan', PAN: 'pan', LA: 'layer', LAYER: 'layer',
+  X: 'explode', EXPLODE: 'explode', OR: 'ortho', ORTHO: 'ortho', OS: 'osnap', OSNAP: 'osnap', SN: 'snap', SNAP: 'snap', S: 'select', SELECT: 'select', W: 'select',
+};
+const BANTUAN = 'Perintah: M geser · CO salin · RO putar · E hapus · DI ukur · X pecah area · Z pas layar · LA layer · U undo · F3 OSNAP · F8 ORTHO · F9 SNAP';
+const angkaKetik = (t: string) => Number(t.trim().replace(',', '.'));
+function bacaJarak(t: string): { rel?: Pt; jarak?: number; abs?: Pt } | null {
+  const s = t.trim(); if (!s) return null;
+  const pasang = (x: string) => { const b = x.includes(';') ? x.split(';') : x.split(','); if (b.length !== 2) return null; const a = angkaKetik(b[0]), c = angkaKetik(b[1]); return Number.isFinite(a) && Number.isFinite(c) ? { x: a, z: c } : null; };
+  if (s.startsWith('@')) { const r = pasang(s.slice(1)); return r ? { rel: r } : null; }
+  if (s.startsWith('#')) { const r = pasang(s.slice(1)); return r ? { abs: r } : null; }
+  if (s.includes(';')) { const r = pasang(s); return r ? { abs: r } : null; }
+  const n = angkaKetik(s); return Number.isFinite(n) ? { jarak: n } : null;
+}
 
 interface Props {
   edit: LayoutEdit; pilih: string | null; setPilih: (id: string | null) => void;
@@ -46,9 +69,16 @@ interface Props {
   potong?: { sumbu: 'x' | 'z'; nilai: number } | null;
   /** Mode kolom: klik di denah → kolom baru (pusat x, z). Ukuran sisi kolom (m) untuk pratinjau. */
   taruhKolom?: (x: number, z: number) => void; ukuranKolom?: number | { w: number; d: number };
+  /** Baris rak terpilih di dalam area rak (id area + nomor baris satu unit). */
+  barisPilih?: { area: string; idx: number[] } | null; setBarisPilih?: (b: { area: string; idx: number[] } | null) => void;
+  /** Layer: tampil / kunci per kelompok komponen. */
+  lapisan?: Lapisan;
+  /** Aksi halaman yang dipanggil dari baris perintah. */
+  perintah?: { undo: () => void; redo: () => void; hapus: () => void; putar: () => void; pecah: () => void; setMode: (m: Mode) => void; bukaLapisan: () => void; setGrid: (g: number) => void };
 }
 
-const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih, setPilih, multi, setMulti, mulaiAksi, ubah, mode, grid, snapTepi, potong, taruhKolom, ukuranKolom: ukKolomProp = 0.5 }, ref) {
+const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih, setPilih, multi, setMulti, mulaiAksi, ubah, mode, grid, snapTepi, potong, taruhKolom, ukuranKolom: ukKolomProp = 0.5,
+  barisPilih = null, setBarisPilih, lapisan = LAPISAN_AWAL, perintah }, ref) {
   const ukKolom = typeof ukKolomProp === 'number' ? { w: ukKolomProp, d: ukKolomProp } : ukKolomProp;
   const ukuranKolom = Math.max(ukKolom.w, ukKolom.d);
   const svg = useRef<SVGSVGElement>(null);
@@ -58,6 +88,25 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
   const [ukurA, setUkurA] = useState<{ x: number; z: number } | null>(null);
   const [kursor, setKursor] = useState<{ x: number; z: number } | null>(null);
   const [kotak, setKotak] = useState<{ ax: number; az: number; bx: number; bz: number } | null>(null);
+  // ---------- alat gaya CAD: baris perintah, ORTHO, OSNAP, SNAP grid
+  const [cmd, setCmd] = useState<Cmd>(null);
+  const [cmdTeks, setCmdTeks] = useState('');
+  const [log, setLog] = useState<string[]>([BANTUAN]);
+  const [ortho, setOrtho] = useState(false);
+  const [osnap, setOsnap] = useState(true);
+  const [snapHover, setSnapHover] = useState<(Pt & { j: JenisSnap }) | null>(null);
+  const gridLalu = useRef(grid || 0.1);
+  useEffect(() => { if (grid > 0) gridLalu.current = grid; }, [grid]);
+  const cmdInput = useRef<HTMLInputElement>(null);
+  const cmdTerakhir = useRef('');
+  useEffect(() => { try { const v = JSON.parse(localStorage.getItem('leca.cad') ?? '{}'); if (typeof v.ortho === 'boolean') setOrtho(v.ortho); if (typeof v.osnap === 'boolean') setOsnap(v.osnap); } catch { /* abaikan */ } }, []);
+  useEffect(() => { try { localStorage.setItem('leca.cad', JSON.stringify({ ortho, osnap })); } catch { /* abaikan */ } }, [ortho, osnap]);
+  const tulis = (m: string) => setLog(l => [...l, m].slice(-3));
+  // ---------- layer
+  const statusLapis = (k: Komponen) => lapisan[lapisDari(k.jenis)] ?? { lihat: true, kunci: false };
+  const tampak = edit.komponen.filter(k => statusLapis(k).lihat);
+  const bisaPilih = (k: Komponen) => { const st = statusLapis(k); return st.lihat && !st.kunci; };
+  const lihatUkuran = lapisan.ukuran?.lihat !== false;
   const setMultiSet = new Set(multi);
   const seleksi = () => (multi.length ? multi : pilih ? [pilih] : []);
   const g = edit.gedung;
@@ -70,9 +119,10 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     setView({ x: -pad - 16 - (w - lebar) / 2, z: -pad - (w * (ukuran.h / Math.max(1, ukuran.w)) - tinggi) / 2, w });
   };
   useEffect(() => {
-    const el = svg.current?.parentElement; if (!el) return;
-    const ro = new ResizeObserver(() => setUkuran({ w: el.clientWidth, h: el.clientHeight }));
-    ro.observe(el); setUkuran({ w: el.clientWidth, h: el.clientHeight });
+    const el = svg.current; if (!el) return;
+    const ukur = () => { const r = el.getBoundingClientRect(); setUkuran({ w: r.width, h: r.height }); };
+    const ro = new ResizeObserver(ukur);
+    ro.observe(el); ukur();
     return () => ro.disconnect();
   }, []);
   useEffect(() => { pasFit(); }, [g.L, g.W, ukuran.w, ukuran.h]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -97,6 +147,125 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     const p = pt.matrixTransform(m.inverse()); return { x: p.x, z: p.y };
   };
   const snap = (v: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
+  /** Titik OSNAP: sudut (ujung), tengah sisi, pusat komponen yang tampil + baris rak area + kolom grid + sudut gedung + ujung garis ukur. */
+  const perluSnap = osnap && (!!cmd || mode === 'ukur');
+  const titikSnap = useMemo(() => {
+    if (!perluSnap) return [] as (Pt & { j: JenisSnap })[];
+    const out: (Pt & { j: JenisSnap })[] = [];
+    const kotakSnap = (x: number, z: number, w: number, d: number) => {
+      out.push({ x, z, j: 'ujung' }, { x: x + w, z, j: 'ujung' }, { x, z: z + d, j: 'ujung' }, { x: x + w, z: z + d, j: 'ujung' },
+        { x: x + w / 2, z, j: 'tengah' }, { x: x + w / 2, z: z + d, j: 'tengah' }, { x, z: z + d / 2, j: 'tengah' }, { x: x + w, z: z + d / 2, j: 'tengah' }, { x: x + w / 2, z: z + d / 2, j: 'pusat' });
+    };
+    kotakSnap(0, 0, g.L, g.W);
+    const lihat = edit.komponen.filter(k => (lapisan[lapisDari(k.jenis)] ?? { lihat: true }).lihat);
+    for (const k of lihat) if (k.area || k.gridKolom) kotakSnap(k.x, k.z, k.w, k.d);
+    for (const k of uraiKomponen(lihat, edit)) kotakSnap(k.x, k.z, k.w, k.d);
+    for (const u of edit.ukur) out.push({ x: u.ax, z: u.az, j: 'ujung' }, { x: u.bx, z: u.bz, j: 'ujung' });
+    return out;
+  }, [perluSnap, edit, lapisan, g.L, g.W]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cariSnap = (p: Pt) => {
+    const r = 12 * view.w / Math.max(1, ukuran.w); let best: (Pt & { j: JenisSnap }) | null = null, bd = r;
+    for (const t of titikSnap) { const d = Math.hypot(t.x - p.x, t.z - p.z); if (d < bd) { bd = d; best = t; } }
+    return best;
+  };
+  /** Titik yang diklik / diarah kursor: OSNAP → snap grid → ORTHO terhadap titik `dari`. */
+  const titik = (p: Pt, dari?: Pt | null): Pt => {
+    const s0 = perluSnap ? cariSnap(p) : null; if (s0) return { x: s0.x, z: s0.z };
+    const q = { x: snap(p.x), z: snap(p.z) };
+    if (ortho && dari) { if (Math.abs(q.x - dari.x) >= Math.abs(q.z - dari.z)) q.z = dari.z; else q.x = dari.x; }
+    return q;
+  };
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  /** Jalankan MOVE / COPY sejauh (dx, dz). Baris area terpilih: hanya komponen melintang yang dipakai. */
+  const terapkan = (c: NonNullable<Cmd>, dx: number, dz: number) => {
+    if (barisPilih) {
+      const k = edit.komponen.find(o => o.id === barisPilih.area); if (!k?.area) return;
+      const db = k.area.rak.arah === 'x' ? dz : dx;
+      mulaiAksi(); ubah(ed => ({ ...ed, komponen: ed.komponen.map(o => (o.id === k.id && o.area ? { ...o, area: geserBarisArea(o.area, barisPilih.idx, db) } : o)) }));
+      tulis(`Baris ${barisPilih.idx.map(i => i + 1).join(' & ')} digeser ${f1(db)} m (melintang).`); setCmd(null); return;
+    }
+    const ids = new Set(seleksi()); if (!ids.size) { setCmd(null); return; }
+    mulaiAksi();
+    if (c.jenis === 'move') {
+      ubah(ed => ({ ...ed, komponen: ed.komponen.map(k => (ids.has(k.id) ? (k.jenis === 'dock' ? { ...k, z: r2(k.z + dz) } : k.jenis === 'gate' ? aturSisiGate({ ...k, x: r2(k.x + dx), z: r2(k.z + dz) }, k.sisi ?? 'depan', ed.gedung) : { ...k, x: r2(k.x + dx), z: r2(k.z + dz) }) : k)) }));
+      tulis(`${ids.size} objek digeser ${f1(dx)}; ${f1(dz)} m.`); setCmd(null);
+    } else {
+      const baru = edit.komponen.filter(k => ids.has(k.id)).map(k => ({ ...k, id: uid(), x: r2(k.x + dx), z: r2(k.z + dz), rak: k.rak ? { ...k.rak } : undefined, area: k.area ? { ...k.area, rak: { ...k.area.rak } } : undefined }));
+      ubah(ed => ({ ...ed, komponen: [...ed.komponen, ...baru] }));
+      tulis(`${baru.length} objek disalin ${f1(dx)}; ${f1(dz)} m. Klik / ketik titik berikutnya, Enter = selesai.`);
+    }
+  };
+  /** Mulai perintah dari teks (huruf pendek seperti di AutoCAD). */
+  const jalankan = (teks: string) => {
+    const t = teks.trim();
+    if (cmd && cmd.tahap !== 'pilih' && t) {
+      const b = bacaJarak(t); if (!b) { tulis(`"${t}" tidak dikenali — ketik jarak (mis. 3,5), @dx;dz, atau x;z.`); return; }
+      if (cmd.tahap === 'dasar') { const q = b.abs ?? (b.rel ? b.rel : null); if (!q) { tulis('Titik dasar: klik di denah atau ketik x;z.'); return; }
+        setCmd({ ...cmd, tahap: 'tujuan', dasar: q }); tulis('Titik kedua: klik, atau ketik jarak arah kursor (mis. 3,5) / @dx;dz.'); return; }
+      const d0 = cmd.dasar!;
+      if (b.rel) { terapkan(cmd, b.rel.x, b.rel.z); return; }
+      if (b.abs) { terapkan(cmd, b.abs.x - d0.x, b.abs.z - d0.z); return; }
+      // jarak langsung: searah kursor (ikut ORTHO)
+      const k0 = kursor ? titik(kursor, d0) : { x: d0.x + 1, z: d0.z };
+      let vx = k0.x - d0.x, vz = k0.z - d0.z; if (ortho) { if (Math.abs(vx) >= Math.abs(vz)) vz = 0; else vx = 0; }
+      // baris di area hanya bergerak melintang → jarak penuh searah sumbu melintang
+      const ka = barisPilih ? edit.komponen.find(o => o.id === barisPilih.area) : null;
+      if (ka?.area) { if (ka.area.rak.arah === 'x') { vz = vz < 0 ? -1 : 1; vx = 0; } else { vx = vx < 0 ? -1 : 1; vz = 0; } }
+      const n = Math.hypot(vx, vz) || 1; if (!vx && !vz) vx = 1;
+      terapkan(cmd, (vx / n) * b.jarak!, (vz / n) * b.jarak!); return;
+    }
+    if (!t) {   // Enter kosong: lanjut / selesai / ulangi perintah terakhir
+      if (cmd?.tahap === 'pilih') { if (seleksi().length || barisPilih) { setCmd({ ...cmd, tahap: 'dasar' }); tulis('Titik dasar: klik (OSNAP aktif) atau ketik x;z.'); } else tulis('Belum ada objek terpilih.'); return; }
+      if (cmd) { setCmd(null); tulis('Selesai.'); return; }
+      if (cmdTerakhir.current) jalankan(cmdTerakhir.current);
+      return;
+    }
+    const kata = t.toUpperCase().split(/\s+/)[0]; const p = PERINTAH[kata];
+    if (!p) { tulis(`Perintah "${t}" tidak dikenal. ${BANTUAN}`); return; }
+    cmdTerakhir.current = kata; setCmd(null);
+    const ada = seleksi().length > 0 || !!barisPilih;
+    switch (p) {
+      case 'move': case 'copy':
+        if (p === 'copy' && barisPilih) { tulis('Salin baris di dalam area tidak bisa — pecah area dulu (X), atau pakai M untuk menggeser baris.'); return; }
+        if (!ada) { setCmd({ jenis: p, tahap: 'pilih' }); perintah?.setMode('pilih'); tulis(`${p === 'move' ? 'MOVE' : 'COPY'} — pilih objek (klik / seret kotak), lalu Enter.`); return; }
+        setCmd({ jenis: p, tahap: 'dasar' }); perintah?.setMode('pilih'); tulis(`${p === 'move' ? 'MOVE' : 'COPY'} — titik dasar: klik (OSNAP aktif) atau ketik x;z.`); return;
+      case 'rotate': if (!ada || barisPilih) { tulis('ROTATE — pilih komponen dulu (baris di dalam area ikut arah area).'); return; } perintah?.putar(); tulis('Diputar 90°.'); return;
+      case 'erase': if (barisPilih) { tulis('Baris di dalam area tidak bisa dihapus satuan — pecah area dulu (X).'); return; } if (!ada) { tulis('ERASE — pilih objek dulu.'); return; } perintah?.hapus(); tulis('Objek dihapus (U = batal).'); return;
+      case 'dist': perintah?.setMode('ukur'); tulis('DIST — klik titik pertama lalu titik kedua (OSNAP aktif). Esc = selesai.'); return;
+      case 'zoom': pasFit(); tulis('Pas layar.'); return;
+      case 'undo': perintah?.undo(); tulis('Undo.'); return;
+      case 'redo': perintah?.redo(); tulis('Redo.'); return;
+      case 'pan': perintah?.setMode('geser'); tulis('PAN — seret denah. Esc = selesai.'); return;
+      case 'select': perintah?.setMode('blok'); tulis('Seleksi kotak — seret ke kanan = masuk penuh, ke kiri = tersentuh.'); return;
+      case 'layer': perintah?.bukaLapisan(); tulis('Panel layer dibuka.'); return;
+      case 'explode': if (!pilih || !edit.komponen.find(k => k.id === pilih)?.area) { tulis('EXPLODE — pilih area rak dulu.'); return; } perintah?.pecah(); tulis('Area dipecah jadi baris rak satuan.'); return;
+      case 'ortho': setOrtho(v => !v); tulis(`ORTHO ${ortho ? 'mati' : 'aktif'}.`); return;
+      case 'osnap': setOsnap(v => !v); tulis(`OSNAP ${osnap ? 'mati' : 'aktif'}.`); return;
+      case 'snap': perintah?.setGrid(grid > 0 ? 0 : gridLalu.current); tulis(`SNAP grid ${grid > 0 ? 'mati' : 'aktif'}.`); return;
+    }
+  };
+  const batalCmd = () => { if (cmd) tulis('*Batal*'); setCmd(null); setCmdTeks(''); cmdInput.current?.blur(); };
+  // keyboard gaya CAD: huruf / angka langsung masuk baris perintah, F3 / F8 / F9, Enter / spasi = ulang / lanjut, Esc = batal.
+  // Satu listener tetap (dipasang sekali) memanggil handler terbaru lewat ref — tidak terlewat walau halaman merender ulang di tengah event.
+  const tombolRef = useRef<(ev: KeyboardEvent) => void>(() => {});
+  useEffect(() => { const h = (ev: KeyboardEvent) => tombolRef.current(ev); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, []);
+  {
+    const f = (ev: KeyboardEvent) => {
+      if (ev.key === 'F3') { ev.preventDefault(); setOsnap(v => !v); return; }
+      if (ev.key === 'F8') { ev.preventDefault(); setOrtho(v => !v); return; }
+      if (ev.key === 'F9') { ev.preventDefault(); perintah?.setGrid(grid > 0 ? 0 : gridLalu.current); return; }
+      const tg = ev.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return;
+      if (tg && (tg.tagName === 'BUTTON' || tg.tagName === 'SUMMARY' || tg.tagName === 'A') && (ev.key === 'Enter' || ev.key === ' ')) return;
+      if (!svg.current || svg.current.getBoundingClientRect().width === 0) return;   // editor 2D sedang tersembunyi
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (ev.key === 'Escape') { batalCmd(); return; }
+      if (ev.key === 'Enter' || (ev.key === ' ' && cmd)) { ev.preventDefault(); jalankan(''); return; }
+      const huruf = /^[a-zA-Z]$/.test(ev.key), angkaK = /^[0-9@#.,;-]$/.test(ev.key);
+      if (huruf && ev.key.toLowerCase() === 'r' && (pilih || multi.length) && !cmd) return;   // R = putar cepat (pintasan lama)
+      if (huruf || (angkaK && cmd && cmd.tahap !== 'pilih')) { ev.preventDefault(); setCmdTeks(t => t + ev.key); cmdInput.current?.focus(); }
+    };
+    tombolRef.current = f;
+  }
   /** Tempel ke tepi komponen lain / dinding bila dalam 0,3 m. */
   const tempel = (k: Komponen, x: number, z: number) => {
     if (!snapTepi) return { x, z };
@@ -124,9 +293,16 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
   function turun(e: React.PointerEvent, id?: string, h?: string) {
     (e.target as Element).setPointerCapture?.(e.pointerId);
     const p = keDunia(e.clientX, e.clientY);
+    // perintah MOVE / COPY: klik = titik dasar / titik kedua
+    if (cmd && cmd.tahap !== 'pilih' && e.button === 0) {
+      const q = titik(p, cmd.tahap === 'tujuan' ? cmd.dasar : null);
+      if (cmd.tahap === 'dasar') { setCmd({ ...cmd, tahap: 'tujuan', dasar: q }); tulis('Titik kedua: klik, atau ketik jarak arah kursor (mis. 3,5) / @dx;dz.'); }
+      else terapkan(cmd, q.x - cmd.dasar!.x, q.z - cmd.dasar!.z);
+      return;
+    }
     if (mode === 'kolom' && e.button === 0 && !h) { const t = titikKolom(p); taruhKolom?.(t.x, t.z); return; }
     if (mode === 'ukur') {
-      const q = { x: snap(p.x), z: snap(p.z) };
+      const q = titik(p, ukurA);
       if (!ukurA) setUkurA(q);
       else { mulaiAksi(); ubah(ed => ({ ...ed, ukur: [...ed.ukur, { id: Math.random().toString(36).slice(2, 9), ax: ukurA.x, az: ukurA.z, bx: q.x, bz: q.z }] })); setUkurA(null); }
       return;
@@ -143,6 +319,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       seret.current = { jenis: 'pan', sx: e.clientX, sy: e.clientY, v0: { ...view } }; return;
     }
     const k = edit.komponen.find(c => c.id === id); if (!k) return;
+    if (!bisaPilih(k)) return;
     // Shift / Ctrl + klik: tambah / buang dari seleksi
     if (!h && ubahSel) {
       const cur = seleksi(); setMulti(cur.includes(k.id) ? cur.filter(i => i !== k.id) : [...cur, k.id]); return;
@@ -153,16 +330,45 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       for (const c of edit.komponen) if (setMultiSet.has(c.id)) awal[c.id] = { x: c.x, z: c.z };
       seret.current = { jenis: 'grup', ax: p.x, az: p.z, awal }; return;
     }
-    setPilih(k.id); mulaiAksi();
+    setPilih(k.id); setBarisPilih?.(null); mulaiAksi();
     seret.current = h ? { jenis: 'ukuran', id: k.id, h, ax: p.x, az: p.z, k0: { ...k } } : { jenis: 'geser', id: k.id, ax: p.x, az: p.z, x0: k.x, z0: k.z };
+  }
+  /** Klik / seret satu baris rak di dalam area: pilih baris (+ pasangan back-to-back; Alt = baris itu saja) lalu geser melintang. */
+  function turunBaris(e: React.PointerEvent, area: Komponen, ke: number) {
+    if (e.button !== 0) { turun(e); return; }
+    if (cmd?.tahap === 'tujuan' || cmd?.tahap === 'dasar') { turun(e, area.id); return; }
+    if (mode !== 'pilih' || e.shiftKey || e.ctrlKey || e.metaKey || !area.area || !bisaPilih(area)) { turun(e, area.id); return; }
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    const p = keDunia(e.clientX, e.clientY);
+    const idx = e.altKey ? [ke] : unitBaris(area, edit, ke);
+    setPilih(area.id); setBarisPilih?.({ area: area.id, idx });
+    const c = celahBaris(area, edit, idx); if (!c) return;
+    mulaiAksi();
+    const ax = area.area.rak.arah === 'x';
+    seret.current = { jenis: 'baris', area: area.id, idx, ab: ax ? p.z : p.x, g0: { ...(area.area.geserBaris ?? {}) }, awal: c.awal, akhir: c.akhir, prevAkhir: c.prevAkhir, nextAwal: c.nextAwal, lor: area.area.rak.lebarLorong };
   }
   function gerak(e: React.PointerEvent) {
     const p = keDunia(e.clientX, e.clientY); setKursor(p);
+    if (perluSnap) { const t = cariSnap(p); setSnapHover(t); } else if (snapHover) setSnapHover(null);
     const s = seret.current; if (!s) return;
+    if (s.jenis === 'baris') {
+      const k0 = edit.komponen.find(c => c.id === s.area); if (!k0?.area) return;
+      const ax = k0.area.rak.arah === 'x';
+      let d = snap((ax ? p.z : p.x) - s.ab);
+      // magnet: lorong sebelum / sesudah tepat = lebar lorong isian, atau kembali ke posisi otomatis
+      const tol = Math.min(0.3, Math.max(0.08, 8 * view.w / Math.max(1, ukuran.w)));
+      const kand = [-(Number(s.g0[s.idx[0]]) || 0)];
+      if (s.prevAkhir != null) kand.push(s.prevAkhir + s.lor - s.awal);
+      if (s.nextAwal != null) kand.push(s.nextAwal - s.lor - s.akhir);
+      const d0 = d; let best = tol; for (const c of kand) if (Math.abs(d0 - c) < best) { best = Math.abs(d0 - c); d = c; }
+      ubah(ed => ({ ...ed, komponen: ed.komponen.map(o => (o.id === s.area && o.area ? { ...o, area: geserBarisArea(o.area, s.idx, d, s.g0) } : o)) }));
+      return;
+    }
     if (s.jenis === 'pan') { const skala = s.v0.w / Math.max(1, ukuran.w); setView({ ...s.v0, x: s.v0.x - (e.clientX - s.sx) * skala, z: s.v0.z - (e.clientY - s.sy) * skala }); return; }
     if (s.jenis === 'kotak') { setKotak({ ax: s.ax, az: s.az, bx: p.x, bz: p.z }); return; }
     if (s.jenis === 'grup') {
-      const dx = snap(p.x - s.ax), dz = snap(p.z - s.az); const r = (v: number) => Math.round(v * 100) / 100;
+      let dx = snap(p.x - s.ax), dz = snap(p.z - s.az); const r = (v: number) => Math.round(v * 100) / 100;
+      if (ortho) { if (Math.abs(dx) >= Math.abs(dz)) dz = 0; else dx = 0; }
       ubah(ed => ({ ...ed, komponen: ed.komponen.map(k => { const a = s.awal[k.id]; if (!a) return k; return { ...k, x: k.jenis === 'dock' ? a.x : r(a.x + dx), z: r(a.z + dz) }; }) }));
       return;
     }
@@ -170,6 +376,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       if (k.id !== s.id) return k;
       if (s.jenis === 'geser') {
         let x = snap(s.x0 + p.x - s.ax), z = snap(s.z0 + p.z - s.az);
+        if (ortho) { if (Math.abs(p.x - s.ax) >= Math.abs(p.z - s.az)) z = s.z0; else x = s.x0; }
         if (k.jenis === 'dock') x = 0;
         if (k.jenis === 'gate') return seretGate(k, p.x, p.z, ed.gedung, snap);
         if (k.jenis === 'kolom') {   // kolom: as sejajar dengan kolom lain (≤ 0,6 m), ukuran tidak berubah
@@ -184,6 +391,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
           return { ...k, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100 };
         }
         ({ x, z } = tempel(k, x, z));
+        if (ortho) { if (Math.abs(p.x - s.ax) >= Math.abs(p.z - s.az)) z = s.z0; else x = s.x0; }
         return { ...k, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100 };
       }
       const k0 = s.k0; let { x, z, w, d } = k0; const dx = p.x - s.ax, dz = p.z - s.az;
@@ -212,7 +420,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         if (s.id) setMulti(cur.includes(s.id) ? cur.filter(i => i !== s.id) : [...cur, s.id]); else if (!s.tambah) setMulti([]);
         return;
       }
-      const kena = edit.komponen.filter(k => silang
+      const kena = edit.komponen.filter(bisaPilih).filter(k => silang
         ? k.x < x1 && k.x + k.w > x0 && k.z < z1 && k.z + k.d > z0
         : k.x >= x0 && k.x + k.w <= x1 && k.z >= z0 && k.z + k.d <= z1).map(k => k.id);
       const dasar = s.tambah ? seleksi() : [];
@@ -275,16 +483,21 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         <rect x={c.x} y={c.z} width={c.w} height={c.d} fill={w.isi} stroke={dipilih ? '#f97316' : '#1e293b'} strokeWidth={fs * 0.05} /></g>);
       el.push(<text key="t" x={k.x + fs * 0.3} y={k.z - fs * 0.45} fontSize={fs * 0.75} fill="#0f766e" style={{ paintOrder: 'stroke', stroke: '#ffffffcc', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>
         {k.label} · {xs.length} × {zs.length} as · {kol.length} kolom</text>);
-      return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined }}>{el}</g>;
+      return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined, pointerEvents: bisaPilih(k) ? undefined : 'none' }}>{el}</g>;
     }
     el.push(<rect key="r" x={k.x} y={k.z} width={k.w} height={k.d} fill={k.jenis === 'jalur' ? 'url(#arsir)' : isi} fillOpacity={k.jenis === 'zona' ? 0.5 : k.jenis === 'areaRak' ? 0.45 : 1}
       stroke={dipilih ? '#f97316' : w.garis} strokeWidth={dipilih ? fs * 0.18 : fs * 0.07} strokeDasharray={k.jenis === 'jalur' || k.jenis === 'zona' || k.jenis === 'areaRak' ? `${fs * 0.4} ${fs * 0.25}` : undefined} />);
     el.push(...gambarRak(k, w.garis, ''));
     if (k.area) {
       const sub = WARNA_KOMP[k.area.jenisRak];
+      const selB = barisPilih?.area === k.id ? new Set(barisPilih.idx) : null;
       for (const r of uraiArea(k, edit)) {
-        el.push(<rect key={`${r.id}r`} x={r.x} y={r.z} width={r.w} height={r.d} fill={sub.isi} stroke={sub.garis} strokeWidth={fs * 0.06} />);
-        el.push(...gambarRak(r, sub.garis, r.id));
+        const on = !!selB && r.barisKe != null && selB.has(r.barisKe);
+        el.push(<g key={`${r.id}g`} onPointerDown={ev => { ev.stopPropagation(); turunBaris(ev, k, r.barisKe ?? 0); }}
+          style={{ cursor: mode === 'pilih' && !cmd ? (k.area.rak.arah === 'x' ? 'ns-resize' : 'ew-resize') : undefined }}>
+          <rect x={r.x} y={r.z} width={r.w} height={r.d} fill={on ? '#ffedd5' : sub.isi} stroke={on ? '#f97316' : sub.garis} strokeWidth={on ? fs * 0.16 : fs * 0.06} />
+          {gambarRak(r, sub.garis, r.id)}
+        </g>);
       }
     }
     if (k.jenis === 'block' && k.blok) {
@@ -345,7 +558,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     }
     // kolom kecil: area pegang transparan lebih besar supaya mudah diseret
     if (k.jenis === 'kolom') { const pad = fs * 0.22; el.unshift(<rect key="hit" data-ekspor="tidak" x={k.x - pad} y={k.z - pad} width={k.w + 2 * pad} height={k.d + 2 * pad} fill="transparent" />); }
-    return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined }}>{el}</g>;
+    return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined, pointerEvents: bisaPilih(k) ? undefined : 'none' }}>{el}</g>;
   };
 
   /** Handle ubah ukuran. Komponen kecil (mis. kolom 0,5 m) → handle di LUAR bentuk supaya bagian tengah tetap bisa diseret tanpa mengubah ukuran. */
@@ -360,9 +573,10 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
   const jb = terpilih && !['dock', 'gate', 'platform'].includes(terpilih.jenis) ? jarakBebas(edit, terpilih) : null;
   const luar = poligonLuar(g), miring = dindingMiring(g);
   return (
+    <div className="cad-wadah">
     <svg ref={svg} className="sim2d-svg" viewBox={`${view.x} ${view.z} ${view.w} ${tinggiView}`} preserveAspectRatio="xMinYMin meet"
       onPointerDown={e => turun(e)} onPointerMove={gerak} onPointerUp={naik} onPointerLeave={() => setKursor(null)} onWheel={roda}
-      style={{ cursor: mode === 'geser' ? 'grab' : mode === 'ukur' || mode === 'blok' || mode === 'kolom' ? 'crosshair' : 'default', fontFamily: 'Noto Sans, Arial, sans-serif' }}>
+      style={{ cursor: mode === 'geser' ? 'grab' : (cmd && cmd.tahap !== 'pilih') || mode === 'ukur' || mode === 'blok' || mode === 'kolom' ? 'crosshair' : 'default', fontFamily: 'Noto Sans, Arial, sans-serif' }}>
       <defs>
         <marker id="panah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" /></marker>
         <pattern id="arsir" width="1" height="1" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1" height="1" fill="#fef9c3" /><line x1="0" y1="0" x2="0" y2="1" stroke="#facc15" strokeWidth="0.25" /></pattern>
@@ -378,16 +592,16 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       <rect x={0} y={0} width={g.L} height={g.W} fill="#ffffff" />
       <rect x={0} y={0} width={g.L} height={g.W} fill="url(#kisi5)" data-ekspor="tidak" />
       {/* latar denah */}
-      {edit.latar?.jenis === 'gambar' && edit.latar.url && <image href={edit.latar.url} x={edit.latar.x} y={edit.latar.z} width={edit.latar.w} height={edit.latar.d} opacity={edit.latar.opasitas} preserveAspectRatio="none" style={{ pointerEvents: 'none' }} />}
-      {edit.latar?.jenis === 'dxf' && edit.latar.garis && (
+      {lapisan.latar?.lihat !== false && edit.latar?.jenis === 'gambar' && edit.latar.url && <image href={edit.latar.url} x={edit.latar.x} y={edit.latar.z} width={edit.latar.w} height={edit.latar.d} opacity={edit.latar.opasitas} preserveAspectRatio="none" style={{ pointerEvents: 'none' }} />}
+      {lapisan.latar?.lihat !== false && edit.latar?.jenis === 'dxf' && edit.latar.garis && (
         <g opacity={edit.latar.opasitas} style={{ pointerEvents: 'none' }} transform={`translate(${edit.latar.x} ${edit.latar.z}) scale(${edit.latar.w})`}>
           <path d={edit.latar.garis.map(([a, b, c, d]) => `M${a} ${b}L${c} ${d}`).join('')} stroke="#334155" strokeWidth={0.04 / Math.max(0.001, edit.latar.w)} fill="none" />
         </g>
       )}
-      {edit.komponen.filter(k => k.jenis === 'areaRak').map(gambarKomp)}
-      {edit.komponen.filter(k => k.jenis === 'jalur' || k.jenis === 'zona').map(gambarKomp)}
-      {edit.komponen.filter(k => !['jalur', 'zona', 'areaRak', 'gate'].includes(k.jenis)).map(gambarKomp)}
-      {edit.komponen.filter(k => k.jenis === 'gate').map(gambarKomp)}
+      {tampak.filter(k => k.jenis === 'areaRak').map(gambarKomp)}
+      {tampak.filter(k => k.jenis === 'jalur' || k.jenis === 'zona').map(gambarKomp)}
+      {tampak.filter(k => !['jalur', 'zona', 'areaRak', 'gate'].includes(k.jenis)).map(gambarKomp)}
+      {tampak.filter(k => k.jenis === 'gate').map(gambarKomp)}
       {/* gedung trapesium: area di luar dinding miring diarsir abu-abu (tidak bisa dipakai) */}
       {luar && <polygon points={luar.map(p => `${p.x},${p.z}`).join(' ')} fill="url(#luarGedung)" stroke="none" style={{ pointerEvents: 'none' }} />}
       {/* dinding */}
@@ -402,6 +616,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         : garisUkur(g.L + fs * 1.4, 0, g.L + fs * 1.4, g.W, `${f1(g.W)} m`, '#334155', 'dimW')}
       {/* grid pilar: as & rantai dimensi as-ke-as per bentang */}
       {(() => {
+        if (lapisan.kolom?.lihat === false) return null;
         const kol = denganKolom(edit.komponen, g).filter(k => k.jenis === 'kolom'); if (kol.length < 2) return null;
         const unik = (a: number[]) => a.map(v => Math.round(v * 100) / 100).sort((p, q) => p - q).filter((v, i, arr) => i === 0 || v - arr[i - 1] > 0.05);
         // as pilar tepi yang menempel dinding dianggap di garis dinding (as grid = as dinding)
@@ -421,7 +636,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         return <g>{el}</g>;
       })()}
       {/* ukuran tersimpan */}
-      {edit.ukur.map(u => garisUkur(u.ax, u.az, u.bx, u.bz, `${f1(Math.hypot(u.bx - u.ax, u.bz - u.az))} m`, '#be123c', u.id))}
+      {lihatUkuran && edit.ukur.map(u => garisUkur(u.ax, u.az, u.bx, u.bz, `${f1(Math.hypot(u.bx - u.ax, u.bz - u.az))} m`, '#be123c', u.id))}
       {/* kotak seleksi blok: biru = masuk penuh (seret ke kanan), hijau putus-putus = tersentuh (seret ke kiri) */}
       {kotak && (() => { const silang = kotak.bx < kotak.ax; return (
         <rect data-ekspor="tidak" x={Math.min(kotak.ax, kotak.bx)} y={Math.min(kotak.az, kotak.bz)} width={Math.abs(kotak.bx - kotak.ax)} height={Math.abs(kotak.bz - kotak.az)}
@@ -454,13 +669,30 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       {terpilih && mode === 'pilih' && handle(terpilih)}
       {/* area rak terpilih: lebar cross aisle aktual (awal / tengah / akhir) */}
       {/* lebar lorong aktual tiap area rak (ikut ekspor); row spacer hanya saat area dipilih */}
-      {edit.komponen.filter(k => k.area).map(k => {
+      {lihatUkuran && tampak.filter(k => k.area).map(k => {
         const ax = k.area!.rak.arah === 'x'; const dipilih = k.id === pilih;
-        return <g key={`lor${k.id}`} style={{ pointerEvents: 'none' }}>{lorongArea(k, edit).filter(l => l.jenis === 'lorong' || dipilih).map((l, i) => {
-          const w = l.jenis === 'lorong' ? '#7c3aed' : '#64748b'; const t = `${f1(l.lebar)}${l.jenis === 'lorong' ? ' m' : ''}`;
-          return ax ? garisUkur(l.a, l.b0, l.a, l.b1, t, w, `l${i}`, l.jenis === 'lorong') : garisUkur(l.b0, l.a, l.b1, l.a, t, w, `l${i}`, l.jenis === 'lorong');
+        return <g key={`lor${k.id}`} style={{ pointerEvents: 'none' }}>{lorongArea(k, edit).filter(l => l.jenis !== 'spacer' || dipilih).map((l, i) => {
+          // lorong = ungu (sesuai isian); sisa ruang = abu-abu "+x"; row spacer = abu-abu (saat area dipilih)
+          const w = l.jenis === 'lorong' ? '#7c3aed' : '#94a3b8'; const t = l.jenis === 'lorong' ? `${f1(l.lebar)} m` : l.jenis === 'sisa' ? `+${f1(l.lebar)}` : f1(l.lebar);
+          const ekspor = l.jenis !== 'spacer';
+          return ax ? garisUkur(l.a, l.b0, l.a, l.b1, t, w, `l${i}`, ekspor) : garisUkur(l.b0, l.a, l.b1, l.a, t, w, `l${i}`, ekspor);
         })}</g>;
       })}
+      {/* baris terpilih: celah sebelum & sesudah (berubah saat diseret) */}
+      {barisPilih && (() => {
+        const k = edit.komponen.find(o => o.id === barisPilih.area); if (!k?.area) return null;
+        const c = celahBaris(k, edit, barisPilih.idx); if (!c) return null;
+        const ax = k.area.rak.arah === 'x';
+        const rows = uraiArea(k, edit).filter(r => r.barisKe != null && barisPilih.idx.includes(r.barisKe));
+        if (!rows.length) return null;
+        const a0 = Math.min(...rows.map(r => (ax ? r.x : r.z))), a1 = Math.max(...rows.map(r => (ax ? r.x + r.w : r.z + r.d)));
+        const a = Math.min(a1, a0 + Math.max(3, (a1 - a0) * 0.35));
+        const garis = (b0: number, b1: number, key: string) => (ax ? garisUkur(a, b0, a, b1, `${f1(b1 - b0)} m`, '#ea580c', key, false) : garisUkur(b0, a, b1, a, `${f1(b1 - b0)} m`, '#ea580c', key, false));
+        return <g data-ekspor="tidak" style={{ pointerEvents: 'none' }}>
+          {c.prevAkhir != null && c.sebelum! > 0.01 && garis(c.prevAkhir, c.awal, 'bp0')}
+          {c.nextAwal != null && c.sesudah! > 0.01 && garis(c.akhir, c.nextAwal, 'bp1')}
+        </g>;
+      })()}
       {terpilih?.area && terpilih.area.mode !== 'adaptif' && (() => {
         const k = terpilih; const c = celahArea(k, edit); if (!c) return null;
         const ax = k.area!.rak.arah === 'x'; const A0 = c.a0; const m = ax ? k.z + k.d / 2 : k.x + k.w / 2; const bw = k.area!.rak.bayW;
@@ -482,8 +714,59 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
           </g>
         );
       })()}
+      {/* perintah MOVE / COPY: bayangan objek + garis karet dari titik dasar */}
+      {cmd?.tahap === 'tujuan' && cmd.dasar && kursor && (() => {
+        const q = titik(kursor, cmd.dasar); const dx = q.x - cmd.dasar.x, dz = q.z - cmd.dasar.z;
+        let kotakG: { x: number; z: number; w: number; d: number }[] = [];
+        if (barisPilih) {
+          const k = edit.komponen.find(o => o.id === barisPilih.area);
+          if (k?.area) { const ax = k.area.rak.arah === 'x'; kotakG = uraiArea(k, edit).filter(r => r.barisKe != null && barisPilih.idx.includes(r.barisKe)).map(r => ({ x: r.x + (ax ? 0 : dx), z: r.z + (ax ? dz : 0), w: r.w, d: r.d })); }
+        } else { const ids = new Set(seleksi()); kotakG = edit.komponen.filter(k => ids.has(k.id)).map(k => ({ x: k.x + dx, z: k.z + dz, w: k.w, d: k.d })); }
+        return <g data-ekspor="tidak" style={{ pointerEvents: 'none' }}>
+          {kotakG.map((b, i) => <rect key={i} x={b.x} y={b.z} width={b.w} height={b.d} fill="rgba(249,115,22,0.08)" stroke="#f97316" strokeWidth={fs * 0.07} strokeDasharray={`${fs * 0.35} ${fs * 0.2}`} />)}
+          <line x1={cmd.dasar.x} y1={cmd.dasar.z} x2={q.x} y2={q.z} stroke="#f97316" strokeWidth={fs * 0.06} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />
+          <circle cx={cmd.dasar.x} cy={cmd.dasar.z} r={fs * 0.18} fill="#f97316" />
+          <text x={q.x + fs * 0.5} y={q.z - fs * 0.5} fontSize={fs * 0.8} fill="#c2410c" fontWeight={600} style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: fs * 0.25 }}>
+            {f1(Math.hypot(dx, dz))} m{Math.abs(dx) > 0.005 && Math.abs(dz) > 0.005 ? ` (Δx ${f1(dx)}; Δz ${f1(dz)})` : ''}</text>
+        </g>;
+      })()}
+      {/* kursor silang (crosshair) saat memilih titik */}
+      {kursor && ((cmd && cmd.tahap !== 'pilih') || mode === 'ukur') && (() => { const q = snapHover ?? kursor; return (
+        <g data-ekspor="tidak" style={{ pointerEvents: 'none' }}>
+          <line x1={view.x} y1={q.z} x2={view.x + view.w} y2={q.z} stroke="#64748b" strokeWidth={fs * 0.025} strokeOpacity={0.6} />
+          <line x1={q.x} y1={view.z} x2={q.x} y2={view.z + tinggiView} stroke="#64748b" strokeWidth={fs * 0.025} strokeOpacity={0.6} />
+        </g>); })()}
+      {/* penanda OSNAP: kotak = ujung / sudut, segitiga = tengah sisi, lingkaran = pusat */}
+      {perluSnap && snapHover && (() => { const m = fs * 0.32, { x, z, j } = snapHover; return (
+        <g data-ekspor="tidak" style={{ pointerEvents: 'none' }} stroke="#16a34a" strokeWidth={fs * 0.08} fill="none">
+          {j === 'ujung' ? <rect x={x - m} y={z - m} width={2 * m} height={2 * m} /> : j === 'tengah' ? <path d={`M ${x} ${z - m} L ${x + m} ${z + m * 0.8} L ${x - m} ${z + m * 0.8} Z`} /> : <circle cx={x} cy={z} r={m} />}
+          <text x={x + m * 1.6} y={z + m * 2.6} fontSize={fs * 0.62} fill="#15803d" stroke="none">{j === 'ujung' ? 'sudut' : j === 'tengah' ? 'tengah' : 'pusat'}</text>
+        </g>); })()}
       {kursor && <text data-ekspor="tidak" x={view.x + fs * 0.5} y={view.z + tinggiView - fs * 0.6} fontSize={fs * 0.75} fill="#64748b">x {f1(kursor.x)} m · z {f1(kursor.z)} m</text>}
     </svg>
+    {/* baris perintah & status (gaya CAD) */}
+    <div className="cad-bar" data-ekspor="tidak">
+      <div className="cad-log">{log.slice(-2).map((l, i) => <div key={i} className={i === log.slice(-2).length - 1 ? 'akhir' : ''}>{l}</div>)}</div>
+      <div className="cad-baris">
+        <label className="cad-input">
+          <span>{cmd ? (cmd.tahap === 'pilih' ? 'Pilih objek ›' : cmd.tahap === 'dasar' ? 'Titik dasar ›' : 'Titik kedua ›') : 'Perintah ›'}</span>
+          <input ref={cmdInput} value={cmdTeks} spellCheck={false} placeholder={cmd ? (cmd.tahap === 'tujuan' ? 'jarak (3,5) atau @dx;dz' : cmd.tahap === 'dasar' ? 'klik atau x;z' : 'Enter = lanjut') : 'M, CO, RO, E, DI, X, Z, LA…'}
+            onChange={e => setCmdTeks(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || (e.key === ' ' && !cmdTeks.includes('@'))) { e.preventDefault(); const t = cmdTeks; setCmdTeks(''); jalankan(t); if (!t || !cmd) cmdInput.current?.blur(); return; }
+              if (e.key === 'Escape') { e.preventDefault(); batalCmd(); }
+              if (e.key === 'F3' || e.key === 'F8' || e.key === 'F9') { e.preventDefault(); if (e.key === 'F3') setOsnap(v => !v); else if (e.key === 'F8') setOrtho(v => !v); else perintah?.setGrid(grid > 0 ? 0 : gridLalu.current); }
+            }} />
+        </label>
+        <div className="cad-status">
+          <button type="button" className={grid > 0 ? 'on' : ''} onClick={() => perintah?.setGrid(grid > 0 ? 0 : gridLalu.current)} title="Snap ke grid (F9)">SNAP{grid > 0 ? ` ${f1(grid)}` : ''}</button>
+          <button type="button" className={ortho ? 'on' : ''} onClick={() => setOrtho(v => !v)} title="Gerak lurus sumbu X / Z saja (F8)">ORTHO</button>
+          <button type="button" className={osnap ? 'on' : ''} onClick={() => setOsnap(v => !v)} title="Tangkap sudut, tengah sisi & pusat objek saat memilih titik (F3)">OSNAP</button>
+          <span className="cad-koord">{kursor ? `${f1(kursor.x)}; ${f1(kursor.z)}` : '—'}</span>
+        </div>
+      </div>
+    </div>
+    </div>
   );
 });
 

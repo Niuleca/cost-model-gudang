@@ -13,11 +13,12 @@ import { IT_SHEET_DEFAULT } from '@/lib/it';
 import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import { paramAwal, susunLayout, type LayoutGudang, type ParamSim } from '@/lib/simulasi3d/layout';
 import { dariOtomatis, tarikRak, keLayoutGudang, komponenBaru, levelDariTinggi, nBay, pasanganRak, putar, ringkas, tinggiRak, uid, kapasitasRak, tapakBlok, dimRak,
-  DEFAULT_RAK, BLOK_DEFAULT, uraiBlok, aturSisiGate, posisiBentang, posisiGate, type SpekBlok, celahArea, gabungJadiArea, pecahArea, asGridKolom, bentangAktual, pecahGridKolom, gabungJadiAreaKolom, denganKolom, type SpekGridKolom, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
+  DEFAULT_RAK, BLOK_DEFAULT, uraiBlok, celahBaris, geserBarisArea, barisArea, aturSisiGate, posisiBentang, posisiGate, type SpekBlok, celahArea, gabungJadiArea, pecahArea, asGridKolom, bentangAktual, pecahGridKolom, gabungJadiAreaKolom, denganKolom, type SpekGridKolom, ringkasArea, lorongArea, type JenisKomp, type Komponen, type LayoutEdit, type SpekArea, type SpekRak } from '@/lib/simulasi3d/editor';
 import { bacaDxf } from '@/lib/simulasi3d/dxf';
 import { labelStatus } from '@/lib/status';
 import { dataTanpaProject, GEDUNG_BARU, ID_PRIBADI, layoutKosong, type SpekGedungBaru } from '@/lib/simulasi3d/tanpaProject';
 import Editor2D, { WARNA_GATE, WARNA_KOMP, type Editor2DApi, type Mode } from './layout/Editor2D';
+import { LAPISAN, LAPISAN_AWAL, lapisDari, type Lapisan } from './layout/lapisan';
 import Potongan, { potongAwal, type ArahPotong, type PotonganApi } from './layout/Potongan';
 import ParamSpace from './ParamSpace';
 import type { Kamera, OpsiViewer, ViewerApi } from './Viewer3D';
@@ -73,9 +74,16 @@ export default function DesainGudang() {
   const [kotor, setKotor] = useState(false);
   const [pilih, setPilihS] = useState<string | null>(null);
   const [multi, setMultiS] = useState<string[]>([]);
-  const setPilih = useCallback((id: string | null) => { setPilihS(id); setMultiS([]); }, []);
+  /** Baris rak terpilih di dalam area rak (bisa digeser melintang). */
+  const [barisPilih, setBarisPilih] = useState<{ area: string; idx: number[] } | null>(null);
+  const setPilih = useCallback((id: string | null) => { setPilihS(id); setMultiS([]); setBarisPilih(null); }, []);
   /** Seleksi banyak: 1 id → jadi seleksi tunggal (panel properti), ≥ 2 → panel seleksi blok. */
-  const setMulti = useCallback((ids: string[]) => { if (ids.length === 1) { setPilihS(ids[0]); setMultiS([]); } else { setPilihS(null); setMultiS(ids); } }, []);
+  const setMulti = useCallback((ids: string[]) => { setBarisPilih(null); if (ids.length === 1) { setPilihS(ids[0]); setMultiS([]); } else { setPilihS(null); setMultiS(ids); } }, []);
+  // layer denah (tampil / kunci) — disimpan per browser
+  const [lapisan, setLapisanS] = useState<Lapisan>(LAPISAN_AWAL);
+  useEffect(() => { try { const v = JSON.parse(localStorage.getItem('leca.sim2d.lapisan') ?? 'null'); if (v && typeof v === 'object') setLapisanS({ ...LAPISAN_AWAL, ...v }); } catch { /* abaikan */ } }, []);
+  const setLapisan = (f: (l: Lapisan) => Lapisan) => setLapisanS(l => { const n = f(l); try { localStorage.setItem('leca.sim2d.lapisan', JSON.stringify(n)); } catch { /* abaikan */ } return n; });
+  const panelLapis = useRef<HTMLDetailsElement>(null);
   const [mode, setMode] = useState<Mode>('pilih');
   const [grid, setGrid] = useState(0.1);
   const [snapTepi, setSnapTepi] = useState(true);
@@ -254,7 +262,16 @@ export default function DesainGudang() {
   }
   const ubahArea = (p: Partial<SpekArea>) => ubahK(k => (k.area ? { ...k, area: { ...k.area, ...p } } : k));
   const ubahAreaRak = (p: Partial<SpekRak>) => ubahK(k => { if (!k.area) return k; const r = { ...k.area.rak, ...p }; return { ...k, tinggi: r2(tinggiRak(r)), area: { ...k.area, rak: r } }; });
-  function hapus() { if (!pilih) return; aksi(e => ({ ...e, komponen: e.komponen.filter(k => k.id !== pilih) })); setPilih(null); }
+  function hapus() {
+    if (!pilih) return;
+    if (barisPilih) { setPesan('Baris di dalam area rak tidak bisa dihapus satuan. Pecah area jadi baris satuan dulu (tombol "Pecah jadi baris rak" / perintah X), lalu hapus barisnya.'); return; }
+    aksi(e => ({ ...e, komponen: e.komponen.filter(k => k.id !== pilih) })); setPilih(null);
+  }
+  const hapusSeleksi = () => (multi.length ? hapusBanyak() : hapus());
+  const putarSeleksi = () => { if (multi.length) { const set = new Set(multi); aksi(e => ({ ...e, komponen: e.komponen.map(k => (set.has(k.id) ? putar(k) : k)) })); } else ubahK(putar); };
+  /** Geser baris terpilih (melintang, m) — dari panel, panah, atau seret di denah. */
+  const geserBaris = (delta: number) => { if (!barisPilih) return; const idx = barisPilih.idx;
+    aksi(e => ({ ...e, komponen: e.komponen.map(k => (k.id === barisPilih.area && k.area ? { ...k, area: geserBarisArea(k.area, idx, delta) } : k)) })); };
   function hapusBanyak() {
     if (!multi.length) return; const set = new Set(multi); const n = multi.length;
     aksi(e => ({ ...e, komponen: e.komponen.filter(k => !set.has(k.id)) })); setPilih(null);
@@ -338,7 +355,7 @@ export default function DesainGudang() {
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return; }
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y') { ev.preventDefault(); redo(); return; }
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'd') { ev.preventDefault(); gandakan(); return; }
-      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'a' && edit) { ev.preventDefault(); setMulti(edit.komponen.map(k => k.id)); return; }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'a' && edit) { ev.preventDefault(); setMulti(edit.komponen.filter(k => { const st = lapisan[lapisDari(k.jenis)]; return !st || (st.lihat && !st.kunci); }).map(k => k.id)); return; }
       if (ev.key === 'Escape') { setPilih(null); setMode('pilih'); return; }
       if (multi.length) {
         if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); hapusBanyak(); return; }
@@ -348,8 +365,15 @@ export default function DesainGudang() {
         return;
       }
       if (!pilih) return;
+      if (barisPilih && edit) {   // baris di area: panah melintang menggeser baris (Shift = 1 m)
+        const k = edit.komponen.find(c => c.id === barisPilih.area); const ax = k?.area?.rak.arah === 'x';
+        const lang = ev.shiftKey ? 1 : grid || 0.1;
+        const d = (ax ? ({ ArrowUp: -lang, ArrowDown: lang } as Record<string, number>) : ({ ArrowLeft: -lang, ArrowRight: lang } as Record<string, number>))[ev.key];
+        if (d) { ev.preventDefault(); geserBaris(d); return; }
+        if (ev.key.startsWith('Arrow')) { ev.preventDefault(); return; }
+      }
       if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); hapus(); return; }
-      if (ev.key.toLowerCase() === 'r') { ubahK(putar); return; }
+      if (ev.key.toLowerCase() === 'r' && !barisPilih) { ubahK(putar); return; }
       const lang = ev.shiftKey ? 1 : grid || 0.1;
       const d = ({ ArrowLeft: [-lang, 0], ArrowRight: [lang, 0], ArrowUp: [0, -lang], ArrowDown: [0, lang] } as Record<string, number[]>)[ev.key];
       if (d) { ev.preventDefault(); ubahK(k => geserPanah(k, d[0], d[1])); }
@@ -553,6 +577,19 @@ export default function DesainGudang() {
               <button className="ghost" onClick={undo} title="Ctrl+Z">↶ Undo</button><button className="ghost" onClick={redo} title="Ctrl+Y">↷ Redo</button>
               <button className="ghost" onClick={() => ed2.current?.pasFit()}>Pas layar</button>
             </div>
+            <details className="sim2d-detail" ref={panelLapis} open>
+              <summary className="eyebrow">Layer</summary>
+              <div className="lapis-daftar">
+                {LAPISAN.map(l => { const st = lapisan[l.k]; const n = l.jenis.length ? edit.komponen.filter(k => l.jenis.includes(k.jenis)).length : null; return (
+                  <div key={l.k} className="lapis-baris">
+                    <i style={{ background: l.warna }} />
+                    <span className={st.lihat ? '' : 'mati'} title={l.label}>{l.label}{n != null && <span className="muted"> ({n})</span>}</span>
+                    <button type="button" className={st.lihat ? '' : 'off'} title={st.lihat ? 'Sembunyikan layer' : 'Tampilkan layer'} onClick={() => setLapisan(x => ({ ...x, [l.k]: { ...x[l.k], lihat: !x[l.k].lihat } }))}>{st.lihat ? '👁' : '—'}</button>
+                    <button type="button" className={st.kunci ? 'off' : ''} title={st.kunci ? 'Buka kunci (bisa dipilih & digeser)' : 'Kunci (tidak bisa dipilih / tergeser)'} disabled={!l.jenis.length} onClick={() => setLapisan(x => ({ ...x, [l.k]: { ...x[l.k], kunci: !x[l.k].kunci } }))}>{st.kunci ? '🔒' : '🔓'}</button>
+                  </div>); })}
+              </div>
+              <p className="small muted" style={{ margin: '4px 0 0' }}>Layer hanya mengatur tampilan & seleksi denah 2D (ikut ekspor PNG/PDF denah). Kapasitas & 3D tetap menghitung semua komponen.</p>
+            </details>
             <div className="sim2d-tarik">
               <button type="button" onClick={() => tarik(false)} title="Panjangkan semua baris rak sampai rintangan / dinding terdekat; jumlah bay & kapasitas menyesuaikan">↔ Tarik rak otomatis</button>
               <button type="button" className="ghost" onClick={semuaJadiArea} title="Gabungkan rak satuan per kolom jadi area rak yang bisa ditarik (gaya CLASS)">▦ Semua rak → area otomatis</button>
@@ -647,6 +684,7 @@ export default function DesainGudang() {
             <div className="eyebrow">Ekspor</div>
             <div className="row"><button className="ghost" onClick={unduhPng}>PNG denah</button><button className="ghost" onClick={unduhPdf}>PDF A3</button>
               <button className="ghost" onClick={() => { const u = api3.current?.screenshot(); if (u) { const a = document.createElement('a'); a.href = u; a.download = `${namaFile()}_3D.png`; a.click(); } }} disabled={tampil === '2d'}>PNG 3D</button></div>
+            <p className="small muted">Gaya CAD: ketik perintah langsung di denah — <b>M</b> geser, <b>CO</b> salin, <b>RO</b> putar, <b>E</b> hapus, <b>DI</b> ukur, <b>X</b> pecah area, <b>Z</b> pas layar, <b>LA</b> layer; Enter / spasi = ulangi perintah terakhir; saat titik kedua ketik jarak (3,5) atau @dx;dz. F3 OSNAP · F8 ORTHO · F9 SNAP.</p>
             <p className="small muted">Pintasan: Seleksi blok / Shift + seret = pilih banyak (seret ke kanan = yang masuk penuh, ke kiri = yang tersentuh) · Shift/Ctrl + klik tambah/buang · Ctrl+A pilih semua · Delete hapus · R putar · Ctrl+D gandakan · panah geser (Shift = 1 m; dock & gate bergeser sepanjang dinding) · Ctrl+Z / Ctrl+Y · scroll zoom · seret area kosong = pan.</p>
           </div>
 
@@ -683,6 +721,8 @@ export default function DesainGudang() {
             <div className={`sim2d-kanvas ${tampil}`}>
               <div className="sim2d-panel2d" style={{ display: tampil === '3d' ? 'none' : undefined }}>
                 <Editor2D ref={ed2} edit={edit} pilih={pilih} setPilih={setPilih} multi={multi} setMulti={setMulti} mulaiAksi={mulaiAksi} ubah={ubah} mode={mode} grid={grid} snapTepi={snapTepi} taruhKolom={taruhKolom} ukuranKolom={acuanKolom ?? Math.max(0.2, gridPilar.ukuran)}
+                  barisPilih={barisPilih} setBarisPilih={setBarisPilih} lapisan={lapisan}
+                  perintah={{ undo, redo, hapus: hapusSeleksi, putar: putarSeleksi, pecah, setMode, setGrid, bukaLapisan: () => { if (panelLapis.current) { panelLapis.current.open = true; panelLapis.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } } }}
                   potong={potongan ? { sumbu: potongan.arah === 'depan' ? 'x' : 'z', nilai: potongan.nilai } : null} />
               </div>
               {tampil !== '2d' && layout3d && (
@@ -777,7 +817,9 @@ export default function DesainGudang() {
                     </div>
                     <div className="eyebrow">Lorong</div>
                     <div className="grid2" style={{ gap: 6 }}>
-                      <Angka l={adaptif ? 'Lebar lorong minimum' : 'Lebar lorong (muka-ke-muka)'} u="m" step={0.1} v={s.lebarLorong} set={x => ubahAreaRak({ lebarLorong: Math.max(0.5, x) })} />
+                      <Angka l={adaptif && a.sisaLorong === 'rata' ? 'Lebar lorong minimum' : 'Lebar lorong (muka-ke-muka)'} u="m" step={0.1} v={s.lebarLorong} set={x => ubahAreaRak({ lebarLorong: Math.max(0.5, x) })} />
+                      {adaptif && <label className="f">Sisa ruang di antara kolom<select value={a.sisaLorong ?? 'akhir'} onChange={e => ubahArea({ sisaLorong: e.target.value as SpekArea['sisaLorong'] })}>
+                        <option value="akhir">Lorong pas isian · sisa di lorong terakhir</option><option value="awal">Lorong pas isian · sisa di lorong pertama</option><option value="rata">Dibagi rata (semua lorong melebar)</option></select></label>}
                       <Angka l="Cross aisle awal" u="m" step={0.5} v={a.crossAwal} set={x => ubahArea({ crossAwal: Math.max(0, x) })} />
                       <Angka l="Jumlah cross aisle tengah" step={1} min={0} v={a.nTengah} set={x => ubahArea({ nTengah: Math.max(0, Math.round(x)) })} />
                       <Angka l="Lebar cross aisle tengah" u="m" step={0.5} v={a.crossTengah} set={x => ubahArea({ crossTengah: Math.max(0, x) })} />
@@ -785,10 +827,35 @@ export default function DesainGudang() {
                       <label className="f">Sisa panjang (&lt; 1 bay) ke<select value={a.sisa ?? 'otomatis'} onChange={e => ubahArea({ sisa: e.target.value as SpekArea['sisa'] })}>
                         <option value="otomatis">Otomatis (cross aisle tengah / dibagi rata)</option><option value="awal">Cross aisle awal</option><option value="akhir">Cross aisle akhir</option></select></label>
                     </div>
-                    {adaptif && (() => { const lr = lorongArea(terpilih, edit); const lo = lr.filter(l => l.jenis === 'lorong'), sp = lr.filter(l => l.jenis === 'spacer'); return (
-                      <p className="small" style={{ margin: 0 }}>Hasil di denah: <b>{lo.length} lorong</b>{lo.length > 0 && <> — {lo.map(l => angka(l.lebar, 2)).join(' · ')} m (min {angka(Math.min(...lo.map(l => l.lebar)), 2)}, maks {angka(Math.max(...lo.map(l => l.lebar)), 2)})</>}
+                    {adaptif && (() => { const lr = lorongArea(terpilih, edit); const lo = lr.filter(l => l.jenis === 'lorong'), sp = lr.filter(l => l.jenis === 'spacer'), si = lr.filter(l => l.jenis === 'sisa'); return (
+                      <p className="small" style={{ margin: 0 }}>Hasil di denah: <b>{lo.length} lorong</b>{lo.length > 0 && <> — {lo.map(l => angka(l.lebar, 2)).join(' · ')} m{Math.max(...lo.map(l => l.lebar)) - Math.min(...lo.map(l => l.lebar)) > 0.01 && <> (min {angka(Math.min(...lo.map(l => l.lebar)), 2)}, maks {angka(Math.max(...lo.map(l => l.lebar)), 2)})</>}</>}
+                        {si.length > 0 && <> · sisa ruang {si.map(l => `+${angka(l.lebar, 2)}`).join(' · ')} m <span className="muted">(abu-abu di denah; seret baris rak untuk memindahkannya)</span></>}
                         {sp.length > 0 && <> · row spacer {[...new Set(sp.map(l => angka(l.lebar, 2)))].join(' / ')} m</>}</p>); })()}
                     {cl && !adaptif && <p className="small" style={{ margin: 0 }}>Hasil di denah: cross aisle awal <b>{angka(cl.awal, 2)} m</b>{a.nTengah > 0 && <> · tengah <b>{angka(cl.tengah, 2)} m</b> × {a.nTengah}</>} · akhir <b>{angka(cl.akhir, 2)} m</b> · bay per segmen {cl.bay.join(' / ')}{cl.sisa > 0.005 && <span className="muted"> (sisa {angka(cl.sisa, 2)} m)</span>}</p>}
+                    {(() => { const nGeser = Object.keys(a.geserBaris ?? {}).length; const bp = barisPilih?.area === terpilih.id ? barisPilih : null;
+                      const c = bp ? celahBaris(terpilih, edit, bp.idx) : null; const g0 = bp ? Number(a.geserBaris?.[bp.idx[0]]) || 0 : 0; const nBaris = barisArea(terpilih, edit).length;
+                      return (<>
+                        {bp && c && (
+                          <div className="baris-terpilih">
+                            <div className="row" style={{ justifyContent: 'space-between' }}><b className="small">Baris {bp.idx.map(i => i + 1).join(' & ')} dari {nBaris}{bp.idx.length > 1 ? ' (back-to-back)' : ''}</b>
+                              <button type="button" className="ghost" style={{ padding: '1px 8px' }} onClick={() => setBarisPilih(null)}>×</button></div>
+                            <div className="grid2" style={{ gap: 6 }}>
+                              <Angka l={`Geser ${s.arah === 'x' ? 'Z (atas–bawah)' : 'X (kiri–kanan)'}`} u="m" step={0.05} v={g0} set={x => geserBaris(x - g0)} />
+                              <div className="small" style={{ alignSelf: 'end' }}>
+                                {c.sebelum != null && <div>Celah sebelum: <b>{angka(c.sebelum, 2)} m</b></div>}
+                                {c.sesudah != null && <div>Celah sesudah: <b>{angka(c.sesudah, 2)} m</b></div>}
+                              </div>
+                            </div>
+                            <div className="row" style={{ gap: 4 }}>
+                              {c.sebelum != null && <button type="button" className="ghost" style={{ padding: '3px 8px' }} onClick={() => geserBaris(s.lebarLorong - c.sebelum!)} title="Geser baris supaya lorong di depannya tepat selebar isian">Celah sebelum = {angka(s.lebarLorong, 2)} m</button>}
+                              {c.sesudah != null && <button type="button" className="ghost" style={{ padding: '3px 8px' }} onClick={() => geserBaris(c.sesudah! - s.lebarLorong)} title="Geser baris supaya lorong di belakangnya tepat selebar isian">Celah sesudah = {angka(s.lebarLorong, 2)} m</button>}
+                              {g0 !== 0 && <button type="button" className="ghost" style={{ padding: '3px 8px' }} onClick={() => geserBaris(-g0)}>↺ Posisi otomatis</button>}
+                            </div>
+                            <p className="small muted" style={{ margin: 0 }}>Seret baris di denah (menempel otomatis saat lorong tepat {angka(s.lebarLorong, 2)} m), tombol panah {s.arah === 'x' ? '↑ ↓' : '← →'} (Shift = 1 m), atau perintah <b>M</b> lalu ketik jarak. Alt + seret = baris ini saja (tanpa pasangan).</p>
+                          </div>)}
+                        {!bp && <p className="small muted" style={{ margin: 0 }}>Klik salah satu baris rak di denah untuk memilih &amp; menggesernya (pasangan back-to-back ikut). Ctrl + klik = pilih area.</p>}
+                        {nGeser > 0 && <button type="button" className="ghost" onClick={() => ubahArea({ geserBaris: undefined })}>↺ Kembalikan semua baris ke posisi otomatis ({nGeser} digeser)</button>}
+                      </>); })()}
                     <p className="small muted" style={{ margin: 0 }}><b>{ra.baris} baris · {angka(ra.bay)} bay · {angka(ra.posisi)} posisi</b> · tinggi rak {angka(tinggiRak(s), 2)} m. Tarik tepi area di denah — baris, lorong, dan bay terbentuk ulang otomatis.</p>
                   </>); })()}
                 {terpilih.rak && (() => { const s = terpilih.rak; const set = (p: Partial<typeof s>) => ubahK(k => { const r = { ...k.rak!, ...p }; return { ...k, rak: r, tinggi: r2(tinggiRak(r)) }; }); return (
