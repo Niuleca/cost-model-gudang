@@ -877,3 +877,8 @@ td .row > span, td .row > label { white-space: nowrap; }
 .lapis-baris button { padding: 1px 6px; font-size: 12px; line-height: 1.3; background: transparent; border: 1px solid transparent; color: var(--ink); }
 .lapis-baris button.off { color: #b45309; border-color: #fde68a; background: #fffbeb; }
 .baris-terpilih { border: 1px solid #fed7aa; background: #fff7ed; border-radius: 8px; padding: 8px; display: grid; gap: 6px; }
+
+/* halaman "Anda telah terdaftar" (setelah klik konfirmasi email) */
+.login .card.terdaftar { width: min(440px, 100%); text-align: left; }
+.login .card.terdaftar .btn { justify-self: start; }
+.terdaftar-cek { width: 52px; height: 52px; border-radius: 50%; background: #e8f4ec; color: #2e6b3a; display: grid; place-items: center; font-size: 28px; font-weight: 700; }

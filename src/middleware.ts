@@ -24,7 +24,19 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isPublic = path.startsWith('/login') || path.startsWith('/auth') || path === '/panduan-leca.pdf' || path === '/panduan-leca.docx';
+  const isPublic = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/situs') || path === '/panduan-leca.pdf' || path === '/panduan-leca.docx';
+
+  // link email lama yang mendarat di halaman awal dengan ?code= → teruskan ke callback konfirmasi
+  if (path === '/' && request.nextUrl.searchParams.get('code')) {
+    const url = request.nextUrl.clone(); url.pathname = '/auth/callback';
+    if (!url.searchParams.get('next')) url.searchParams.set('next', '/auth/terdaftar');
+    return NextResponse.redirect(url);
+  }
+  // pengunjung belum login: halaman awal niuleca.com = landing page (bukan langsung login)
+  if (!user && path === '/') {
+    const url = request.nextUrl.clone(); url.pathname = '/situs';
+    return NextResponse.rewrite(url);
+  }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

@@ -11,7 +11,7 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nama, setNama] = useState('');
-  const [pesan, setPesan] = useState<string | null>(params.get('error') ? 'Link login tidak valid atau kedaluwarsa.' : null);
+  const [pesan, setPesan] = useState<string | null>(params.get('error') ? 'Link login tidak valid atau kedaluwarsa.' : params.get('terdaftar') ? 'Akun Anda sudah terdaftar dan email terkonfirmasi. Silakan login setelah akun disetujui (ACC) Admin.' : null);
   const [sibuk, setSibuk] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -26,7 +26,7 @@ function LoginForm() {
         router.replace(params.get('next') || '/beranda');
         router.refresh();
       } else if (mode === 'daftar') {
-        const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: nama }, emailRedirectTo: redirect } });
+        const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: nama }, emailRedirectTo: `${redirect}?next=/auth/terdaftar` } });
         if (error) throw error;
         setPesan('Akun dibuat. Cek email untuk konfirmasi. Setelah itu akun menunggu persetujuan (ACC) Admin sebelum bisa dipakai. Terima kasih\nCP : 088291919234 / Email : Niuleca@gmail.com');
       } else {
@@ -45,7 +45,7 @@ function LoginForm() {
   return (
     <div className="login">
       <form className="card" onSubmit={submit}>
-        <div className="login-brand"><LecaMark size={40} /><div><div className="nama">Leca</div><div className="oleh">by esapanghegar</div></div></div>
+        <a href="/" className="login-brand" style={{ color: 'inherit', textDecoration: 'none' }}><LecaMark size={40} /><div><div className="nama">Leca</div><div className="oleh">by esapanghegar</div></div></a>
         <p className="login-tagline">Cost model, tender &amp; quotation gudang dalam satu tempat.</p>
         <h1 style={{ fontSize: 20 }}>{mode === 'masuk' ? 'Masuk' : mode === 'daftar' ? 'Buat akun' : 'Reset password'}</h1>
         {mode === 'daftar' && (
