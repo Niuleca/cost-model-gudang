@@ -28,7 +28,9 @@
 .ld-denah { position: absolute; inset: 0; width: 100%; height: 100%; color: #3a4350; z-index: -1; }
 .ld-hero::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, var(--ld-arang) 18%, rgba(22,24,27,.86) 48%, rgba(22,24,27,.35) 100%); }
 .ld-dinding { fill: none; stroke: #6f7a88; stroke-width: 3; }
-.ld-kolom { fill: #566170; }
+.ld-kolom { fill: #93a0b0; }
+.ld-jalur { fill: rgba(239,122,31,.06); stroke: #8a6a4a; stroke-width: 1; stroke-dasharray: 6 4; }
+.ld-ukur.ungu line { stroke: #b49cf5; } .ld-ukur.ungu text { fill: #cdbdfa; }
 .ld-zona { fill: rgba(143,180,227,.05); stroke: #5d6b7d; stroke-width: 1; stroke-dasharray: 5 4; }
 .ld-baris rect { fill: rgba(143, 180, 227, .07); stroke: var(--ld-biru-muda); stroke-width: 1.2; stroke-opacity: .55; }
 .ld-bay { stroke: var(--ld-biru-muda); stroke-opacity: .28; stroke-width: 1; }
@@ -115,12 +117,15 @@
 .m-jalur { fill: #fef3c7; stroke: #d97706; stroke-width: 1; stroke-dasharray: 4 3; }
 .m-rak { fill: #dbe7f7; stroke: #1e56a0; stroke-width: 1; }
 .m-bay { stroke: #1e56a0; stroke-width: .6; stroke-opacity: .6; }
-.m-beam { stroke: #f97316; stroke-width: 2.4; }
+.m-beam { stroke: #f97316; stroke-width: 2; }
 .m-pilih .m-rak { fill: #ffedd5; stroke: #f97316; stroke-width: 2; }
 .m-kolom { fill: #475569; }
 .m-ukur line { stroke: #7c3aed; stroke-width: 1.4; }
 .m-ukur text { fill: #7c3aed; }
 .m-ukur.oranye line { stroke: #ea580c; } .m-ukur.oranye text { fill: #ea580c; }
+.m-ukur.abu line { stroke: #64748b; stroke-dasharray: 3 2; } .m-ukur.abu text { fill: #475569; font-weight: 500; }
+.ld-mini text.m-jalur-t { fill: #92400e; }
+.m-dock { fill: #2563eb; }
 .ld-mini figcaption { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--ld-garis); font-size: 13px; color: var(--ld-muted); flex-wrap: wrap; }
 .ld-mini .m-cmd { color: var(--ld-biru); font-weight: 600; }
 .ld-mini .m-st { margin-left: auto; border: 1px solid var(--ld-garis); border-radius: 5px; padding: 1px 7px; font-size: 11.5px; font-weight: 600; }
@@ -238,6 +243,8 @@
   .ld-pamer-tab button { padding: 10px 8px; font-size: 14.5px; }
   .ld-pamer-gambar { margin: 0 -16px; border-radius: 0; box-shadow: none; }
   .ld-pamer-teks h3 { font-size: 26px; }
+  .ld-mini .m-ket { display: none; }
+  .ld-mini .m-st { margin-left: auto; }
   .ld-wrap { width: calc(100% - 32px); }
   .ld-nav-isi { min-height: 56px; gap: 8px; }
   .ld-merek { font-size: 22px; }

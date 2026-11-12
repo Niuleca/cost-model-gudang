@@ -4,6 +4,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import Kontak from './Kontak';
 import MenuHp from './MenuHp';
 import Pamer3D from './Pamer3D';
+import { DENAH } from './denahContoh';
 import './situs.css';
 
 export const metadata: Metadata = {
@@ -217,55 +218,65 @@ function KartuContoh() {
   );
 }
 
-/** Latar hero: denah rak bergaya blueprint (tergambar saat halaman dibuka). */
+/** Latar hero: denah gudang bergaya blueprint dari DENAH (hasil mesin layout, skala 10 px/m), tergambar saat halaman dibuka. */
 function DenahLatar() {
-  // gudang 60 × 30 m digambar 12 px/m di sisi kanan; pasangan rak back-to-back + lorong 3,5 m, kolom tiap 6 m
-  const X0 = 700, Y0 = 120, S = 12, L = 60 * S, Wd = 30 * S;
-  const baris: { y: number; muka: 1 | -1 }[] = [];
-  for (let z = 1.5, i = 0; z + 1.1 <= 29 && i < 12; i++) { const pas = i % 2 === 0; baris.push({ y: Y0 + z * S, muka: pas ? -1 : 1 }); z += pas ? 1.1 + 0.3 : 1.1 + 3.5; }
+  const S = 10, X0 = 690, Y0 = 200, { L, W } = DENAH;
+  const px = (x: number) => X0 + x * S, pz = (z: number) => Y0 + z * S;
+  const lor = DENAH.lorong.find(l => l[0] === 'lorong')!;
   return (
     <svg className="ld-denah" viewBox="0 0 1440 720" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
       <defs>
-        <pattern id="ldkisi" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0v24" fill="none" stroke="currentColor" strokeWidth=".5" opacity=".35" /></pattern>
+        <pattern id="ldkisi" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0v20" fill="none" stroke="currentColor" strokeWidth=".5" opacity=".35" /></pattern>
       </defs>
       <rect width="1440" height="720" fill="url(#ldkisi)" />
-      <rect x={X0} y={Y0} width={L} height={Wd} className="ld-dinding" />
-      <rect x={X0 + 6} y={Y0 + 6} width={4 * S} height={Wd - 12} className="ld-zona" />
-      {Array.from({ length: 11 }, (_, a) => Array.from({ length: 6 }, (_, b) => <rect key={`${a}-${b}`} x={X0 + a * 6 * S - 3} y={Y0 + b * 6 * S - 3} width="6" height="6" className="ld-kolom" />))}
-      {baris.map((r, i) => (
+      <rect x={px(0)} y={pz(0)} width={L * S} height={W * S} className="ld-dinding" />
+      {[DENAH.stagingIn, DENAH.stagingOut].map((b, i) => <rect key={i} x={px(b[0])} y={pz(b[1])} width={b[2] * S} height={b[3] * S} className="ld-zona" />)}
+      <rect x={px(DENAH.jalur[0])} y={pz(0)} width={DENAH.jalur[2] * S} height={W * S} className="ld-jalur" />
+      {DENAH.rak.map(([x, z, w, d, h], i) => (
         <g key={i} className="ld-baris" style={{ animationDelay: `${0.15 + i * 0.07}s` }}>
-          <rect x={X0 + 8 * S} y={r.y} width={50 * S} height={1.1 * S} />
-          {Array.from({ length: 18 }, (_, b) => <line key={b} x1={X0 + 8 * S + (b + 1) * 2.7 * S} x2={X0 + 8 * S + (b + 1) * 2.7 * S} y1={r.y} y2={r.y + 1.1 * S} className="ld-bay" />)}
-          <line x1={X0 + 8 * S} x2={X0 + 58 * S} y1={r.muka === 1 ? r.y + 1.1 * S : r.y} y2={r.muka === 1 ? r.y + 1.1 * S : r.y} className="ld-beam" />
+          <rect x={px(x)} y={pz(z)} width={w * S} height={d * S} />
+          {Array.from({ length: Math.round(w / DENAH.bayW) - 1 }, (_, b) => <line key={b} x1={px(x + (b + 1) * DENAH.bayW)} x2={px(x + (b + 1) * DENAH.bayW)} y1={pz(z)} y2={pz(z + d)} className="ld-bay" />)}
+          <line x1={px(x)} x2={px(x + w)} y1={pz(h === 1 ? z + d : z)} y2={pz(h === 1 ? z + d : z)} className="ld-beam" />
         </g>
       ))}
-      <g className="ld-ukur"><line x1={X0} x2={X0 + L} y1={Y0 - 26} y2={Y0 - 26} /><path d={`M${X0 + 6} ${Y0 - 30}l-6 4 6 4M${X0 + L - 6} ${Y0 - 30}l6 4-6 4`} /><text x={X0 + L / 2} y={Y0 - 34} textAnchor="middle">60 m</text></g>
-      <g className="ld-ukur"><line x1={X0 + L + 26} x2={X0 + L + 26} y1={Y0} y2={Y0 + Wd} /><text x={X0 + L + 34} y={Y0 + Wd / 2} transform={`rotate(90 ${X0 + L + 34} ${Y0 + Wd / 2})`} textAnchor="middle">30 m</text></g>
+      {DENAH.kolom.map(([x, z], i) => <rect key={i} x={px(x) - 2.5} y={pz(z) - 2.5} width="5" height="5" className="ld-kolom" />)}
+      <g className="ld-ukur"><line x1={px(0)} x2={px(L)} y1={pz(0) - 24} y2={pz(0) - 24} /><text x={px(L / 2)} y={pz(0) - 32} textAnchor="middle">{L} m</text></g>
+      <g className="ld-ukur"><line x1={px(L) + 22} x2={px(L) + 22} y1={pz(0)} y2={pz(W)} /><text x={px(L) + 30} y={pz(W / 2)} transform={`rotate(90 ${px(L) + 30} ${pz(W / 2)})`} textAnchor="middle">{W} m</text></g>
+      <g className="ld-ukur ungu"><line x1={px(60)} x2={px(60)} y1={pz(lor[1])} y2={pz(lor[2])} /><text x={px(60) + 6} y={pz((lor[1] + lor[2]) / 2) + 5}>3,5 m</text></g>
     </svg>
   );
 }
 
-/** Cuplikan denah editor (ilustrasi). */
+/** Cuplikan editor denah: potongan dari DENAH yang sama (skala 12 px/m) — baris back-to-back terpilih + celah lorong. */
 function DenahMini() {
-  const baris = [{ y: 30, h: 1 }, { y: 54, h: -1 }, { y: 74, h: 1 }, { y: 122, h: -1 }, { y: 142, h: 1 }, { y: 190, h: -1 }];
+  const S = 12, A = 41, B = 23.4;   // area tampil: 41 × 23,4 m dari sudut dock
+  const px = (x: number) => 10 + x * S, pz = (z: number) => 10 + z * S;
+  const pilih = [3, 4];            // pasangan back-to-back di garis kolom Z = 12 m
+  const rak = DENAH.rak.filter(r => r[1] + r[3] <= B);
+  const p0 = DENAH.rak[pilih[0]], p1 = DENAH.rak[pilih[1]], sebelum = DENAH.rak[pilih[0] - 1], sesudah = DENAH.rak[pilih[1] + 1];
+  const garis = (z0: number, z1: number, x: number, kelas: string, teks: string) => (
+    <g className={kelas}><line x1={px(x)} x2={px(x)} y1={pz(z0)} y2={pz(z1)} /><text x={px(x) + 6} y={pz((z0 + z1) / 2) + 4}>{teks}</text></g>);
   return (
-    <figure className="ld-mini" aria-label="Cuplikan editor denah gudang Leca">
-      <svg viewBox="0 0 520 250">
-        <rect x="10" y="10" width="500" height="230" className="m-dinding" />
-        <rect x="18" y="18" width="56" height="214" className="m-staging" /><text x="46" y="128" transform="rotate(-90 46 128)">Staging</text>
-        <rect x="80" y="18" width="22" height="214" className="m-jalur" />
-        {baris.map((b, i) => (
-          <g key={i} className={i === 3 ? 'm-pilih' : undefined}>
-            <rect x="118" y={b.y} width="372" height="20" className="m-rak" />
-            {Array.from({ length: 11 }, (_, k) => <line key={k} x1={118 + (k + 1) * 31} x2={118 + (k + 1) * 31} y1={b.y} y2={b.y + 20} className="m-bay" />)}
-            <line x1="118" x2="490" y1={b.h === 1 ? b.y + 20 : b.y} y2={b.h === 1 ? b.y + 20 : b.y} className="m-beam" />
-          </g>
-        ))}
-        <g className="m-ukur"><line x1="300" x2="300" y1="94" y2="122" /><text x="306" y="112">3,5 m</text></g>
-        <g className="m-ukur oranye"><line x1="380" x2="380" y1="162" y2="190" /><text x="386" y="180">3,5 m</text></g>
-        {[150, 260, 370, 480].map(x => [10, 110, 210].map(y => <rect key={`${x}${y}`} x={x - 3} y={y - 3} width="6" height="6" className="m-kolom" />))}
+    <figure className="ld-mini" aria-label="Cuplikan editor denah gudang Leca (skala sebenarnya)">
+      <svg viewBox={`0 0 ${A * S + 10} ${B * S + 20}`}>
+        <rect x={px(0)} y={pz(0)} width={A * S + 20} height={B * S + 20} className="m-dinding" />
+        <rect x={px(DENAH.stagingIn[0])} y={pz(DENAH.stagingIn[1])} width={DENAH.stagingIn[2] * S} height={DENAH.stagingIn[3] * S} className="m-staging" />
+        <text x={px(3.9)} y={pz(9)} transform={`rotate(-90 ${px(3.9)} ${pz(9)})`} textAnchor="middle">Staging inbound</text>
+        <rect x={px(DENAH.jalur[0])} y={pz(0)} width={DENAH.jalur[2] * S} height={B * S + 20} className="m-jalur" />
+        <text x={px(9.6)} y={pz(16)} transform={`rotate(-90 ${px(9.6)} ${pz(16)})`} textAnchor="middle" className="m-jalur-t">Jalur utama 4 m</text>
+        {rak.map(([x, z, , d, h], i) => { const w = A - x + 1; const nb = Math.ceil(w / DENAH.bayW); return (
+          <g key={i} className={pilih.includes(i) ? 'm-pilih' : undefined}>
+            <rect x={px(x)} y={pz(z)} width={w * S} height={d * S} className="m-rak" />
+            {Array.from({ length: nb }, (_, k) => <line key={k} x1={px(x + (k + 1) * DENAH.bayW)} x2={px(x + (k + 1) * DENAH.bayW)} y1={pz(z)} y2={pz(z + d)} className="m-bay" />)}
+            <line x1={px(x)} x2={px(x + w)} y1={pz(h === 1 ? z + d : z)} y2={pz(h === 1 ? z + d : z)} className="m-beam" />
+          </g>); })}
+        {DENAH.kolom.filter(([x, z]) => x <= A + 0.5 && z <= B + 0.5).map(([x, z], i) => <rect key={i} x={px(x - 0.2)} y={pz(z - 0.2)} width={0.4 * S} height={0.4 * S} className="m-kolom" />)}
+        {garis(sebelum[1] + sebelum[3], p0[1], 21, 'm-ukur oranye', '3,5 m')}
+        {garis(p1[1] + p1[3], sesudah[1], 21, 'm-ukur oranye', '3,5 m')}
+        {garis(DENAH.rak[0][1] + DENAH.rak[0][3], DENAH.rak[1][1], 33, 'm-ukur', '3,5 m')}
+        <path d={`M${px(0) - 6} ${pz(3)} l6 3 -6 3z M${px(0) - 6} ${pz(10)} l6 3 -6 3z`} className="m-dock" />
       </svg>
-      <figcaption><span className="m-cmd">Perintah › M</span><span>Titik kedua: 0,85 m</span><span className="m-st">ORTHO</span><span className="m-st on">OSNAP</span></figcaption>
+      <figcaption><span className="m-cmd">Perintah › M</span><span className="m-ket">Skala sebenarnya · rak 1,0 m · lorong 3,5 m · kolom di celah back-to-back</span><span className="m-st">ORTHO</span><span className="m-st on">OSNAP</span></figcaption>
     </figure>
   );
 }
