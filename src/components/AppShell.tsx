@@ -69,7 +69,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const keluarMenu = () => { if (!hover()) return; if (tutupTimer.current) clearTimeout(tutupTimer.current); tutupTimer.current = setTimeout(() => setBuka(null), 450); };
   const navRef = useRef<HTMLElement>(null);
 
-  useEffect(() => { setBuka(null); }, [path]);
+  useEffect(() => { setBuka(null); setLaci(false); }, [path]);
+  // Menu HP: panel geser (laci) dengan akordeon per menu
+  const [laci, setLaci] = useState(false);
+  const [grupLaci, setGrupLaci] = useState<string | null>(null);
+  useEffect(() => {
+    document.body.classList.toggle('laci-buka', laci);
+    if (!laci) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setLaci(false); };
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('keydown', esc); document.body.classList.remove('laci-buka'); };
+  }, [laci]);
   useEffect(() => {
     const tutup = (e: MouseEvent) => { if (navRef.current && !navRef.current.contains(e.target as Node)) setBuka(null); };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setBuka(null); };
@@ -121,6 +131,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.replace('/login');
   }
 
+  const namaAkun = profile?.full_name || profile?.email?.split('@')[0] || '…';
+  const peranAkun = profile ? (profile.is_master ? 'Super Admin' : ROLE_LABEL[profile.role]) : '';
+  const menuAktif = !profile || profile.status === undefined || profile.status === 'aktif';
+  const itemLaci = (isi: Item[]) => isi.map((i, k) => (
+    <Fragment key={i.href}>
+      {i.grup && i.grup !== isi[k - 1]?.grup && <div className="laci-sub">{t(i.grup)}</div>}
+      {i.segera ? <span className="laci-item segera">{t(i.label)} <span className="pill info small">segera</span></span>
+        : <Link href={i.href} className={`laci-item${aktif(i.href) ? ' on' : ''}`} onClick={() => setLaci(false)}>{t(i.label)}
+          {i.href === '/admin/approval' && nPending > 0 && <span className="pill warn small" style={{ marginLeft: 6 }}>{nPending}</span>}</Link>}
+    </Fragment>));
+
   const Dropdown = ({ id, label, item, kanan }: { id: string; label: string; item: Item[]; kanan?: boolean }) => {
     const isi = item.filter(boleh);
     if (!isi.length) return null;
@@ -161,7 +182,43 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {Dropdown({ id: 'akun', kanan: true, item: profile && profile.status && profile.status !== 'aktif' ? [] : AKUN,
             label: `${profile?.full_name || profile?.email?.split('@')[0] || '…'}${profile ? ` · ${profile.is_master ? 'Super Admin' : ROLE_LABEL[profile.role]}` : ''}${nPending ? ` (${nPending})` : ''}` })}
         </nav>
+        <button type="button" className="burger-app" aria-label={laci ? t('Tutup menu') : t('Buka menu')} aria-expanded={laci} aria-controls="laci-app" onClick={() => setLaci(v => !v)}>
+          <span /><span /><span />
+        </button>
       </header>
+      {laci && (
+        <div className="laci-latar" onClick={() => setLaci(false)}>
+          <aside id="laci-app" className="laci" role="dialog" aria-modal="true" aria-label={t('Menu')} onClick={e => e.stopPropagation()}>
+            <div className="laci-kepala">
+              <div className="laci-akun-nama"><b>{namaAkun}</b>{peranAkun && <span>{peranAkun}{nPending ? ` · ${nPending} menunggu ACC` : ''}</span>}</div>
+              <button type="button" className="laci-tutup" aria-label={t('Tutup menu')} onClick={() => setLaci(false)}>✕</button>
+            </div>
+            {menuAktif && <nav className="laci-menu" aria-label={t('Menu utama')}>
+              {MENU.map(m => {
+                const isi = m.item.filter(boleh); if (!isi.length) return null;
+                const on = isi.some(i => aktif(i.href));
+                const terbuka = grupLaci === null ? on : grupLaci === m.id;
+                return (
+                  <section key={m.id} className="laci-grup">
+                    <button type="button" className={`laci-grup-btn${on ? ' on' : ''}`} aria-expanded={terbuka} onClick={() => setGrupLaci(terbuka ? '' : m.id)}>
+                      <span>{t(m.label)}</span><span aria-hidden="true" className={`laci-caret${terbuka ? ' buka' : ''}`}>▾</span>
+                    </button>
+                    {terbuka && <div className="laci-isi">{itemLaci(isi)}</div>}
+                  </section>);
+              })}
+            </nav>}
+            <div className="laci-setelan">
+              <label><span>{t('Bahasa')}</span>
+                <select aria-label={t('Bahasa')} value={bahasa} onChange={e => setBahasa(e.target.value as Bahasa)}>
+                  {BAHASA.map(b => <option key={b.v} value={b.v}>{b.l}</option>)}</select></label>
+              <div className="laci-satuan-wadah"><span>{t('Satuan panjang')}</span><PilihSatuanPanjang className="laci-satuan" /></div>
+            </div>
+            <div className="laci-akun">
+              {menuAktif && itemLaci(AKUN.filter(boleh))}
+              <button type="button" className="laci-keluar" onClick={keluar}>{t('Keluar')}</button>
+            </div>
+          </aside>
+        </div>)}
       {brand.wajib && brand.siap && !brand.lengkap && path !== '/akun' && <div className="notice small" role="alert" style={{ margin: '10px 24px 0' }}>
         <b>Lengkapi profil:</b> unggah {[!brand.logo && 'logo perusahaan', !brand.ttd && 'tanda tangan'].filter(Boolean).join(' & ')} Anda — wajib sebelum membuat quotation. <Link href="/akun#branding">Unggah sekarang →</Link></div>}
       <main className="main">{profile && (profile.status === 'pending' || profile.status === 'ditolak') ? (
