@@ -39,8 +39,8 @@ export function tulisAktivitas(x: Ctx) {
   const M = Math.max(3, pd.mhe.length + 3);         // slot alat (otomatis dari Rincian per task + alat indirect)
   const mpRows: MpBarisXl[] = [];
 
-  // ===================== Man Power Summary
-  AK.h2('Man Power Summary', 'Role otomatis dari kolom Role di Aktivitas (VSM) sesuai urutan muncul. FTE = Σ FTE role di Rincian per task. Shift 1–3 = hasil multi-skill pooling (bagian "Perhitungan multi-skill pooling" di bawah). Remarks otomatis.');
+  // ===================== Manpower Summary
+  AK.h2('Manpower Summary', 'Role otomatis dari kolom Role di Aktivitas (VSM) sesuai urutan muncul. FTE = Σ FTE role di Rincian per task. Shift 1–3 = hasil multi-skill pooling (bagian "Perhitungan multi-skill pooling" di bawah). Remarks otomatis.');
   AK.hdr(['Description', 'Remarks (otomatis)', ['FTE', false, 'Σ FTE role ini di Rincian per task (jenis Man Power)'], ['Man hour / bln', false, 'Σ man hour role ini di Rincian per task'],
     ['Shift 1', false, 'Orang di shift 1 = orang tetap (bagian bulat FTE shift) + orang baru dari pooling. Lihat tabel pooling Shift 1.'], ['Shift 2', false, 'Sama dengan Shift 1, untuk shift 2'], ['Shift 3', false, 'Sama dengan Shift 1, untuk shift 3'],
     ['Resources', false, 'Shift 1 + Shift 2 + Shift 3'], ['Biaya/orang/bln (incl. fee)', false, 'Total per orang di Rincian biaya manpower × porsi × (1 + management fee)'], ['Total/bln', false, 'Biaya/orang × Resources'], ['ROUNDUP(FTE) tanpa pooling', false, 'Pembanding: jumlah orang bila tiap role dibulatkan sendiri tanpa multi-skill']]);
@@ -147,7 +147,7 @@ export function tulisAktivitas(x: Ctx) {
   const pm = { ...PARAM_BIAYA_MP_DEFAULT, ...h.paramBiayaMp };
   const lg = { ...LEVEL_GAJI_DEFAULT, ...(a.levelGaji ?? {}) };
   AK.r++;
-  AK.h2('Rincian biaya manpower', 'Baris jabatan otomatis dari Man Power Summary (direct), supervisor & peran tetap. Isian khusus per jabatan (gaji, hari kerja, lisensi, sharing, level) diisi di tabel "Isian manual per jabatan"; kosong = default.');
+  AK.h2('Rincian biaya manpower', 'Baris jabatan otomatis dari Manpower Summary (direct), supervisor & peran tetap. Isian khusus per jabatan (gaji, hari kerja, lisensi, sharing, level) diisi di tabel "Isian manual per jabatan"; kosong = default.');
   AK.field('UMK area project', { f: 'UMK', v: m.upahMinimum }, 'rp', 'out', 'Rp/bln', 'ganti area di Key Assumption');
   AK.field('Area', { f: 'Kab', v: t.kab_kota }, 'teks', 'out');
   AK.h3('% gaji pokok per level jabatan');
@@ -196,7 +196,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.r++;
   AK.hdr(['No', 'Jabatan', 'Area', 'UMK', ['Level', false, 'Isian manual, kosong = dari nama jabatan'], '% level', 'Gaji pokok (manual)', ['Gaji pokok', false, 'Manual bila diisi, kosong = ROUND(UMK × % level)'], 'Hari kerja (manual)', 'Hari kerja',
     'Actual (manual)', 'Actual hari kerja', 'Lisensi + insentif (manual)', 'Lisensi + insentif', ['Sub total', false, 'Gaji × MIN(1, actual ÷ hari kerja) + lisensi'], ['BPJS TK', false, 'Gaji × BPJS TK'], ['BPJS KS', false, 'MIN(gaji, batas) × BPJS KS'],
-    ['BPJS Pensiun', false, 'MIN(gaji, batas JP) × BPJS JP'], ['THR', false, 'Gaji × THR'], ['Kompensasi', false, 'Gaji × kompensasi'], 'Supervisi & operasional', ['Total', false, 'Sub total + BPJS + THR + kompensasi + supervisi'], ['Manpower', false, 'Dari Man Power Summary / supervisor / peran tetap (0 bila jabatan tidak ada di master)'],
+    ['BPJS Pensiun', false, 'MIN(gaji, batas JP) × BPJS JP'], ['THR', false, 'Gaji × THR'], ['Kompensasi', false, 'Gaji × kompensasi'], 'Supervisi & operasional', ['Total', false, 'Sub total + BPJS + THR + kompensasi + supervisi'], ['Manpower', false, 'Dari Manpower Summary / supervisor / peran tetap (0 bila jabatan tidak ada di master)'],
     'Dedicated / Sharing', 'Porsi sharing', ['TOTAL', false, 'Total × manpower × porsi'], ['Biaya/bln dasar (+fee)', false, 'Total × (1 + fee) × manpower × porsi'], ['Biaya/bln (× eskalasi)', false, 'ROUND(dasar × faktor eskalasi) → masuk Rincian biaya (Hasil)'], 'Jenis', 'Baris isian',
     ['Sto', false, 'Alokasi biaya ke Storage = man hour arus storage ÷ total man hour role'], 'HIn', 'HOut', 'VAS', 'Man']);
   const b0 = AK.r;
@@ -250,7 +250,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.put(2, { f: `"Management Fee "&FIXED(Fee*100,2)&"%"` }, { j: 'txt' }); AK.put(26, { f: `Z${rSt1}*Fee` }, { j: 'out', fmt: 'rp' }); AK.r++;
   AK.put(2, 'Sub Total Biaya-2 (masuk cost model, sebelum kenaikan tahunan)', { j: 'tot' }); AK.put(26, { f: `Z${rSt1}+Z${rSt1 + 1}` }, { j: 'tot', fmt: 'rp' }); AK.r++;
   AK.note('Jabatan yang belum ada di master Jabatan (job level) tidak dibiayai (Manpower = 0), sama dengan web — tambahkan di master lalu export ulang.');
-  // biaya per orang di Man Power Summary
+  // biaya per orang di Manpower Summary
   for (const z of mpRows) {
     AK.put(9, { f: `V${z.row}*Y${z.row}*(1+Fee)` }, { j: 'out', fmt: 'rp' }, z.sumRow);
     AK.put(10, { f: `I${z.sumRow}*H${z.sumRow}` }, { j: 'out', fmt: 'rp' }, z.sumRow);
@@ -340,7 +340,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.h2('Perhitungan multi-skill pooling per shift', 'Langkah (sama dengan web): 1) FTE shift = Σ FTE role per arus × % workload arus di shift itu. 2) Orang tetap = bagian bulat FTE (TKBM/Helper: dibulatkan ke atas, tidak dirangkap). 3) Sisa (pecahan) diurutkan dari terbesar. 4) Tiap sisa ditumpangkan ke orang yang sudah ada, masih punya sisa waktu ≥ sisa tsb & boleh merangkap (matriks) — dipilih yang sisa waktunya paling kecil; bila tidak ada → +1 orang baru (sisa waktunya = 1 − sisa).');
   AK.h3('Data role');
   AK.hdr(['No', 'Role', ['Kategori', false, 'Dari nama role: admin / operator / checker / picker / nonkaryawan (TKBM, helper) / lain'], ['TKBM / helper?', false, '1 = non-karyawan: dibulatkan sendiri, tidak merangkap/dirangkap'],
-    ['FTE inbound', false, 'SUMIFS FTE role arus inbound (Rincian per task)'], 'FTE outbound', 'FTE storage + VAS', ['Status', false, 'Dipakai Remarks di Man Power Summary']]);
+    ['FTE inbound', false, 'SUMIFS FTE role arus inbound (Rincian per task)'], 'FTE outbound', 'FTE storage + VAS', ['Status', false, 'Dipakai Remarks di Manpower Summary']]);
   const dr0 = AK.r;
   for (let i = 1; i <= N; i++) {
     const r = AK.r;
@@ -456,7 +456,7 @@ export function tulisAktivitas(x: Ctx) {
     ['Prod DB', false, 'Produktivitas di database Productivity (bila aktivitas dari DB)'], 'Status vs DB', 'Id DB', ['Admin?', false, 'Role mengandung "admin", UoM order/line/dokumen, arus inbound/outbound'], 'Proses', 'Muat',
     ['Baris volume', false, 'Nomor baris arus ini di tabel Volume'], ['UoM arus', false, 'UoM volume arus (dinormalkan: case/karton/dus = case)'], ['UoM aktivitas', false, 'UoM aktivitas (dinormalkan)'], ['Isi palet', false, '1 palet = … case (Volume)'],
     ['Isi per UoM', false, 'per1 (Volume)'], 'UoM isi', ['Isi kecil', false, 'per2 (Volume)'], 'UoM kecil', ['Faktor UoM', false, 'Sama = 1 · case→palet = 1 ÷ isi palet · UoM isi = isi per UoM · UoM kecil = isi × isi kecil · x = tidak dikenal'],
-    ['Pengali efektif', false, 'Pengali manual bila ≠ 1, kalau tidak faktor UoM (x → 1)'], ['Peak arus', false, 'Peak efektif arus (Volume)'], ['Role pertama?', false, '1 = baris pertama role ini (dasar daftar Man Power Summary)'], 'No role', ['Bobot alat', false, 'Peak × % × pengali ÷ prod — dasar alokasi biaya MHE per arus (sama dengan web)']]);
+    ['Pengali efektif', false, 'Pengali manual bila ≠ 1, kalau tidak faktor UoM (x → 1)'], ['Peak arus', false, 'Peak efektif arus (Volume)'], ['Role pertama?', false, '1 = baris pertama role ini (dasar daftar Manpower Summary)'], 'No role', ['Bobot alat', false, 'Peak × % × pengali ÷ prod — dasar alokasi biaya MHE per arus (sama dengan web)']]);
   const vs0 = AK.r, vs1 = vs0 + aktRows.length - 1;
   const aktEf = h.aktivitas;
   aktRows.forEach((z, i) => {
@@ -502,7 +502,7 @@ export function tulisAktivitas(x: Ctx) {
     AK.r++;
   });
   AK.nmR('VSM_Role', 6, vs0, vs1); AK.nmR('VSM_RoleNo', 35, vs0, vs1); AK.nmR('VSM_Tool', 4, vs0, vs1); AK.nmR('VSM_Arus', 9, vs0, vs1); AK.nmR('VSM_Bobot', 36, vs0, vs1);
-  AK.note(`${aktivitasAktif(a.aktivitas).length} aktivitas aktif${a.aktivitas.length > aktivitasAktif(a.aktivitas).length ? ` (${a.aktivitas.length - aktivitasAktif(a.aktivitas).length} dimatikan di Landmark VSM, tidak dihitung)` : ''} + 5 baris kosong untuk tambahan. Role / alat baru di VSM otomatis masuk Man Power Summary, MHE Summary, pooling & biaya (selama slot masih ada: ${N} role, ${M} alat).`);
+  AK.note(`${aktivitasAktif(a.aktivitas).length} aktivitas aktif${a.aktivitas.length > aktivitasAktif(a.aktivitas).length ? ` (${a.aktivitas.length - aktivitasAktif(a.aktivitas).length} dimatikan di Landmark VSM, tidak dihitung)` : ''} + 5 baris kosong untuk tambahan. Role / alat baru di VSM otomatis masuk Manpower Summary, MHE Summary, pooling & biaya (selama slot masih ada: ${N} role, ${M} alat).`);
   // Rincian per task — rumus (rujuk baris VSM)
   for (const p of pending) {
     const r = p.r, v = vs0 + p.i;

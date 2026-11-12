@@ -1,4 +1,5 @@
 'use client';
+import { saranGudang, solusiUntuk, type Saran } from '@/lib/solusiFlag';
 import VsmMapPanel from './VsmMapPanel';
 import { InputPanjang, useSatuanPanjang } from '@/lib/satuanPanjang';
 import { T, useT } from '@/lib/i18n';
@@ -168,7 +169,7 @@ export default function TenderPage() {
     window.addEventListener('storage', f);
     return () => window.removeEventListener('storage', f);
   }, [id, muat]);
-  // Data master (UMK, jabatan, payroll) untuk biaya default per orang di Man Power Summary
+  // Data master (UMK, jabatan, payroll) untuk biaya default per orang di Manpower Summary
   const [masterMp, setMasterMp] = useState<Awaited<ReturnType<typeof muatMaster>>['master'] | null>(null);
   const kunciMaster = t ? `${t.id}|${t.kab_kota}|${t.provinsi}` : '';
   useEffect(() => { if (!t) return; muatMaster(sb, t).then(r => setMasterMp(r.master)).catch(() => {}); }, [kunciMaster]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -871,7 +872,7 @@ export default function TenderPage() {
         </div>
       </>)}
 
-      {tab === 'Result' && <HasilPanel belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
+      {tab === 'Result' && <HasilPanel onBukaTab={x => setTab(x as (typeof TABS)[number])} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} hariTarif={a.hariTarifHarian} onHariTarif={hariTarifHarian => setA({ hariTarifHarian })} uomManual={a.uomManual ?? {}} onUomManual={uomManual => setA({ uomManual })} onBukaAlokasi={() => setTab('Cost Allocation')}
@@ -906,8 +907,9 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, uomManual, onUomManual, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif }: {
+function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, uomManual, onUomManual, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, onBukaTab, saran }: {
   onBukaAlokasi: () => void; hariTarif?: number; onHariTarif: (n: number | undefined) => void;
+  onBukaTab: (tab: string) => void; saran: Saran[];
   uomManual: Partial<Record<Bucket, { uom: string; volume: number }>>; onUomManual: (u: Partial<Record<Bucket, { uom: string; volume: number }>>) => void;
   layananJual: Partial<Record<Bucket, 'jual' | 'termasuk'>>; onLayananJual: (x: Partial<Record<Bucket, 'jual' | 'termasuk'>>) => void;
   tambahan: TarifTambahanInput[]; onTambahan: (x: TarifTambahanInput[]) => void;
@@ -951,9 +953,16 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
         {sembunyiFlag && h.redFlags.length > 0 && <p className="small muted">
           {(['kritis', 'peringatan', 'info'] as const).map(l => { const n = h.redFlags.filter(f => f.level === l).length; return n ? <span key={l} className={`pill ${l === 'kritis' ? 'bad' : l === 'peringatan' ? 'warn' : 'info'}`} style={{ marginRight: 6 }}>{n} {l}</span> : null; })}
           disembunyikan — tekan Tampilkan untuk melihat detail.</p>}
-        {!sembunyiFlag && h.redFlags.map((f, i) => <div key={i} className={`flag ${f.level}`}><b className="small">{f.level.toUpperCase()} · {f.kode}</b><div>{f.pesan}</div></div>)}
+        {!sembunyiFlag && h.redFlags.map((f, i) => { const so = solusiUntuk(f.kode); return <div key={i} className={`flag ${f.level}`}><b className="small">{f.level.toUpperCase()} · {f.kode}</b><div>{f.pesan}</div>
+          {so && <div className="solusi"><b>Solusi:</b> {so.solusi}{so.tab && <> <button className="link-kecil" onClick={() => onBukaTab(so.tab!)}>Buka {so.tab} →</button></>}</div>}</div>; })}
         {!sembunyiFlag && catatan.length > 0 && <p className="small muted">Catatan master data ikut dimasukkan sebagai red flag MASTER_DATA.</p>}
       </div>
+
+      {saran.length > 0 && <div className="card">
+        <h2>Saran solusi gudang</h2>
+        <p className="small muted">Peluang efisiensi & mitigasi risiko dari angka tender ini — pertimbangkan sebelum quotation final.</p>
+        <div className="saran-gudang">{saran.map((x, i) => <div key={i} className="saran"><i>{i + 1}</i><div><b>{x.judul}</b><div className="small">{x.isi}{x.tab && <> <button className="link-kecil" onClick={() => onBukaTab(x.tab!)}>Buka {x.tab} →</button></>}</div></div></div>)}</div>
+      </div>}
 
       {h.alokasiLayanan && <div className="card row" style={{ justifyContent: 'space-between', gap: 8 }}>
         <span className="small"><b>Pembagian biaya ke layanan:</b> {h.alokasiLayanan.matriks?.filter(r => r.override).length ? `${h.alokasiLayanan.matriks.filter(r => r.override).length} kategori diubah` : 'default simulasi (cost-to-serve)'}

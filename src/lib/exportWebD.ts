@@ -394,7 +394,7 @@ export function tulisHasil(x: Ctx) {
   // ===================== Kebutuhan manpower & MHE
   HS.r++;
   HS.h2('Kebutuhan manpower & MHE', 'Hanya jumlah (orang / unit). Biayanya ada di Rincian biaya per bulan (kategori Manpower & MHE).');
-  HS.hdr(['Role', 'Jenis', ['FTE', false, 'Dari Man Power Summary'], ['Orang per shift', false, 'Hasil pooling (Man Power Summary)'], ['Headcount', false, 'Manpower di Rincian biaya manpower'], ['Utilisasi', false, 'FTE ÷ headcount'], 'Skema']);
+  HS.hdr(['Role', 'Jenis', ['FTE', false, 'Dari Manpower Summary'], ['Orang per shift', false, 'Hasil pooling (Manpower Summary)'], ['Headcount', false, 'Manpower di Rincian biaya manpower'], ['Utilisasi', false, 'FTE ÷ headcount'], 'Skema']);
   const AKN = `'${x.AK.nama}'!`;
   const mpRows = x.mpRows as MpBarisXl[];
   for (const z of mpRows) {

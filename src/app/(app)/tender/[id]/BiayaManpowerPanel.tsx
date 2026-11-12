@@ -33,7 +33,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
   return (
     <div className="card" style={{ gap: 10 }}>
       <h2><T>Rincian biaya manpower</T></h2>
-      <p className="small muted">Jumlah orang dari Man Power Summary. Kotak kosong = default (gaji pokok = UMK area × % level jabatan; lisensi & insentif = tunjangan jabatan; hari kerja = Working Days Employee).
+      <p className="small muted">Jumlah orang dari Manpower Summary. Kotak kosong = default (gaji pokok = UMK area × % level jabatan; lisensi & insentif = tunjangan jabatan; hari kerja = Working Days Employee).
         BPJS, THR & kompensasi dihitung dari gaji pokok; <b>Sharing</b> = biaya orang dibagi beberapa project (0,5 = pegang 2 project, 0,25 = 4 project); gaji dibayar = gaji pokok × actual hari kerja ÷ hari kerja.</p>
       <div className="umk-box">
         <div><div className="small muted">UMK area project</div><b style={{ fontSize: 18 }}>{umk ? rp(umk) : 'memuat…'}</b><span className="small muted"> /bln</span></div>

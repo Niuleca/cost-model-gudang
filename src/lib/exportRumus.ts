@@ -235,7 +235,7 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
   const p1 = S3.r - 1;
   const rgRes = `'${S3.nama}'!$E$${p0}:$E$${p1}`, rgJenis = `'${S3.nama}'!$F$${p0}:$F$${p1}`, rgFte = `'${S3.nama}'!$R$${p0}:$R$${p1}`, rgMh = `'${S3.nama}'!$O$${p0}:$O$${p1}`;
   S3.kosong();
-  S3.bagian('Man Power Summary (direct)', 'FTE = Σ FTE per role · Headcount = hasil pooling multi-skill di web (bagian bulat FTE + sisa dirangkap sesuai matriks)');
+  S3.bagian('Manpower Summary (direct)', 'FTE = Σ FTE per role · Headcount = hasil pooling multi-skill di web (bagian bulat FTE + sisa dirangkap sesuai matriks)');
   const km: Kol[] = [{ h: '' }, { h: 'Role' }, { h: 'FTE', fmt: 'n3' }, { h: 'Man hour / bln', fmt: 'n2' }, { h: 'ROUNDUP(FTE)', fmt: 'n0' }, { h: 'Headcount (pooling)', fmt: 'n0', jenis: 'input' }, { h: 'Utilisasi', fmt: 'pct' }, { h: 'Catatan rangkap' }];
   const m0 = S3.header(km);
   S3.ws.mergeCells(m0 - 1, 8, m0 - 1, 18);

@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type CSSPr
 
 import { DESIMAL, aturSatuanAktif, konversiPanjang, type SatuanPanjang } from '@/lib/satuanPanjangInti';
 export { DESIMAL, konversiPanjang, type SatuanPanjang };
-export const SATUAN_PANJANG: { v: SatuanPanjang; l: string }[] = [{ v: 'm', l: 'meter (m)' }, { v: 'cm', l: 'centimeter (cm)' }, { v: 'mm', l: 'milimeter (mm)' }];
+export const SATUAN_PANJANG: { v: SatuanPanjang; l: string }[] = [{ v: 'm', l: 'm' }, { v: 'cm', l: 'cm' }, { v: 'mm', l: 'mm' }];
 const bulat = (x: number, d: number) => { const f = 10 ** d; return Math.round(x * f) / f; };
 
 const KUNCI = 'leca.satuanPanjang';

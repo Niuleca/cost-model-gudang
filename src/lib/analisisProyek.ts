@@ -124,7 +124,7 @@ export function analisisAkar(ms: Metrik[]): Temuan[] {
   if (hc.status === 'merah' || (hc.persen != null && hc.persen > 0.05 && (vol == null || vol < hc.persen - 0.05))) T.push({ kode: 'hc', judul: 'Manpower melebihi rencana', tingkat: tk(hc),
     bukti: `Headcount ${pct(hc.persen)} vs rencana dengan volume ${pct(vol)}`,
     akar: ['Lembur & tenaga harian dipakai menutup produktivitas rendah', 'Peran tambahan di luar rencana (admin, checker, cleaning) belum ada di cost model', 'Shift pattern tidak mengikuti profil volume per jam'],
-    tindakan: ['Rekonsiliasi daftar karyawan vs Man Power Summary di cost model', 'Atur roster mengikuti profil order per jam (peak shifting)', 'Batasi lembur dengan approval; ganti tenaga harian dengan pola tetap bila rutin', 'Ajukan biaya peran tambahan ke customer bila permintaan customer (change request)'] });
+    tindakan: ['Rekonsiliasi daftar karyawan vs Manpower Summary di cost model', 'Atur roster mengikuti profil order per jam (peak shifting)', 'Batasi lembur dengan approval; ganti tenaga harian dengan pola tetap bila rutin', 'Ajukan biaya peran tambahan ke customer bila permintaan customer (change request)'] });
   if (util.status !== 'kosong' && util.aktual != null && util.pita && util.aktual > util.pita[1]) T.push({ kode: 'util-tinggi', judul: 'Space hampir penuh', tingkat: util.status === 'merah' ? 'merah' : 'kuning',
     bukti: `Utilisasi ${Math.round(util.aktual * 100)}% (rencana ${util.rencana != null ? Math.round(util.rencana * 100) : '—'}%)`,
     akar: ['Stok menumpuk: slow moving / dead stock / barang reject belum dikembalikan', 'Inbound lebih cepat dari outbound (forecast & PO customer tidak sinkron)', 'Kapasitas rak lebih kecil dari desain (level / beban)'],

@@ -288,7 +288,7 @@ tr.kat-link:hover td { background: var(--res); }
 
 .panduan-btn { padding: 4px 10px; font-size: 13px; white-space: nowrap; text-decoration: none; }
 
-/* Man Power Summary dengan kolom per shift */
+/* Manpower Summary dengan kolom per shift */
 .pd-sum.pd-sum-shift { table-layout: auto; min-width: 1060px; }
 .pd-sum.pd-sum-shift th { width: auto !important; }
 .pd-sum.pd-sum-shift th:nth-child(1) { width: 15% !important; } .pd-sum.pd-sum-shift th:nth-child(2) { width: 30% !important; }
@@ -758,3 +758,93 @@ tr.akt-nonaktif td:first-child { opacity: 1; }
 .lm-wi-btn { cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; min-height: 0; line-height: 1.5; color: inherit; }
 .lm-wi-btn:hover:not(:disabled) { background: #ffe58a; }
 .lm-wi-btn:disabled { cursor: default; opacity: .6; }
+
+/* =====================================================================================
+   Tema "Rak & lantai gudang" — warna dari rak selective (upright biru, beam oranye) dan
+   marka lantai (garis kuning-hitam). Satu elemen menonjol: penanda tab / menu aktif seperti
+   lakban marka lantai. Sisanya tenang: abu beton, garis tipis, angka tabular.
+   ===================================================================================== */
+:root {
+  --bg: #eef0f3; --surface: #ffffff; --surface-2: #f6f7f9;
+  --ink: #1d2733; --muted: #5d6875; --line: #dde2e8; --line-strong: #bcc4ce;
+  --rak: #1f5fa8; --rak-gelap: #174b86; --rak-muda: #e8f0fa; --beam: #f07c1a; --marka: #f5c518;
+  --accent: var(--rak); --accent-ink: #ffffff;
+  --res: #eef4fb; --res-strong: #dce9f7; --res-ink: #163f6c; --res-line: #c3d6ec;
+  --ok: #1f7a46; --warn: #9a5b00; --bad: #b3261e;
+  --shadow: 0 1px 2px rgba(29,39,51,.05);
+  --radius: 10px;
+  --marka-garis: repeating-linear-gradient(-45deg, var(--marka) 0 8px, #1d2733 8px 16px);
+}
+body { background: var(--bg); color: var(--ink); }
+a { color: var(--rak); }
+
+/* ---------- Header: satu baris, ringkas ---------- */
+.topbar { flex-wrap: nowrap; gap: 16px; min-height: 56px; background: rgba(255,255,255,.96); box-shadow: 0 1px 0 var(--line); }
+.topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px; height: 3px; background: var(--marka-garis); opacity: .9; }
+.topnav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; }
+.topnav::-webkit-scrollbar { display: none; }
+.ddbtn { padding: 17px 10px 15px; font-size: 14px; }
+.ddbtn.on { border-bottom: 3px solid var(--beam); color: var(--ink); }
+.bahasa-pilih { margin-right: 2px; flex: none; }
+.bahasa-pilih select { max-width: 150px; padding: 4px 22px 4px 7px; font-size: 12px; text-overflow: ellipsis; }
+.bahasa-pilih select[aria-label='Satuan panjang'] { max-width: 64px; }
+.dd:last-child .ddbtn { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+.ddmenu { z-index: 70; }
+@media (max-width: 1180px) { .brand-oleh { display: none; } .ddbtn { padding-left: 8px; padding-right: 8px; } .dd:last-child .ddbtn { max-width: 160px; } }
+
+/* ---------- Tombol ---------- */
+button, .btn { border-radius: 8px; font-weight: 600; }
+button:hover:not(:disabled), .btn:hover { background: var(--rak-gelap); border-color: var(--rak-gelap); }
+button.ghost, .btn.ghost { background: #fff; color: var(--ink); border-color: var(--line-strong); font-weight: 500; }
+button.ghost:hover:not(:disabled), .btn.ghost:hover { background: var(--rak-muda); border-color: var(--rak); color: var(--rak-gelap); }
+button.danger:hover:not(:disabled) { background: #fdf0ef; border-color: var(--bad); }
+input:focus, select:focus, textarea:focus { border-color: var(--rak); box-shadow: 0 0 0 3px rgba(31,95,168,.14); }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--rak); }
+
+/* ---------- Tab tender: penanda aktif = lakban marka lantai ---------- */
+.tabs { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 2px; width: 100%; }
+.tabs button { color: var(--muted); font-weight: 500; padding: 7px 13px 10px; border-radius: 8px; position: relative; font-size: 13.5px; }
+.tabs button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.tabs button.on, .tabs button.on:hover:not(:disabled) { background: var(--ink); color: #fff; box-shadow: none; font-weight: 600; }
+.tabs button.on::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 3px; height: 3px; border-radius: 2px; background: var(--marka-garis); }
+
+/* ---------- Kartu & judul ---------- */
+.card { box-shadow: var(--shadow); border-color: var(--line); }
+.card > h2:first-child, .card > .row:first-child > h2 { padding-left: 10px; border-left: 4px solid var(--rak); line-height: 1.25; }
+
+/* ---------- Tabel: ringkas, angka tabular, teks panjang dipotong (klik untuk lihat semua) ---------- */
+.tablewrap { border-radius: 10px; }
+table { font-size: 13px; }
+th, td { padding: 6px 9px; vertical-align: middle; }
+th { background: #f2f4f7; color: #44505d; font-size: 11.5px; font-weight: 600; letter-spacing: .01em; border-bottom: 1px solid var(--line-strong); }
+tbody tr:hover > td { background-color: color-mix(in srgb, var(--rak-muda) 55%, transparent); }
+td input, td select { padding: 4px 7px; font-size: 13px; min-height: 30px; }
+td button { padding: 4px 10px; font-size: 12.5px; }
+.main td:not(:has(input, select, textarea, button, svg, table, .no-potong)):not(.potong-bebas) {
+  max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.main td.potong-ada { cursor: zoom-in; }
+.main td.buka { white-space: normal !important; overflow: visible !important; max-width: none !important; cursor: zoom-out; background: #fffbea; }
+/* tabel yang memang berisi paragraf: tetap membungkus */
+.main .sp-tabel td, .main .vsm-sop td, .main table.bungkus td, .main .sop-tabel td { white-space: normal; max-width: none; overflow: visible; }
+
+/* ---------- Form: label 1–2 baris sejajar, kotak isian sama tinggi ---------- */
+.grid2, .grid3, .grid4 { align-items: start; }
+.grid2 > label.f, .grid3 > label.f, .grid4 > label.f { grid-template-rows: minmax(2.7em, auto); align-items: end; line-height: 1.35; }
+.grid2 > label.f > input, .grid2 > label.f > select, .grid3 > label.f > input, .grid3 > label.f > select, .grid4 > label.f > input, .grid4 > label.f > select { height: 38px; }
+
+/* ---------- Status ---------- */
+.flag { background: #fff; border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 8px 12px; }
+.flag .solusi { margin-top: 4px; font-size: 13px; color: var(--ink); }
+.flag .solusi b { color: var(--rak-gelap); }
+.kpi { background: #fff; border-color: var(--line); border-top: 3px solid var(--rak); }
+.kpi b { color: var(--ink); }
+.notice { background: #fff; border-color: var(--line); border-left: 4px solid var(--marka); }
+.saran-gudang { display: grid; gap: 8px; }
+.saran-gudang .saran { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.saran-gudang .saran i { font-style: normal; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--rak-muda); color: var(--rak-gelap); font-weight: 700; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+td .row > span, td .row > label { white-space: nowrap; }
+.flag.kritis, .flag.peringatan, .flag.info { border-color: var(--line); }
+.flag.kritis { border-left-color: var(--bad); background: #fffafa; } .flag.peringatan { border-left-color: var(--marka); } .flag.info { border-left-color: var(--line-strong); }
+.flag > b.small { color: var(--muted); letter-spacing: .02em; }

@@ -80,7 +80,7 @@ const K: Kamus = {
   'Area / kab-kota (menentukan UMK)': ['Area / regency-city (sets minimum wage)', '지역 / 시·군 (최저임금 기준)', '地域 / 県・市（最低賃金の基準）'],
   'Go-live (menentukan tahun kalender & UMK)': ['Go-live (sets calendar year & minimum wage)', '운영 개시일 (연도·최저임금 기준)', '稼働開始日（暦年・最低賃金の基準）'],
   // Bagian
-  'Man Power Summary': ['Manpower Summary', '인력 요약', '人員サマリー'],
+  'Manpower Summary': ['Manpower Summary', '인력 요약', '人員サマリー'],
   'MHE Summary': ['MHE Summary', '하역장비 요약', 'MHEサマリー'],
   'Rincian biaya manpower': ['Manpower cost breakdown', '인건비 내역', '人件費内訳'],
   'Rincian per task': ['Breakdown per task', '작업별 내역', 'タスク別内訳'],

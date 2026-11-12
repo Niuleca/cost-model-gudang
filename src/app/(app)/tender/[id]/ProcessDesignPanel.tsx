@@ -103,7 +103,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
       <p className="small muted">FTE alat dari Value Stream Mapping; unit = ROUNDUP(FTE) + spare.</p>
     </div>);
   if (bagian === 'ringkasan') {
-    // Man Power Summary = direct (process design) + indirect (supervisor) + peran tetap, dalam satu tabel
+    // Manpower Summary = direct (process design) + indirect (supervisor) + peran tetap, dalam satu tabel
     const ind = h.indirect.rows;
     // Kolom per shift (hanya shift yang punya workload); peran tetap basis "total" tidak dibagi per shift
     const sIdx: number[] = (h.shiftAktifIdx ?? []).length > 1 ? h.shiftAktifIdx : [];
@@ -128,7 +128,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
       <div className="card" style={{ gap: 10 }}>
         <div>
           <div style={{ minWidth: 0 }}>
-            <h3><T>Man Power Summary</T></h3>
+            <h3><T>Manpower Summary</T></h3>
             <div className="tablewrap"><table className={`pd-sum${biaya ? " pd-sum-biaya" : ""}${nS ? " pd-sum-shift" : ""}`}>
               <thead><tr><th>Description</th><th>Remarks</th><th className="num" title={TIP_FTE}>FTE<div className="small muted" style={{ fontWeight: 400 }}>Full Time Equivalent</div></th>
                 {sIdx.map(si => <th key={si} className="num">Shift {si + 1}<div className="small muted" style={{ fontWeight: 400 }}>orang</div></th>)}

@@ -90,6 +90,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const brand = useBrandingSaya(profile);
   useEffect(() => { brand.muat(); }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Sel tabel yang terpotong (…): tampilkan teks lengkap saat disorot, klik untuk membuka / menutup
+  useEffect(() => {
+    const sel = (e: Event) => (e.target as HTMLElement | null)?.closest?.('.main td') as HTMLTableCellElement | null;
+    const sorot = (e: Event) => {
+      const td = sel(e); if (!td || td.classList.contains('buka')) return;
+      const terpotong = td.scrollWidth > td.clientWidth + 1;
+      td.classList.toggle('potong-ada', terpotong);
+      if (terpotong && !td.title) td.title = (td.innerText || '').trim().slice(0, 600);
+    };
+    const klik = (e: Event) => {
+      const t = e.target as HTMLElement; if (t.closest('a, button, input, select, textarea, label, summary')) return;
+      const td = sel(e); if (!td) return;
+      if (td.classList.contains('buka')) td.classList.remove('buka');
+      else if (td.classList.contains('potong-ada') || td.scrollWidth > td.clientWidth + 1) td.classList.add('buka');
+    };
+    document.addEventListener('mouseover', sorot); document.addEventListener('click', klik);
+    return () => { document.removeEventListener('mouseover', sorot); document.removeEventListener('click', klik); };
+  }, []);
   // Jumlah akun menunggu persetujuan (badge untuk Super Admin)
   const [nPending, setNPending] = useState(0);
   useEffect(() => {
@@ -150,7 +168,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="card" style={{ maxWidth: 560, margin: '40px auto' }}>
           <h2>{profile.status === 'pending' ? 'Menunggu persetujuan' : 'Pendaftaran ditolak'}</h2>
           {profile.status === 'pending'
-            ? <p>Akun <b>{profile.email}</b> sudah terdaftar dan sedang menunggu persetujuan (ACC) Admin. Setelah disetujui dan diberi role, menu Leca akan terbuka — muat ulang halaman ini nanti. Terimakasih<br />CP : 088291919234 / Email : Niuleca@gmail.com</p>
+            ? <p>Akun <b>{profile.email}</b> sudah terdaftar dan sedang menunggu persetujuan (ACC) Admin. Setelah disetujui dan diberi role, menu Leca akan terbuka — muat ulang halaman ini nanti. Terima kasih<br />CP : 088291919234 / Email : Niuleca@gmail.com</p>
             : <p>Pendaftaran akun <b>{profile.email}</b> tidak disetujui. Hubungi Super Admin bila ini keliru.</p>}
           <div className="row"><button className="ghost" onClick={() => location.reload()}>Muat ulang</button><button onClick={keluar}>Keluar</button></div>
         </div>) : children}</main>
