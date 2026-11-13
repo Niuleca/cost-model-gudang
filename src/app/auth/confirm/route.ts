@@ -12,5 +12,5 @@ export async function GET(request: Request) {
     const { error } = await supabaseServer().auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) return NextResponse.redirect(`${origin}${next}`);
   }
-  return NextResponse.redirect(`${origin}${next.startsWith('/auth/terdaftar') ? '/auth/terdaftar?status=gagal' : '/login?error=link'}`);
+  return NextResponse.redirect(`${origin}${next.startsWith('/auth/terdaftar') ? '/auth/terdaftar?status=gagal' : type === 'recovery' ? '/login?error=reset&mode=lupa' : '/login?error=link'}`);
 }

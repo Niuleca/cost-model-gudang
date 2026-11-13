@@ -950,3 +950,6 @@ p.ok { color: var(--ok); }
 .bagi-contoh { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; font-size: 13px; }
 .bagi-contoh input { width: auto; margin-top: 3px; }
 @media (max-width: 560px) { .bagi-form { grid-template-columns: 1fr; } }
+.pw-kolom { display: flex; gap: 6px; align-items: stretch; }
+.pw-kolom input { flex: 1; min-width: 0; }
+.pw-lihat { flex: none; padding-inline: 10px; font-size: 13px; }

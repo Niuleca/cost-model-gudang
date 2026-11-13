@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import InputPassword from '@/components/InputPassword';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useProfile } from '@/lib/useProfile';
 import { ROLE_LABEL } from '@/lib/format';
@@ -69,7 +70,7 @@ export default function AkunPage() {
       </form>
       <form className="card" onSubmit={simpan} style={{ maxWidth: 560 }}>
         <h2>Ganti password</h2>
-        <label className="f" htmlFor="pw">Password baru<input id="pw" type="password" minLength={8} required value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" /></label>
+        <InputPassword id="pw" label="Password baru" value={pw} onChange={setPw} autoComplete="new-password" />
         {pesan && <p className="small" role="status">{pesan}</p>}
         <div className="row"><button type="submit">Simpan password</button></div>
       </form>
