@@ -13,6 +13,8 @@ import { BAHASA, useBahasa, type Bahasa } from '@/lib/i18n';
 import { useBrandingSaya } from './BrandingProfil';
 
 type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: boolean; grup?: string; segera?: boolean };
+/** Penguji boleh membuat & membuka project miliknya sendiri (dan yang dibagikan ke mereka). */
+const TIM_PENGUJI: AppRole[] = [...TIM_TENDER, 'penguji'];
 const MENU: { id: string; label: string; item: Item[] }[] = [
   { id: 'dashboard', label: 'Dashboard', item: [
     { href: '/beranda', label: 'Logistics Opportunity Radar', roles: 'semua' },
@@ -23,10 +25,10 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/heatmap', label: 'Opportunity Control Tower', roles: TIM_TENDER },
   ] },
   { id: 'tender', label: 'Logistics Tender', item: [
-    { href: '/tender/baru', label: 'New Tender', roles: TIM_TENDER, grup: 'Warehouse Tender' },
-    { href: '/tender?grup=draft', label: 'Draft Tender', roles: TIM_TENDER, grup: 'Warehouse Tender' },
+    { href: '/tender/baru', label: 'New Tender', roles: TIM_PENGUJI, grup: 'Warehouse Tender' },
+    { href: '/tender?grup=draft', label: 'Draft Tender', roles: TIM_PENGUJI, grup: 'Warehouse Tender' },
     { href: '/perbandingan', label: 'Tender Comparison', roles: TIM_TENDER, grup: 'Warehouse Tender' },
-    { href: '/riwayat', label: 'Tender History', roles: TIM_TENDER, grup: 'Warehouse Tender' },
+    { href: '/riwayat', label: 'Tender History', roles: TIM_PENGUJI, grup: 'Warehouse Tender' },
     { href: '/approval-quotation', label: 'Approval quotation', roles: ['admin', 'manager'], grup: 'Warehouse Tender' },
     { href: '/implementasi', label: 'Implementation / Project Charter', roles: 'semua', grup: 'Warehouse Tender' },
     { href: '/transport', label: 'Transportation Tender', roles: TIM_TENDER, grup: 'Transport & Intermodal' },
@@ -54,6 +56,7 @@ const AKUN: Item[] = [
   { href: '/admin/approval', label: 'Approval akun', roles: ['admin'] },
   { href: '/master', label: 'Master data (kalender, keuangan, margin, T&C)', roles: 'semua' },
   { href: '/akun', label: 'Profil & password', roles: 'semua' },
+  { href: '/akun/tim', label: 'Tim & berbagi project', roles: 'semua' },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -222,7 +225,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {brand.wajib && brand.siap && !brand.lengkap && path !== '/akun' && <div className="notice small" role="alert" style={{ margin: '10px 24px 0' }}>
         <b>Lengkapi profil:</b> unggah {[!brand.logo && 'logo perusahaan', !brand.ttd && 'tanda tangan'].filter(Boolean).join(' & ')} Anda — wajib sebelum membuat quotation. <Link href="/akun#branding">Unggah sekarang →</Link></div>}
       {profile && profile.role === 'penguji' && !profile.is_master && profile.status === 'aktif' && <div className="notice small" role="status" style={{ margin: '10px 24px 0' }}>
-        Akun <b>Penguji (beta)</b>: selama masa uji coba, data kerja tim (tender, harga, gudang, kontak customer) tidak ditampilkan. Hubungi admin bila perlu akses tambahan — WhatsApp 0882-9191-9234.</div>}
+        Akun <b>Penguji (beta)</b>: Anda bisa membuat project sendiri dan membuka project yang dibagikan ke Anda. Data kerja tim lain (harga, gudang, kontak customer) tidak ditampilkan. Hubungi admin bila perlu akses tambahan — WhatsApp 0882-9191-9234.</div>}
       <main className="main">{profile && (profile.status === 'pending' || profile.status === 'ditolak') ? (
         <div className="card" style={{ maxWidth: 560, margin: '40px auto' }}>
           <h2>{profile.status === 'pending' ? 'Menunggu persetujuan' : 'Pendaftaran ditolak'}</h2>

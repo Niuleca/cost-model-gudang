@@ -48,6 +48,7 @@ import HistorisPanel from './HistorisPanel';
 import CostAllocation from './PembagianLayanan';
 import HasilKomersial, { type Kurs, type Pajak } from './HasilKomersial';
 import StatusControl from '@/components/StatusControl';
+import BagikanTender from '@/components/BagikanTender';
 import { labelStatus, STATUS_DRAFT } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
 
@@ -118,6 +119,7 @@ export default function TenderPage() {
   const kotorAkhir = useRef(false);
   const setKotor = (v: boolean) => { kotorAkhir.current = v; setKotorS(v); };
   const [pembuat, setPembuat] = useState<string | null>(null);
+  const [hakEdit, setHakEdit] = useState<boolean | null>(null);
   const [konfirmVsm, setKonfirmVsm] = useState(false);
   const seret = useRef<number | null>(null);
 
@@ -151,6 +153,7 @@ export default function TenderPage() {
     setJabatan(((jb.data ?? []) as Jab[]).map(j => j.role_name));
     if (row.hasil) setHasil(row.hasil as HasilTender);
     if (row.asumsi.historis && !new URLSearchParams(window.location.search).get('tab')) setTab(TAB_EXCEL);
+    sb.rpc('bisa_edit_tender', { p_id: id }).then(({ data, error }: { data: boolean | null; error: unknown }) => setHakEdit(error ? null : !!data));
     if (row.created_by) {
       const { data: pc } = await sb.from('profiles').select('full_name, email').eq('id', row.created_by).maybeSingle();
       setPembuat(pc ? (pc.full_name || pc.email) : null);
@@ -324,8 +327,9 @@ export default function TenderPage() {
     return () => clearTimeout(id);
   }, [kunciMargin]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Draft tender hanya bisa diedit pembuatnya (atau admin/master); akun lain hanya melihat. Aturan sama dipasang di database.
-  const bisaEdit = !!t && !!profile && (profile.role === 'admin' || profile.role === 'manager' || !!profile.is_master || t.created_by === profile.id || !STATUS_DRAFT.includes(t.status));
+  // Hak edit mengikuti aturan berbagi di database (pembuat, dibagikan dengan hak Edit, Super Admin, approver quotation).
+  const bisaEdit = !!t && !!profile && (hakEdit ?? (!!profile.is_master || t.created_by === profile.id));
+  const bolehKelolaAkses = !!t && !!profile && (!!profile.is_master || t.created_by === profile.id);
 
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
   const spaceH = useMemo(() => {
@@ -435,10 +439,14 @@ export default function TenderPage() {
         </div>
         {aksi(true)}
       </div>
-      {profile && !bisaEdit && <div className="ro-banner" role="note"><b>Hanya lihat</b> · Draft ini dibuat oleh {pembuat ?? 'akun lain'}. Anda bisa melihat isi dan menjalankan Hitung untuk simulasi, tetapi tidak bisa menyimpan perubahan, mengubah status, atau membuat quotation.</div>}
+      {profile && !bisaEdit && <div className="ro-banner" role="note"><b>Hanya lihat</b> · Project ini milik {pembuat ?? 'akun lain'}{t.contoh_publik ? ' dan dibuka sebagai contoh publik' : ' dan dibagikan ke Anda dengan hak Lihat'}. Anda bisa melihat isi dan menjalankan Hitung untuk simulasi, tetapi tidak bisa menyimpan perubahan, mengubah status, atau membuat quotation.</div>}
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
         {bisaEdit ? <StatusControl tender={t} onBerubah={st => setT(x => x && ({ ...x, status: st }))} /> : <span />}
-        {profile && (profile.role === 'admin' || profile.role === 'manager' || (t.created_by === profile.id && STATUS_DRAFT.includes(t.status))) && <HapusTender id={t.id} kode={t.kode ?? t.customer} customer={t.customer} />}
+        <div className="row" style={{ margin: 0 }}>
+          {profile && <BagikanTender tenderId={t.id} bolehKelola={bolehKelolaAkses} bolehContoh={!!profile.is_master || profile.role === 'admin'}
+            contohPublik={!!t.contoh_publik} onContoh={v => setT(x => x && ({ ...x, contoh_publik: v }))} />}
+          {profile && bisaEdit && (profile.role === 'admin' || profile.role === 'manager' || (t.created_by === profile.id && STATUS_DRAFT.includes(t.status))) && <HapusTender id={t.id} kode={t.kode ?? t.customer} customer={t.customer} />}
+        </div>
       </div>
 
       <div className="tabs tabs-beku" role="tablist">

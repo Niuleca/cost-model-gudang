@@ -937,3 +937,16 @@ td .row > span, td .row > label { white-space: nowrap; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi b { font-size: clamp(17px, 5vw, 22px); overflow-wrap: anywhere; }
 }
+
+/* Berbagi project & tim */
+p.ok { color: var(--ok); }
+.bagi-kotak { width: min(600px, 100%); align-self: start; margin-top: 8vh; max-height: calc(100vh - 16vh); }
+.bagi-isi { overflow: auto; padding: 16px; display: grid; gap: 14px; background: var(--white); }
+.bagi-daftar { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: 8px; }
+.bagi-daftar li { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 12px; flex-wrap: wrap; }
+.bagi-daftar li + li { border-top: 1px solid var(--line); }
+.bagi-form { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; }
+.bagi-form .f { margin: 0; }
+.bagi-contoh { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; font-size: 13px; }
+.bagi-contoh input { width: auto; margin-top: 3px; }
+@media (max-width: 560px) { .bagi-form { grid-template-columns: 1fr; } }

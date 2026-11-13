@@ -18,7 +18,7 @@ export interface TenderRow {
   skenario_aset: 'Rental' | 'Own Asset' | 'Built-to-Suit'; durasi_kontrak_bulan: number; tanggal_go_live: string | null;
   jumlah_shift: number; jam_kerja_per_shift: number; jam_efektif_per_shift: number; hari_kerja_per_minggu: 5 | 6 | 7;
   payment_term_hari: number; asumsi: Asumsi; hasil: unknown; status: string; versi: number; updated_at: string;
-  warehouse_id: string | null; pic: string | null; alasan_hasil: string | null; tanggal_keputusan: string | null; created_at?: string; created_by?: string | null;
+  warehouse_id: string | null; pic: string | null; alasan_hasil: string | null; tanggal_keputusan: string | null; created_at?: string; created_by?: string | null; contoh_publik?: boolean;
 }
 
 /** Snapshot gudang terpilih (disalin dari master gudang saat dipilih, supaya tender tetap utuh walau master berubah). */
