@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   title: { default: 'Leca', template: '%s · Leca' },
   description: 'Leca — cost model, tender & quotation gudang. Dibuat oleh esapanghegar.',
   authors: [{ name: 'esapanghegar' }],
+  metadataBase: new URL('https://niuleca.com'),
+  openGraph: { siteName: 'Leca', locale: 'id_ID', images: [{ url: '/og-leca.jpg', width: 1200, height: 630 }] },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

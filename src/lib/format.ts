@@ -12,11 +12,12 @@ export const tanggal = (s: string | null | undefined) =>
 
 export type AppRole =
   | 'admin' | 'manager' | 'solution_design' | 'commercial' | 'finance'
-  | 'hr' | 'procurement' | 'it' | 'engineering' | 'operations';
+  | 'hr' | 'procurement' | 'it' | 'engineering' | 'operations' | 'penguji';
 
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: 'Admin', manager: 'Manager', solution_design: 'Solution Design', commercial: 'Business Development', finance: 'Finance',
   hr: 'HR', procurement: 'Procurement', it: 'IT', engineering: 'Engineering', operations: 'Operational',
+  penguji: 'Penguji (beta)',
 };
 
 export const TIM_TENDER: AppRole[] = ['admin', 'manager', 'solution_design', 'commercial', 'finance'];

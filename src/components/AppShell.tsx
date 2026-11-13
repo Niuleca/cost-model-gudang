@@ -221,6 +221,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>)}
       {brand.wajib && brand.siap && !brand.lengkap && path !== '/akun' && <div className="notice small" role="alert" style={{ margin: '10px 24px 0' }}>
         <b>Lengkapi profil:</b> unggah {[!brand.logo && 'logo perusahaan', !brand.ttd && 'tanda tangan'].filter(Boolean).join(' & ')} Anda — wajib sebelum membuat quotation. <Link href="/akun#branding">Unggah sekarang →</Link></div>}
+      {profile && profile.role === 'penguji' && !profile.is_master && profile.status === 'aktif' && <div className="notice small" role="status" style={{ margin: '10px 24px 0' }}>
+        Akun <b>Penguji (beta)</b>: selama masa uji coba, data kerja tim (tender, harga, gudang, kontak customer) tidak ditampilkan. Hubungi admin bila perlu akses tambahan — WhatsApp 0882-9191-9234.</div>}
       <main className="main">{profile && (profile.status === 'pending' || profile.status === 'ditolak') ? (
         <div className="card" style={{ maxWidth: 560, margin: '40px auto' }}>
           <h2>{profile.status === 'pending' ? 'Menunggu persetujuan' : 'Pendaftaran ditolak'}</h2>

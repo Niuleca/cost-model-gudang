@@ -28,7 +28,7 @@ export default function ApprovalPage() {
     setPesan(error ? `Gagal: ${error.message}` : !data?.length ? 'Tidak tersimpan (hanya Super Admin).' : ok);
     setSibuk(null); muat();
   }
-  const acc = (r: Row) => { const role = pilihRole[r.id] ?? 'solution_design';
+  const acc = (r: Row) => { const role = pilihRole[r.id] ?? 'penguji';
     return ubah(r, { status: 'aktif', role, disetujui_oleh: profile!.id, disetujui_at: new Date().toISOString() } as Partial<Row>, `${r.email} disetujui sebagai ${ROLE_LABEL[role]}.`); };
   const tolak = (r: Row) => ubah(r, { status: 'ditolak', disetujui_oleh: profile!.id, disetujui_at: new Date().toISOString() } as Partial<Row>, `${r.email} ditolak.`);
   const jadikanMaster = (r: Row, on: boolean) => ubah(r, on ? { is_master: true, role: 'admin', status: 'aktif' } : { is_master: false },
@@ -39,13 +39,13 @@ export default function ApprovalPage() {
   const ditolak = rows.filter(r => r.status === 'ditolak');
   const aktif = rows.filter(r => r.status === 'aktif' || r.status === undefined);
 
-  const roleSel = (r: Row) => <select aria-label={`Role untuk ${r.email}`} value={pilihRole[r.id] ?? 'solution_design'} disabled={!master}
+  const roleSel = (r: Row) => <select aria-label={`Role untuk ${r.email}`} value={pilihRole[r.id] ?? 'penguji'} disabled={!master}
     onChange={e => setPilihRole({ ...pilihRole, [r.id]: e.target.value as AppRole })}>
     {(Object.keys(ROLE_LABEL) as AppRole[]).map(k => <option key={k} value={k}>{ROLE_LABEL[k]}</option>)}</select>;
 
   return (<>
     <div className="head"><div><div className="eyebrow">Admin</div><h1>Approval akun</h1>
-      <p className="muted">Pendaftar baru tidak bisa membuka data apa pun sampai disetujui Super Admin dan diberi role.</p></div></div>
+      <p className="muted">Pendaftar baru tidak bisa membuka data apa pun sampai disetujui Super Admin dan diberi role. Role awal <b>Penguji (beta)</b> tidak bisa melihat data kerja (tender, harga, gudang, kontak customer, profil pengguna lain) — pilih role tim hanya untuk rekan kerja yang Anda percaya.</p></div></div>
     {migrasiBelum && <p className="notice small">Aturan approval belum aktif di database — jalankan migrasi <b>0014_master_admin_approval</b> dulu.</p>}
     {!master && <p className="notice small">Hanya <b>Super Admin</b> yang bisa ACC, menolak, atau menunjuk Super Admin. Anda bisa melihat daftarnya saja.</p>}
     {pesan && <p className="small" role="status">{pesan}</p>}

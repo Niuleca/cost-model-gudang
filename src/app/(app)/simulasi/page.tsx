@@ -684,7 +684,7 @@ export default function DesainGudang() {
             <div className="eyebrow">Ekspor</div>
             <div className="row"><button className="ghost" onClick={unduhPng}>PNG denah</button><button className="ghost" onClick={unduhPdf}>PDF A3</button>
               <button className="ghost" onClick={() => { const u = api3.current?.screenshot(); if (u) { const a = document.createElement('a'); a.href = u; a.download = `${namaFile()}_3D.png`; a.click(); } }} disabled={tampil === '2d'}>PNG 3D</button></div>
-            <p className="small muted">Gaya CAD: ketik perintah langsung di denah — <b>M</b> geser, <b>CO</b> salin, <b>RO</b> putar, <b>E</b> hapus, <b>DI</b> ukur, <b>X</b> pecah area, <b>Z</b> pas layar, <b>LA</b> layer; Enter / spasi = ulangi perintah terakhir; saat titik kedua ketik jarak (3,5) atau @dx;dz. F3 OSNAP · F8 ORTHO · F9 SNAP.</p>
+            <p className="small muted">Perintah cepat: ketik langsung di denah — <b>M</b> geser, <b>CO</b> salin, <b>RO</b> putar, <b>E</b> hapus, <b>DI</b> ukur, <b>X</b> pecah area, <b>Z</b> pas layar, <b>LA</b> layer; Enter / spasi = ulangi perintah terakhir; saat titik kedua ketik jarak (3,5) atau @dx;dz. F3 OSNAP · F8 ORTHO · F9 SNAP.</p>
             <p className="small muted">Pintasan: Seleksi blok / Shift + seret = pilih banyak (seret ke kanan = yang masuk penuh, ke kiri = yang tersentuh) · Shift/Ctrl + klik tambah/buang · Ctrl+A pilih semua · Delete hapus · R putar · Ctrl+D gandakan · panah geser (Shift = 1 m; dock & gate bergeser sepanjang dinding) · Ctrl+Z / Ctrl+Y · scroll zoom · seret area kosong = pan.</p>
           </div>
 

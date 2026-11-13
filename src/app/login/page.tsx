@@ -26,17 +26,25 @@ function LoginForm() {
         router.replace(params.get('next') || '/beranda');
         router.refresh();
       } else if (mode === 'daftar') {
-        const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: nama }, emailRedirectTo: `${redirect}?next=/auth/terdaftar` } });
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { full_name: nama }, emailRedirectTo: `${redirect}?next=/auth/terdaftar` } });
         if (error) throw error;
-        setPesan('Akun dibuat. Cek email untuk konfirmasi. Setelah itu akun menunggu persetujuan (ACC) Admin sebelum bisa dipakai. Terima kasih\nCP : 088291919234 / Email : Niuleca@gmail.com');
+        if (data.session) {
+          // konfirmasi email tidak diwajibkan: langsung masuk, lalu menunggu ACC admin
+          router.replace('/beranda'); router.refresh();
+          return;
+        }
+        setPesan('Akun dibuat. Buka email Anda dan klik link konfirmasi. Setelah itu akun menunggu persetujuan (ACC) Admin sebelum bisa dipakai. Terima kasih\nCP : 088291919234 / Email : Niuleca@gmail.com');
       } else {
         const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${redirect}?next=/akun` });
-        if (error) throw error;
-        setPesan('Link reset password sudah dikirim ke email Anda.');
+        if (error) {
+          setPesan('Email reset password belum bisa dikirim saat ini. Hubungi admin untuk mengatur ulang password Anda: WhatsApp 0882-9191-9234 / Niuleca@gmail.com');
+          return;
+        }
+        setPesan('Link reset password sudah dikirim ke email Anda. Cek juga folder spam.');
       }
     } catch (err) {
       const m = err instanceof Error ? err.message : String(err);
-      setPesan(m === 'Invalid login credentials' ? 'Email atau password salah.' : m);
+      setPesan(pesanAuth(m));
     } finally {
       setSibuk(false);
     }
@@ -77,4 +85,18 @@ function LoginForm() {
 
 export default function LoginPage() {
   return <Suspense><LoginForm /></Suspense>;
+}
+
+/** Pesan error Supabase Auth → bahasa yang mudah dipahami pengguna. */
+function pesanAuth(m: string) {
+  const KONTAK = 'Hubungi admin: WhatsApp 0882-9191-9234 / Niuleca@gmail.com';
+  if (/invalid login credentials/i.test(m)) return 'Email atau password salah.';
+  if (/email not confirmed/i.test(m)) return `Email belum dikonfirmasi. Buka link konfirmasi di email Anda, atau ${KONTAK.toLowerCase()}`;
+  if (/user already registered|already been registered/i.test(m)) return 'Email ini sudah terdaftar. Silakan masuk, atau gunakan "Lupa password".';
+  if (/password should be at least|weak password/i.test(m)) return 'Password terlalu pendek/lemah — minimal 8 karakter, campur huruf & angka.';
+  if (/error sending|smtp|email.*(send|deliver)/i.test(m)) return `Email dari sistem sedang tidak bisa dikirim. ${KONTAK}`;
+  if (/rate limit|too many requests|security purposes/i.test(m)) return 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.';
+  if (/invalid email|unable to validate email/i.test(m)) return 'Format email tidak valid.';
+  if (/failed to fetch|network/i.test(m)) return 'Koneksi bermasalah. Periksa internet Anda lalu coba lagi.';
+  return m;
 }

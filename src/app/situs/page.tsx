@@ -10,6 +10,14 @@ import './situs.css';
 export const metadata: Metadata = {
   title: { absolute: 'Leca — Cost model & tender gudang · niuleca.com' },
   description: 'Leca menghitung cost model gudang, merancang layout 2D/3D, menyusun manpower, MHE, SOP, hingga quotation tender — dalam satu platform.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website', url: '/', siteName: 'Leca', locale: 'id_ID',
+    title: 'Leca — Cost model, layout & simulasi gudang dalam satu platform',
+    description: 'Dari volume customer sampai quotation — lengkap dengan denah 2D, gudang 3D, dan simulasi operasi.',
+    images: [{ url: '/og-leca.jpg', width: 1200, height: 630, alt: 'Leca — cost model, layout & simulasi gudang' }],
+  },
+  twitter: { card: 'summary_large_image', title: 'Leca — Cost model, layout & simulasi gudang', images: ['/og-leca.jpg'] },
 };
 
 // Halaman awal niuleca.com untuk pengunjung (belum login). Menu: Beranda · Contact · Login.
@@ -84,7 +92,7 @@ export default async function Situs() {
           <div className="ld-wrap ld-sorot">
             <div>
               <h2 id="denah">Denah gudang yang ikut menghitung</h2>
-              <p className="ld-lead">Tarik area rak, dan baris, lorong, serta bay terbentuk otomatis menghindari kolom, office, dan ramp. Geser baris dengan perintah gaya CAD, lihat hasilnya di 3D, lalu jalankan simulasi operasi harian.</p>
+              <p className="ld-lead">Tarik area rak, dan baris, lorong, serta bay terbentuk otomatis menghindari kolom, office, dan ramp. Geser baris rak dengan presisi, lihat hasilnya di 3D, lalu jalankan simulasi operasi harian.</p>
               <ul className="ld-cek">
                 <li>Lebar lorong pas sesuai isian, sisa ruang terlihat jelas</li>
                 <li>Kekuatan rak &amp; lantai dicek per level dan per jenis palet</li>
@@ -153,7 +161,7 @@ export default async function Situs() {
 
 const KEMAMPUAN: { ikon: JenisIkon; judul: string; isi: string }[] = [
   { ikon: 'biaya', judul: 'Cost model gudang', isi: 'Space, manpower, MHE, IT, overhead hingga margin dihitung dari volume customer, lengkap dengan red flag dan cara memperbaikinya.' },
-  { ikon: 'denah', judul: 'Warehouse planning & 3D', isi: 'Kapasitas palet, level rak, kekuatan lantai, denah 2D gaya CAD, gudang 3D, simulasi operasi, dan mode jelajah.' },
+  { ikon: 'denah', judul: 'Warehouse planning & 3D', isi: 'Kapasitas palet, level rak, kekuatan lantai, denah 2D berskala sebenarnya, gudang 3D, simulasi operasi, dan mode jelajah.' },
   { ikon: 'orang', judul: 'Manpower, MHE & VSM', isi: 'Aktivitas, produktivitas, matriks multi-skill, Landmark VSM, serta SOP dan WI per proses dalam Word atau PDF.' },
   { ikon: 'harga', judul: 'Rate card & quotation', isi: 'Tarif per palet, per hari, per UoM (karton, drum, IBC), VAS, alokasi biaya, sampai quotation siap kirim.' },
   { ikon: 'truk', judul: 'Transport & intermodal', isi: 'Tender trucking dan intermodal di platform yang sama, dengan perbandingan harga vendor.' },

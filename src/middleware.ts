@@ -22,34 +22,41 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: galatSesi } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isPublic = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/situs') || path === '/panduan-leca.pdf' || path === '/panduan-leca.docx';
+  const isPublic = path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/situs') || path === '/panduan-leca.pdf' || path === '/panduan-leca.docx'
+    || path === '/robots.txt' || path === '/sitemap.xml';
+  // Sesi lama/kedaluwarsa (refresh token sudah tidak ada): hapus cookie login supaya browser tidak mengirimnya terus
+  const sesiBasi = !!galatSesi && 'code' in galatSesi && (galatSesi.code === 'refresh_token_not_found' || galatSesi.code === 'refresh_token_already_used');
+  const bersihkan = (res: NextResponse) => {
+    if (sesiBasi) for (const c of request.cookies.getAll()) if (c.name.startsWith('sb-')) res.cookies.delete(c.name);
+    return res;
+  };
 
   // link email lama yang mendarat di halaman awal dengan ?code= → teruskan ke callback konfirmasi
   if (path === '/' && request.nextUrl.searchParams.get('code')) {
     const url = request.nextUrl.clone(); url.pathname = '/auth/callback';
     if (!url.searchParams.get('next')) url.searchParams.set('next', '/auth/terdaftar');
-    return NextResponse.redirect(url);
+    return bersihkan(NextResponse.redirect(url));
   }
   // pengunjung belum login: halaman awal niuleca.com = landing page (bukan langsung login)
   if (!user && path === '/') {
     const url = request.nextUrl.clone(); url.pathname = '/situs';
-    return NextResponse.rewrite(url);
+    return bersihkan(NextResponse.rewrite(url));
   }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', path);
-    return NextResponse.redirect(url);
+    return bersihkan(NextResponse.redirect(url));
   }
   if (user && path === '/login') {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);
   }
-  return response;
+  return bersihkan(response);
 }
 
 export const config = {
