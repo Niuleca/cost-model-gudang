@@ -137,6 +137,9 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   if (pd) {
     // ---- 4b. Manpower direct metode Process Design: FTE per bulan → ROUNDUP per shift aktif ----
     const shiftAktif = pd.beban.filter(w => w > 0).length || 1;
+    const shiftKosong = pd.beban.map((w, i) => (w > 0 ? 0 : i + 1)).filter(i => i > 0 && i <= t.jumlahShift);
+    if (t.jumlahShift > 1 && shiftKosong.length)
+      flags.push({ level: 'peringatan', kode: 'SHIFT_TANPA_BEBAN', pesan: `Jumlah shift ${t.jumlahShift}, tetapi shift ${shiftKosong.join(' & ')} bebannya 0% — manpower tidak dihitung untuk shift itu. Atur "Workload per shift" di Process Design (mis. ${Math.round(100 / t.jumlahShift)}% per shift).` });
     for (const r of pd.mp) {
       if (!jobs.has(r.nama)) continue;
       const alok = kosongAlokasi();

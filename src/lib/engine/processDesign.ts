@@ -52,6 +52,20 @@ export interface BarisPD {
   jamTersedia: number; operating: number; fte: number;
 }
 
+/** Saat jumlah shift diubah: porsi beban yang belum diisi untuk shift tambahan (semua 0%) dibagi rata,
+ *  mis. 2 shift → 50/50, 3 shift → 33/33/33. Porsi yang sudah diisi pengguna tidak diubah. */
+export function ratakanBebanShift(pd: ProcessDesignInput, jumlahShift: number): ProcessDesignInput {
+  const n = Math.max(1, Math.min(3, jumlahShift));
+  if (n <= 1) return pd;
+  const rata = (b?: number[]) => {
+    if (!b) return b;
+    const isi = Array.from({ length: 3 }, (_, i) => Math.max(0, Number(b[i] ?? 0)));
+    if (isi.slice(1, n).some(x => x > 0)) return b;
+    return Array.from({ length: 3 }, (_, i) => (i < n ? Math.round((1 / n) * 10000) / 10000 : 0));
+  };
+  return { ...pd, bebanShift: rata(pd.bebanShift) ?? pd.bebanShift, bebanShiftInbound: rata(pd.bebanShiftInbound), bebanShiftOutbound: rata(pd.bebanShiftOutbound) };
+}
+
 export function bebanAktif(beban: number[], jumlahShift: number) {
   const b = Array.from({ length: Math.max(1, jumlahShift) }, (_, i) => Math.max(0, Number(beban[i] ?? 0)));
   const tot = b.reduce((s, x) => s + x, 0);

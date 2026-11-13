@@ -43,7 +43,7 @@ import { hitungLevelRak } from '@/lib/engine/space';
 import MhePanel from './MhePanel';
 import BiayaSpacePanel from './BiayaSpacePanel';
 import { hitungSpaceExcel, lengkapiSpaceExcel, ringkasPalet, daftarPalet, type SpaceExcel, type PaletTipe } from '@/lib/engine/space';
-import { hitungProcessDesign, PD_DEFAULT } from '@/lib/engine/processDesign';
+import { hitungProcessDesign, PD_DEFAULT, ratakanBebanShift } from '@/lib/engine/processDesign';
 import HistorisPanel from './HistorisPanel';
 import CostAllocation from './PembagianLayanan';
 import HasilKomersial, { type Kurs, type Pajak } from './HasilKomersial';
@@ -204,6 +204,12 @@ export default function TenderPage() {
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setKol = <K extends keyof TenderRow>(k: K, v: TenderRow[K]) => { catat(); setT(x => x && ({ ...x, [k]: v })); setKotor(true); };
+  // Ganti jumlah shift: porsi beban shift tambahan yang masih 0% langsung dibagi rata (tidak menimpa porsi yang sudah diisi)
+  const gantiShift = (n: number) => {
+    catat();
+    setT(x => x && ({ ...x, jumlah_shift: n, asumsi: { ...x.asumsi, processDesign: ratakanBebanShift(x.asumsi.processDesign ?? PD_DEFAULT, n) } }));
+    setKotor(true);
+  };
   const setA = (patch: Partial<Asumsi>) => {
     catat();
     const peran = 'aktivitas' in patch || 'peranTetap' in patch || 'spanOfControl' in patch || 'roleSupervisor' in patch;
@@ -472,7 +478,7 @@ export default function TenderPage() {
             <Sel id="aset" label="Skenario aset" value={t.skenario_aset} options={(['Rental', 'Own Asset', 'Built-to-Suit'] as const).map(v => ({ v, l: v }))} onChange={v => setKol('skenario_aset', v)} />
             <Num id="kontrak" label="Durasi kontrak" suffix="bulan" value={t.durasi_kontrak_bulan} onChange={v => setKol('durasi_kontrak_bulan', v)} />
             <label className="f" htmlFor="golive">Go-live (menentukan tahun kalender & UMK)<input id="golive" type="date" value={t.tanggal_go_live ?? ''} onChange={e => setKol('tanggal_go_live', e.target.value || null)} /></label>
-            <Sel id="shift" label="Jumlah shift" value={t.jumlah_shift} options={[1, 2, 3].map(v => ({ v, l: String(v) }))} onChange={v => setKol('jumlah_shift', v)} />
+            <Sel id="shift" label="Jumlah shift" value={t.jumlah_shift} options={[1, 2, 3].map(v => ({ v, l: String(v) }))} onChange={v => gantiShift(v)} />
             <Sel id="hk" label="Hari kerja per minggu" value={t.hari_kerja_per_minggu} options={([5, 6, 7] as const).map(v => ({ v, l: `${v} hari` }))} onChange={v => setKol('hari_kerja_per_minggu', v)} />
             <Num id="jk" label="Jam kerja per shift" suffix="jam" value={t.jam_kerja_per_shift} onChange={v => setKol('jam_kerja_per_shift', v)} />
             <Num id="je" label="Jam efektif per shift" suffix="jam" value={t.jam_efektif_per_shift} onChange={v => setKol('jam_efektif_per_shift', v)} hint="Setelah istirahat, briefing, ganti baterai" />
@@ -508,7 +514,7 @@ export default function TenderPage() {
         </div>;
       })()}
       {tab === 'Key Assumption' && <ProcessDesignPanel bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
-          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />}
+          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />}
 
       {tab === 'Volume' && (
         <div className="card">
@@ -629,7 +635,7 @@ export default function TenderPage() {
       {tab === 'Value Stream Mapping' && (<>
         {<>
           <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
-              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)}
+              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift}
               biaya={{
                 perOrang: role => { const r = rincianMp.find(x => x.role === role); return (r?.total ?? 0) * (r?.porsi ?? 1) * (1 + paramMp.feePersen); },
                 persenTahun: (a.eskalasiManpower ?? ESKALASI_DEFAULT).persenTahun, onPersen: persenTahun => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), persenTahun } }),
@@ -642,9 +648,9 @@ export default function TenderPage() {
             onLevelGaji={levelGaji => setA({ levelGaji })} onLevelRole={levelRole => setA({ levelRole })}
             onInput={rincianBiayaMp => setA({ rincianBiayaMp })} onParam={p => setA({ paramBiayaMp: { ...(a.paramBiayaMp ?? {}), ...p } })} />
           <ProcessDesignPanel bagian="rincian" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
-              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
+              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />
           <ProcessDesignPanel bagian="matriks" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
-              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
+              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />
           <p className="small muted">Working day, workload shift, dan faktor produktivitas ada di tab <b>Key Assumption</b>.</p>
         </>}
         <div className="card">
@@ -838,7 +844,7 @@ export default function TenderPage() {
 
       {tab === 'Technology & Equipment' && <>
         <ProcessDesignPanel bagian="mhe" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
-          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={n => setKol('jumlah_shift', n)} />
+          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />
         <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })} kontrakBulan={t.durasi_kontrak_bulan}
           kebutuhan={true
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
