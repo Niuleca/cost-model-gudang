@@ -332,6 +332,9 @@ export function reviewIntermodal(t: TenderIntermodal, rates: RateTransport[] = [
       else if (s.sumberHarga === 'estimasi') out.push({ level: 'perhatian', rute: nama, pesan: `${st}: harga masih estimasi — konfirmasi dengan vendor.` });
       if (!s.dari || !s.ke) out.push({ level: 'perhatian', rute: nama, pesan: `${st}: titik dari / ke belum lengkap.` });
       if (s.leadTimeHari == null) out.push({ level: 'info', rute: nama, pesan: `${st}: lead time belum diisi.` });
+      const kmDarat = k !== 1 && s.moda === 'darat' ? jarakKm(s.dari, s.ke, 'darat') : null;
+      if (kmDarat && kmDarat > 300) out.push({ level: 'perhatian', rute: nama, pesan: `${st}: truk ±${kmDarat.toLocaleString('id-ID')} km dari ${k === 0 ? 'origin ke port asal' : 'port tujuan ke destination'} — cek apakah bandara / pelabuhan yang lebih dekat lebih tepat.` });
+      if (s.moda === 'darat' && s.dari && s.ke && !bisaDarat(s.dari, s.ke)) out.push({ level: 'kritis', rute: nama, pesan: `${st}: ${s.dari} dan ${s.ke} beda pulau — truk tidak bisa lewat darat, ganti titik serah terima atau moda.` });
       cekRate(s.rateId, rates, `${nama} · ${st}`, out);
     });
     if (!(r.shipmentBulan > 0)) out.push({ level: 'perhatian', rute: nama, pesan: 'Shipment per bulan 0.' });

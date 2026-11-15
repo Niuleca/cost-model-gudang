@@ -16,6 +16,8 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { cariLokasi, jarakLurusKm, FAKTOR_JALUR, type Lokasi } from '@/lib/lokasiIndonesia';
 import type { Moda } from '@/lib/transport';
+import { ruteDarat } from '@/lib/jalur/darat';
+import { muatMasker, ruteLaut, type LonLat, type MaskerDarat } from '@/lib/jalur/laut';
 
 export interface Leg { moda: Moda; dari: string; ke: string; hari?: number | null; label?: string; armada?: string }
 export interface RuteSim { nama: string; legs: Leg[] }
@@ -26,6 +28,10 @@ const WARNA: Record<Moda, string> = { darat: '#f59e0b', laut: '#0ea5e9', udara: 
 const LABEL_MODA: Record<Moda, string> = { darat: 'Truk', laut: 'Kapal', udara: 'Pesawat', kereta: 'Kereta' };
 const IKON_MODA: Record<Moda, string> = { darat: '🚚', laut: '🚢', udara: '✈️', kereta: '🚆' };
 const IKON_LOKASI: Record<string, string> = { kota: '🏭', pelabuhan: '⚓', bandara: '✈' };
+const LABEL_SUMBER: Record<SumberJalur, string> = {
+  jalan: 'Jalur: jalan raya (OpenStreetMap / OSRM)', laut: 'Jalur: alur laut (menghindari daratan)', udara: 'Jalur: udara (great circle)',
+  lurus: 'Jalur: garis perkiraan', muat: 'Mencari jalur…', gagal: 'Tidak ada jalur darat antar titik ini — perlu kapal / ferry atau ganti titik serah terima',
+};
 const DETIK_STAGE = 7;     // durasi animasi satu stage pada kecepatan 1×
 const JEDA = 1.4;          // jeda di titik serah terima antar stage (detik)
 const K = 4;               // unit per derajat di permukaan
@@ -131,11 +137,37 @@ function teksturBuih() {
 
 
 // ---------------- Leg ----------------
-interface LegHitung { idx: number; moda: Moda; a: Lokasi; b: Lokasi; km: number; hari: number; perkiraan: boolean; label?: string; armada?: string; titik: THREE.Vector3[]; kurva: THREE.CatmullRomCurve3 }
+type SumberJalur = 'jalan' | 'laut' | 'udara' | 'lurus' | 'muat' | 'gagal';
+interface LegHitung { idx: number; moda: Moda; a: Lokasi; b: Lokasi; km: number; hari: number; perkiraan: boolean; label?: string; armada?: string; titik: THREE.Vector3[]; kurva: THREE.CatmullRomCurve3; sumber: SumberJalur }
+interface JalurNyata { jalur: LonLat[]; km: number }
+const kunciJalur = (moda: Moda, a: Lokasi, b: Lokasi) => `${moda}|${a.lon},${a.lat}|${b.lon},${b.lat}`;
 
-function hitungLeg(l: Leg, idx: number, proj: Proyeksi): LegHitung | null {
+/** Titik 3D dari polyline lon/lat (jalan raya / alur laut), di-resample merata sepanjang jalur. */
+function titikDariPolyline(ps: LonLat[], proj: Proyeksi, n: number) {
+  const pts = ps.map(([lon, lat]) => proj(lon, lat, HJALUR));
+  const kum = [0]; for (let i = 1; i < pts.length; i++) kum.push(kum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  const total = kum[kum.length - 1] || 1, out: THREE.Vector3[] = [];
+  let j = 1;
+  for (let i = 0; i <= n; i++) {
+    const s = (i / n) * total;
+    while (j < pts.length - 1 && kum[j] < s) j++;
+    const seg = kum[j] - kum[j - 1] || 1, u = (s - kum[j - 1]) / seg;
+    out.push(pts[j - 1].clone().lerp(pts[j], Math.min(1, Math.max(0, u))).normalize().multiplyScalar(R + HJALUR));
+  }
+  return out;
+}
+
+function hitungLeg(l: Leg, idx: number, proj: Proyeksi, nyata: Record<string, JalurNyata | null>): LegHitung | null {
   const a = cariLokasi(l.dari), b = cariLokasi(l.ke);
   if (!a || !b || a.nama === b.nama) return null;
+  const kj = kunciJalur(l.moda, a, b);
+  const jn = l.moda === 'darat' || l.moda === 'laut' ? nyata[kj] : undefined;
+  if (jn) {
+    const hari = l.hari && l.hari > 0 ? l.hari : Math.max(0.25, jn.km / KM_HARI[l.moda]);
+    const titik = titikDariPolyline(jn.jalur, proj, Math.max(120, Math.min(900, jn.jalur.length * 3)));
+    return { idx, moda: l.moda, a, b, km: jn.km, hari, perkiraan: !(l.hari && l.hari > 0), label: l.label, armada: l.armada, titik, kurva: new THREE.CatmullRomCurve3(titik, false, 'centripetal'), sumber: l.moda === 'darat' ? 'jalan' : 'laut' };
+  }
+  const sumber: SumberJalur = l.moda === 'udara' ? 'udara' : kj in nyata ? (nyata[kj] === null ? 'gagal' : 'lurus') : l.moda === 'kereta' ? 'lurus' : 'muat';
   const km = Math.round(jarakLurusKm(a, b) * FAKTOR_JALUR[l.moda]);
   const hari = l.hari && l.hari > 0 ? l.hari : Math.max(l.moda === 'udara' ? 1 : 0.25, km / KM_HARI[l.moda]);
   const pa = proj(a.lon, a.lat), pb = proj(b.lon, b.lat);
@@ -156,7 +188,24 @@ function hitungLeg(l: Leg, idx: number, proj: Proyeksi): LegHitung | null {
     const off = l.moda === 'laut' ? pj * 0.1 * s : kelok[0] * s + kelok[1] * Math.sin(2 * Math.PI * u);
     titik.push(dasar.multiplyScalar(R).addScaledVector(sisi, off).normalize().multiplyScalar(R + HJALUR + tinggi * s));
   }
-  return { idx, moda: l.moda, a, b, km, hari, perkiraan: !(l.hari && l.hari > 0), label: l.label, armada: l.armada, titik, kurva: new THREE.CatmullRomCurve3(titik) };
+  return { idx, moda: l.moda, a, b, km, hari, perkiraan: !(l.hari && l.hari > 0), label: l.label, armada: l.armada, titik, kurva: new THREE.CatmullRomCurve3(titik), sumber };
+}
+
+let maskerJanji: Promise<MaskerDarat> | null = null;
+/** Ambil jalur nyata semua leg darat (jalan raya OSRM) dan laut (A* masker darat). */
+async function ambilJalurNyata(rute: RuteSim[]): Promise<Record<string, JalurNyata | null>> {
+  const out: Record<string, JalurNyata | null> = {};
+  const kerja: Promise<void>[] = [];
+  for (const r of rute) for (const l of r.legs) {
+    const a = cariLokasi(l.dari), b = cariLokasi(l.ke);
+    if (!a || !b || a.nama === b.nama) continue;
+    const k = kunciJalur(l.moda, a, b); if (k in out) continue; out[k] = null;
+    if (l.moda === 'darat') kerja.push(ruteDarat([a.lon, a.lat], [b.lon, b.lat]).then(x => { out[k] = x; }));
+    else if (l.moda === 'laut') kerja.push((maskerJanji ??= muatMasker()).then(m => { out[k] = ruteLaut(m, [a.lon, a.lat], [b.lon, b.lat]); }).catch(() => { maskerJanji = null; }));
+    else delete out[k];
+  }
+  await Promise.all(kerja);
+  return out;
 }
 
 // ---------------- Tile citra satelit dinamis di bola (quadtree Web Mercator) ----------------
@@ -296,19 +345,28 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
   Object.assign(kontrol.current, { jalan, kec, fokus, kameraAuto, satelit });
   if (kontrol.current.tampilan !== tampilan) { kontrol.current.tampilan = tampilan; kontrol.current.terbang = 1; kontrol.current.manualSampai = 0; }
 
+  const [nyata, setNyata] = useState<Record<string, JalurNyata | null>>({});
+  const [cariJalur, setCariJalur] = useState(false);
+  const kunciRute = JSON.stringify(rute);
+  useEffect(() => {
+    let batal = false; setCariJalur(true);
+    ambilJalurNyata(rute).then(x => { if (!batal) { setNyata(x); setCariJalur(false); } }).catch(() => { if (!batal) setCariJalur(false); });
+    return () => { batal = true; };
+  }, [kunciRute]); // eslint-disable-line react-hooks/exhaustive-deps
+  const kamTerakhir = useRef<{ pos: THREE.Vector3; target: THREE.Vector3; up: THREE.Vector3; rute: string } | null>(null);
   const { data, proj } = useMemo(() => {
     const lok = rute.flatMap(r => r.legs.flatMap(l => [cariLokasi(l.dari), cariLokasi(l.ke)])).filter((x): x is Lokasi => !!x);
     const lonP = lok.length ? lok.reduce((t, l) => t + l.lon, 0) / lok.length : 118, latP = lok.length ? lok.reduce((t, l) => t + l.lat, 0) / lok.length : -2;
     const proj = buatProyeksi(lonP, latP);
     const data = rute.map(r => {
-      const legs = r.legs.map((l, i) => hitungLeg(l, i, proj));
+      const legs = r.legs.map((l, i) => hitungLeg(l, i, proj, nyata));
       const ok = legs.filter((x): x is LegHitung => !!x);
       return { nama: r.nama, legs: ok, gagal: r.legs.filter((_, i) => !legs[i]).map(l => `${l.dari || '?'} → ${l.ke || '?'}`), total: ok.reduce((t, x) => t + x.hari, 0), km: ok.reduce((t, x) => t + x.km, 0) };
     });
     return { data, proj };
-  }, [rute]);
+  }, [rute, nyata]);
   const nStage = Math.max(0, ...data.map(d => d.legs.length));
-  const kunci = JSON.stringify(rute);
+  const kunci = `${kunciRute}#${Object.keys(nyata).filter(k => nyata[k]).length}`;
   /** Posisi waktu animasi → stage aktif & progres u (0..1). */
   const fase = (t: number, f: number) => {
     const per = DETIK_STAGE + JEDA;
@@ -431,7 +489,10 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
       // arah atas layar: utara untuk top view, vertikal lokal untuk tampilan miring (horizon datar)
       return { target: c, pos: c.clone().addScaledVector(arah.normalize(), jarak), up: mode === 'atas' ? N : n };
     };
-    const b0 = bingkaiKam(-1); ctl.target.copy(b0.target); cam.position.copy(b0.pos); cam.up.copy(b0.up); ctl.update();
+    const lama = kamTerakhir.current?.rute === kunciRute ? kamTerakhir.current : null;
+    if (lama) { ctl.target.copy(lama.target); cam.position.copy(lama.pos); cam.up.copy(lama.up); kontrol.current.lompat = false; }
+    else { const b0 = bingkaiKam(-1); ctl.target.copy(b0.target); cam.position.copy(b0.pos); cam.up.copy(b0.up); }
+    ctl.update();
 
     let lebar = el.clientWidth, tinggiEl = el.clientHeight;
     const semuaMat = () => [...jalur.flatMap(j => j.mats), ...ilustrasi.children.map(c => (c as Line2).material)];
@@ -520,6 +581,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
     };
     id = requestAnimationFrame(loop);
     return () => {
+      kamTerakhir.current = { pos: cam.position.clone(), target: ctl.target.clone(), up: cam.up.clone(), rute: kunciRute };
       batal = true; tile.hentikan(); cancelAnimationFrame(id); ro.disconnect(); ctl.dispose();
       scene.traverse(o => {
         if (o.userData.bersama) return;
@@ -582,7 +644,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
           })}
         </div>}
         <div className="rute3d-legenda">{(Object.keys(WARNA) as Moda[]).map(m => <span key={m}><i style={{ background: WARNA[m] }} />{LABEL_MODA[m]}</span>)}
-          {(infoPeta === 'muat' && satelit) && <span className="muted">memuat citra satelit…</span>}{muatModel && <span className="muted">memuat model 3D…</span>}</div>
+          {(infoPeta === 'muat' && satelit) && <span className="muted">memuat citra satelit…</span>}{muatModel && <span className="muted">memuat model 3D…</span>}{cariJalur && <span className="muted">mencari jalur jalan & laut…</span>}</div>
         <div className="rute3d-atribusi">{satelit && infoPeta === 'ok' ? 'Citra © Esri, Maxar, Earthstar Geographics' : infoPeta === 'gagal' && satelit ? 'Citra satelit tidak dapat dimuat — peta ilustrasi' : 'Peta ilustrasi'} · Model 3D: Meshy</div>
       </div>
       <div className="tablewrap fit"><table className="tabel-fit">
@@ -592,7 +654,8 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
           return (
             <tr key={`${r.nama}-${i}`} className={l.idx === hud.stage ? 'aktif' : undefined}>
               {i === 0 && <td rowSpan={r.legs.length}><b>{r.nama}</b><div className="small muted">{r.km.toLocaleString('id-ID')} km · {fmtHari(r.total)} · hari ke-{(hud.hariRute[ri] ?? 0).toLocaleString('id-ID', { maximumFractionDigits: 1 })}</div>{r.gagal.length > 0 && <div className="small" style={{ color: 'var(--bad)' }}>Lokasi belum dikenal: {r.gagal.join(', ')}</div>}</td>}
-              <td><span style={{ color: WARNA[l.moda], fontWeight: 600 }}>{IKON_MODA[l.moda]} {namaStage(l)}</span> · {l.armada ? `${l.armada} · ` : ''}{l.a.nama} → {l.b.nama}</td>
+              <td><span style={{ color: WARNA[l.moda], fontWeight: 600 }}>{IKON_MODA[l.moda]} {namaStage(l)}</span> · {l.armada ? `${l.armada} · ` : ''}{l.a.nama} → {l.b.nama}
+                <div className="small" style={{ color: l.sumber === 'gagal' ? 'var(--bad)' : undefined }}>{l.sumber === 'gagal' && l.moda === 'laut' ? 'Alur laut tidak ditemukan — garis perkiraan' : LABEL_SUMBER[l.sumber]}</div></td>
               <td className="num">±{l.km.toLocaleString('id-ID')} km</td>
               <td className="num">{fmtHari(l.hari)}{l.perkiraan ? <span className="small muted"> (perkiraan)</span> : ''}</td>
               <td className="small">{st}</td>
@@ -603,6 +666,6 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
       </table></div>
       <p className="small muted" style={{ margin: 0 }}>Animasi per stage: setiap stage diputar ±{DETIK_STAGE} detik (1×) lalu berhenti di titik serah terima; angka lead time di layar = lead time vendor yang diisi.
         * Lead time kosong diperkirakan dari jarak (truk ±450 km/hari, kapal ±420 km/hari termasuk sandar, pesawat ±1 hari termasuk handling, kereta ±500 km/hari).
-        Jarak = garis lurus × faktor jalur. Peta = globe bumi dengan citra satelit Esri World Imagery seluruh dunia; detail bertambah otomatis saat di-zoom (seret untuk memutar, scroll untuk zoom). Bila citra gagal dimuat, garis pantai ilustrasi dipakai.</p>
+        Jarak truk = jarak jalan raya OpenStreetMap (OSRM), kapal = panjang alur laut yang menghindari daratan, pesawat = great circle; bila jalur belum ditemukan dipakai garis lurus × faktor jalur. Peta = globe bumi dengan citra satelit Esri World Imagery seluruh dunia; detail bertambah otomatis saat di-zoom (seret untuk memutar, scroll untuk zoom). Bila citra gagal dimuat, garis pantai ilustrasi dipakai.</p>
     </div>);
 }
