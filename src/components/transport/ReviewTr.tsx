@@ -3,7 +3,9 @@
 // (margin saat ini vs tier, mis. 15% / 10% / 5%) dengan harga jual per rute, pendapatan, GP & nilai kontrak.
 import { useEffect, useState } from 'react';
 import { rp } from '@/lib/format';
-import { persen1, TIER_DEFAULT, type CatatanReview, type HasilTier } from '@/lib/transport';
+import { BASIS, GRUP_BASIS, labelBasis, persen1, TIER_DEFAULT, type Basis, type CatatanReview, type HasilTier } from '@/lib/transport';
+
+const fmtQ = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 3 });
 
 const KELAS: Record<CatatanReview['level'], string> = { kritis: 'bad', perhatian: 'warn', info: 'info' };
 const LABEL: Record<CatatanReview['level'], string> = { kritis: 'Kritis', perhatian: 'Perhatian', info: 'Info' };
@@ -36,10 +38,17 @@ function InputPersen({ nilai, set, label, lebar = 70 }: { nilai: number; set: (v
 }
 
 /** Tabel perbandingan margin. `tiers` disimpan di tender; "Pakai" menerapkan tier ke semua rute (margin global, pengecualian rute dihapus). */
-export function PerbandinganMargin({ hasil, tiers, onTiers, onPakai, kontrakBulan, marginGlobal, adaOverride, onMarginGlobal }: {
+export function PerbandinganMargin({ hasil, tiers, onTiers, onPakai, kontrakBulan, marginGlobal, adaOverride, onMarginGlobal, onJadikanSatuan, dasarKonversi }: {
   hasil: HasilTier; tiers: number[]; onTiers: (t: number[]) => void; onPakai: (m: number) => void; kontrakBulan: number; marginGlobal: number; adaOverride: number;
   onMarginGlobal?: (m: number) => void;
+  /** Jadikan satuan terpilih sebagai satuan harga rute (dipakai di quotation). */
+  onJadikanSatuan?: (idRute: string, basis: Basis) => void;
+  /** Penjelasan dasar konversi (mis. profil muatan / kapasitas armada). */
+  dasarKonversi?: string;
 }) {
+  const [satuanSemua, setSatuanSemua] = useState<Basis | ''>('');
+  const [satuanBaris, setSatuanBaris] = useState<Record<string, Basis>>({});
+  const pilihan = (id: string, asal: Basis) => satuanBaris[id] ?? (satuanSemua || asal);
   const ubahTier = (i: number, v: number) => onTiers(tiers.map((x, j) => (j === i ? v : x)));
   const [baru, setBaru] = useState('');
   const k = hasil.kolom.length;
@@ -62,21 +71,47 @@ export function PerbandinganMargin({ hasil, tiers, onTiers, onPakai, kontrakBula
         <button className="ghost" onClick={tambah} disabled={!baru}>+ Tier</button>
         {JSON.stringify(tiers) !== JSON.stringify(TIER_DEFAULT) && <button className="link-kecil" onClick={() => onTiers(TIER_DEFAULT)}>reset 15/10/5%</button>}
       </div>
+      <div className="row small" style={{ gap: 6 }}>
+        <span className="muted">Tampilkan harga all-in per:</span>
+        <select aria-label="Satuan harga semua rute" className="input-kecil" value={satuanSemua} onChange={e => { setSatuanSemua(e.target.value as Basis | ''); setSatuanBaris({}); }}>
+          <option value="">Satuan dasar tiap rute</option>
+          {GRUP_BASIS.map(g => <optgroup key={g} label={g}>{BASIS.filter(x => x.grup === g).map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</optgroup>)}
+        </select>
+        {dasarKonversi && <span className="muted">· {dasarKonversi}</span>}
+      </div>
       <div className="tablewrap fit"><table className="tabel-fit tabel-tier">
         <thead>
-          <tr><th>Rute</th><th>Satuan</th><th className="num">Harga beli</th>
+          <tr><th>Rute</th><th>Satuan (pilih)</th><th className="num">Harga beli all-in</th>
             {hasil.kolom.map((c, i) => <th key={i} className={`num${i === 0 ? ' tier-kini' : ''}`}>
               {c.margin != null ? <>Margin <InputPersen label={`Margin kolom ${i}`} nilai={c.margin} set={v => ubahTier(i - 1, v)} lebar={56} /></> : c.label}
               {c.margin != null && <div><button className="link-kecil" onClick={() => onPakai(c.margin!)}>pakai untuk semua rute</button></div>}</th>)}</tr>
         </thead>
         <tbody>
           {hasil.baris.length === 0 && <tr><td colSpan={3 + k} className="muted">Belum ada rute.</td></tr>}
-          {hasil.baris.map(b => (
+          {hasil.baris.map(b => {
+            const u = pilihan(b.id, b.basis);
+            const kv = b.konversi.find(x => x.basis === u);
+            const f = kv?.faktor ?? null;
+            const asli = b.konversi.find(x => x.basis === b.basis);
+            return (
             <tr key={b.id}>
-              <td>{b.nama}</td><td className="small">{b.satuan}</td><td className="num">{b.beli > 0 ? rp(b.beli) : <span style={{ color: 'var(--bad)' }}>belum ada</span>}</td>
-              {b.jual.map((j, i) => <td key={i} className={`num${i === 0 ? ' tier-kini' : ''}`}><b>{b.beli > 0 ? rp(j) : '—'}</b>
+              <td>{b.nama}</td>
+              <td className="small">
+                <select aria-label={`Satuan harga ${b.nama}`} className="input-kecil" value={u} onChange={e => setSatuanBaris(x => ({ ...x, [b.id]: e.target.value as Basis }))}>
+                  {GRUP_BASIS.map(g => <optgroup key={g} label={g}>{BASIS.filter(x => x.grup === g).map(x => {
+                    const k = b.konversi.find(y => y.basis === x.v);
+                    return <option key={x.v} value={x.v} disabled={!k?.faktor}>{x.l}{x.v === b.basis ? ' (dasar)' : !k?.faktor ? ' — data belum ada' : ''}</option>;
+                  })}</optgroup>)}
+                </select>
+                <div className="dasar-def">{u === b.basis ? b.satuan : f != null && kv?.qty != null && asli?.qty != null
+                  ? `${fmtQ(asli.qty)} ${b.basis} = ${fmtQ(kv.qty)} ${u} → × ${fmtQ(f)}` : 'isi data konversi dulu'}
+                  {onJadikanSatuan && u !== b.basis && f != null && <> · <button className="link-kecil" onClick={() => { onJadikanSatuan(b.id, u); setSatuanBaris(x => { const y = { ...x }; delete y[b.id]; return y; }); }}>jadikan satuan quotation</button></>}</div>
+              </td>
+              <td className="num">{b.beli > 0 ? (f != null ? rp(Math.round(b.beli * f * 100) / 100) : '—') : <span style={{ color: 'var(--bad)' }}>belum ada</span>}</td>
+              {b.jual.map((j, i) => <td key={i} className={`num${i === 0 ? ' tier-kini' : ''}`}><b>{b.beli > 0 && f != null ? rp(Math.round(j * f * 100) / 100) : '—'}</b>
+                {b.beli > 0 && f != null && u !== b.basis && <div className="dasar-def">{labelBasis(u)}</div>}
                 {b.volBulan > 0 && b.beli > 0 && <div className="dasar-def">GP {rp(b.gpBulan[i])}/bln</div>}</td>)}
-            </tr>))}
+            </tr>); })}
         </tbody>
         <tfoot>
           <tr><td colSpan={3}>Pendapatan / bulan</td>{hasil.total.map((x, i) => <td key={i} className={`num${i === 0 ? ' tier-kini' : ''}`}>{rp(x.pendapatanBulan)}</td>)}</tr>

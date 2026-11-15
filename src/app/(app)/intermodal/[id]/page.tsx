@@ -48,7 +48,7 @@ function BarisStage({ s, idx, rates, q, onUbah }: { s: StageIntermodal; idx: num
       <td className="num"><input aria-label="Qty per shipment" type="number" min={0} step="any" value={q.auto ? q.qty : (s.qty || '')} className={q.auto ? 'input-auto' : undefined}
         title={q.auto ? 'Otomatis dari profil muatan — ketik untuk isi manual' : undefined} onChange={e => onUbah({ qty: Number(e.target.value) || 0, qtyAuto: false })} />
         <div className="dasar-def">{labelBasis(s.basis).replace('per ', '')}/shipment
-          {q.auto ? <span className="chip-auto" title={s.moda === 'udara' && s.basis === 'kg' ? 'chargeable weight = maks. berat aktual vs CBM × 166,67' : s.moda === 'laut' && s.basis === 'ton' ? 'W/M = maks. ton vs CBM' : 'dari profil muatan'}> auto</span>
+          {q.auto ? <span className="chip-auto" title={s.moda === 'udara' && s.basis === 'kg' ? 'chargeable weight = maks. berat aktual vs CBM × 166,67' : s.moda === 'laut' && s.basis === 'ton' && /lcl/i.test(s.armada) ? 'W/M LCL = maks. ton vs CBM' : 'dari profil muatan'}> auto</span>
             : <> · <button className="link-kecil" title="hitung dari profil muatan rute" onClick={() => onUbah({ qtyAuto: true })}>auto</button></>}</div></td>
       <td>
         {pilihan.length > 0 && <select aria-label="Pilih dari market price" value={s.rateId ?? ''} onChange={e => {
@@ -156,7 +156,7 @@ export default function IntermodalTender() {
               <label className="f">Margin rute (%)<PersenInput label="Margin rute" nilai={r.marginPersen} placeholder={`${Math.round(im.marginGlobal * 1000) / 10} (global)`} onChange={v => setRute(i, { marginPersen: v })} /></label>
             </div>
             <div className="muatan-box">
-              <div className="small"><b>Profil muatan per shipment</b> <span className="muted">— isi yang diketahui; qty stage & qty jual bertanda <i>auto</i> dihitung dari sini (udara per kg = chargeable weight, laut per ton = W/M).</span></div>
+              <div className="small"><b>Profil muatan per shipment</b> <span className="muted">— isi yang diketahui; qty stage & qty jual bertanda <i>auto</i> dihitung dari sini (udara per kg = chargeable weight, laut LCL per ton = W/M).</span></div>
               <div className="muatan-grid">{FIELD_MUATAN.map(f => <label key={f.k} className="f small">{f.l}
                 <input type="number" min={0} step="any" value={r.muatan?.[f.k] ?? ''} placeholder="—" onChange={e => setMuatan(f.k, e.target.value)} /></label>)}</div>
             </div>
@@ -185,7 +185,19 @@ export default function IntermodalTender() {
       {tab === 'Result & margin' && <>
         <KartuReview review={review} />
         <PerbandinganMargin hasil={tierIntermodal(im, tiers)} tiers={tiers} onTiers={x => setIm({ tierMargin: x })} kontrakBulan={t.durasi_kontrak_bulan}
-          marginGlobal={im.marginGlobal} adaOverride={override} onMarginGlobal={m => setIm({ marginGlobal: m })} onPakai={m => setIm({ marginGlobal: m, rute: im.rute.map(r => ({ ...r, marginPersen: null })) })} />
+          marginGlobal={im.marginGlobal} adaOverride={override} onMarginGlobal={m => setIm({ marginGlobal: m })} onPakai={m => setIm({ marginGlobal: m, rute: im.rute.map(r => ({ ...r, marginPersen: null })) })}
+          dasarKonversi="harga all-in door to door (semua stage + biaya lain) per shipment ÷ jumlah satuan dari Profil muatan di tab Input rute."
+          onJadikanSatuan={(idR, b) => setIm({ rute: im.rute.map(r => (r.id === idR ? { ...r, satuanJual: b, qtyJualAuto: true } : r)) })} />
+        <div className="card" style={{ display: 'grid', gap: 8 }}>
+          <h3 style={{ margin: 0 }}>Data konversi satuan — profil muatan per shipment</h3>
+          <p className="small muted" style={{ margin: 0 }}>Isi yang diketahui (mis. 1 shipment = 20.000 kg = 40 CBM = 20 pallet = 1.600 case). Dropdown satuan di tabel atas otomatis menghitung harga all-in per kg, ton, CBM, pallet, pcs, case, liter, container. Udara per kg memakai chargeable weight (maks. berat vs CBM × 166,67); laut LCL per ton memakai W/M.</p>
+          <div className="tablewrap fit"><table className="tabel-fit">
+            <thead><tr><th>Rute</th>{FIELD_MUATAN.map(f => <th key={f.k} className="num">{f.l}</th>)}</tr></thead>
+            <tbody>{im.rute.map((r, i) => <tr key={r.id}><td>{r.origin || '…'} → {r.destination || '…'}</td>
+              {FIELD_MUATAN.map(f => <td key={f.k} className="num"><input aria-label={`${f.l} ${r.origin} → ${r.destination}`} type="number" min={0} step="any" style={{ width: 90 }} value={r.muatan?.[f.k] ?? ''} placeholder="—"
+                onChange={e => setRute(i, { muatan: { ...(r.muatan ?? {}), [f.k]: e.target.value === '' ? undefined : Number(e.target.value) } })} /></td>)}</tr>)}</tbody>
+          </table></div>
+        </div>
       </>}
 
       {tab === 'Quotation' && <QuotationPanel tender={{ ...t, asumsi: t.asumsi as never }} profile={profile} sumber={{

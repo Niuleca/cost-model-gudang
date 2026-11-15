@@ -99,7 +99,8 @@ test('satuan harga: qty otomatis dari profil muatan (chargeable weight udara, W/
   const m = { kg: 500, cbm: 4, pallet: 4, pcs: 1200, koli: 80 };
   assert.equal(qtyDariMuatan('kg', m, 'udara'), 666.67);       // 4 CBM × 166,67 > 500 kg
   assert.equal(qtyDariMuatan('kg', m, 'darat'), 500);
-  assert.equal(qtyDariMuatan('ton', m, 'laut'), 4);             // W/M: maks(0,5 t ; 4 CBM)
+  assert.equal(qtyDariMuatan('ton', m, 'laut', null, 'LCL (per CBM)'), 4);   // W/M LCL: maks(0,5 t ; 4 CBM)
+  assert.equal(qtyDariMuatan('ton', m, 'laut', null, 'Container 20 ft'), 0.5);
   assert.equal(qtyDariMuatan('ton', m, 'darat'), 0.5);
   assert.equal(qtyDariMuatan('pcs', m), 1200);
   assert.equal(qtyDariMuatan('liter', m), null);
@@ -114,4 +115,21 @@ test('satuan harga: qty otomatis dari profil muatan (chargeable weight udara, W/
   const s = qtyStage({ ...r.stage[1], qtyAuto: false, qty: 700 }, r);
   assert.deepEqual(s, { qty: 700, auto: false });
   assert.ok(hargaPerSatuan(r, 0.2).some(o => o.basis === 'pcs' && o.qty === 1200));
+});
+
+test('konversi harga all-in antar satuan (intermodal dari muatan, transport dari kapasitas armada)', async () => {
+  const { konversiIntermodal, konversiTransport, ruteBaru } = await import('../src/lib/transport.ts');
+  const r = ruteIntermodalBaru({ satuanJual: 'ton', qtyJual: 20, qtyJualAuto: true, muatan: { kg: 20_000, cbm: 40, pallet: 20, case: 1600 } });
+  const k = Object.fromEntries(konversiIntermodal(r).map(x => [x.basis, x.faktor]));
+  assert.equal(k.ton, 1);
+  assert.equal(k.kg, 20 / 20_000);       // per kg = per ton ÷ 1.000
+  assert.equal(k.pallet, 1);             // 20 ton = 20 pallet
+  assert.equal(k.case, 20 / 1600);
+  assert.equal(k.shipment, 20);          // per shipment = 20 ton
+  assert.equal(k.liter, null);           // data liter belum ada
+  const t = ruteBaru({ armada: 'CDD Box', basis: 'trip', hargaBeli: 2_000_000 });
+  const kt = Object.fromEntries(konversiTransport(t).map(x => [x.basis, x.faktor]));
+  assert.equal(kt.trip, 1);
+  assert.ok(Math.abs(kt.ton! - 1 / 4.25) < 1e-9);   // CDD 5 t × 85% = 4,25 t/trip
+  assert.equal(kt.case, null);
 });

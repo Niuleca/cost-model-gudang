@@ -10,7 +10,7 @@ import { KartuReview, PerbandinganMargin } from '@/components/transport/ReviewTr
 import QuotationPanel from '@/app/(app)/tender/[id]/QuotationPanel';
 import {
   ARMADA, BASIS_DARAT, TIER_DEFAULT, TRANSPORT_DEFAULT, armada, cocokRate, estimasiHarga, hasilOverview, hitungRute, kapasitasBasis, labelBasis,
-  rateCardTransport, reviewTransport, ringkasTransport, ruteBaru, tierTransport, type RuteTransport, type TenderTransport,
+  rateCardTransport, reviewTransport, ringkasTransport, ruteBaru, tierTransport, konversiTransport, type RuteTransport, type TenderTransport,
 } from '@/lib/transport';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { useProfile } from '@/lib/useProfile';
@@ -139,7 +139,13 @@ export default function TransportTender() {
       {tab === 'Result & margin' && <>
         <KartuReview review={review} />
         <PerbandinganMargin hasil={tierTransport(tr, tiers)} tiers={tiers} onTiers={x => setTr({ tierMargin: x })} kontrakBulan={t.durasi_kontrak_bulan}
-          marginGlobal={tr.marginGlobal} adaOverride={override} onMarginGlobal={m => setTr({ marginGlobal: m })} onPakai={m => setTr({ marginGlobal: m, rute: tr.rute.map(r => ({ ...r, marginPersen: null })) })} />
+          marginGlobal={tr.marginGlobal} adaOverride={override} onMarginGlobal={m => setTr({ marginGlobal: m })} onPakai={m => setTr({ marginGlobal: m, rute: tr.rute.map(r => ({ ...r, marginPersen: null })) })}
+          dasarKonversi="konversi dari kapasitas armada (utilisasi 85%) dan jarak rute; per pcs / case / koli belum bisa karena tergantung barang."
+          onJadikanSatuan={(idR, b) => setTr({ rute: tr.rute.map(r => {
+            if (r.id !== idR) return r;
+            const f = konversiTransport(r).find(x => x.basis === b)?.faktor; if (!f) return r;
+            return { ...r, basis: b, hargaBeli: Math.round(r.hargaBeli * f * 100) / 100, volumeBulan: Math.round((r.volumeBulan || 0) / f * 1000) / 1000, rateId: null };
+          }) })} />
       </>}
 
       {tab === 'Quotation' && <QuotationPanel tender={{ ...t, asumsi: t.asumsi as never }} profile={profile} sumber={{
