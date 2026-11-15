@@ -5,15 +5,20 @@
 import { jarakKm, bisaDarat } from './lokasiIndonesia.ts';
 
 export type Moda = 'darat' | 'laut' | 'udara' | 'kereta';
-export type Basis = 'trip' | 'cbm' | 'ton' | 'kg' | 'pallet' | 'liter' | 'container';
+export type Basis = 'trip' | 'shipment' | 'km' | 'kg' | 'ton' | 'cbm' | 'liter' | 'pallet' | 'pcs' | 'koli' | 'container';
 
 export const MODA: { v: Moda; l: string }[] = [{ v: 'darat', l: 'Darat (trucking)' }, { v: 'laut', l: 'Laut' }, { v: 'udara', l: 'Udara' }, { v: 'kereta', l: 'Kereta' }];
-export const BASIS: { v: Basis; l: string }[] = [
-  { v: 'trip', l: 'per trip' }, { v: 'cbm', l: 'per CBM' }, { v: 'ton', l: 'per ton' }, { v: 'pallet', l: 'per pallet' },
-  { v: 'liter', l: 'per liter' }, { v: 'kg', l: 'per kg' }, { v: 'container', l: 'per container' },
+/** Satuan harga beli / jual. grup = kelompok di dropdown (Armada, Berat, Volume, Unit). */
+export const BASIS: { v: Basis; l: string; grup: 'Armada / perjalanan' | 'Berat' | 'Volume' | 'Unit barang' }[] = [
+  { v: 'trip', l: 'per trip', grup: 'Armada / perjalanan' }, { v: 'shipment', l: 'per shipment', grup: 'Armada / perjalanan' },
+  { v: 'km', l: 'per km', grup: 'Armada / perjalanan' }, { v: 'container', l: 'per container', grup: 'Armada / perjalanan' },
+  { v: 'kg', l: 'per kg', grup: 'Berat' }, { v: 'ton', l: 'per ton', grup: 'Berat' },
+  { v: 'cbm', l: 'per CBM', grup: 'Volume' }, { v: 'liter', l: 'per liter', grup: 'Volume' },
+  { v: 'pallet', l: 'per pallet', grup: 'Unit barang' }, { v: 'pcs', l: 'per pcs', grup: 'Unit barang' }, { v: 'koli', l: 'per koli', grup: 'Unit barang' },
 ];
-/** Buying basis tender transport darat (sesuai UAT): per trip, per CBM, per ton, per pallet, per liter. */
-export const BASIS_DARAT: Basis[] = ['trip', 'cbm', 'ton', 'pallet', 'liter'];
+export const GRUP_BASIS = ['Armada / perjalanan', 'Berat', 'Volume', 'Unit barang'] as const;
+/** Buying basis tender transport darat: semua satuan (per trip, km, kg, ton, CBM, liter, pallet, pcs, koli, …). */
+export const BASIS_DARAT: Basis[] = BASIS.map(b => b.v);
 export const labelBasis = (b: Basis) => BASIS.find(x => x.v === b)?.l ?? b;
 
 export interface Armada { nama: string; moda: Moda; kapKg: number; kapCbm: number; kapPalet: number; kapLiter?: number; rpPerKm?: number; ket: string }
@@ -51,7 +56,7 @@ export const armadaModa = (m: Moda) => ARMADA.filter(a => a.moda === m);
 /** Kapasitas armada dalam satuan basis (untuk konversi harga per trip ↔ per CBM / ton / pallet / liter). Utilisasi tipikal 85%. */
 export function kapasitasBasis(a: Armada | undefined, basis: Basis, utilisasi = 0.85): number | null {
   if (!a) return null;
-  const v = basis === 'trip' || basis === 'container' ? 1 : basis === 'cbm' ? a.kapCbm * utilisasi : basis === 'ton' ? (a.kapKg / 1000) * utilisasi
+  const v = basis === 'trip' || basis === 'container' || basis === 'shipment' ? 1 : basis === 'cbm' ? a.kapCbm * utilisasi : basis === 'ton' ? (a.kapKg / 1000) * utilisasi
     : basis === 'kg' ? a.kapKg * utilisasi : basis === 'pallet' ? a.kapPalet : basis === 'liter' ? (a.kapLiter ?? 0) * 0.95 : 0;
   return v > 0 ? v : null;
 }
@@ -60,6 +65,7 @@ export function kapasitasBasis(a: Armada | undefined, basis: Basis, utilisasi = 
 export function estimasiHarga(namaArmada: string, origin: string, destination: string, basis: Basis): { harga: number; km: number; ket: string } | null {
   const a = armada(namaArmada); if (!a?.rpPerKm) return null;
   const km = jarakKm(origin, destination, 'darat'); if (!km) return null;
+  if (basis === 'km') return { harga: a.rpPerKm, km, ket: `tarif indikatif Rp${a.rpPerKm.toLocaleString('id-ID')}/km (${km.toLocaleString('id-ID')} km)` };
   const trip = Math.max(a.rpPerKm * km, a.rpPerKm * 40);       // minimal ±40 km (tarif dalam kota)
   const kap = kapasitasBasis(a, basis); if (!kap) return null;
   const harga = Math.round(trip / kap / 1000) * 1000;
@@ -128,6 +134,37 @@ export interface StageIntermodal {
   moda: Moda; dari: string; ke: string; armada: string; basis: Basis;
   qty: number;                  // satuan basis per shipment (mis. 1 trip, 1 container, 20 CBM, 500 kg)
   harga: number; vendor: string; rateId?: number | null; sumberHarga?: 'market' | 'estimasi' | 'manual'; leadTimeHari?: number | null;
+  qtyAuto?: boolean;            // true = qty dihitung dari profil muatan rute sesuai basis (lihat qtyDariMuatan)
+}
+/** Profil muatan per shipment — dasar konversi otomatis qty per satuan (kg, CBM, pallet, pcs, …). */
+export interface Muatan { kg?: number; cbm?: number; liter?: number; pallet?: number; pcs?: number; koli?: number; container?: number }
+export const FIELD_MUATAN: { k: keyof Muatan; l: string }[] = [
+  { k: 'kg', l: 'Berat (kg)' }, { k: 'cbm', l: 'Volume (CBM)' }, { k: 'liter', l: 'Liter' }, { k: 'pallet', l: 'Pallet' },
+  { k: 'pcs', l: 'Pcs' }, { k: 'koli', l: 'Koli' }, { k: 'container', l: 'Container' },
+];
+/** Faktor volumetrik udara IATA: 6.000 cm³/kg → 1 CBM = 166,67 kg chargeable. */
+export const KG_PER_CBM_UDARA = 1_000_000 / 6000;
+/** Qty per shipment dari profil muatan untuk satu basis. Udara per kg = chargeable weight (maks. aktual vs volume × 166,67);
+ *  laut per ton memakai W/M (maks. ton vs CBM) bila CBM diisi. null = data muatan belum cukup. */
+export function qtyDariMuatan(basis: Basis, m: Muatan | undefined, moda?: Moda, km?: number | null): number | null {
+  const v = (x?: number) => (x != null && x > 0 ? x : null);
+  const mu = m ?? {};
+  switch (basis) {
+    case 'trip': case 'shipment': return 1;
+    case 'km': return v(km ?? undefined);
+    case 'kg': {
+      const kg = v(mu.kg), cbm = v(mu.cbm);
+      if (moda === 'udara' && (kg || cbm)) return Math.round(Math.max(kg ?? 0, (cbm ?? 0) * KG_PER_CBM_UDARA) * 100) / 100;
+      return kg;
+    }
+    case 'ton': {
+      const t = v(mu.kg) ? mu.kg! / 1000 : null, cbm = v(mu.cbm);
+      if (moda === 'laut' && (t || cbm)) return Math.round(Math.max(t ?? 0, cbm ?? 0) * 1000) / 1000;
+      return t;
+    }
+    case 'container': return v(mu.container) ?? 1;
+    default: return v(mu[basis]);
+  }
 }
 export interface RuteIntermodal {
   id: string; origin: string; destination: string;
@@ -135,6 +172,8 @@ export interface RuteIntermodal {
   biayaLain: number;            // per shipment: THC, dokumen, handling port / gudang transit, asuransi
   shipmentBulan: number;        // shipment per bulan
   satuanJual: Basis; qtyJual: number;   // harga jual dinyatakan per … (mis. per container 1, per CBM 20)
+  qtyJualAuto?: boolean;        // true = qty jual dihitung dari profil muatan
+  muatan?: Muatan;              // profil muatan per shipment
   marginPersen?: number | null; catatan?: string;
 }
 export interface TenderIntermodal { marginGlobal: number; rute: RuteIntermodal[]; catatan?: string; tierMargin?: number[] }
@@ -142,21 +181,48 @@ export const INTERMODAL_DEFAULT: TenderIntermodal = { marginGlobal: 0.12, rute: 
 export const NAMA_STAGE = ['Stage 1 · Pickup (first mile)', 'Stage 2 · Main leg (laut / udara / kereta)', 'Stage 3 · Delivery (last mile)'] as const;
 
 export function ruteIntermodalBaru(p: Partial<RuteIntermodal> = {}): RuteIntermodal {
-  const st = (moda: Moda, armadaNama: string, basis: Basis): StageIntermodal => ({ moda, dari: '', ke: '', armada: armadaNama, basis, qty: 1, harga: 0, vendor: '', sumberHarga: 'manual' });
+  const st = (moda: Moda, armadaNama: string, basis: Basis): StageIntermodal => ({ moda, dari: '', ke: '', armada: armadaNama, basis, qty: 1, harga: 0, vendor: '', sumberHarga: 'manual', qtyAuto: true });
   return { id: idBaru(), origin: '', destination: '', stage: [st('darat', 'Trailer 20 ft', 'trip'), st('laut', 'Container 20 ft', 'container'), st('darat', 'Trailer 20 ft', 'trip')],
-    biayaLain: 0, shipmentBulan: 1, satuanJual: 'container', qtyJual: 1, ...p };
+    biayaLain: 0, shipmentBulan: 1, satuanJual: 'container', qtyJual: 1, qtyJualAuto: true, muatan: {}, ...p };
+}
+
+/** Qty efektif stage: otomatis dari muatan bila qtyAuto & datanya ada, selain itu isian manual. */
+export function qtyStage(s: StageIntermodal, r: Pick<RuteIntermodal, 'muatan'>): { qty: number; auto: boolean } {
+  if (s.qtyAuto) {
+    const q = qtyDariMuatan(s.basis, r.muatan, s.moda, s.basis === 'km' ? jarakKm(s.dari, s.ke, s.moda) : null);
+    if (q != null) return { qty: q, auto: true };
+  }
+  return { qty: s.qty || 0, auto: false };
+}
+/** Qty jual efektif per shipment. */
+export function qtyJualRute(r: RuteIntermodal): { qty: number; auto: boolean } {
+  if (r.qtyJualAuto) {
+    const q = qtyDariMuatan(r.satuanJual, r.muatan, r.stage[1]?.moda, r.satuanJual === 'km' ? jarakKm(r.origin, r.destination, 'darat') : null);
+    if (q != null && q > 0) return { qty: q, auto: true };
+  }
+  return { qty: r.qtyJual > 0 ? r.qtyJual : 1, auto: false };
 }
 
 export function hitungIntermodal(r: RuteIntermodal, marginGlobal: number) {
-  const perStage = r.stage.map(s => (s.harga || 0) * (s.qty || 0));
+  const qtys = r.stage.map(s => qtyStage(s, r).qty);
+  const perStage = r.stage.map((s, k) => (s.harga || 0) * qtys[k]);
   const beliShipment = perStage.reduce((t, x) => t + x, 0) + (r.biayaLain || 0);
   const m = marginRute(r.marginPersen, marginGlobal);
   const jualShipment = hargaJual(beliShipment, m);
-  const q = r.qtyJual > 0 ? r.qtyJual : 1;
+  const q = qtyJualRute(r).qty;
   const biayaBulan = beliShipment * (r.shipmentBulan || 0), pendapatanBulan = jualShipment * (r.shipmentBulan || 0);
   const lead = r.stage.reduce((t, s) => t + (Number(s.leadTimeHari) || 0), 0);
-  return { perStage, beliShipment, jualShipment, margin: m, beliPerSatuan: Math.round(beliShipment / q * 100) / 100, jualPerSatuan: Math.round(jualShipment / q * 100) / 100, biayaBulan, pendapatanBulan,
+  return { qtys, qtyJual: q, perStage, beliShipment, jualShipment, margin: m, beliPerSatuan: Math.round(beliShipment / q * 100) / 100, jualPerSatuan: Math.round(jualShipment / q * 100) / 100, biayaBulan, pendapatanBulan,
     gp: pendapatanBulan - biayaBulan, gpPersen: jualShipment > 0 ? (jualShipment - beliShipment) / jualShipment : 0, leadTimeHari: lead };
+}
+/** Harga beli & jual per berbagai satuan untuk satu rute (dari profil muatan) — membantu memilih satuan jual. */
+export function hargaPerSatuan(r: RuteIntermodal, marginGlobal: number) {
+  const h = hitungIntermodal(r, marginGlobal);
+  return BASIS.map(b => {
+    const q = qtyDariMuatan(b.v, r.muatan, r.stage[1]?.moda, b.v === 'km' ? jarakKm(r.origin, r.destination, 'darat') : null);
+    if (b.v === 'container' && !(r.muatan?.container! > 0)) return null;
+    return q && q > 0 ? { basis: b.v, label: b.l, qty: q, beli: Math.round(h.beliShipment / q * 100) / 100, jual: Math.round(h.jualShipment / q * 100) / 100 } : null;
+  }).filter((x): x is NonNullable<typeof x> => !!x);
 }
 export const ringkasIntermodal = (t: TenderIntermodal) =>
   ringkasDari(t.rute.map(r => ({ ...hitungIntermodal(r, t.marginGlobal), tanpaHarga: r.stage.some(s => !(s.harga > 0)) })));
@@ -191,7 +257,7 @@ export function tierIntermodal(t: TenderIntermodal, tiers: number[]): HasilTier 
     kolom: [{ label: 'Saat ini', margin: null }, ...tiers.map(m => ({ label: `Margin ${persen1(m)}`, margin: m }))],
     baris: t.rute.map((r, i) => {
       const h = versi.map(v => hitungIntermodal(v.rute[i], v.marginGlobal));
-      return { id: r.id, nama: `${r.origin || '…'} → ${r.destination || '…'}`, satuan: labelBasis(r.satuanJual), beli: h[0].beliPerSatuan, volBulan: (r.shipmentBulan || 0) * (r.qtyJual || 1),
+      return { id: r.id, nama: `${r.origin || '…'} → ${r.destination || '…'}`, satuan: labelBasis(r.satuanJual), beli: h[0].beliPerSatuan, volBulan: (r.shipmentBulan || 0) * qtyJualRute(r).qty,
         jual: h.map(x => x.jualPerSatuan), gpBulan: h.map(x => x.gp) };
     }),
     total: versi.map(ringkasIntermodal),
@@ -262,7 +328,7 @@ export const rateCardTransport = (t: TenderTransport): BarisRateCard[] => t.rute
 export const rateCardIntermodal = (t: TenderIntermodal): BarisRateCard[] => t.rute.filter(r => r.stage.every(s => s.harga > 0)).map(r => {
   const h = hitungIntermodal(r, t.marginGlobal);
   const main = r.stage[1];
-  return { layanan: `${r.origin} → ${r.destination} (door to door)`, satuan: `${labelBasis(r.satuanJual)}${r.qtyJual > 1 ? ` (${fmtAngka(r.qtyJual)} per shipment)` : ''}`,
+  return { layanan: `${r.origin} → ${r.destination} (door to door)`, satuan: `${labelBasis(r.satuanJual)}${h.qtyJual > 1 ? ` (${fmtAngka(h.qtyJual)} per shipment)` : ''}`,
     tarif: Math.ceil(h.jualPerSatuan),
     catatan: [`via ${MODA.find(m => m.v === main.moda)?.l.split(' ')[0] ?? main.moda} ${main.dari} → ${main.ke} (${main.armada})`, h.leadTimeHari ? `lead time ±${fmtAngka(h.leadTimeHari)} hari` : ''].filter(Boolean).join('; ') };
 });

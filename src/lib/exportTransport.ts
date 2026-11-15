@@ -3,7 +3,7 @@
 // perbandingan margin per tier, dan catatan review. Sel input (broken white) bisa diubah → semua hasil ikut terhitung ulang.
 import type ExcelJSNS from 'exceljs';
 import {
-  TIER_DEFAULT, hitungIntermodal, hitungRute, labelBasis, marginRute, MODA, NAMA_STAGE, reviewIntermodal, reviewTransport, ringkasIntermodal, ringkasTransport,
+  TIER_DEFAULT, hitungIntermodal, hitungRute, qtyStage, labelBasis, marginRute, MODA, NAMA_STAGE, reviewIntermodal, reviewTransport, ringkasIntermodal, ringkasTransport,
   tierIntermodal, tierTransport, type RateTransport, type TenderIntermodal, type TenderTransport,
 } from './transport.ts';
 import { jarakKm } from './lokasiIndonesia.ts';
@@ -198,10 +198,11 @@ export async function workbookIntermodal(t: InfoTenderEkspor, im: TenderIntermod
     { t: 'Qty / shipment (input)', input: true, w: 11 }, { t: 'Harga beli (input)', input: true, w: 14 }, { t: 'Vendor', w: 18 }, { t: 'Sumber harga', w: 12 }, { t: 'Lead time hari (input)', input: true, w: 10 }, { t: 'Biaya / shipment', w: 16 }]);
   let r = 5;
   im.rute.forEach((x, i) => x.stage.forEach((s, k) => {
+    const q = qtyStage(s, x);
     sel(st, `A${r}`, { teks: i + 1 }); sel(st, `B${r}`, { teks: `${x.origin} → ${x.destination}` }); sel(st, `C${r}`, { teks: NAMA_STAGE[k] });
     sel(st, `D${r}`, { teks: MODA.find(m => m.v === s.moda)?.l ?? s.moda }); sel(st, `E${r}`, { teks: s.dari }); sel(st, `F${r}`, { teks: s.ke }); sel(st, `G${r}`, { teks: s.armada }); sel(st, `H${r}`, { teks: labelBasis(s.basis) });
-    sel(st, `I${r}`, { input: s.qty || 0, fmt: '#,##0.##' }); sel(st, `J${r}`, { input: s.harga || 0, fmt: RP }); sel(st, `K${r}`, { teks: s.vendor }); sel(st, `L${r}`, { teks: s.sumberHarga ?? 'manual' });
-    sel(st, `M${r}`, { input: Number(s.leadTimeHari) || 0, fmt: '0.##' }); sel(st, `N${r}`, { f: `J${r}*I${r}`, hasil: (s.harga || 0) * (s.qty || 0), fmt: RP });
+    sel(st, `I${r}`, { input: q.qty, fmt: '#,##0.##' }); sel(st, `J${r}`, { input: s.harga || 0, fmt: RP }); sel(st, `K${r}`, { teks: s.vendor }); sel(st, `L${r}`, { teks: `${s.sumberHarga ?? 'manual'}${q.auto ? ' · qty auto dari muatan' : ''}` });
+    sel(st, `M${r}`, { input: Number(s.leadTimeHari) || 0, fmt: '0.##' }); sel(st, `N${r}`, { f: `J${r}*I${r}`, hasil: (s.harga || 0) * q.qty, fmt: RP });
     r++;
   }));
   const s0 = 5, s1 = Math.max(5, r - 1), rs = (c: string) => `Stage!$${c}$${s0}:$${c}$${s1}`;
@@ -215,7 +216,7 @@ export async function workbookIntermodal(t: InfoTenderEkspor, im: TenderIntermod
   im.rute.forEach((x, i) => {
     const rr = 5 + i, h = hitungIntermodal(x, im.marginGlobal);
     sel(ws, `A${rr}`, { teks: i + 1 }); sel(ws, `B${rr}`, { teks: x.origin }); sel(ws, `C${rr}`, { teks: x.destination });
-    sel(ws, `D${rr}`, { input: x.shipmentBulan || 0, fmt: '#,##0.##' }); sel(ws, `E${rr}`, { teks: labelBasis(x.satuanJual) }); sel(ws, `F${rr}`, { input: x.qtyJual || 0, fmt: '#,##0.##' });
+    sel(ws, `D${rr}`, { input: x.shipmentBulan || 0, fmt: '#,##0.##' }); sel(ws, `E${rr}`, { teks: labelBasis(x.satuanJual) }); sel(ws, `F${rr}`, { input: h.qtyJual, fmt: '#,##0.##' });
     sel(ws, `G${rr}`, { input: x.biayaLain || 0, fmt: RP });
     sel(ws, `H${rr}`, { f: `SUMIF(${rs('A')},A${rr},${rs('N')})+G${rr}`, hasil: h.beliShipment, fmt: RP });
     sel(ws, `I${rr}`, { input: x.marginPersen ?? null, fmt: PCT });
@@ -236,7 +237,7 @@ export async function workbookIntermodal(t: InfoTenderEkspor, im: TenderIntermod
   legenda(ws, tot + 2);
   const tiers = im.tierMargin ?? TIER_DEFAULT;
   perbandingan(wb, {
-    baris: im.rute.map((x, i) => ({ nama: `${x.origin} → ${x.destination}`, satuan: labelBasis(x.satuanJual), beliRef: `Rute!H${5 + i}`, volRef: `Rute!D${5 + i}`, qtyRef: `Rute!F${5 + i}`, kiniJual: `Rute!M${5 + i}`, kiniGp: `Rute!P${5 + i}`, beli: hitungIntermodal(x, im.marginGlobal).beliShipment, vol: x.shipmentBulan || 0, qty: x.qtyJual || 0 })),
+    baris: im.rute.map((x, i) => ({ nama: `${x.origin} → ${x.destination}`, satuan: labelBasis(x.satuanJual), beliRef: `Rute!H${5 + i}`, volRef: `Rute!D${5 + i}`, qtyRef: `Rute!F${5 + i}`, kiniJual: `Rute!M${5 + i}`, kiniGp: `Rute!P${5 + i}`, beli: hitungIntermodal(x, im.marginGlobal).beliShipment, vol: x.shipmentBulan || 0, qty: hitungIntermodal(x, im.marginGlobal).qtyJual })),
     tiers, hasil: tierIntermodal(im, tiers), kontrak: KONTRAK, kontrakN: t.durasi_kontrak_bulan, intermodal: true,
   });
   sheetReview(wb, reviewIntermodal(im, rates));

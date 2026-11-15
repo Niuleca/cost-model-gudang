@@ -93,3 +93,25 @@ test('export Excel transport: rumus lengkap + hasil sama dengan sistem', async (
   assert.equal((r.getCell('M5').value as { result: number }).result, 2_352_941.18);
   assert.deepEqual(wb.worksheets.map(w => w.name), ['Ringkasan', 'Rute', 'Perbandingan Margin', 'Review']);
 });
+
+test('satuan harga: qty otomatis dari profil muatan (chargeable weight udara, W/M laut, km)', async () => {
+  const { qtyDariMuatan, qtyStage, hargaPerSatuan } = await import('../src/lib/transport.ts');
+  const m = { kg: 500, cbm: 4, pallet: 4, pcs: 1200, koli: 80 };
+  assert.equal(qtyDariMuatan('kg', m, 'udara'), 666.67);       // 4 CBM × 166,67 > 500 kg
+  assert.equal(qtyDariMuatan('kg', m, 'darat'), 500);
+  assert.equal(qtyDariMuatan('ton', m, 'laut'), 4);             // W/M: maks(0,5 t ; 4 CBM)
+  assert.equal(qtyDariMuatan('ton', m, 'darat'), 0.5);
+  assert.equal(qtyDariMuatan('pcs', m), 1200);
+  assert.equal(qtyDariMuatan('liter', m), null);
+  assert.equal(qtyDariMuatan('trip', {}), 1);
+  const r = ruteIntermodalBaru({ muatan: m, satuanJual: 'kg' });
+  r.stage[1] = { ...r.stage[1], moda: 'udara', basis: 'kg', harga: 30_000 };
+  r.stage[0] = { ...r.stage[0], harga: 1_000_000 }; r.stage[2] = { ...r.stage[2], harga: 1_000_000 };
+  assert.deepEqual(qtyStage(r.stage[1], r), { qty: 666.67, auto: true });
+  const h = hitungIntermodal(r, 0.2);
+  assert.equal(h.beliShipment, 2_000_000 + 30_000 * 666.67);
+  assert.equal(h.qtyJual, 666.67);                              // satuan jual kg ikut chargeable weight main leg udara
+  const s = qtyStage({ ...r.stage[1], qtyAuto: false, qty: 700 }, r);
+  assert.deepEqual(s, { qty: 700, auto: false });
+  assert.ok(hargaPerSatuan(r, 0.2).some(o => o.basis === 'pcs' && o.qty === 1200));
+});

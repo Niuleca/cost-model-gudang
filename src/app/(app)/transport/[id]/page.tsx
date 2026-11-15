@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useCallback, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
+import SelectBasis from '@/components/transport/SelectBasis';
 import StatusControl from '@/components/StatusControl';
 import { DatalistLokasi, InfoTenderTr, KartuRingkas, PersenInput, useRates, useTenderTr, type TenderTr } from '@/components/transport/shared';
 import { KartuReview, PerbandinganMargin } from '@/components/transport/ReviewTr';
@@ -103,9 +104,8 @@ export default function TransportTender() {
                   <td>
                     <select aria-label="Armada" value={r.armada} onChange={e => setRute(i, { armada: e.target.value })}>
                       {ARMADA.filter(x => x.moda === 'darat').map(x => <option key={x.nama}>{x.nama}</option>)}</select>
-                    <select aria-label="Buying basis" className="input-kecil" value={r.basis} onChange={e => setRute(i, { basis: e.target.value as RuteTransport['basis'] })}>
-                      {BASIS_DARAT.map(b => <option key={b} value={b}>{labelBasis(b)}</option>)}</select>
-                    {a && <div className="dasar-def">{(a.kapKg / 1000).toLocaleString('id-ID')} t · {a.kapCbm} CBM · {a.kapPalet} palet{kap && r.basis !== 'trip' ? ` · ±${kap.toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${r.basis}/trip` : ''}</div>}
+                    <SelectBasis label="Buying basis" className="input-kecil" value={r.basis} pilihan={BASIS_DARAT} onChange={b => setRute(i, { basis: b })} />
+                    {a && <div className="dasar-def">{(a.kapKg / 1000).toLocaleString('id-ID')} t · {a.kapCbm} CBM · {a.kapPalet} palet{kap && r.basis !== 'trip' && r.basis !== 'shipment' ? ` · ±${kap.toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${r.basis}/trip` : ''}</div>}
                   </td>
                   <td className="num"><input aria-label="Volume per bulan" type="number" min={0} step="any" value={r.volumeBulan || ''} placeholder="0" onChange={e => setRute(i, { volumeBulan: Number(e.target.value) || 0 })} />
                     <div className="dasar-def">{labelBasis(r.basis).replace('per ', '')}/bln</div></td>

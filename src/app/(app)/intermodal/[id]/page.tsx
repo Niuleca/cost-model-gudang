@@ -6,11 +6,12 @@ import { useParams } from 'next/navigation';
 import StatusControl from '@/components/StatusControl';
 import { DatalistLokasi, InfoTenderTr, KartuRingkas, PersenInput, useRates, useTenderTr, type TenderTr } from '@/components/transport/shared';
 import { KartuReview, PerbandinganMargin } from '@/components/transport/ReviewTr';
+import SelectBasis from '@/components/transport/SelectBasis';
 import QuotationPanel from '@/app/(app)/tender/[id]/QuotationPanel';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { useProfile } from '@/lib/useProfile';
 import {
-  BASIS, INTERMODAL_DEFAULT, MODA, NAMA_STAGE, TIER_DEFAULT, armadaModa, cocokRate, estimasiHarga, hasilOverview, hitungIntermodal, labelBasis,
+  FIELD_MUATAN, INTERMODAL_DEFAULT, MODA, hargaPerSatuan, qtyStage, qtyJualRute, NAMA_STAGE, TIER_DEFAULT, armadaModa, cocokRate, estimasiHarga, hasilOverview, hitungIntermodal, labelBasis,
   rateCardIntermodal, reviewIntermodal, ringkasIntermodal, ruteIntermodalBaru, tierIntermodal, type Basis, type Moda, type RateTransport, type RuteIntermodal, type StageIntermodal, type TenderIntermodal,
 } from '@/lib/transport';
 import { jarakKm } from '@/lib/lokasiIndonesia';
@@ -21,17 +22,19 @@ const Rute3D = dynamic(() => import('@/components/transport/Rute3D'), { ssr: fal
 
 const TABS = ['Input rute', 'Result & margin', 'Quotation', 'Simulasi 3D'] as const;
 const ambilIm = (t: TenderTr): TenderIntermodal => ({ ...INTERMODAL_DEFAULT, ...((t.asumsi?.intermodal as TenderIntermodal | undefined) ?? {}) });
-const BASIS_MODA: Record<Moda, Basis[]> = { darat: ['trip', 'cbm', 'ton', 'pallet', 'liter'], laut: ['container', 'cbm', 'ton'], udara: ['kg'], kereta: ['container', 'ton'] };
+/** Basis default saat moda diganti (semua satuan tetap bisa dipilih di setiap stage). */
+const BASIS_AWAL: Record<Moda, Basis> = { darat: 'trip', laut: 'container', udara: 'kg', kereta: 'container' };
+const fmtQ = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 2 });
 
 /** Satu stage: moda, armada, basis, qty per shipment, vendor & harga dari market price. Di level modul supaya input tidak kehilangan fokus. */
-function BarisStage({ s, idx, rates, onUbah }: { s: StageIntermodal; idx: number; rates: RateTransport[]; onUbah: (p: Partial<StageIntermodal>) => void }) {
+function BarisStage({ s, idx, rates, q, onUbah }: { s: StageIntermodal; idx: number; rates: RateTransport[]; q: { qty: number; auto: boolean }; onUbah: (p: Partial<StageIntermodal>) => void }) {
   const pilihan = s.dari && s.ke ? cocokRate(rates, { moda: s.moda, origin: s.dari, destination: s.ke, armada: s.armada, basis: s.basis }) : [];
   const km = jarakKm(s.dari, s.ke, s.moda);
   const est = s.moda === 'darat' && s.dari && s.ke ? estimasiHarga(s.armada, s.dari, s.ke, s.basis) : null;
   return (
     <tr className={!(s.harga > 0) ? 'baris-merah' : undefined}>
       <td><b className="small">{NAMA_STAGE[idx]}</b>
-        <select aria-label="Moda" className="input-kecil" value={s.moda} onChange={e => { const m = e.target.value as Moda; onUbah({ moda: m, armada: armadaModa(m)[0]?.nama ?? '', basis: BASIS_MODA[m][0], rateId: null }); }}>
+        <select aria-label="Moda" className="input-kecil" value={s.moda} onChange={e => { const m = e.target.value as Moda; onUbah({ moda: m, armada: armadaModa(m)[0]?.nama ?? '', basis: BASIS_AWAL[m], rateId: null }); }}>
           {MODA.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}</select></td>
       <td>
         <input aria-label="Dari" list={`dl-im-${s.moda}`} value={s.dari} placeholder="Dari" onChange={e => onUbah({ dari: e.target.value, rateId: null })} />
@@ -40,10 +43,13 @@ function BarisStage({ s, idx, rates, onUbah }: { s: StageIntermodal; idx: number
       </td>
       <td>
         <select aria-label="Armada" value={s.armada} onChange={e => onUbah({ armada: e.target.value, rateId: null })}>{armadaModa(s.moda).map(a => <option key={a.nama}>{a.nama}</option>)}</select>
-        <select aria-label="Basis" className="input-kecil" value={s.basis} onChange={e => onUbah({ basis: e.target.value as Basis, rateId: null })}>{BASIS_MODA[s.moda].map(b => <option key={b} value={b}>{labelBasis(b)}</option>)}</select>
+        <SelectBasis className="input-kecil" value={s.basis} onChange={b => onUbah({ basis: b, rateId: null })} />
       </td>
-      <td className="num"><input aria-label="Qty per shipment" type="number" min={0} step="any" value={s.qty || ''} onChange={e => onUbah({ qty: Number(e.target.value) || 0 })} />
-        <div className="dasar-def">{labelBasis(s.basis).replace('per ', '')}/shipment</div></td>
+      <td className="num"><input aria-label="Qty per shipment" type="number" min={0} step="any" value={q.auto ? q.qty : (s.qty || '')} className={q.auto ? 'input-auto' : undefined}
+        title={q.auto ? 'Otomatis dari profil muatan — ketik untuk isi manual' : undefined} onChange={e => onUbah({ qty: Number(e.target.value) || 0, qtyAuto: false })} />
+        <div className="dasar-def">{labelBasis(s.basis).replace('per ', '')}/shipment
+          {q.auto ? <span className="chip-auto" title={s.moda === 'udara' && s.basis === 'kg' ? 'chargeable weight = maks. berat aktual vs CBM × 166,67' : s.moda === 'laut' && s.basis === 'ton' ? 'W/M = maks. ton vs CBM' : 'dari profil muatan'}> auto</span>
+            : <> · <button className="link-kecil" title="hitung dari profil muatan rute" onClick={() => onUbah({ qtyAuto: true })}>auto</button></>}</div></td>
       <td>
         {pilihan.length > 0 && <select aria-label="Pilih dari market price" value={s.rateId ?? ''} onChange={e => {
           const x = pilihan.find(p => p.id === Number(e.target.value));
@@ -55,7 +61,7 @@ function BarisStage({ s, idx, rates, onUbah }: { s: StageIntermodal; idx: number
       </td>
       <td className="num"><input aria-label="Harga beli" type="number" min={0} value={s.harga || ''} placeholder={labelBasis(s.basis)} onChange={e => onUbah({ harga: Number(e.target.value) || 0, rateId: null, sumberHarga: 'manual' })} /></td>
       <td className="num"><input aria-label="Lead time" type="number" min={0} step="any" value={s.leadTimeHari ?? ''} placeholder="hari" onChange={e => onUbah({ leadTimeHari: e.target.value === '' ? null : Number(e.target.value) })} /></td>
-      <td className="num"><b>{rp((s.harga || 0) * (s.qty || 0))}</b></td>
+      <td className="num"><b>{rp((s.harga || 0) * q.qty)}</b><div className="dasar-def">{rp(s.harga || 0)} × {fmtQ(q.qty)}</div></td>
     </tr>);
 }
 
@@ -122,6 +128,9 @@ export default function IntermodalTender() {
       {im.rute.length === 0 && <div className="card muted">Belum ada rute. Klik “+ Tambah rute”.</div>}
       {im.rute.map((r, i) => {
         const h = hitungIntermodal(r, im.marginGlobal);
+        const qj = qtyJualRute(r);
+        const opsi = hargaPerSatuan(r, im.marginGlobal);
+        const setMuatan = (k: string, v: string) => setRute(i, { muatan: { ...(r.muatan ?? {}), [k]: v === '' ? undefined : Number(v) } });
         return (
           <div key={r.id} className="card" style={{ display: 'grid', gap: 10 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -138,24 +147,37 @@ export default function IntermodalTender() {
               <label className="f">Shipment / bulan<input type="number" min={0} step="any" value={r.shipmentBulan || ''} onChange={e => setRute(i, { shipmentBulan: Number(e.target.value) || 0 })} /></label>
               <label className="f">Harga jual dinyatakan
                 <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
-                  <select aria-label="Satuan jual" value={r.satuanJual} onChange={e => setRute(i, { satuanJual: e.target.value as Basis })}>{BASIS.map(b => <option key={b.v} value={b.v}>{b.l}</option>)}</select>
-                  <input aria-label="Qty jual per shipment" type="number" min={0} step="any" value={r.qtyJual || ''} title="jumlah satuan jual per shipment" onChange={e => setRute(i, { qtyJual: Number(e.target.value) || 1 })} style={{ width: 80 }} />
-                </span></label>
+                  <SelectBasis label="Satuan jual" value={r.satuanJual} onChange={b => setRute(i, { satuanJual: b })} />
+                  <input aria-label="Qty jual per shipment" type="number" min={0} step="any" value={qj.auto ? qj.qty : (r.qtyJual || '')} className={qj.auto ? 'input-auto' : undefined}
+                    title={qj.auto ? 'Otomatis dari profil muatan — ketik untuk isi manual' : 'jumlah satuan jual per shipment'} onChange={e => setRute(i, { qtyJual: Number(e.target.value) || 1, qtyJualAuto: false })} style={{ width: 80 }} />
+                </span>
+                <span className="dasar-def">{qj.auto ? <span className="chip-auto">auto dari muatan</span> : <button className="link-kecil" onClick={() => setRute(i, { qtyJualAuto: true })}>hitung otomatis dari muatan</button>}</span></label>
               <label className="f">Biaya lain / shipment (Rp)<input type="number" min={0} value={r.biayaLain || ''} placeholder="THC, dokumen, handling" onChange={e => setRute(i, { biayaLain: Number(e.target.value) || 0 })} /></label>
               <label className="f">Margin rute (%)<PersenInput label="Margin rute" nilai={r.marginPersen} placeholder={`${Math.round(im.marginGlobal * 1000) / 10} (global)`} onChange={v => setRute(i, { marginPersen: v })} /></label>
             </div>
+            <div className="muatan-box">
+              <div className="small"><b>Profil muatan per shipment</b> <span className="muted">— isi yang diketahui; qty stage & qty jual bertanda <i>auto</i> dihitung dari sini (udara per kg = chargeable weight, laut per ton = W/M).</span></div>
+              <div className="muatan-grid">{FIELD_MUATAN.map(f => <label key={f.k} className="f small">{f.l}
+                <input type="number" min={0} step="any" value={r.muatan?.[f.k] ?? ''} placeholder="—" onChange={e => setMuatan(f.k, e.target.value)} /></label>)}</div>
+            </div>
             <div className="tablewrap fit"><table className="tabel-fit tabel-im">
               <thead><tr><th>Stage · moda</th><th>Dari → ke</th><th>Armada · basis</th><th className="num">Qty</th><th>Vendor</th><th className="num">Harga beli</th><th className="num">Lead time</th><th className="num">Biaya / shipment</th></tr></thead>
-              <tbody>{r.stage.map((s, k) => <BarisStage key={k} s={s} idx={k} rates={rates} onUbah={p => setStage(i, k, p)} />)}</tbody>
+              <tbody>{r.stage.map((s, k) => <BarisStage key={k} s={s} idx={k} rates={rates} q={qtyStage(s, r)} onUbah={p => setStage(i, k, p)} />)}</tbody>
             </table></div>
             <div className="tablewrap fit"><table className="tabel-fit">
               <tbody>
                 <tr><td>Harga beli gabungan per shipment <span className="small muted">({h.perStage.map(x => rp(x)).join(' + ')}{r.biayaLain ? ` + lain ${rp(r.biayaLain)}` : ''})</span></td><td className="num"><b>{rp(h.beliShipment)}</b></td></tr>
                 <tr><td>Harga jual per shipment · margin {(h.margin * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%{r.marginPersen == null ? ' (global)' : ''}</td><td className="num"><b>{rp(h.jualShipment)}</b></td></tr>
-                <tr><td>Harga jual {labelBasis(r.satuanJual)} <span className="small muted">(÷ {r.qtyJual || 1})</span></td><td className="num"><b>{rp(h.jualPerSatuan)}</b> <span className="small muted">beli {rp(h.beliPerSatuan)}</span></td></tr>
+                <tr><td>Harga jual {labelBasis(r.satuanJual)} <span className="small muted">(÷ {fmtQ(h.qtyJual)})</span></td><td className="num"><b>{rp(h.jualPerSatuan)}</b> <span className="small muted">beli {rp(h.beliPerSatuan)}</span></td></tr>
                 <tr className="pd-sub"><td>Per bulan ({r.shipmentBulan || 0} shipment): biaya {rp(h.biayaBulan)} · GP {(h.gpPersen * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%</td><td className="num"><b>{rp(h.pendapatanBulan)}</b></td></tr>
               </tbody>
             </table></div>
+            {opsi.length > 0 && <div className="tablewrap fit"><table className="tabel-fit tabel-satuan">
+              <thead><tr><th>Pilih satuan jual (dari profil muatan)</th><th className="num">Qty / shipment</th><th className="num">Harga beli</th><th className="num">Harga jual</th><th></th></tr></thead>
+              <tbody>{opsi.map(o => <tr key={o.basis} className={o.basis === r.satuanJual ? 'aktif' : undefined}>
+                <td>{o.label}</td><td className="num">{fmtQ(o.qty)}</td><td className="num">{rp(o.beli)}</td><td className="num"><b>{rp(o.jual)}</b></td>
+                <td>{o.basis === r.satuanJual ? <span className="chip-auto">dipakai</span> : <button className="link-kecil" onClick={() => setRute(i, { satuanJual: o.basis, qtyJualAuto: true })}>pakai</button>}</td></tr>)}</tbody>
+            </table></div>}
           </div>);
       })}
       </>}
