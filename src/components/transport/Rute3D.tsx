@@ -1,10 +1,10 @@
 'use client';
-// Simulasi rute 3D per stage (transport & intermodal).
-// - Peta: citra satelit (Esri World Imagery, dimuat di browser) di atas peta ilustrasi sebagai cadangan; lapisan detail
-//   zoom tinggi otomatis untuk leg pendek (mis. pickup kota → bandara) supaya tetap tajam saat kamera mendekat.
-// - Animasi satu per satu: Stage 1 truk origin → bandara / pelabuhan, Stage 2 pesawat / kapal / kereta port → port,
-//   Stage 3 truk ke destination. Kamera otomatis membingkai stage aktif (top view default, bisa 3D miring),
-//   panel HUD menampilkan stage, armada, rute, lead time & progres.
+// Simulasi rute 3D per stage di atas GLOBE bumi (transport & intermodal).
+// - Peta: bola bumi bertekstur citra satelit Esri World Imagery menutup seluruh dunia. Tile dimuat dinamis
+//   (quadtree Web Mercator, zoom 2–17) mengikuti posisi kamera: makin dekat makin tajam, seperti Google Earth.
+// - Mode kamera: Top view & 3D miring (membingkai stage aktif) dan Globe (seluruh dunia, bisa diputar).
+// - Animasi satu per satu: Stage 1 truk origin → bandara / pelabuhan, Stage 2 pesawat / kapal / kereta,
+//   Stage 3 truk ke destination; HUD menampilkan stage, armada, rute, lead time & progres.
 // - Model armada 3D dari Meshy (public/sim3d/model/*.glb), ukuran tetap terbaca di layar pada zoom berapa pun.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -28,12 +28,26 @@ const IKON_MODA: Record<Moda, string> = { darat: '🚚', laut: '🚢', udara: '�
 const IKON_LOKASI: Record<string, string> = { kota: '🏭', pelabuhan: '⚓', bandara: '✈' };
 const DETIK_STAGE = 7;     // durasi animasi satu stage pada kecepatan 1×
 const JEDA = 1.4;          // jeda di titik serah terima antar stage (detik)
-const K = 4;               // unit per derajat
-const G = 0.05;            // tinggi permukaan peta
-const YJALUR = G + 0.03;
-const ke3 = (lon: number, lat: number, y = 0) => new THREE.Vector3((lon - 118) * K, y, -(lat + 2) * K);
+const K = 4;               // unit per derajat di permukaan
+const R = (180 / Math.PI) * K;   // jari-jari bumi dalam unit scene (1° busur = K unit)
+const HJALUR = 0.08;       // tinggi jalur di atas permukaan
 function acak(seed: number) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; }; }
 const hashTeks = (t: string) => Array.from(t).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+
+type Proyeksi = (lon: number, lat: number, h?: number) => THREE.Vector3;
+/** Proyeksi lon/lat → titik di bola; diputar supaya pusat rute menghadap +Y dan arah utara ke −Z
+ *  (kamera OrbitControls dengan up = Y tetap terasa seperti peta datar di sekitar rute). */
+function buatProyeksi(lonP: number, latP: number): Proyeksi {
+  const mentah = (lon: number, lat: number) => {
+    const a = THREE.MathUtils.degToRad(lon), b = THREE.MathUtils.degToRad(lat);
+    return new THREE.Vector3(Math.cos(b) * Math.sin(a), Math.sin(b), Math.cos(b) * Math.cos(a));
+  };
+  const P = mentah(lonP, latP);
+  const N = mentah(lonP, latP + 0.01).sub(P).normalize();
+  const E = new THREE.Vector3().crossVectors(N, P).normalize();
+  const m = new THREE.Matrix3().set(E.x, E.y, E.z, P.x, P.y, P.z, -N.x, -N.y, -N.z);
+  return (lon, lat, h = 0) => mentah(lon, lat).applyMatrix3(m).multiplyScalar(R + h);
+}
 
 // Garis pantai pulau utama (lon, lat) — disederhanakan, hanya untuk orientasi.
 const PULAU: [number, number][][] = [
@@ -96,18 +110,6 @@ function modelKotak(m: Moda) {
 }
 
 
-function teksturLaut() {
-  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d')!;
-  x.fillStyle = '#2a73b2'; x.fillRect(0, 0, 256, 256);
-  const r = acak(11);
-  for (let i = 0; i < 520; i++) {
-    const px = r() * 256, py = r() * 256, w = 6 + r() * 22;
-    x.strokeStyle = r() < 0.6 ? `rgba(120,190,235,${0.18 + r() * 0.22})` : `rgba(15,60,110,${0.15 + r() * 0.2})`;
-    x.lineWidth = 1 + r() * 1.5; x.beginPath(); x.moveTo(px, py); x.quadraticCurveTo(px + w / 2, py - 2 - r() * 3, px + w, py); x.stroke();
-  }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(40, 18); t.colorSpace = THREE.SRGBColorSpace; return t;
-}
-
 /** Tekstur RGBA (dipakai sebagai map transparan): bayangan bulat pesawat & buih V di belakang kapal. */
 function teksturBayang() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d')!;
@@ -128,98 +130,154 @@ function teksturBuih() {
 }
 
 
-/** Bentuk pulau diperbesar dari titik beratnya (untuk pantai & laut dangkal). */
-function bentuk(p: [number, number][], tambah = 0) {
-  const cx = p.reduce((t, q) => t + q[0], 0) / p.length, cy = p.reduce((t, q) => t + q[1], 0) / p.length;
-  return new THREE.Shape(p.map(([lon, lat]) => {
-    const dx = lon - cx, dy = lat - cy, d = Math.hypot(dx, dy) || 1, f = (d + tambah) / d;
-    return new THREE.Vector2((cx + dx * f - 118) * K, (cy + dy * f + 2) * K);
-  }));
-}
-
-
 // ---------------- Leg ----------------
 interface LegHitung { idx: number; moda: Moda; a: Lokasi; b: Lokasi; km: number; hari: number; perkiraan: boolean; label?: string; armada?: string; titik: THREE.Vector3[]; kurva: THREE.CatmullRomCurve3 }
 
-function hitungLeg(l: Leg, idx: number): LegHitung | null {
+function hitungLeg(l: Leg, idx: number, proj: Proyeksi): LegHitung | null {
   const a = cariLokasi(l.dari), b = cariLokasi(l.ke);
   if (!a || !b || a.nama === b.nama) return null;
   const km = Math.round(jarakLurusKm(a, b) * FAKTOR_JALUR[l.moda]);
   const hari = l.hari && l.hari > 0 ? l.hari : Math.max(l.moda === 'udara' ? 1 : 0.25, km / KM_HARI[l.moda]);
-  const p0 = ke3(a.lon, a.lat, YJALUR), p1 = ke3(b.lon, b.lat, YJALUR);
-  const n = 80, titik: THREE.Vector3[] = [];
-  const pj = p0.distanceTo(p1);
+  const pa = proj(a.lon, a.lat), pb = proj(b.lon, b.lat);
+  const na = pa.clone().normalize(), nb = pb.clone().normalize();
+  const pj = pa.distanceTo(pb);
   const tinggi = l.moda === 'udara' ? Math.max(0.5, pj * 0.16) : 0;
-  const tegak = new THREE.Vector3(-(p1.z - p0.z), 0, p1.x - p0.x).normalize();
-  if (tegak.z > 0) tegak.negate();
-  // laut: lengkung ke utara (alur pelayaran); darat / kereta: sedikit berkelok supaya terbaca sebagai jalan
+  const t = new THREE.Vector3().subVectors(pb, pa).normalize();
+  const tengah = na.clone().add(nb).normalize();
+  const sisi = new THREE.Vector3().crossVectors(t, tengah).normalize();
+  if (sisi.z > 0) sisi.negate();   // ke arah utara (−Z), alur pelayaran di utara pulau besar
   const r = acak(hashTeks(a.nama + b.nama));
   const kelok = l.moda === 'darat' || l.moda === 'kereta' ? [r() - 0.5, r() - 0.5].map(x => x * pj * 0.12) : [0, 0];
+  const n = Math.max(80, Math.min(240, Math.round(pj * 2))), titik: THREE.Vector3[] = [];
+  const q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion().setFromUnitVectors(na, nb);
   for (let i = 0; i <= n; i++) {
     const u = i / n, s = Math.sin(Math.PI * u);
-    const off = l.moda === 'laut' ? pj * 0.1 * s : kelok[0] * Math.sin(Math.PI * u) + kelok[1] * Math.sin(2 * Math.PI * u);
-    titik.push(new THREE.Vector3().lerpVectors(p0, p1, u).addScaledVector(tegak, off).setY(YJALUR + tinggi * s));
+    const dasar = na.clone().applyQuaternion(q0.clone().slerp(q1, u));   // lintasan lingkaran besar
+    const off = l.moda === 'laut' ? pj * 0.1 * s : kelok[0] * s + kelok[1] * Math.sin(2 * Math.PI * u);
+    titik.push(dasar.multiplyScalar(R).addScaledVector(sisi, off).normalize().multiplyScalar(R + HJALUR + tinggi * s));
   }
   return { idx, moda: l.moda, a, b, km, hari, perkiraan: !(l.hari && l.hari > 0), label: l.label, armada: l.armada, titik, kurva: new THREE.CatmullRomCurve3(titik) };
 }
 
-// ---------------- Citra satelit (tile XYZ Web Mercator) ----------------
+// ---------------- Tile citra satelit dinamis di bola (quadtree Web Mercator) ----------------
 const URL_TILE = (z: number, x: number, y: number) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
-const tileX = (lon: number, z: number) => ((lon + 180) / 360) * 2 ** z;
-const tileY = (lat: number, z: number) => { const r = (lat * Math.PI) / 180; return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z; };
 const lonTile = (x: number, z: number) => (x / 2 ** z) * 360 - 180;
 const latTile = (y: number, z: number) => (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / 2 ** z))) * 180) / Math.PI;
-interface Kotak { lon0: number; lat0: number; lon1: number; lat1: number }
-const muatGambar = (src: string) => new Promise<HTMLImageElement>((ok, gagal) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = gagal; im.src = src; });
+const Z_MIN = 2, Z_MAKS = 17;
+interface Tile { z: number; x: number; y: number; status: 'muat' | 'ok' | 'gagal'; mesh?: THREE.Mesh; pakai: number; pusat: THREE.Vector3; ukuran: number }
 
-/** Mesh peta satelit untuk kotak lon/lat: zoom tertinggi yang muat dalam maks×maks tile. null bila tile gagal dimuat. */
-async function petaSatelit(k: Kotak, y: number, maks = 7, zMaks = 16): Promise<{ mesh: THREE.Mesh; z: number } | null> {
-  let z = zMaks;
-  for (; z > 2; z--) {
-    const nx = Math.floor(tileX(k.lon1, z)) - Math.floor(tileX(k.lon0, z)) + 1, ny = Math.floor(tileY(k.lat0, z)) - Math.floor(tileY(k.lat1, z)) + 1;
-    if (nx <= maks && ny <= maks) break;
-  }
-  const x0 = Math.floor(tileX(k.lon0, z)), x1 = Math.floor(tileX(k.lon1, z)), y0 = Math.floor(tileY(k.lat1, z)), y1 = Math.floor(tileY(k.lat0, z));
-  const nx = x1 - x0 + 1, ny = y1 - y0 + 1;
-  const c = document.createElement('canvas'); c.width = nx * 256; c.height = ny * 256; const g = c.getContext('2d')!;
-  g.fillStyle = '#1d3b5a'; g.fillRect(0, 0, c.width, c.height);
-  const kerja: Promise<boolean>[] = [];
-  for (let tx = x0; tx <= x1; tx++) for (let ty = y0; ty <= y1; ty++)
-    kerja.push(muatGambar(URL_TILE(z, tx, ty)).then(im => { g.drawImage(im, (tx - x0) * 256, (ty - y0) * 256); return true; }).catch(() => false));
-  const hasil = await Promise.all(kerja);
-  if (!hasil.some(Boolean)) return null;
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-  // grid: u linear di lon, v linear di tile-y (Mercator) → lat dihitung per baris
-  const seg = 40, pos: number[] = [], uv: number[] = [], idx: number[] = [];
-  const lonA = lonTile(x0, z), lonB = lonTile(x1 + 1, z);
+function geometriTile(z: number, x: number, y: number, proj: Proyeksi) {
+  const seg = z <= 3 ? 32 : z <= 6 ? 16 : 6;
+  const lon0 = lonTile(x, z), lon1 = lonTile(x + 1, z);
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
   for (let j = 0; j <= seg; j++) {
-    const v = j / seg, lat = latTile(y0 + v * ny, z);
-    for (let i = 0; i <= 1; i++) { const p = ke3(lonA + (lonB - lonA) * i, lat, y); pos.push(p.x, p.y, p.z); uv.push(i, 1 - v); }
-    if (j < seg) { const a = j * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    const v = j / seg, lat = latTile(y + v, z);
+    for (let i = 0; i <= seg; i++) {
+      const u = i / seg, p = proj(lon0 + (lon1 - lon0) * u, lat);
+      pos.push(p.x, p.y, p.z); uv.push(u, 1 - v);
+      if (i < seg && j < seg) { const a = j * (seg + 1) + i, b = a + seg + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    }
   }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
-  return { mesh, z };
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  return g;
 }
-const kotakDari = (pts: { lon: number; lat: number }[], pad: number, minimum: number): Kotak => {
-  const lon = pts.map(p => p.lon), lat = pts.map(p => p.lat);
-  let lon0 = Math.min(...lon), lon1 = Math.max(...lon), lat0 = Math.min(...lat), lat1 = Math.max(...lat);
-  const sx = Math.max(minimum, (lon1 - lon0) * (1 + pad * 2)), sy = Math.max(minimum, (lat1 - lat0) * (1 + pad * 2));
-  const cx = (lon0 + lon1) / 2, cy = (lat0 + lat1) / 2;
-  lon0 = cx - sx / 2; lon1 = cx + sx / 2; lat0 = cy - sy / 2; lat1 = cy + sy / 2;
-  return { lon0, lat0, lon1, lat1 };
-};
+
+/** Pengelola tile: pilih tile sesuai kamera (makin dekat makin detail), muat paralel, tampilkan induk sementara tile anak dimuat. */
+function buatPengelolaTile(proj: Proyeksi, grup: THREE.Group, onDasar: (ok: boolean) => void) {
+  const cache = new Map<string, Tile>();
+  const antre: string[] = []; let jalan = 0; let batal = false; let dasarOk = 0, dasarSelesai = 0;
+  const kunci = (z: number, x: number, y: number) => `${z}/${x}/${y}`;
+  /** Data tile (dari cache atau baru); masuk antrean muat hanya bila diminta. */
+  const ambil = (z: number, x: number, y: number, minta = true) => {
+    const k = kunci(z, x, y); let t = cache.get(k);
+    if (!t) {
+      const lonC = lonTile(x + 0.5, z), latC = latTile(y + 0.5, z);
+      const pusat = proj(lonC, latC), ujung = proj(lonTile(x, z), latTile(y, z)), ujung2 = proj(lonTile(x + 1, z), latTile(y + 1, z));
+      t = { z, x, y, status: 'muat', pakai: 0, pusat, ukuran: Math.max(ujung.distanceTo(ujung2), 1e-3) };
+      if (!minta) return t;
+      cache.set(k, t); antre.push(k);
+    } else if (minta && !cache.has(k)) cache.set(k, t);
+    return t;
+  };
+  const pompa = () => {
+    antre.sort((a, b) => Number(a.split('/')[0]) - Number(b.split('/')[0]));
+    while (jalan < 12 && antre.length) {
+      const k = antre.shift()!; const t = cache.get(k); if (!t || t.mesh) continue;
+      jalan++;
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => {
+        jalan--; if (batal) return;
+        const tex = new THREE.Texture(im); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.needsUpdate = true;
+        const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -t.z * 0.5, polygonOffsetUnits: -t.z * 4 });
+        t.mesh = new THREE.Mesh(geometriTile(t.z, t.x, t.y, proj), mat); t.mesh.visible = false; t.mesh.renderOrder = t.z; t.status = 'ok'; grup.add(t.mesh);
+        if (t.z === Z_MIN) { dasarOk++; dasarSelesai++; if (dasarSelesai === 16 || dasarOk === 1) onDasar(true); }
+        pompa();
+      };
+      im.onerror = () => { jalan--; t.status = 'gagal'; if (t.z === Z_MIN && ++dasarSelesai === 16 && !dasarOk) onDasar(false); pompa(); };
+      im.src = URL_TILE(t.z, t.x, t.y);
+    }
+  };
+  for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) ambil(Z_MIN, x, y);
+  pompa();
+  const frustum = new THREE.Frustum(), m = new THREE.Matrix4(), bola = new THREE.Sphere();
+  let detik = 0;
+  /** Dipanggil per frame: pilih set tile yang tampil. */
+  const perbarui = (cam: THREE.PerspectiveCamera, tinggiLayar: number) => {
+    detik++;
+    m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); frustum.setFromProjectionMatrix(m);
+    const C = cam.position, jarakPusat = C.length();
+    const cosHorizon = Math.min(1, R / Math.max(R + 1e-3, jarakPusat));
+    const ambang = 0.42 * (560 / Math.max(300, tinggiLayar));
+    const ingin: Tile[] = [];
+    const dikunjungi = new Set<string>();
+    const kunjungi = (z: number, x: number, y: number) => {
+      const t = ambil(z, x, y, false);
+      // horizon: tile di balik bumi tidak perlu
+      const n = t.pusat.clone().normalize();
+      const sudut = Math.acos(THREE.MathUtils.clamp(n.dot(C) / jarakPusat, -1, 1)), batasSudut = Math.acos(cosHorizon) + t.ukuran / R;
+      if (z > Z_MIN && sudut > batasSudut) return;
+      bola.set(t.pusat, t.ukuran * 0.75);
+      if (z > Z_MIN && !frustum.intersectsSphere(bola)) return;
+      const d = Math.max(1e-3, C.distanceTo(t.pusat) - t.ukuran * 0.5);
+      if (z < Z_MAKS && t.ukuran / d > ambang && ingin.length < 160) {
+        if (z % 3 === 0) { ambil(z, x, y); dikunjungi.add(kunci(z, x, y)); }   // induk perantara: tampil sementara anak dimuat
+        for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) kunjungi(z + 1, x * 2 + dx, y * 2 + dy);
+      } else { ingin.push(ambil(z, x, y)); dikunjungi.add(kunci(z, x, y)); }
+    };
+    for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) kunjungi(Z_MIN, x, y);
+    const tampil = new Set<Tile>();
+    for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) { const t = cache.get(kunci(Z_MIN, x, y)); if (t?.mesh) tampil.add(t); }
+    for (let t of ingin) {
+      if (!t.mesh) {   // belum dimuat: pakai induk terdekat yang sudah ada
+        let z = t.z, x = t.x, y = t.y; let induk: Tile | undefined;
+        while (z > Z_MIN && !induk?.mesh) { z--; x >>= 1; y >>= 1; induk = cache.get(kunci(z, x, y)); }
+        if (!induk?.mesh) continue; t = induk;
+      }
+      tampil.add(t);
+    }
+    for (const t of cache.values()) if (t.mesh) { const v = tampil.has(t); t.mesh.visible = v; if (v) t.pakai = detik; }
+    // antrean hanya tile yang masih relevan untuk posisi kamera sekarang
+    for (let i = antre.length - 1; i >= 0; i--) if (!dikunjungi.has(antre[i]) && !antre[i].startsWith(`${Z_MIN}/`)) { cache.delete(antre[i]); antre.splice(i, 1); }
+    pompa();
+    // buang tile lama dari memori
+    if (cache.size > 420) {
+      const lama = [...cache.entries()].filter(([, t]) => t.z > Z_MIN && !tampil.has(t) && t.status !== 'muat').sort((a, b) => a[1].pakai - b[1].pakai).slice(0, cache.size - 360);
+      for (const [k, t] of lama) { if (t.mesh) { grup.remove(t.mesh); t.mesh.geometry.dispose(); const mt = t.mesh.material as THREE.MeshBasicMaterial; mt.map?.dispose(); mt.dispose(); } cache.delete(k); }
+    }
+  };
+  return { perbarui, hentikan: () => { batal = true; } };
+}
 
 // ---------------- Garis rute tegas (lebar dalam piksel layar) ----------------
 function garis(titik: THREE.Vector3[], warna: string, px: number, opsi: { putus?: number; opacity?: number } = {}) {
   const geo = new LineGeometry(); geo.setPositions(titik.flatMap(p => [p.x, p.y, p.z]));
   const mat = new LineMaterial({ color: warna, linewidth: px, worldUnits: false, transparent: true, opacity: opsi.opacity ?? 1, dashed: !!opsi.putus,
     dashSize: opsi.putus ?? 1, gapSize: (opsi.putus ?? 1) * 0.8, depthWrite: false });
-  const l = new Line2(geo, mat); l.computeLineDistances(); l.renderOrder = 5;
+  const l = new Line2(geo, mat); l.computeLineDistances(); l.renderOrder = 50;
   return l;
 }
 
-type Tampilan = 'atas' | 'miring';
+type Tampilan = 'atas' | 'miring' | 'globe';
 interface StatusHud { t: number; stage: number; u: number; hariRute: number[] }
 
 export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi?: number }) {
@@ -234,15 +292,21 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
   const [infoPeta, setInfoPeta] = useState<'muat' | 'ok' | 'gagal'>('muat');
   const [muatModel, setMuatModel] = useState(true);
   const [hud, setHud] = useState<StatusHud>({ t: 0, stage: 0, u: 0, hariRute: [] });
-  const kontrol = useRef({ jalan: true, kec: 1, t: 0, fokus: -1, tampilan: 'atas' as Tampilan, kameraAuto: true, satelit: true, manualSampai: 0, lompat: true });
+  const kontrol = useRef({ jalan: true, kec: 1, t: 0, fokus: -1, tampilan: 'atas' as Tampilan, kameraAuto: true, satelit: true, manualSampai: 0, lompat: true, terbang: 0 });
   Object.assign(kontrol.current, { jalan, kec, fokus, kameraAuto, satelit });
-  if (kontrol.current.tampilan !== tampilan) { kontrol.current.tampilan = tampilan; kontrol.current.lompat = true; kontrol.current.manualSampai = 0; }
+  if (kontrol.current.tampilan !== tampilan) { kontrol.current.tampilan = tampilan; kontrol.current.terbang = 1; kontrol.current.manualSampai = 0; }
 
-  const data = useMemo(() => rute.map(r => {
-    const legs = r.legs.map((l, i) => hitungLeg(l, i));
-    const ok = legs.filter((x): x is LegHitung => !!x);
-    return { nama: r.nama, legs: ok, gagal: r.legs.filter((_, i) => !legs[i]).map(l => `${l.dari || '?'} → ${l.ke || '?'}`), total: ok.reduce((t, x) => t + x.hari, 0), km: ok.reduce((t, x) => t + x.km, 0) };
-  }), [rute]);
+  const { data, proj } = useMemo(() => {
+    const lok = rute.flatMap(r => r.legs.flatMap(l => [cariLokasi(l.dari), cariLokasi(l.ke)])).filter((x): x is Lokasi => !!x);
+    const lonP = lok.length ? lok.reduce((t, l) => t + l.lon, 0) / lok.length : 118, latP = lok.length ? lok.reduce((t, l) => t + l.lat, 0) / lok.length : -2;
+    const proj = buatProyeksi(lonP, latP);
+    const data = rute.map(r => {
+      const legs = r.legs.map((l, i) => hitungLeg(l, i, proj));
+      const ok = legs.filter((x): x is LegHitung => !!x);
+      return { nama: r.nama, legs: ok, gagal: r.legs.filter((_, i) => !legs[i]).map(l => `${l.dari || '?'} → ${l.ke || '?'}`), total: ok.reduce((t, x) => t + x.hari, 0), km: ok.reduce((t, x) => t + x.km, 0) };
+    });
+    return { data, proj };
+  }, [rute]);
   const nStage = Math.max(0, ...data.map(d => d.legs.length));
   const kunci = JSON.stringify(rute);
   /** Posisi waktu animasi → stage aktif & progres u (0..1). */
@@ -256,73 +320,56 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
 
   useEffect(() => {
     const el = wadah.current; if (!el) return;
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: false });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio)); renderer.setSize(el.clientWidth, el.clientHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; el.appendChild(renderer.domElement);
     const lr = new CSS2DRenderer(); lr.setSize(el.clientWidth, el.clientHeight);
     Object.assign(lr.domElement.style, { position: 'absolute', top: '0', left: '0', pointerEvents: 'none' }); el.appendChild(lr.domElement);
-    const scene = new THREE.Scene(); scene.background = new THREE.Color('#cfdcea');
-    const cam = new THREE.PerspectiveCamera(40, el.clientWidth / el.clientHeight, 0.01, 4000);
-    const ctl = new OrbitControls(cam, renderer.domElement); ctl.enableDamping = true; ctl.maxPolarAngle = Math.PI * 0.45; ctl.minDistance = 0.3; ctl.maxDistance = 600;
-    ctl.addEventListener('start', () => { kontrol.current.manualSampai = performance.now() + 6000; });
+    const scene = new THREE.Scene(); scene.background = new THREE.Color('#050b18');
+    const cam = new THREE.PerspectiveCamera(40, el.clientWidth / el.clientHeight, 0.05, 20000);
+    const ctl = new OrbitControls(cam, renderer.domElement); ctl.enableDamping = true;
+    ctl.addEventListener('start', () => { kontrol.current.manualSampai = performance.now() + 6000; kontrol.current.terbang = 0; });
     scene.add(new THREE.HemisphereLight('#f0f9ff', '#5a6b4a', 1.1));
-    const sun = new THREE.DirectionalLight('#fff7e6', 2.4); sun.position.set(-60, 140, 60); scene.add(sun);
+    const sun = new THREE.DirectionalLight('#fff7e6', 2.4); sun.position.set(-60, 600, 160); scene.add(sun);
 
-    // ---- peta ilustrasi (cadangan bila citra satelit gagal / dimatikan)
+    // ---- bintang
+    const rb = acak(42), bintangPos: number[] = [];
+    for (let i = 0; i < 2500; i++) { const v = new THREE.Vector3(rb() - 0.5, rb() - 0.5, rb() - 0.5).normalize().multiplyScalar(5000 + rb() * 2000); bintangPos.push(v.x, v.y, v.z); }
+    const gB = new THREE.BufferGeometry(); gB.setAttribute('position', new THREE.Float32BufferAttribute(bintangPos, 3));
+    scene.add(new THREE.Points(gB, new THREE.PointsMaterial({ color: '#cbd5e1', size: 1.4, sizeAttenuation: false })));
+
+    // ---- bumi: bola dasar (laut) + garis pantai ilustrasi (cadangan) + tile satelit + atmosfer
+    const bumi = new THREE.Mesh(new THREE.SphereGeometry(R - 0.03, 128, 96), new THREE.MeshStandardMaterial({ color: '#12456e', roughness: 0.6, metalness: 0.1 }));
+    scene.add(bumi);
     const ilustrasi = new THREE.Group(); scene.add(ilustrasi);
-    const tLaut = teksturLaut();
-    const laut = new THREE.Mesh(new THREE.PlaneGeometry(330, 150), new THREE.MeshStandardMaterial({ map: tLaut, roughness: 0.32, metalness: 0.15 }));
-    laut.rotation.x = -Math.PI / 2; laut.position.set(ke3(118, -2).x, 0, ke3(118, -2).z); ilustrasi.add(laut);
-    const mDangkal = new THREE.MeshStandardMaterial({ color: '#5cb8d6', roughness: 0.4, transparent: true, opacity: 0.85 });
-    const mPantai = new THREE.MeshStandardMaterial({ color: '#e6d6a3', roughness: 0.95 });
-    const mDarat = new THREE.MeshStandardMaterial({ color: '#6a9e55', roughness: 0.95 });
-    for (const p of PULAU) {
-      const dangkal = new THREE.Mesh(new THREE.ShapeGeometry(bentuk(p, 0.22)), mDangkal); dangkal.rotation.x = -Math.PI / 2; dangkal.position.y = 0.006; ilustrasi.add(dangkal);
-      const pantai = new THREE.Mesh(new THREE.ShapeGeometry(bentuk(p, 0.05)), mPantai); pantai.rotation.x = -Math.PI / 2; pantai.position.y = 0.012; ilustrasi.add(pantai);
-      const darat = new THREE.Mesh(new THREE.ExtrudeGeometry(bentuk(p, -0.02), { depth: G - 0.015, bevelEnabled: false }), mDarat); darat.rotation.x = -Math.PI / 2; ilustrasi.add(darat);
-    }
+    for (const p of PULAU) ilustrasi.add(garis([...p, p[0]].map(([lon, lat]) => proj(lon, lat, 0.01)), '#86efac', 1.6));
+    const grupTile = new THREE.Group(); scene.add(grupTile);
+    let batal = false, infoGagal = false;
+    const tile = buatPengelolaTile(proj, grupTile, ok => { infoGagal = !ok; if (!batal) setInfoPeta(ok ? 'ok' : 'gagal'); });
+    const atmosfer = new THREE.Mesh(new THREE.SphereGeometry(R * 1.1, 96, 64), new THREE.ShaderMaterial({
+      vertexShader: 'varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec3 vN; void main(){ float i = pow(max(0.0, 0.68 - dot(vN, vec3(0.0, 0.0, 1.0))), 3.0); gl_FragColor = vec4(0.35, 0.62, 1.0, 1.0) * i; }',
+      blending: THREE.AdditiveBlending, side: THREE.BackSide, transparent: true, depthWrite: false,
+    }));
+    scene.add(atmosfer);
 
-    // ---- citra satelit: dasar (seluruh rute) + detail per leg pendek
-    const lapisSatelit = new THREE.Group(); scene.add(lapisSatelit);
-    let batal = false;
-    const semuaLok = data.flatMap(r => r.legs.flatMap(l => [l.a, l.b]));
-    (async () => {
-      if (!semuaLok.length) { setInfoPeta('gagal'); return; }
-      const kb = kotakDari(semuaLok, 0.6, 1.6);
-      const lebarMin = (kb.lat1 - kb.lat0) * 1.9;   // lebarkan supaya layar lebar (16:9) tertutup citra
-      if (kb.lon1 - kb.lon0 < lebarMin) { const cx = (kb.lon0 + kb.lon1) / 2; kb.lon0 = cx - lebarMin / 2; kb.lon1 = cx + lebarMin / 2; }
-      const dasar = await petaSatelit(kb, G + 0.001, 10, 9);
-      if (batal) return;
-      if (!dasar) { setInfoPeta('gagal'); return; }
-      lapisSatelit.add(dasar.mesh); setInfoPeta('ok');
-      let n = 0;
-      const sudah = new Set<string>();
-      for (const r of data) for (const l of r.legs) {
-        const key = `${l.a.nama}|${l.b.nama}`; if (sudah.has(key)) continue; sudah.add(key);
-        if (l.km > 400) continue;
-        const det = await petaSatelit(kotakDari([l.a, l.b], 0.45, 0.12), G + 0.002 + 0.0005 * ++n, 7, 16);
-        if (batal) return;
-        if (det && det.z > dasar.z + 1) lapisSatelit.add(det.mesh); else det?.mesh.geometry.dispose();
-      }
-    })();
-
-    // ---- lokasi: pin label (ikon + nama)
-    const pin = (l: Lokasi) => {
-      const d = document.createElement('div'); d.className = `rute3d-pin ${l.jenis}`;
-      d.innerHTML = `<span class="ikon">${IKON_LOKASI[l.jenis] ?? '📍'}</span><span>${l.nama.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>`;
-      const o = new CSS2DObject(d); o.position.copy(ke3(l.lon, l.lat, YJALUR)); o.center.set(0.5, 1.15); return o;
-    };
+    // ---- lokasi: pin label (ikon + nama) + cakram di permukaan
+    const SUMBU_Y = new THREE.Vector3(0, 1, 0);
     const dipakai = new Map<string, Lokasi>();
     for (const r of data) for (const l of r.legs) { dipakai.set(l.a.nama, l.a); dipakai.set(l.b.nama, l.b); }
+    const pins: { o: CSS2DObject; p: THREE.Vector3; nama: string }[] = [];
     const titikLok: THREE.Mesh[] = [];
     for (const l of dipakai.values()) {
-      scene.add(pin(l));
+      const p = proj(l.lon, l.lat, HJALUR);
+      const d = document.createElement('div'); d.className = `rute3d-pin ${l.jenis}`;
+      d.innerHTML = `<span class="ikon">${IKON_LOKASI[l.jenis] ?? '📍'}</span><span>${l.nama.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>`;
+      const o = new CSS2DObject(d); o.position.copy(p); o.center.set(0.5, 1.15); scene.add(o); pins.push({ o, p, nama: l.nama });
       const warna = l.jenis === 'pelabuhan' ? '#1d4ed8' : l.jenis === 'bandara' ? '#7c3aed' : '#dc2626';
       const m = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.02, 24), new THREE.MeshBasicMaterial({ color: warna, transparent: true, opacity: 0.9 }));
-      m.position.copy(ke3(l.lon, l.lat, YJALUR)); scene.add(m); titikLok.push(m);
+      m.position.copy(p); m.quaternion.setFromUnitVectors(SUMBU_Y, p.clone().normalize()); scene.add(m); titikLok.push(m);
     }
 
-    // ---- jalur: casing putih + garis warna moda (tegas), panah gerak putus-putus untuk laut & udara
+    // ---- jalur: casing putih + garis warna moda (tegas), putus-putus bergerak untuk laut & udara
     const jalur: { stage: number; mats: LineMaterial[]; dash?: LineMaterial }[] = [];
     for (const r of data) for (const l of r.legs) {
       const pj = l.kurva.getLength();
@@ -331,7 +378,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
       scene.add(casing, inti);
       const ent: (typeof jalur)[number] = { stage: l.idx, mats: [casing.material, inti.material] };
       if (l.moda !== 'darat') {
-        const d = garis(l.titik, '#ffffff', 2, { putus: pj / 50, opacity: 0.8 }); d.renderOrder = 6; scene.add(d);
+        const d = garis(l.titik, '#ffffff', 2, { putus: pj / 50, opacity: 0.8 }); d.renderOrder = 51; scene.add(d);
         ent.dash = d.material; ent.mats.push(d.material);
       }
       jalur.push(ent);
@@ -341,8 +388,8 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
     const tBayang = teksturBayang(), tBuih = teksturBuih();
     const armada = data.map(r => {
       const obj = new THREE.Group(); scene.add(obj);
-      const bayang = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshBasicMaterial({ map: tBayang, transparent: true, opacity: 0.45, depthWrite: false }));
-      bayang.rotation.x = -Math.PI / 2; bayang.visible = false; scene.add(bayang);
+      const bayang = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshBasicMaterial({ map: tBayang, transparent: true, opacity: 0.4, depthWrite: false }));
+      bayang.visible = false; scene.add(bayang);
       const d = document.createElement('div'); d.className = 'rute3d-tag';
       const tag = new CSS2DObject(d); tag.center.set(0.5, 1.6); scene.add(tag);
       return { obj, bayang, tag, el: d, r };
@@ -353,7 +400,6 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
     const buatModel = (l: LegHitung, j: JenisArmada) => {
       const g = new THREE.Group(); const m = siap.get(j);
       g.add(m ? m.clone(true) : modelKotak(l.moda));
-      // halo warna moda di bawah armada supaya tetap terlihat jelas di atas citra satelit (top view)
       const halo = new THREE.Mesh(new THREE.CircleGeometry(PANJANG[j] * 0.5, 40), new THREE.MeshBasicMaterial({ color: WARNA[l.moda], transparent: true, opacity: 0.45, depthWrite: false }));
       halo.rotation.x = -Math.PI / 2; halo.position.y = 0.01; g.add(halo);
       const cincin = new THREE.Mesh(new THREE.RingGeometry(PANJANG[j] * 0.5, PANJANG[j] * 0.56, 48), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
@@ -365,22 +411,30 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
       return g;
     };
 
-    // ---- kamera: bingkai stage aktif
-    const bingkaiStage = (s: number) => {
-      const box = new THREE.Box3();
-      for (const r of data) for (const l of r.legs) if (l.idx === s || (s < 0)) for (const p of l.titik) box.expandByPoint(p.clone().setY(G));
-      if (box.isEmpty()) for (const r of data) for (const l of r.legs) for (const p of l.titik) box.expandByPoint(p.clone().setY(G));
-      if (box.isEmpty()) box.setFromCenterAndSize(ke3(113, -5), new THREE.Vector3(60, 0, 30));
-      const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    // ---- kamera: bingkai stage aktif di permukaan, atau seluruh globe
+    const semuaLegs = data.flatMap(r => r.legs);
+    const bingkaiKam = (s: number) => {
+      const mode = kontrol.current.tampilan;
+      const legs = semuaLegs.filter(l => s < 0 || l.idx === s);
+      const pakai = legs.length ? legs : semuaLegs;
+      const ll = pakai.flatMap(l => [l.a, l.b]);
+      const lonC = ll.length ? ll.reduce((t, x) => t + x.lon, 0) / ll.length : 118, latC = ll.length ? ll.reduce((t, x) => t + x.lat, 0) / ll.length : -2;
+      const c = proj(lonC, latC), n = c.clone().normalize();
+      const N = proj(lonC, latC + 0.01).sub(c).normalize(), E = new THREE.Vector3().crossVectors(N, n).normalize();
+      if (mode === 'globe') return { target: new THREE.Vector3(), pos: n.clone().addScaledVector(N, -0.35).normalize().multiplyScalar(R * 2.9), up: N };
+      let sx = 0, sz = 0;
+      for (const l of pakai) for (const p of l.titik) { const v = p.clone().sub(c); sx = Math.max(sx, Math.abs(v.dot(E)) * 2); sz = Math.max(sz, Math.abs(v.dot(N)) * 2); }
+      if (!pakai.length) { sx = 60; sz = 30; }
       const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * 2;
-      const jarak = Math.max(0.8, Math.max(sz.z / tan, sz.x / (tan * cam.aspect * 0.62)) * 1.3);
-      const arah = kontrol.current.tampilan === 'atas' ? new THREE.Vector3(0, 1, 0.03).normalize() : new THREE.Vector3(-0.15, 0.78, 0.62).normalize();
-      return { target: c, pos: c.clone().addScaledVector(arah, jarak) };
+      const jarak = Math.max(0.8, Math.max(sz / tan, sx / (tan * cam.aspect * 0.62)) * 1.3);
+      const arah = mode === 'atas' ? n.clone().addScaledVector(N, -0.03) : n.clone().multiplyScalar(0.78).addScaledVector(N, -0.62).addScaledVector(E, -0.15);
+      // arah atas layar: utara untuk top view, vertikal lokal untuk tampilan miring (horizon datar)
+      return { target: c, pos: c.clone().addScaledVector(arah.normalize(), jarak), up: mode === 'atas' ? N : n };
     };
-    const b0 = bingkaiStage(-1); ctl.target.copy(b0.target); cam.position.copy(b0.pos); ctl.update();
+    const b0 = bingkaiKam(-1); ctl.target.copy(b0.target); cam.position.copy(b0.pos); cam.up.copy(b0.up); ctl.update();
 
     let lebar = el.clientWidth, tinggiEl = el.clientHeight;
-    const semuaMat = () => jalur.flatMap(j => j.mats);
+    const semuaMat = () => [...jalur.flatMap(j => j.mats), ...ilustrasi.children.map(c => (c as Line2).material)];
     const ro = new ResizeObserver(() => {
       const w = el.clientWidth, h = el.clientHeight; if (!w || !h) return; lebar = w; tinggiEl = h;
       renderer.setSize(w, h); lr.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); for (const m of semuaMat()) m.resolution.set(w, h);
@@ -388,7 +442,8 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
     ro.observe(el); for (const m of semuaMat()) m.resolution.set(lebar, tinggiEl);
 
     const fmt = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 1 });
-    let id = 0, lalu = performance.now(), tampilLalu = 0;
+    const tmp = new THREE.Vector3();
+    let id = 0, lalu = performance.now(), tampilLalu = 0, tileLalu = 0;
     const loop = (kini: number) => {
       id = requestAnimationFrame(loop);
       const dt = Math.min(0.1, (kini - lalu) / 1000); lalu = kini;
@@ -396,21 +451,24 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
       const panjangLoop = k.fokus >= 0 ? DETIK_STAGE + JEDA + 0.6 : nStage * (DETIK_STAGE + JEDA) + 1;
       if (k.jalan) { k.t += dt * k.kec; if (k.t > panjangLoop) k.t = 0; }
       const { stage, u } = faseRef.current(k.t, k.fokus);
-      tLaut.offset.x = (tLaut.offset.x + dt * 0.004) % 1;
-      lapisSatelit.visible = k.satelit;
-      // jalur: stage aktif tegas, lainnya redup; putus-putus bergerak searah perjalanan
+      const globe = k.tampilan === 'globe';
+      grupTile.visible = k.satelit;
+      ilustrasi.visible = !k.satelit || infoGagal;
       for (const j of jalur) {
         const aktif = j.stage === stage;
         j.mats.forEach((m, i) => { m.opacity = (aktif ? 1 : 0.38) * (i === 0 ? 0.95 : 1); });
         if (j.dash) j.dash.dashOffset -= dt * j.dash.dashSize * 2.2;
       }
       const jarakKam = cam.position.distanceTo(ctl.target);
-      for (const m of titikLok) m.scale.set(jarakKam * 0.008, 1, jarakKam * 0.008);
+      for (const m of titikLok) m.scale.set(Math.min(3, jarakKam * 0.008), 1, Math.min(3, jarakKam * 0.008));
+      // pin: sembunyikan di balik bumi; dari jauh hanya titik stage aktif supaya label tidak bertumpuk
+      const jauh = cam.position.length() - R > R * 0.3;
+      const ujungAktif = new Set(semuaLegs.filter(l => l.idx === stage).flatMap(l => [l.a.nama, l.b.nama]));
+      for (const p of pins) p.o.visible = tmp.subVectors(cam.position, p.p).dot(p.p) > 0 && (!jauh || ujungAktif.has(p.nama));
       const hariRute: number[] = [];
       for (const a of armada) {
         const legs = a.r.legs;
         if (!legs.length) { a.obj.visible = false; a.tag.visible = false; hariRute.push(0); continue; }
-        // leg aktif rute ini: indeks stage asli yang paling dekat ≤ stage
         let li = legs.findIndex(l => l.idx === stage);
         let uu = u;
         if (li < 0) { li = Math.max(0, legs.filter(l => l.idx < stage).length - 1); uu = legs[li].idx < stage ? 1 : 0; }
@@ -420,37 +478,49 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
         const j = jenisArmada(leg.moda, leg.armada);
         const kunciM = `${leg.moda}-${j}-${siap.has(j) ? 'glb' : 'kotak'}`;
         if (a.obj.userData.model !== kunciM) { a.obj.clear(); a.obj.add(buatModel(leg, j)); a.obj.userData.model = kunciM; }
-        a.obj.visible = true;
-        a.obj.position.copy(p);
+        const n = p.clone().normalize();
+        a.obj.visible = true; a.obj.position.copy(p); a.obj.up.copy(n);
         const arah = uu >= 1 ? new THREE.Vector3().subVectors(p, q0) : new THREE.Vector3().subVectors(q, p);
         a.obj.lookAt(p.x + arah.x, p.y + arah.y, p.z + arah.z); a.obj.rotateY(-Math.PI / 2);
         const sk = THREE.MathUtils.clamp(cam.position.distanceTo(p) * (leg.moda === 'laut' ? 0.035 : leg.moda === 'udara' ? 0.05 : 0.065), 0.01, 6);
         a.obj.scale.setScalar(sk);
-        if (leg.moda === 'laut') a.obj.position.y += Math.sin(kini / 600 + p.x) * 0.02 * sk;
+        if (leg.moda === 'laut') a.obj.position.addScaledVector(n, Math.sin(kini / 600 + p.x) * 0.02 * sk);
         a.bayang.visible = leg.moda === 'udara';
-        if (a.bayang.visible) { a.bayang.position.set(p.x, G + 0.004, p.z); a.bayang.scale.setScalar(sk); (a.bayang.material as THREE.MeshBasicMaterial).opacity = 0.4; }
-        a.tag.position.copy(p); a.tag.visible = true;
+        if (a.bayang.visible) { a.bayang.position.copy(n).multiplyScalar(R + 0.02); a.bayang.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n); a.bayang.scale.setScalar(sk); }
+        const terlihat = tmp.subVectors(cam.position, p).dot(n) > -R * 0.05;
+        a.tag.position.copy(p); a.tag.visible = terlihat;
         const status = uu >= 1 ? 'tiba' : uu <= 0 ? 'menunggu' : `${Math.round(uu * 100)}%`;
         const isi = `<b>${IKON_MODA[leg.moda]} Stage ${leg.idx + 1}${leg.label ? ` · ${leg.label}` : ''}</b><span>${leg.armada ?? LABEL_MODA[leg.moda]} · ${status}</span><span>Lead time ${fmt(uu * leg.hari)} / ${fmt(leg.hari)} hari${leg.perkiraan ? '*' : ''}</span>`;
         if (a.el.innerHTML !== isi) a.el.innerHTML = isi;
         a.el.style.opacity = data.length > 1 && armada.indexOf(a) > 0 ? '0.85' : '1';
       }
-      // kamera otomatis: bingkai stage aktif (dijeda 6 detik setelah pengguna menggeser / zoom)
-      if ((k.kameraAuto && kini > k.manualSampai) || k.lompat) {
-        const b = bingkaiStage(stage);
-        const f = k.lompat ? 1 : 1 - Math.exp(-dt * 2.2);
-        ctl.target.lerp(b.target, f); cam.position.lerp(b.pos, f); k.lompat = false;
+      // kontrol orbit per mode
+      if (globe) { ctl.minDistance = R * 1.08; ctl.maxDistance = R * 8; ctl.maxPolarAngle = Math.PI; }
+      else { ctl.minDistance = 0.3; ctl.maxDistance = R * 3; ctl.maxPolarAngle = Math.PI * 0.47; }
+      // kamera otomatis: bingkai stage aktif (dijeda 6 dtk setelah pengguna menggeser / zoom); pindah mode = terbang halus
+      const ikut = (!globe && k.kameraAuto && kini > k.manualSampai) || k.terbang > 0 || k.lompat;
+      if (ikut) {
+        const b = bingkaiKam(globe ? -1 : stage);
+        const f = k.lompat ? 1 : 1 - Math.exp(-dt * (k.terbang > 0 ? 3 : 2.2));
+        ctl.target.lerp(b.target, f); cam.position.lerp(b.pos, f); cam.up.lerp(b.up, f).normalize(); k.lompat = false;
+        if (k.terbang > 0) { k.terbang -= dt / 1.8; if (cam.position.distanceTo(b.pos) < b.pos.distanceTo(b.target) * 0.02) k.terbang = 0; }
+        // jaga kamera tidak masuk ke dalam bumi saat transisi
+        const dk = cam.position.length(); if (dk < R + 0.2) cam.position.multiplyScalar((R + 0.2) / dk);
       }
-      if (kini - tampilLalu > 150) { tampilLalu = kini; setHud({ t: k.t, stage, u, hariRute }); }
       ctl.update();
+      const tinggiKam = cam.position.length() - R;
+      atmosfer.visible = tinggiKam > R * 0.25;
       const dk = cam.position.distanceTo(ctl.target);
-      const near = Math.max(0.005, dk * 0.02), far = Math.max(50, dk * 40);
-      if (Math.abs(cam.near - near) > near * 0.2 || Math.abs(cam.far - far) > far * 0.2) { cam.near = near; cam.far = far; cam.updateProjectionMatrix(); }
+      const near = Math.max(0.005, Math.min(tinggiKam * 0.3, dk * 0.02)), far = cam.position.length() > R * 1.6 ? 9000 : cam.position.length() + R * 1.2;
+      if (Math.abs(cam.near - near) > near * 0.2 || cam.far !== far) { cam.near = near; cam.far = far; cam.updateProjectionMatrix(); }
+      cam.updateMatrixWorld();
+      if (k.satelit && kini - tileLalu > 120) { tileLalu = kini; tile.perbarui(cam, tinggiEl); }
+      if (kini - tampilLalu > 150) { tampilLalu = kini; setHud({ t: k.t, stage, u, hariRute }); }
       renderer.render(scene, cam); lr.render(scene, cam);
     };
     id = requestAnimationFrame(loop);
     return () => {
-      batal = true; cancelAnimationFrame(id); ro.disconnect(); ctl.dispose();
+      batal = true; tile.hentikan(); cancelAnimationFrame(id); ro.disconnect(); ctl.dispose();
       scene.traverse(o => {
         if (o.userData.bersama) return;
         const m = o as THREE.Mesh; m.geometry?.dispose?.();
@@ -481,6 +551,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
         <div className="tabs" role="group" aria-label="Tampilan">
           <button type="button" className={tampilan === 'atas' ? 'on' : ''} onClick={() => setTampilan('atas')}>Top view</button>
           <button type="button" className={tampilan === 'miring' ? 'on' : ''} onClick={() => setTampilan('miring')}>3D miring</button>
+          <button type="button" className={tampilan === 'globe' ? 'on' : ''} onClick={() => setTampilan('globe')} title="Lihat seluruh dunia; seret untuk memutar bumi, scroll untuk zoom">🌏 Globe</button>
         </div>
         <label className="row" style={{ gap: 4 }}><input type="checkbox" checked={kameraAuto} onChange={e => { setKameraAuto(e.target.checked); kontrol.current.manualSampai = 0; }} /> Kamera ikut stage</label>
         <label className="row" style={{ gap: 4 }}><input type="checkbox" checked={satelit} onChange={e => setSatelit(e.target.checked)} /> Citra satelit</label>
@@ -532,6 +603,6 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
       </table></div>
       <p className="small muted" style={{ margin: 0 }}>Animasi per stage: setiap stage diputar ±{DETIK_STAGE} detik (1×) lalu berhenti di titik serah terima; angka lead time di layar = lead time vendor yang diisi.
         * Lead time kosong diperkirakan dari jarak (truk ±450 km/hari, kapal ±420 km/hari termasuk sandar, pesawat ±1 hari termasuk handling, kereta ±500 km/hari).
-        Jarak = garis lurus × faktor jalur. Citra satelit dimuat langsung dari Esri World Imagery di browser; bila gagal, peta ilustrasi dipakai.</p>
+        Jarak = garis lurus × faktor jalur. Peta = globe bumi dengan citra satelit Esri World Imagery seluruh dunia; detail bertambah otomatis saat di-zoom (seret untuk memutar, scroll untuk zoom). Bila citra gagal dimuat, garis pantai ilustrasi dipakai.</p>
     </div>);
 }
