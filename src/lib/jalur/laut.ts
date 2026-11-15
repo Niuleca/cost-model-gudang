@@ -1,7 +1,9 @@
-// Rute kapal yang selalu lewat laut: A* di grid masker darat/laut Indonesia
+// Rute di grid masker darat/laut Indonesia: kapal selalu lewat laut, truk/kereta (cadangan bila rute jalan tidak tersedia) selalu lewat darat.
+// A* di grid masker
 // (public/sim3d/darat-indonesia.bin; Natural Earth 1:10m via world-atlas, sel 0,04° ≈ 4,4 km; dibuat dengan scripts/masker-darat-*).
 // Sel di dekat pantai diberi biaya tambahan supaya alur menjauhi garis pantai; jalur akhir dihaluskan (line of sight).
 export type LonLat = [number, number];
+export type Mode = 'laut' | 'darat';
 export const MASKER = { lon0: 88, lat1: 14, step: 0.04, w: 1475, h: 775 };
 
 export function kmHaversine(a: LonLat, b: LonLat) {
@@ -27,6 +29,7 @@ export class MaskerDarat {
       }
     }
   }
+  lolos(c: number, r: number, mode: Mode) { return mode === 'laut' ? this.laut(c, r) : this.darat(c, r); }
   laut(c: number, r: number) { const { w, h } = MASKER; return c >= 0 && r >= 0 && c < w && r < h && this.lautUtama[r * w + c] === 1; }
   darat(c: number, r: number) {
     const { w, h } = MASKER; if (c < 0 || r < 0 || c >= w || r >= h) return false;   // di luar masker dianggap laut
@@ -35,23 +38,26 @@ export class MaskerDarat {
   sel(p: LonLat): [number, number] { return [Math.floor((p[0] - MASKER.lon0) / MASKER.step), Math.floor((MASKER.lat1 - p[1]) / MASKER.step)]; }
   titik(c: number, r: number): LonLat { return [MASKER.lon0 + (c + 0.5) * MASKER.step, MASKER.lat1 - (r + 0.5) * MASKER.step]; }
   dalam(p: LonLat) { const [c, r] = this.sel(p); return c >= 0 && r >= 0 && c < MASKER.w && r < MASKER.h; }
-  /** Sel laut terdekat (spiral sampai ±60 sel ≈ 260 km). */
-  lautTerdekat(p: LonLat): [number, number] | null {
+  /** Sel laut / darat terdekat (spiral sampai ±80 sel ≈ 350 km). */
+  terdekat(p: LonLat, mode: Mode): [number, number] | null {
     const [c0, r0] = this.sel(p);
-    if (this.laut(c0, r0)) return [c0, r0];
+    if (this.lolos(c0, r0, mode)) return [c0, r0];
     for (let d = 1; d <= 80; d++) {
       let best: [number, number] | null = null, bd = Infinity;
       for (let dc = -d; dc <= d; dc++) for (const dr of [-d, d]) for (const [c, r] of [[c0 + dc, r0 + dr], [c0 + dr, r0 + dc]]) {
-        if (this.laut(c, r)) { const x = dc * dc + dr * dr; if (x < bd) { bd = x; best = [c, r]; } }
+        if (this.lolos(c, r, mode)) { const x = dc * dc + dr * dr; if (x < bd) { bd = x; best = [c, r]; } }
       }
       if (best) return best;
     }
     return null;
   }
-  /** Garis lurus antar sel seluruhnya laut? */
-  bebas(a: [number, number], b: [number, number]) {
+  /** Garis lurus antar sel seluruhnya laut (mode laut) / darat (mode darat)? */
+  bebas(a: [number, number], b: [number, number], mode: Mode = 'laut') {
     const n = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) * 2;
-    for (let i = 0; i <= n; i++) { const u = n ? i / n : 0; if (this.darat(Math.round(a[0] + (b[0] - a[0]) * u), Math.round(a[1] + (b[1] - a[1]) * u))) return false; }
+    for (let i = 0; i <= n; i++) {
+      const u = n ? i / n : 0, c = Math.round(a[0] + (b[0] - a[0]) * u), r = Math.round(a[1] + (b[1] - a[1]) * u);
+      if (mode === 'laut' ? this.darat(c, r) : !this.darat(c, r)) return false;
+    }
     return true;
   }
 }
@@ -62,16 +68,20 @@ export async function muatMasker(url = '/sim3d/darat-indonesia.bin') {
 }
 
 /** Jalur laut pelabuhan → pelabuhan yang tidak memotong daratan; null bila tidak ketemu. */
-export function ruteLaut(m: MaskerDarat, a: LonLat, b: LonLat): { jalur: LonLat[]; km: number } | null {
+export const ruteLaut = (m: MaskerDarat, a: LonLat, b: LonLat) => ruteGrid(m, a, b, 'laut');
+/** Jalur darat (tidak menyeberang laut); null bila beda pulau / tidak tersambung. */
+export const ruteDaratGrid = (m: MaskerDarat, a: LonLat, b: LonLat) => ruteGrid(m, a, b, 'darat');
+
+export function ruteGrid(m: MaskerDarat, a: LonLat, b: LonLat, mode: Mode): { jalur: LonLat[]; km: number } | null {
   if (!m.dalam(a) || !m.dalam(b)) return null;
-  const s = m.lautTerdekat(a), t = m.lautTerdekat(b); if (!s || !t) return null;
+  const s = m.terdekat(a, mode), t = m.terdekat(b, mode); if (!s || !t) return null;
   const { w, h } = MASKER, N = w * h;
   const idx = (c: number, r: number) => r * w + c;
   const g = new Float32Array(N).fill(Infinity), asal = new Int32Array(N).fill(-1), tutup = new Uint8Array(N);
   const latRad = (r: number) => ((MASKER.lat1 - (r + 0.5) * MASKER.step) * Math.PI) / 180;
   const kx = (r: number) => Math.cos(latRad(r));
   const hEst = (c: number, r: number) => Math.hypot((c - t[0]) * kx(r), r - t[1]);
-  const dekatPantai = (c: number, r: number) => { for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (m.darat(c + dc, r + dr)) return true; return false; };
+  const dekatPantai = (c: number, r: number) => { for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (m.darat(c + dc, r + dr) !== (mode === 'darat')) return true; return false; };
   // heap biner [f, idx]
   const hf: number[] = [], hi: number[] = [];
   const dorong = (f: number, i: number) => { hf.push(f); hi.push(i); let k = hf.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (hf[p] <= hf[k]) break; [hf[p], hf[k]] = [hf[k], hf[p]]; [hi[p], hi[k]] = [hi[k], hi[p]]; k = p; } };
@@ -85,10 +95,10 @@ export function ruteLaut(m: MaskerDarat, a: LonLat, b: LonLat): { jalur: LonLat[
     if (u === ti || ++langkah > 900_000) break;
     const c = u % w, r = (u - c) / w;
     for (const [dc, dr] of ARAH) {
-      const nc = c + dc, nr = r + dr; if (nc < 0 || nr < 0 || nc >= w || nr >= h || m.darat(nc, nr)) continue;
-      if (dc && dr && (m.darat(c + dc, r) || m.darat(c, r + dr))) continue;   // jangan potong sudut daratan
+      const nc = c + dc, nr = r + dr; if (nc < 0 || nr < 0 || nc >= w || nr >= h || !m.lolos(nc, nr, mode)) continue;
+      if (dc && dr && (!m.lolos(c + dc, r, mode) || !m.lolos(c, r + dr, mode))) continue;   // jangan potong sudut
       const v = idx(nc, nr); if (tutup[v]) continue;
-      const biaya = Math.hypot(dc * kx(r), dr) * (dekatPantai(nc, nr) ? 1.6 : 1);
+      const biaya = Math.hypot(dc * kx(r), dr) * (dekatPantai(nc, nr) ? (mode === 'laut' ? 1.6 : 1.3) : 1);
       const ng = g[u] + biaya;
       if (ng < g[v]) { g[v] = ng; asal[v] = u; dorong(ng + hEst(nc, nr), v); }
     }
@@ -101,7 +111,7 @@ export function ruteLaut(m: MaskerDarat, a: LonLat, b: LonLat): { jalur: LonLat[
   const halus: [number, number][] = [sel[0]];
   for (let i = 0; i < sel.length - 1;) {
     let j = i + 1;
-    while (j + 1 < sel.length && m.bebas(sel[i], sel[j + 1])) j++;
+    while (j + 1 < sel.length && m.bebas(sel[i], sel[j + 1], mode)) j++;
     halus.push(sel[j]); i = j;
   }
   const jalur: LonLat[] = [a, ...halus.map(([c, r]) => m.titik(c, r)), b];

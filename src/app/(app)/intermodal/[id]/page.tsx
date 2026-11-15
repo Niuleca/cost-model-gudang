@@ -11,7 +11,7 @@ import QuotationPanel from '@/app/(app)/tender/[id]/QuotationPanel';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { useProfile } from '@/lib/useProfile';
 import {
-  FIELD_MUATAN, INTERMODAL_DEFAULT, MODA, hargaPerSatuan, qtyStage, qtyJualRute, NAMA_STAGE, TIER_DEFAULT, armadaModa, cocokRate, estimasiHarga, hasilOverview, hitungIntermodal, labelBasis,
+  FIELD_MUATAN, INTERMODAL_DEFAULT, MODA, qtyStage, qtyJualRute, NAMA_STAGE, TIER_DEFAULT, armadaModa, cocokRate, estimasiHarga, hasilOverview, hitungIntermodal, labelBasis,
   rateCardIntermodal, reviewIntermodal, ringkasIntermodal, ruteIntermodalBaru, tierIntermodal, type Basis, type Moda, type RateTransport, type RuteIntermodal, type StageIntermodal, type TenderIntermodal,
 } from '@/lib/transport';
 import { jarakKm } from '@/lib/lokasiIndonesia';
@@ -129,8 +129,6 @@ export default function IntermodalTender() {
       {im.rute.map((r, i) => {
         const h = hitungIntermodal(r, im.marginGlobal);
         const qj = qtyJualRute(r);
-        const opsi = hargaPerSatuan(r, im.marginGlobal);
-        const setMuatan = (k: string, v: string) => setRute(i, { muatan: { ...(r.muatan ?? {}), [k]: v === '' ? undefined : Number(v) } });
         return (
           <div key={r.id} className="card" style={{ display: 'grid', gap: 10 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -155,11 +153,6 @@ export default function IntermodalTender() {
               <label className="f">Biaya lain / shipment (Rp)<input type="number" min={0} value={r.biayaLain || ''} placeholder="THC, dokumen, handling" onChange={e => setRute(i, { biayaLain: Number(e.target.value) || 0 })} /></label>
               <label className="f">Margin rute (%)<PersenInput label="Margin rute" nilai={r.marginPersen} placeholder={`${Math.round(im.marginGlobal * 1000) / 10} (global)`} onChange={v => setRute(i, { marginPersen: v })} /></label>
             </div>
-            <div className="muatan-box">
-              <div className="small"><b>Profil muatan per shipment</b> <span className="muted">— isi yang diketahui; qty stage & qty jual bertanda <i>auto</i> dihitung dari sini (udara per kg = chargeable weight, laut LCL per ton = W/M).</span></div>
-              <div className="muatan-grid">{FIELD_MUATAN.map(f => <label key={f.k} className="f small">{f.l}
-                <input type="number" min={0} step="any" value={r.muatan?.[f.k] ?? ''} placeholder="—" onChange={e => setMuatan(f.k, e.target.value)} /></label>)}</div>
-            </div>
             <div className="tablewrap fit"><table className="tabel-fit tabel-im">
               <thead><tr><th>Stage · moda</th><th>Dari → ke</th><th>Armada · basis</th><th className="num">Qty</th><th>Vendor</th><th className="num">Harga beli</th><th className="num">Lead time</th><th className="num">Biaya / shipment</th></tr></thead>
               <tbody>{r.stage.map((s, k) => <BarisStage key={k} s={s} idx={k} rates={rates} q={qtyStage(s, r)} onUbah={p => setStage(i, k, p)} />)}</tbody>
@@ -172,12 +165,7 @@ export default function IntermodalTender() {
                 <tr className="pd-sub"><td>Per bulan ({r.shipmentBulan || 0} shipment): biaya {rp(h.biayaBulan)} · GP {(h.gpPersen * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%</td><td className="num"><b>{rp(h.pendapatanBulan)}</b></td></tr>
               </tbody>
             </table></div>
-            {opsi.length > 0 && <div className="tablewrap fit"><table className="tabel-fit tabel-satuan">
-              <thead><tr><th>Pilih satuan jual (dari profil muatan)</th><th className="num">Qty / shipment</th><th className="num">Harga beli</th><th className="num">Harga jual</th><th></th></tr></thead>
-              <tbody>{opsi.map(o => <tr key={o.basis} className={o.basis === r.satuanJual ? 'aktif' : undefined}>
-                <td>{o.label}</td><td className="num">{fmtQ(o.qty)}</td><td className="num">{rp(o.beli)}</td><td className="num"><b>{rp(o.jual)}</b></td>
-                <td>{o.basis === r.satuanJual ? <span className="chip-auto">dipakai</span> : <button className="link-kecil" onClick={() => setRute(i, { satuanJual: o.basis, qtyJualAuto: true })}>pakai</button>}</td></tr>)}</tbody>
-            </table></div>}
+
           </div>);
       })}
       </>}
@@ -188,8 +176,8 @@ export default function IntermodalTender() {
           marginGlobal={im.marginGlobal} adaOverride={override} onMarginGlobal={m => setIm({ marginGlobal: m })} onPakai={m => setIm({ marginGlobal: m, rute: im.rute.map(r => ({ ...r, marginPersen: null })) })}
           dasarKonversi="harga all-in door to door (semua stage + biaya lain) per shipment ÷ jumlah satuan dari Profil muatan di tab Input rute."
           onJadikanSatuan={(idR, b) => setIm({ rute: im.rute.map(r => (r.id === idR ? { ...r, satuanJual: b, qtyJualAuto: true } : r)) })} />
-        <div className="card" style={{ display: 'grid', gap: 8 }}>
-          <h3 style={{ margin: 0 }}>Data konversi satuan — profil muatan per shipment</h3>
+        <details className="card" style={{ display: 'grid', gap: 8 }}>
+          <summary style={{ cursor: 'pointer' }}><b>Konversi satuan (opsional)</b> <span className="small muted">— isi hanya bila ingin melihat harga per kg / CBM / pallet / case dll.</span></summary>
           <p className="small muted" style={{ margin: 0 }}>Isi yang diketahui (mis. 1 shipment = 20.000 kg = 40 CBM = 20 pallet = 1.600 case). Dropdown satuan di tabel atas otomatis menghitung harga all-in per kg, ton, CBM, pallet, pcs, case, liter, container. Udara per kg memakai chargeable weight (maks. berat vs CBM × 166,67); laut LCL per ton memakai W/M.</p>
           <div className="tablewrap fit"><table className="tabel-fit">
             <thead><tr><th>Rute</th>{FIELD_MUATAN.map(f => <th key={f.k} className="num">{f.l}</th>)}</tr></thead>
@@ -197,7 +185,7 @@ export default function IntermodalTender() {
               {FIELD_MUATAN.map(f => <td key={f.k} className="num"><input aria-label={`${f.l} ${r.origin} → ${r.destination}`} type="number" min={0} step="any" style={{ width: 90 }} value={r.muatan?.[f.k] ?? ''} placeholder="—"
                 onChange={e => setRute(i, { muatan: { ...(r.muatan ?? {}), [f.k]: e.target.value === '' ? undefined : Number(e.target.value) } })} /></td>)}</tr>)}</tbody>
           </table></div>
-        </div>
+        </details>
       </>}
 
       {tab === 'Quotation' && <QuotationPanel tender={{ ...t, asumsi: t.asumsi as never }} profile={profile} sumber={{
