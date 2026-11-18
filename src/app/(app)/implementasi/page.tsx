@@ -1,4 +1,5 @@
 'use client';
+import { AngkaBebas } from '@/components/fields';
 import ExportButton from '@/components/ExportButton';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -129,7 +130,7 @@ export default function Implementasi() {
                 <td>{edit ? <select aria-label="Status" value={t.status} onChange={e => ubah(t, { status: e.target.value })}>{STATUS_TUGAS.map(s => <option key={s}>{s}</option>)}</select> : null}
                   {st === 'Terlambat' && <span className="pill bad" style={{ marginTop: 4 }}>terlambat</span>}
                   {!edit && st !== 'Terlambat' && <span className={`pill ${st === 'Selesai' ? 'ok' : st === 'Blocked' ? 'bad' : 'warn'}`}>{st}</span>}</td>
-                <td className="num">{edit ? <input aria-label="Progress" type="number" min={0} max={100} step={10} value={t.progress} onChange={e => ubah(t, { progress: Math.max(0, Math.min(100, Number(e.target.value))) })} style={{ width: 70 }} /> : `${t.progress}%`}</td>
+                <td className="num">{edit ? <AngkaBebas aria-label="Progress" min={0} max={100} bulat value={t.progress} onValue={progress => ubah(t, { progress })} style={{ width: 70 }} /> : `${t.progress}%`}</td>
                 <td>{edit ? <input aria-label="Catatan" defaultValue={t.catatan ?? ''} onBlur={e => e.target.value !== (t.catatan ?? '') && ubah(t, { catatan: e.target.value })} /> : t.catatan}</td>
               </tr>);
           })}

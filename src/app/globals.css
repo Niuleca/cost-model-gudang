@@ -994,3 +994,39 @@ tr.aktif td { background: #f5f3ff; }
 .rute3d-kontrol label { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; margin: 0; }
 .rute3d-hud .hud-step { width: 100%; justify-content: flex-start; margin: 0; min-height: 0; box-shadow: none; }
 .rute3d-hud .hud-step > span:last-child { display: grid; gap: 1px; }
+
+/* ---------- Editor 2D: kontrol zoom melayang */
+.cad-wadah { position: relative; }
+.ed-zoom { position: absolute; top: 10px; right: 10px; z-index: 3; display: flex; align-items: stretch; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 14px rgba(15,23,42,.12); overflow: hidden; }
+.ed-zoom button { border: 0; border-radius: 0; background: transparent; color: var(--ink); min-width: 40px; height: 38px; padding: 0 10px; font-size: 20px; font-weight: 600; line-height: 1; box-shadow: none; }
+.ed-zoom button.pct { font-size: 13px; min-width: 58px; border-inline: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.ed-zoom button:hover { background: #f1f5f9; }
+@media (pointer: coarse) { .ed-zoom button { min-width: 46px; height: 44px; } }
+
+/* ---------- Desain gudang: Mode edit penuh (seperti aplikasi) */
+.app-laci { display: none; }
+.sim2d-tata.mode-app { position: fixed; inset: 0; z-index: 1000; margin: 0; padding: 0; gap: 0; width: 100vw; height: 100vh; height: 100dvh;
+  background: var(--bg); grid-template-columns: 250px minmax(0, 1fr) 300px; grid-template-rows: minmax(0, 1fr); align-items: stretch; overflow: hidden; }
+.sim2d-tata.mode-app > .sim2d-kiri, .sim2d-tata.mode-app > .sim2d-kanan { position: relative; top: 0; height: 100%; max-height: none; margin: 0; border-radius: 0; border-top: 0; border-bottom: 0; overflow-y: auto; box-shadow: none; }
+.sim2d-tata.mode-app > .sim2d-tengah { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 8px; gap: 8px; }
+.sim2d-tata.mode-app > .sim2d-tengah > * { flex: none; }
+.sim2d-tata.mode-app .sim2d-kanvas { flex: 1 1 auto; height: auto; min-height: 0; }
+.sim2d-tata.mode-app.tanpa-panel { grid-template-columns: minmax(0, 1fr); }
+.laci-tutup { position: fixed; inset: 0; z-index: 4; background: rgba(15, 23, 42, .35); border: 0; border-radius: 0; padding: 0; }
+@media (max-width: 1280px) {
+  .sim2d-tata.mode-app { grid-template-columns: 240px minmax(0, 1fr); }
+  .sim2d-tata.mode-app > .sim2d-kanan { display: none; }
+  .sim2d-tata.mode-app .app-laci.kanan { display: inline-flex; }
+  .sim2d-tata.mode-app.laci-kanan > .sim2d-kanan { display: grid; position: fixed; right: 0; top: 0; bottom: 0; height: auto; width: min(340px, 92vw); z-index: 5; box-shadow: -12px 0 30px rgba(15,23,42,.25); }
+}
+@media (max-width: 860px) {
+  .sim2d-tata.mode-app { grid-template-columns: minmax(0, 1fr); }
+  .sim2d-tata.mode-app > .sim2d-kiri { display: none; }
+  .sim2d-tata.mode-app .app-laci { display: inline-flex; }
+  .sim2d-tata.mode-app .app-panel { display: none; }
+  .sim2d-tata.mode-app.laci-kiri > .sim2d-kiri { display: grid; position: fixed; left: 0; top: 0; bottom: 0; height: auto; width: min(320px, 88vw); z-index: 5; box-shadow: 12px 0 30px rgba(15,23,42,.25); }
+  .sim2d-tata.mode-app > .sim2d-tengah { padding: 6px; gap: 6px; }
+}
+.sim2d-tata.mode-app .sim2d-tengah .tabs { padding: 3px; }
+.sim2d-tata.mode-app .sim2d-tengah .tabs button { padding: 4px 9px; font-size: 12.5px; }
+.sim2d-tata.mode-app .sim2d-tengah > .row { row-gap: 6px; }

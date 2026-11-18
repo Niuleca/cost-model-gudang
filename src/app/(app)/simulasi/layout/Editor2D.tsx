@@ -111,13 +111,68 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
   const seleksi = () => (multi.length ? multi : pilih ? [pilih] : []);
   const g = edit.gedung;
   const tinggiView = view.w * (ukuran.h / Math.max(1, ukuran.w));
-  const fs = view.w / 70;                                           // ukuran huruf tetap di layar
+  const pxM = Math.max(1, ukuran.w) / Math.max(0.001, view.w);    // piksel layar per meter
+  const kasar = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;   // layar sentuh
+  const fs = (kasar ? 18 : 16) / pxM;                               // ukuran huruf & garis tetap dalam piksel layar (label ≈ 12–14 px)
+  const minPx = (px: number) => px / pxM;                           // ukuran minimum tampil (meter) untuk benda kecil spt kolom
 
+  // ---------- zoom halus: view menuju target dengan animasi (scroll / tombol / keyboard); pan & pinch langsung
+  const viewRef = useRef(view); viewRef.current = view;
+  const target = useRef<{ x: number; z: number; w: number } | null>(null);
+  const raf = useRef(0);
+  const fitW = useRef(100);
+  const aturView = (v: { x: number; z: number; w: number }) => { target.current = null; if (raf.current) cancelAnimationFrame(raf.current); raf.current = 0; viewRef.current = v; setView(v); };
+  const langkahAnim = () => {
+    const t = target.current; if (!t) { raf.current = 0; return; }
+    const v = viewRef.current, k = 0.3;
+    const n = { x: v.x + (t.x - v.x) * k, z: v.z + (t.z - v.z) * k, w: v.w + (t.w - v.w) * k };
+    if (Math.abs(n.w - t.w) / t.w < 0.003 && Math.abs(n.x - t.x) < t.w * 0.002 && Math.abs(n.z - t.z) < t.w * 0.002) { aturView(t); return; }
+    viewRef.current = n; setView(n); raf.current = requestAnimationFrame(langkahAnim);
+  };
+  /** Zoom dengan faktor f (< 1 = mendekat) berpusat di titik layar (cx, cy); default tengah kanvas. */
+  const zoomKe = (f: number, cx?: number, cy?: number) => {
+    const el = svg.current; if (!el) return; const r = el.getBoundingClientRect(); if (!r.width) return;
+    const ox = (cx ?? r.left + r.width / 2) - r.left, oy = (cy ?? r.top + r.height / 2) - r.top;
+    const b = target.current ?? viewRef.current; const s0 = b.w / r.width;
+    const wx = b.x + ox * s0, wz = b.z + oy * s0;
+    const w = Math.min(2000, Math.max(3, b.w * f)); const s1 = w / r.width;
+    target.current = { x: wx - ox * s1, z: wz - oy * s1, w };
+    if (!raf.current) raf.current = requestAnimationFrame(langkahAnim);
+  };
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
   const pasFit = () => {
     const pad = 6; const lebar = g.L + 2 * pad + 16, tinggi = g.W + 2 * pad;
     const w = Math.max(lebar, tinggi * (ukuran.w / Math.max(1, ukuran.h)));
-    setView({ x: -pad - 16 - (w - lebar) / 2, z: -pad - (w * (ukuran.h / Math.max(1, ukuran.w)) - tinggi) / 2, w });
+    fitW.current = w;
+    aturView({ x: -pad - 16 - (w - lebar) / 2, z: -pad - (w * (ukuran.h / Math.max(1, ukuran.w)) - tinggi) / 2, w });
   };
+  // pinch 2 jari (layar sentuh): zoom + geser sekaligus; membatalkan seret yang sedang berjalan
+  const jari = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d0: number; mx: number; my: number; v0: { x: number; z: number; w: number } } | null>(null);
+  useEffect(() => {
+    const el = svg.current; if (!el) return;
+    const jarak = () => { const [a, b] = [...jari.current.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; };
+    const down = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      jari.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (jari.current.size === 2) { seret.current = null; setKotak(null); const j = jarak(); pinch.current = { d0: Math.max(10, j.d), mx: j.mx, my: j.my, v0: { ...viewRef.current } }; }
+    };
+    const move = (e: PointerEvent) => {
+      if (!jari.current.has(e.pointerId)) return;
+      jari.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const p0 = pinch.current; if (!p0 || jari.current.size < 2) return;
+      e.preventDefault(); e.stopPropagation();
+      const r = el.getBoundingClientRect(); const j = jarak();
+      const w = Math.min(2000, Math.max(3, p0.v0.w * p0.d0 / Math.max(10, j.d)));
+      const s0 = p0.v0.w / r.width, s1 = w / r.width;
+      const wx = p0.v0.x + (p0.mx - r.left) * s0, wz = p0.v0.z + (p0.my - r.top) * s0;   // titik dunia di bawah tengah dua jari awal
+      aturView({ x: wx - (j.mx - r.left) * s1, z: wz - (j.my - r.top) * s1, w });
+    };
+    const up = (e: PointerEvent) => { jari.current.delete(e.pointerId); if (jari.current.size < 2) pinch.current = null; };
+    el.addEventListener('pointerdown', down, true); el.addEventListener('pointermove', move, true);
+    el.addEventListener('pointerup', up, true); el.addEventListener('pointercancel', up, true);
+    return () => { el.removeEventListener('pointerdown', down, true); el.removeEventListener('pointermove', move, true); el.removeEventListener('pointerup', up, true); el.removeEventListener('pointercancel', up, true); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const el = svg.current; if (!el) return;
     const ukur = () => { const r = el.getBoundingClientRect(); setUkuran({ w: r.width, h: r.height }); };
@@ -259,6 +314,9 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       if (!svg.current || svg.current.getBoundingClientRect().width === 0) return;   // editor 2D sedang tersembunyi
       if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
       if (ev.key === 'Escape') { batalCmd(); return; }
+      if (!cmd && (ev.key === '+' || ev.key === '=')) { ev.preventDefault(); zoomKe(1 / 1.4); return; }
+      if (!cmd && (ev.key === '-' || ev.key === '_')) { ev.preventDefault(); zoomKe(1.4); return; }
+      if (!cmd && ev.key === '0') { ev.preventDefault(); pasFit(); return; }
       if (ev.key === 'Enter' || (ev.key === ' ' && cmd)) { ev.preventDefault(); jalankan(''); return; }
       const huruf = /^[a-zA-Z]$/.test(ev.key), angkaK = /^[0-9@#.,;-]$/.test(ev.key);
       if (huruf && ev.key.toLowerCase() === 'r' && (pilih || multi.length) && !cmd) return;   // R = putar cepat (pintasan lama)
@@ -364,7 +422,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       ubah(ed => ({ ...ed, komponen: ed.komponen.map(o => (o.id === s.area && o.area ? { ...o, area: geserBarisArea(o.area, s.idx, d, s.g0) } : o)) }));
       return;
     }
-    if (s.jenis === 'pan') { const skala = s.v0.w / Math.max(1, ukuran.w); setView({ ...s.v0, x: s.v0.x - (e.clientX - s.sx) * skala, z: s.v0.z - (e.clientY - s.sy) * skala }); return; }
+    if (s.jenis === 'pan') { const skala = s.v0.w / Math.max(1, ukuran.w); aturView({ ...s.v0, x: s.v0.x - (e.clientX - s.sx) * skala, z: s.v0.z - (e.clientY - s.sy) * skala }); return; }
     if (s.jenis === 'kotak') { setKotak({ ax: s.ax, az: s.az, bx: p.x, bz: p.z }); return; }
     if (s.jenis === 'grup') {
       let dx = snap(p.x - s.ax), dz = snap(p.z - s.az); const r = (v: number) => Math.round(v * 100) / 100;
@@ -429,9 +487,9 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     }
   }
   function roda(e: React.WheelEvent) {
-    const p = keDunia(e.clientX, e.clientY);
-    const f = Math.exp(e.deltaY * 0.0012); const w = Math.min(2000, Math.max(4, view.w * f));
-    setView({ x: p.x - (p.x - view.x) * (w / view.w), z: p.z - (p.z - view.z) * (w / view.w), w });
+    // mouse: ±15% per notch; pinch trackpad (ctrlKey, delta kecil) lebih peka; animasi menghaluskan lompatan
+    const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+    zoomKe(Math.exp(Math.max(-60, Math.min(60, dy)) * (e.ctrlKey ? 0.012 : 0.0016)), e.clientX, e.clientY);
   }
   useEffect(() => {
     const el = svg.current; if (!el) return;
@@ -480,7 +538,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         zs.forEach((z, i) => el.push(<line key={`gz${i}`} x1={k.x} y1={z} x2={k.x + k.w} y2={z} stroke="#0f766e" strokeWidth={fs * 0.03} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} style={{ pointerEvents: 'none' }} />));
       }
       for (const c of kol) el.push(<g key={c.id}><rect x={c.x - fs * 0.22} y={c.z - fs * 0.22} width={c.w + fs * 0.44} height={c.d + fs * 0.44} fill="transparent" data-ekspor="tidak" />
-        <rect x={c.x} y={c.z} width={c.w} height={c.d} fill={w.isi} stroke={dipilih ? '#f97316' : '#1e293b'} strokeWidth={fs * 0.05} /></g>);
+        {(() => { const v = minPx(kasar ? 10 : 8), cw = Math.max(c.w, v), cd = Math.max(c.d, v); return <rect x={c.x + c.w / 2 - cw / 2} y={c.z + c.d / 2 - cd / 2} width={cw} height={cd} fill={w.isi} stroke={dipilih ? '#f97316' : '#1e293b'} strokeWidth={fs * 0.05} />; })()}</g>);
       el.push(<text key="t" x={k.x + fs * 0.3} y={k.z - fs * 0.45} fontSize={fs * 0.75} fill="#0f766e" style={{ paintOrder: 'stroke', stroke: '#ffffffcc', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>
         {k.label} · {xs.length} × {zs.length} as · {kol.length} kolom</text>);
       return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined, pointerEvents: bisaPilih(k) ? undefined : 'none' }}>{el}</g>;
@@ -557,13 +615,22 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         transform={tegak ? `rotate(-90 ${cx} ${cz})` : undefined} style={{ paintOrder: 'stroke', stroke: '#ffffffcc', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>{label}</text>);
     }
     // kolom kecil: area pegang transparan lebih besar supaya mudah diseret
-    if (k.jenis === 'kolom') { const pad = fs * 0.22; el.unshift(<rect key="hit" data-ekspor="tidak" x={k.x - pad} y={k.z - pad} width={k.w + 2 * pad} height={k.d + 2 * pad} fill="transparent" />); }
+    if (k.jenis === 'kolom') {
+      // kolom kecil di layar: tanda minimum ±9 px supaya tetap terlihat, area pegang ±28 px supaya mudah diseret (jari / mouse)
+      const vis = minPx(kasar ? 11 : 9), hitR = minPx(kasar ? 34 : 24);
+      if (k.w < vis || k.d < vis) {
+        const cx = k.x + k.w / 2, cz = k.z + k.d / 2;
+        el.push(<rect key="tanda" x={cx - vis / 2} y={cz - vis / 2} width={vis} height={vis} fill={dipilih ? '#f97316' : '#334155'} stroke="#fff" strokeWidth={fs * 0.06} style={{ pointerEvents: 'none' }} />);
+      }
+      const pw = Math.max(fs * 0.22, (hitR - k.w) / 2), pd = Math.max(fs * 0.22, (hitR - k.d) / 2);
+      el.unshift(<rect key="hit" data-ekspor="tidak" x={k.x - pw} y={k.z - pd} width={k.w + 2 * pw} height={k.d + 2 * pd} fill="transparent" />);
+    }
     return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined, pointerEvents: bisaPilih(k) ? undefined : 'none' }}>{el}</g>;
   };
 
   /** Handle ubah ukuran. Komponen kecil (mis. kolom 0,5 m) → handle di LUAR bentuk supaya bagian tengah tetap bisa diseret tanpa mengubah ukuran. */
   const handle = (k: Komponen) => {
-    const s = fs * 0.45; const kecil = Math.min(k.w, k.d) < s * 3; const o = kecil ? s * 1.2 : 0;
+    const s = minPx(kasar ? 16 : 11); const kecil = Math.min(k.w, k.d) < s * 3; const o = kecil ? s * 1.2 : 0;
     const semua: [string, number, number][] = [['nw', k.x - o, k.z - o], ['n', k.x + k.w / 2, k.z - o], ['ne', k.x + k.w + o, k.z - o], ['e', k.x + k.w + o, k.z + k.d / 2], ['se', k.x + k.w + o, k.z + k.d + o], ['s', k.x + k.w / 2, k.z + k.d + o], ['sw', k.x - o, k.z + k.d + o], ['w', k.x - o, k.z + k.d / 2]];
     const pts = kecil ? semua.filter(([h]) => h.length === 2) : semua;   // kecil: cukup 4 sudut
     return pts.map(([h, x, z]) => <rect key={h} data-ekspor="tidak" x={x - s / 2} y={z - s / 2} width={s} height={s} fill="#fff" stroke="#f97316" strokeWidth={fs * 0.08}
@@ -649,7 +716,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
           <g data-ekspor="tidak" style={{ pointerEvents: 'none' }}>
             {t.sejajarX != null && <line x1={t.x} y1={0} x2={t.x} y2={g.W} stroke="#2563eb" strokeWidth={fs * 0.05} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />}
             {t.sejajarZ != null && <line x1={0} y1={t.z} x2={g.L} y2={t.z} stroke="#2563eb" strokeWidth={fs * 0.05} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />}
-            <rect x={t.x - ukKolom.w / 2} y={t.z - ukKolom.d / 2} width={ukKolom.w} height={ukKolom.d} fill="rgba(71,85,105,0.55)" stroke="#0f172a" strokeWidth={fs * 0.06} />
+            {(() => { const w = Math.max(ukKolom.w, minPx(10)), d = Math.max(ukKolom.d, minPx(10)); return <rect x={t.x - w / 2} y={t.z - d / 2} width={w} height={d} fill="rgba(71,85,105,0.55)" stroke="#0f172a" strokeWidth={fs * 0.06} />; })()}
             {t.kiri && garisUkur(t.kiri.x, t.z - u, t.x, t.z - u, `${f1(t.x - t.kiri.x)} m`, '#2563eb', 'kolomX', false)}
             {t.atas && garisUkur(t.x + u, t.atas.z, t.x + u, t.z, `${f1(t.z - t.atas.z)} m`, '#2563eb', 'kolomZ', false)}
             <text x={t.x + u} y={t.z + u * 2 + fs * 0.6} fontSize={fs * 0.7} fill="#0f172a">klik = taruh kolom {f1(ukKolom.w)} × {f1(ukKolom.d)} m ({f1(t.x)}; {f1(t.z)})</text>
@@ -744,6 +811,11 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         </g>); })()}
       {kursor && <text data-ekspor="tidak" x={view.x + fs * 0.5} y={view.z + tinggiView - fs * 0.6} fontSize={fs * 0.75} fill="#64748b">x {f1(kursor.x)} m · z {f1(kursor.z)} m</text>}
     </svg>
+    <div className="ed-zoom" data-ekspor="tidak" role="group" aria-label="Zoom denah">
+      <button type="button" onClick={() => zoomKe(1.4)} title="Perkecil (−)" aria-label="Perkecil">−</button>
+      <button type="button" className="pct" onClick={pasFit} title="Pas layar (0)">{Math.round((fitW.current / Math.max(0.001, view.w)) * 100)}%</button>
+      <button type="button" onClick={() => zoomKe(1 / 1.4)} title="Perbesar (+)" aria-label="Perbesar">+</button>
+    </div>
     {/* baris perintah & status (gaya CAD) */}
     <div className="cad-bar" data-ekspor="tidak">
       <div className="cad-log">{log.slice(-2).map((l, i) => <div key={i} className={i === log.slice(-2).length - 1 ? 'akhir' : ''}>{l}</div>)}</div>

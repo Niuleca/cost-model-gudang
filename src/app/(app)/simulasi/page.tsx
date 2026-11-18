@@ -3,6 +3,7 @@
 // Layout otomatis dari parameter Space tender (bisa direvisi & disusun ulang) → edit komponen gudang (rak, block stack, staging, dock,
 // fasilitas, kolom, jalur, zona), atur jarak & tinggi, kapasitas dihitung ulang, 3D mengikuti. Simpan beberapa versi per project;
 // versi tersimpan dipakai sebagai gudang di Leca Game. Export PNG / PDF. Latar denah gambar / DXF.
+import { AngkaBebas } from '@/components/fields';
 import { useSatuanPanjang } from '@/lib/satuanPanjang';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -54,10 +55,16 @@ function Angka({ l, v, set, step = 0.1, min, u }: { l: string; v: number; set: (
   const sp = useSatuanPanjang(); const pjg = u === 'm';
   const keTeks = (x: number) => String(pjg ? sp.tampil(x, 'm') : x);
   const [teks, setTeks] = useState(keTeks(v));
-  useEffect(() => { const n = Number(teks); if (!Number.isFinite(n) || Math.abs((pjg ? sp.simpan(n, 'm') : n) - v) > 1e-9) setTeks(keTeks(v)); }, [v, sp.satuan]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [fokus, setFokus] = useState(false);
+  // selama kolom aktif, ketikan tidak ditimpa (mis. editor membatasi ukuran minimum) — dirapikan saat keluar kolom
+  useEffect(() => { if (fokus) return; const n = Number(teks); if (!Number.isFinite(n) || Math.abs((pjg ? sp.simpan(n, 'm') : n) - v) > 1e-9) setTeks(keTeks(v)); }, [v, sp.satuan, fokus]); // eslint-disable-line react-hooks/exhaustive-deps
+  const baca = (x: string) => { const n = Number(x.trim().replace(',', '.')); return x.trim() === '' || !Number.isFinite(n) || (min != null && n < min) ? null : n; };
   return (
     <label className="f">{l}{u ? ` (${pjg ? sp.satuan : u})` : ''}
-      <input type="number" step={pjg ? 'any' : step} min={min} value={teks} onChange={e => { setTeks(e.target.value); const x = Number(e.target.value); if (e.target.value !== '' && Number.isFinite(x)) set(pjg ? sp.simpan(x, 'm') : x); }} />
+      <input type="text" inputMode="decimal" data-step={step} value={teks} onFocus={() => setFokus(true)}
+        onChange={e => { setTeks(e.target.value); const x = baca(e.target.value); if (x != null) set(pjg ? sp.simpan(x, 'm') : x); }}
+        onBlur={() => { setFokus(false); setTeks(keTeks(v)); }}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
     </label>
   );
 }
@@ -111,22 +118,23 @@ export default function DesainGudang() {
   // ---------- ukuran editor: normal · perbesar (memenuhi jendela) · layar penuh (Fullscreen API) · sembunyikan panel samping
   const tataRef = useRef<HTMLDivElement>(null);
   const [besarEd, setBesarEd] = useState(false); const [penuhEd, setPenuhEd] = useState(false); const [tanpaPanel, setTanpaPanel] = useState(false);
+  const [laci, setLaci] = useState<'kiri' | 'kanan' | null>(null);    // mode edit penuh di layar sempit: panel alat / properti sebagai laci
   useEffect(() => {
     const f = () => setPenuhEd(!!tataRef.current && document.fullscreenElement === tataRef.current);
     document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f);
   }, []);
   useEffect(() => {
     if (!besarEd) return;
-    const f = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.fullscreenElement) setBesarEd(false); };
+    const f = (e: KeyboardEvent) => { if (e.key !== 'Escape' || document.fullscreenElement) return; const tg = e.target as HTMLElement; if (tg && ['INPUT', 'SELECT', 'TEXTAREA'].includes(tg.tagName)) return; setLaci(l => { if (l) return null; setBesarEd(false); return l; }); };
     const ov = document.body.style.overflow; document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', f); return () => { window.removeEventListener('keydown', f); document.body.style.overflow = ov; };
   }, [besarEd]);
-  const layarPenuhEd = async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else if (tataRef.current?.requestFullscreen) await tataRef.current.requestFullscreen();
-      else setBesarEd(true);
-    } catch { setBesarEd(true); }
+  /** Mode edit penuh (seperti aplikasi): editor menutupi seluruh layar, menu & halaman disembunyikan; layar penuh perangkat bila didukung. */
+  const modeEditPenuh = async (on: boolean) => {
+    setLaci(null);
+    if (!on) { setBesarEd(false); try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* abaikan */ } return; }
+    setBesarEd(true);
+    try { if (!document.fullscreenElement && tataRef.current?.requestFullscreen) await tataRef.current.requestFullscreen({ navigationUI: 'hide' }); } catch { /* iPhone / tidak didukung: tetap mode penuh di dalam browser */ }
   };
   const ed2 = useRef<Editor2DApi>(null);
   const api3 = useRef<ViewerApi>(null);
@@ -536,7 +544,7 @@ export default function DesainGudang() {
             <div className="eyebrow">Desain baru tanpa project · tersimpan di akun Anda</div>
             <div className="sim-baru-isi">
               {([['L', 'Panjang gedung (m)', 10, 400, 0.5], ['W', 'Lebar gedung (m)', 8, 300, 0.5], ['tinggi', 'Tinggi sisi (m)', 4, 40, 0.5], ['dockIn', 'Dock inbound', 1, 30, 1], ['dockOut', 'Dock outbound', 1, 30, 1]] as const).map(([k, l, mn, mx, st]) => (
-                <label key={k} className="f">{l}<input type="number" min={mn} max={mx} step={st} value={formBaru[k]} onChange={e => setFormBaru({ ...formBaru, [k]: Math.min(mx, Math.max(mn, Number(e.target.value) || mn)) })} /></label>
+                <label key={k} className="f">{l}<AngkaBebas min={mn} max={mx} bulat={st >= 1} value={formBaru[k]} onValue={v => setFormBaru(f => f && { ...f, [k]: v })} /><span className="small muted">{mn}–{mx}</span></label>
               ))}
               <label className="sim3d-cek" style={{ alignSelf: 'end' }}><input type="checkbox" checked={formBaru.isiRak} onChange={e => setFormBaru({ ...formBaru, isiRak: e.target.checked })} />Isi rak otomatis (area adaptif)</label>
               <div className="row" style={{ alignSelf: 'end' }}><button type="button" onClick={() => buatTanpaProject(formBaru)}>Buat gedung</button><button type="button" className="ghost" onClick={() => setFormBaru(null)}>Batal</button></div>
@@ -560,7 +568,8 @@ export default function DesainGudang() {
       )}
       {edit && data && langkah === 'simulasi' && <SimulasiDesain edit={edit} data={data} kotor={kotor} />}
       {edit && data && rk && langkah === 'layout' && (
-        <div ref={tataRef} className={`sim2d-tata${besarEd && !penuhEd ? ' layar-besar' : ''}${penuhEd ? ' layar-penuh' : ''}${tanpaPanel ? ' tanpa-panel' : ''}`}>
+        <div ref={tataRef} className={`sim2d-tata${besarEd || penuhEd ? ' mode-app' : ''}${tanpaPanel ? ' tanpa-panel' : ''}${laci ? ` laci-${laci}` : ''}`}>
+          {(besarEd || penuhEd) && laci && <button type="button" className="laci-tutup" aria-label="Tutup panel" onClick={() => setLaci(null)} />}
           {/* ---------- kiri: alat & komponen */}
           <div className="card sim2d-kiri">
             <div className="eyebrow">Mode</div>
@@ -593,7 +602,7 @@ export default function DesainGudang() {
             <div className="sim2d-tarik">
               <button type="button" onClick={() => tarik(false)} title="Panjangkan semua baris rak sampai rintangan / dinding terdekat; jumlah bay & kapasitas menyesuaikan">↔ Tarik rak otomatis</button>
               <button type="button" className="ghost" onClick={semuaJadiArea} title="Gabungkan rak satuan per kolom jadi area rak yang bisa ditarik (gaya CLASS)">▦ Semua rak → area otomatis</button>
-              <label className="small">Jarak ke dinding <input type="number" min={0} step={0.1} value={jarakDinding} onChange={e => setJarakDinding(Math.max(0, Number(e.target.value) || 0))} /> m</label>
+              <label className="small">Jarak ke dinding <AngkaBebas min={0} value={jarakDinding} onValue={setJarakDinding} style={{ width: 70 }} /> m</label>
             </div>
             <div className="eyebrow">Tambah komponen</div>
             <div className="sim2d-palet">
@@ -712,9 +721,13 @@ export default function DesainGudang() {
                 </>)}
               </div>
               <div className="tabs" role="group" aria-label="Ukuran editor">
-                <button type="button" className={tanpaPanel ? 'on' : ''} onClick={() => setTanpaPanel(v => !v)} title="Sembunyikan / tampilkan panel alat & properti supaya kanvas lebih lebar">{tanpaPanel ? '◨ Tampilkan panel' : '◧ Sembunyikan panel'}</button>
-                <button type="button" className={besarEd && !penuhEd ? 'on' : ''} onClick={() => setBesarEd(v => !v)} title={besarEd ? 'Kembali ke ukuran normal (Esc)' : 'Perbesar editor memenuhi jendela browser'}>{besarEd && !penuhEd ? '⤡ Kecilkan' : '⤢ Perbesar'}</button>
-                <button type="button" className={penuhEd ? 'on' : ''} onClick={layarPenuhEd} title={penuhEd ? 'Keluar layar penuh (Esc)' : 'Layar penuh (seluruh monitor)'}>{penuhEd ? '✕ Keluar layar penuh' : '⛶ Layar penuh'}</button>
+                {(besarEd || penuhEd) && <>
+                  <button type="button" className={`app-laci${laci === 'kiri' ? ' on' : ''}`} onClick={() => setLaci(l => (l === 'kiri' ? null : 'kiri'))} title="Alat, mode & komponen">☰ Alat</button>
+                  <button type="button" className={`app-laci kanan${laci === 'kanan' ? ' on' : ''}`} onClick={() => setLaci(l => (l === 'kanan' ? null : 'kanan'))} title="Properti komponen terpilih & kapasitas">⚙ Properti</button>
+                </>}
+                <button type="button" className={`app-panel${tanpaPanel ? ' on' : ''}`} onClick={() => setTanpaPanel(v => !v)} title="Sembunyikan / tampilkan panel alat & properti supaya kanvas lebih lebar">{tanpaPanel ? '◨ Tampilkan panel' : '◧ Sembunyikan panel'}</button>
+                <button type="button" className={besarEd || penuhEd ? 'on' : ''} onClick={() => modeEditPenuh(!(besarEd || penuhEd))}
+                  title={besarEd || penuhEd ? 'Kembali ke halaman (Esc)' : 'Edit layout di layar penuh seperti aplikasi — menu & halaman disembunyikan'}>{besarEd || penuhEd ? '✕ Keluar mode penuh' : '⛶ Mode edit penuh'}</button>
               </div>
               <span className="small muted">{edit.komponen.length} komponen · {edit.ukur.length} garis ukur {edit.ukur.length > 0 && <button className="ghost" style={{ padding: '2px 8px', marginLeft: 6 }} onClick={() => aksi(e => ({ ...e, ukur: [] }))}>hapus ukur</button>}</span>
             </div>
@@ -734,7 +747,7 @@ export default function DesainGudang() {
                       <div className="sim2d-potong-alat">
                         <label className="small">Posisi potong {potongan.arah === 'depan' ? 'X' : 'Z'}
                           <input type="range" min={0} max={potongan.arah === 'depan' ? edit.gedung.L : edit.gedung.W} step={0.05} value={potongan.nilai} onChange={e => setPotongan(p => (p ? { ...p, nilai: Number(e.target.value) } : p))} />
-                          <input type="number" step={0.1} value={potongan.nilai} onChange={e => setPotongan(p => (p ? { ...p, nilai: Number(e.target.value) || 0 } : p))} style={{ width: 70 }} /> m
+                          <AngkaBebas min={0} value={potongan.nilai} onValue={nilai => setPotongan(p => (p ? { ...p, nilai } : p))} style={{ width: 70 }} /> m
                         </label>
                         <button className="ghost" onClick={() => setPotongan(p => (p ? { ...p, nilai: potongAwal(edit, p.arah) } : p))}>Ke rak</button>
                         <span className="small">Zoom</span>
@@ -943,9 +956,9 @@ export default function DesainGudang() {
                     </div>
                     <div className="sim2d-lapis">
                       <span className="small">Jumlah gate di dinding ini</span>
-                      <input type="number" min={1} max={40} value={sebarGate.n} onChange={e => setSebarGate(g => ({ ...g, n: Math.max(1, Math.min(40, Number(e.target.value) || 1)) }))} />
+                      <AngkaBebas min={1} max={40} bulat value={sebarGate.n} onValue={n => setSebarGate(g => ({ ...g, n }))} />
                       <span className="small">as ke as</span>
-                      <input type="number" step={0.5} min={0} value={sebarGate.jarak} onChange={e => setSebarGate(g => ({ ...g, jarak: Math.max(0, Number(e.target.value) || 0) }))} />
+                      <AngkaBebas min={0} value={sebarGate.jarak} onValue={jarak => setSebarGate(g => ({ ...g, jarak }))} />
                       <span className="small">m (0 = merata)</span>
                       <button className="ghost" onClick={buatSebarGate}>Terapkan</button>
                     </div>
@@ -988,7 +1001,7 @@ export default function DesainGudang() {
                     {(['x', 'z'] as const).map(sb => { const d = sb === 'x' ? bX : bZ; return d.length > 0 && (
                       <div key={sb} className="sim2d-bentang"><span className="small muted">Bentang {sb.toUpperCase()} per as (ubah yang berbeda):</span>
                         <div className="row" style={{ gap: 4 }}>{d.slice(0, 40).map((v, i) => (
-                          <label key={i} className="small" title={`As ${i + 1} → ${i + 2}`}>{i + 1}–{i + 2}<input type="number" step={0.1} className="input-kecil" style={{ width: 62 }} value={v} onChange={e => { const x = Number(e.target.value); if (x > 0) ubahSatu(sb, i, x); }} /></label>))}</div>
+                          <label key={i} className="small" title={`As ${i + 1} → ${i + 2}`}>{i + 1}–{i + 2}<AngkaBebas className="input-kecil" style={{ width: 62 }} min={0.5} value={v} onValue={x => ubahSatu(sb, i, x)} /></label>))}</div>
                       </div>); })}
                     {(gk.lewati?.length ?? 0) > 0 && <p className="small muted" style={{ margin: 0 }}>{gk.lewati!.length} titik grid tanpa kolom (dari kolom satuan yang digabung) · <button type="button" className="link-kecil" onClick={() => ubahGrid({ lewati: [] })}>isi semua titik</button></p>}
                     <div className="row" style={{ gap: 6 }}>
@@ -1009,9 +1022,9 @@ export default function DesainGudang() {
                 </div>
                 <div className="sim2d-lapis">
                   <span className="small">Ulangi</span>
-                  <input type="number" min={1} max={50} value={lapis.n} onChange={e => setLapis(l => ({ ...l, n: Math.max(1, Math.min(50, Number(e.target.value) || 1)) }))} />
+                  <AngkaBebas min={1} max={50} bulat value={lapis.n} onValue={n => setLapis(l => ({ ...l, n }))} />
                   <span className="small">× jarak</span>
-                  <input type="number" step={0.1} value={lapis.jarak} onChange={e => setLapis(l => ({ ...l, jarak: Number(e.target.value) || 0 }))} />
+                  <AngkaBebas value={lapis.jarak} onValue={jarak => setLapis(l => ({ ...l, jarak }))} />
                   <span className="small">m ke</span>
                   <select value={lapis.arah} onChange={e => setLapis(l => ({ ...l, arah: e.target.value as 'x' | 'z' }))}><option value="z">kanan (Z)</option><option value="x">belakang (X)</option></select>
                   <select value={(lapis.asKeAs || terpilih.jenis === 'kolom') ? 'as' : 'celah'} onChange={e => setLapis(l => ({ ...l, asKeAs: e.target.value === 'as' }))} disabled={terpilih.jenis === 'kolom'}>

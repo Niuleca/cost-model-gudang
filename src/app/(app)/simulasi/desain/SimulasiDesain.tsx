@@ -1,6 +1,7 @@
 'use client';
 // Langkah ② Simulasi operasi di Desain gudang: menjalankan mesin Leca Game di atas layout yang sedang diedit
 // (termasuk perubahan yang belum disimpan) → amati di 2D (tampak atas, gaya CLASS) dan 3D, lalu nilai lewat Analisis KPI & red flag.
+import { AngkaBebas } from '@/components/fields';
 import { useMemo, useState } from 'react';
 import { buatDunia, skenarioDariTender, type Dunia } from '@/lib/game';
 import type { TenderRow } from '@/lib/tender';
@@ -39,7 +40,7 @@ export default function SimulasiDesain({ edit, data, kotor }: { edit: LayoutEdit
             Amati pergerakan di <b>2D</b> (tampak atas) dan <b>3D</b>, lalu nilai di tab <b>Analisis KPI</b> dan <b>Red flag</b>.
           </p>
         </div>
-        <label className="f">Hari simulasi<input type="number" min={1} max={60} value={hari} onChange={e => setHari(Math.max(1, Math.min(60, Number(e.target.value) || 1)))} /></label>
+        <label className="f">Hari simulasi<AngkaBebas min={1} max={60} bulat value={hari} onValue={setHari} /></label>
         <label className="f">Seed<input type="number" value={seed} onChange={e => setSeed(Number(e.target.value) || 0)} /></label>
         <button type="button" onClick={mulai}>{sim ? '↻ Ulang simulasi' : '▶ Mulai simulasi'}</button>
       </div>

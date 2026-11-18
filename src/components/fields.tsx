@@ -14,6 +14,35 @@ export function AngkaInput({ value, onValue, bulat, ...rest }: Omit<InputHTMLAtt
     onBlur={e => { if (e.target.value === '') { setTeks('0'); onValue(0); } rest.onBlur?.(e); }} />;
 }
 
+/** Input angka bebas diketik: batas min/max baru diterapkan saat Enter / keluar kolom (bukan per ketikan),
+ *  jadi mengetik "30" tidak berubah jadi "10" atau "400" di tengah jalan. Nilai dalam batas langsung dipakai (pratinjau). */
+export function AngkaBebas({ value, onValue, min, max, bulat, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'min' | 'max'> & {
+  value: number; onValue: (v: number) => void; min?: number; max?: number; bulat?: boolean;
+}) {
+  const [teks, setTeks] = useState(String(value));
+  const [fokus, setFokus] = useState(false);
+  useEffect(() => { if (!fokus) setTeks(String(value)); }, [value, fokus]);
+  const baca = (x: string) => { const n = Number(x.trim().replace(',', '.')); return x.trim() === '' || !Number.isFinite(n) ? null : bulat ? Math.round(n) : n; };
+  const dalam = (n: number) => (min == null || n >= min) && (max == null || n <= max);
+  const n = baca(teks);
+  const luar = fokus && n != null && !dalam(n);
+  const simpan = () => {
+    const v = baca(teks);
+    if (v == null) { setTeks(String(value)); return; }
+    const c = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
+    if (c !== value) onValue(c);
+    setTeks(String(c));
+  };
+  return <input {...rest} type="text" inputMode="decimal" value={teks}
+    aria-invalid={luar || undefined}
+    title={luar ? `Batas ${min ?? '–'} s/d ${max ?? '–'}; disesuaikan saat Enter / keluar kolom` : rest.title}
+    style={{ ...(rest.style ?? {}), ...(luar ? { borderColor: 'var(--warn, #b45309)', outlineColor: 'var(--warn, #b45309)' } : {}) }}
+    onFocus={e => { setFokus(true); rest.onFocus?.(e); }}
+    onChange={e => { setTeks(e.target.value); const v = baca(e.target.value); if (v != null && dalam(v)) onValue(v); }}
+    onBlur={e => { setFokus(false); simpan(); rest.onBlur?.(e); }}
+    onKeyDown={e => { if (e.key === 'Enter') { simpan(); (e.target as HTMLInputElement).blur(); } rest.onKeyDown?.(e); }} />;
+}
+
 export function Num({ id, label, value, onChange, step = 'any', min, suffix, hint }: {
   id: string; label: string; value: number | undefined; onChange: (v: number) => void; step?: string; min?: number; suffix?: string; hint?: string;
 }) {
