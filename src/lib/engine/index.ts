@@ -5,7 +5,7 @@
 
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
-import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen, uraiUom, kelasUom, type Muatan } from './types';
+import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, type Muatan } from './types';
 import { PARAM_BIAYA_MP_DEFAULT, rincianBiayaRole } from './biayaMp';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
@@ -72,6 +72,7 @@ export function hitungTender(t: TenderInput, m: MasterData) {
   const kal = hitungKalender(t.tahun, t.hariKerjaPerMinggu, m.holidays, t.cutiTahunanHari);
 
   // ---- 2. Volume desain (peak) ----
+  for (const { v } of volumeSalahRibuan(t.volumes)) flags.push({ level: 'kritis', kode: 'VOLUME_DESIMAL', pesan: `Volume ${v.arus} ${v.uom} tercatat ${String(v.peakBulan).replace('.', ',')} per bulan (desimal) — kemungkinan maksudnya ${Math.round(v.peakBulan * 1000).toLocaleString('id-ID')}. Tarif per unit jadi sangat besar. Perbaiki di tab Volume.` });
   const volume = t.volumes.map(v => {
     if (v.peakBulan < v.rataRataBulan) flags.push({ level: 'kritis', kode: 'PEAK_LT_AVG', pesan: `Peak ${v.arus} (${v.uom}) lebih kecil dari rata-rata.` });
     if (v.komitmenBulan > v.peakBulan) flags.push({ level: 'peringatan', kode: 'MGV_GT_PEAK', pesan: `Volume komitmen ${v.arus} melebihi peak.` });

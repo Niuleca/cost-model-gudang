@@ -9,13 +9,13 @@ import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, aktivitasAktif, bersihkanRoleTerhapus, type Asumsi, type TenderRow } from '@/lib/tender';
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko, type TarifTambahanInput } from '@/lib/engine/index.ts';
-import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
+import { Num, Pct, Txt, Sel, ubahArray, AngkaInput, AngkaVolume } from '@/components/fields';
 import { skemaVsmDefault, VSM_DEFAULT, tagDariDefault } from '@/lib/vsmDefault';
 import { alatRak, sesuaikanAlatRak, BATAS_ANGKAT_CBT_MM } from '@/lib/alatRak';
 import { RE_SECURITY, RE_CLEANING } from '@/lib/biayaLainDefault';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
-import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom } from '@/lib/engine/types';
+import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
@@ -549,6 +549,12 @@ export default function TenderPage() {
             Peak/bln atau Komitmen/bln masih 0 — sementara dihitung memakai <b>rata-rata/bln</b> (sizing, volume aktivitas, ringkasan order, tarif). Isi peak & komitmen sebenarnya bila berbeda.{' '}
             <button className="ghost" onClick={() => setA({ volumes: a.volumes.map(v => v.rataRataBulan > 0 ? { ...v, peakBulan: v.peakBulan > 0 ? v.peakBulan : v.rataRataBulan, komitmenBulan: v.komitmenBulan > 0 ? v.komitmenBulan : v.rataRataBulan } : v) })}>Isi yang kosong = rata-rata/bln</button>
             {' '}lalu sesuaikan bila peak / komitmen berbeda.</p>}
+          {(() => { const xs = volumeSalahRibuan(a.volumes); if (!xs.length) return null;
+            const kali = (x: number) => (x > 0 && x < 1000 && !Number.isInteger(x) ? Math.round(x * 1000) : x);
+            return <p className="notice small" role="alert" style={{ borderColor: 'var(--bad, #c0392b)' }}>
+              Volume {xs.map(({ v }) => `${v.arus} ${v.uom} ${String(v.peakBulan).replace('.', ',')}`).join(' · ')} tercatat <b>desimal</b> — kemungkinan maksudnya ribuan
+              ({xs.map(({ v }) => Math.round(v.peakBulan * 1000).toLocaleString('id-ID')).join(' · ')}). Inilah yang membuat tarif handling per unit sangat besar.{' '}
+              <button className="ghost" onClick={() => setA({ volumes: a.volumes.map((v, i) => xs.some(x => x.i === i) ? { ...v, rataRataBulan: kali(v.rataRataBulan), peakBulan: kali(v.peakBulan), komitmenBulan: kali(v.komitmenBulan) } : v) })}>Perbaiki jadi ribuan (× 1.000)</button></p>; })()}
           <div className="tablewrap"><table>
             <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln</th><th className="num">Faktor peak</th><th title="Berapa satuan baris ini dalam 1 palet (atau isi 1 palet untuk baris palet)">Isi per palet</th><th title="Isi kecil per kemasan: 1 case = … pcs / kg / liter">Isi per kemasan</th><th></th></tr></thead>
             <tbody>{a.volumes.map((v, i) => (
@@ -556,7 +562,7 @@ export default function TenderPage() {
                 <td><select aria-label="Arus" value={v.arus} style={{ minWidth: 130 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>
                 <td><PilihUom value={v.uom} onChange={u => setA({ volumes: ubahArray(a.volumes, i, gantiUom(v, u)) })} /></td>
                 {(['rataRataBulan', 'peakBulan', 'komitmenBulan'] as const).map(k => (
-                  <td key={k} className="num"><AngkaInput aria-label={k} step="any" min={0} value={v[k]}
+                  <td key={k} className="num"><AngkaVolume aria-label={k} value={v[k]}
                     style={k !== 'rataRataBulan' && !(v[k] > 0) && v.rataRataBulan > 0 ? { borderColor: 'var(--bad, #c0392b)' } : undefined}
                     onValue={n => setA({ volumes: ubahArray(a.volumes, i, k === 'rataRataBulan'
                       // peak & komitmen ikut rata-rata selama masih kosong / sama dengan rata-rata lama

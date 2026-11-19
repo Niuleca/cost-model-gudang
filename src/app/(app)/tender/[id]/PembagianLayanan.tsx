@@ -119,7 +119,10 @@ export default function CostAllocation({ h, alokasiKategori, onAlokasiKategori, 
   h: HasilTender | null; alokasiKategori: AlokasiKategori; onAlokasiKategori: (a: AlokasiKategori) => void; tenderId: string; onKeResult: () => void;
 }) {
   if (!h) return <div className="card"><p className="muted" style={{ margin: 0 }}>Menghitung…</p></div>;
+  const salah = h.redFlags.filter(f => f.kode === 'VOLUME_DESIMAL');
   return <div style={{ display: 'grid', gap: 16 }}>
+    {salah.length > 0 && <div className="notice small" role="alert" style={{ borderColor: 'var(--bad, #c0392b)' }}>
+      <b>Tarif tidak wajar karena volume:</b>{salah.map((f, i) => <div key={i}>{f.pesan}</div>)}</div>}
     <MatriksKategori h={h} nilai={alokasiKategori} onUbah={onAlokasiKategori} tenderId={tenderId} />
     <div className="row" style={{ justifyContent: 'flex-end' }}><button onClick={onKeResult}>Lihat Rate card & margin →</button></div>
   </div>;

@@ -65,3 +65,13 @@ test('Profil order: kontainer loose case tidak 0 walau isi case/palet kosong', a
   const out: VolumeInput = { arus: 'outbound', uom: 'karton', rataRataBulan: 1000, peakBulan: 1000, komitmenBulan: 1000, konversi: { uom1: 'case', per1: 0, uom2: 'pcs', per2: 12, paletIsi: 48 } };
   assert.equal(volumePalet(inb, 'peakBulan', PARAM_DEFAULT, [inb, out]).cpp, 48);
 });
+
+test('Volume salah ketik ribuan (10.673 tersimpan 10,673) terdeteksi', async () => {
+  const { volumeSalahRibuan } = await import('../src/lib/engine/types.ts');
+  const vs: VolumeInput[] = [
+    { arus: 'inbound', uom: 'karton', rataRataBulan: 3217, peakBulan: 3217, komitmenBulan: 3217 },
+    { arus: 'outbound', uom: 'karton', rataRataBulan: 10.673, peakBulan: 10.673, komitmenBulan: 10.673 },
+    { arus: 'storage', uom: 'palet', rataRataBulan: 1.5, peakBulan: 1.5, komitmenBulan: 1.5 },
+  ];
+  assert.deepEqual(volumeSalahRibuan(vs).map(x => x.i), [1]);
+});

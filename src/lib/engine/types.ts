@@ -392,3 +392,11 @@ export interface TarifTambahanInput {
   menit?: number; orang?: number; alat?: boolean; pengali?: number; material?: number;
   biaya?: number; gp?: number | null; volumeBulan?: number; catatan?: string;
 }
+
+/** Volume yang kemungkinan salah ketik pemisah ribuan: mis. 10.673 (maksudnya 10.673 karton = sepuluh ribu) tersimpan 10,673.
+ *  Ciri: bukan bilangan bulat, < 1.000, tepat 3 angka desimal, dan baris arus lain bernilai ≥ 100. */
+export function volumeSalahRibuan(volumes: VolumeInput[]) {
+  const besar = volumes.some(v => (Number(v.peakBulan) || 0) >= 100 || (Number(v.rataRataBulan) || 0) >= 100);
+  const curiga = (x: number) => x > 0 && x < 1000 && Math.abs(Math.round(x * 1000) - x * 1000) < 1e-6 && Math.round(x * 1000) % 10 !== 0;   // tepat 3 angka desimal
+  return besar ? volumes.map((v, i) => ({ v, i })).filter(({ v }) => (['rataRataBulan', 'peakBulan', 'komitmenBulan'] as const).some(k => curiga(Number(v[k]) || 0))) : [];
+}

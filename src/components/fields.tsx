@@ -14,6 +14,32 @@ export function AngkaInput({ value, onValue, bulat, ...rest }: Omit<InputHTMLAtt
     onBlur={e => { if (e.target.value === '') { setTeks('0'); onValue(0); } rest.onBlur?.(e); }} />;
 }
 
+/** Baca angka gaya Indonesia: titik = pemisah ribuan ("10.673" → 10673, "1.250.000" → 1250000), koma = desimal ("2,5" → 2.5).
+ *  Satu titik yang tidak diikuti tepat 3 angka tetap dibaca desimal ("1.5" → 1.5). */
+export function bacaAngkaId(x: string): number | null {
+  const t = x.trim().replace(/\s/g, '');
+  if (!t) return null;
+  let n: number;
+  if (/^-?[1-9]\d{0,2}(\.\d{3})+(,\d+)?$/.test(t)) n = Number(t.replace(/\./g, '').replace(',', '.'));
+  else if (/^-?\d+(,\d+)?$/.test(t)) n = Number(t.replace(',', '.'));
+  else n = Number(t.replace(/,/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Input volume: tampil dengan pemisah ribuan (10.673), mengetik "10.673" dibaca sepuluh ribu enam ratus tujuh puluh tiga. */
+export function AngkaVolume({ value, onValue, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
+  value: number | undefined; onValue: (v: number) => void;
+}) {
+  const fmt = (v: number | undefined) => (v == null || Number.isNaN(v) ? '' : v.toLocaleString('id-ID', { maximumFractionDigits: 3 }));
+  const [teks, setTeks] = useState(fmt(value));
+  const [fokus, setFokus] = useState(false);
+  useEffect(() => { if (!fokus) setTeks(fmt(value)); }, [value, fokus]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <input {...rest} type="text" inputMode="decimal" value={teks}
+    onFocus={e => { setFokus(true); rest.onFocus?.(e); }}
+    onChange={e => { const x = e.target.value; setTeks(x); const n = bacaAngkaId(x); if (n != null && n >= 0) onValue(n); }}
+    onBlur={e => { setFokus(false); const n = bacaAngkaId(e.target.value); if (n == null) onValue(0); setTeks(fmt(n ?? 0)); rest.onBlur?.(e); }} />;
+}
+
 /** Input angka bebas diketik: batas min/max baru diterapkan saat Enter / keluar kolom (bukan per ketikan),
  *  jadi mengetik "30" tidak berubah jadi "10" atau "400" di tengah jalan. Nilai dalam batas langsung dipakai (pratinjau). */
 export function AngkaBebas({ value, onValue, min, max, bulat, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'min' | 'max'> & {
