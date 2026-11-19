@@ -305,7 +305,7 @@ export function tulisHasil(x: Ctx) {
   for (const [i, [l, key]] of ([['Volume komitmen', 'Km'], ['Volume rata-rata', 'Rt'], ['Volume peak', 'Pk']] as const).entries()) {
     const r = HS.r;
     const pend = rcList.map(rc => { const z = rcRef[rc.bucket]; return `${z.tarif}*IF(${z.tetap}=1,${z.vol},${key}_${ARUS_B[rc.bucket]}*${z.rasio})`; }).join('+') || '0';
-    const sim = h.simulasi[i];
+    const sim = h.simulasi.find(x => x.skenario === l) ?? h.simulasi[i];
     HS.put(1, l, { j: 'txt', b: true });
     HS.put(2, { f: `(${pend})*(1-PPh)`, v: sim?.pendapatanBulan }, { j: 'out', fmt: 'rp' });
     HS.put(3, { f: 'TotalBiaya', v: h.totalBiayaBulan }, { j: 'out', fmt: 'rp' });

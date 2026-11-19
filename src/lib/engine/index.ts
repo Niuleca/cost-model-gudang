@@ -557,15 +557,16 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
 
   // ---- 12. Ringkasan & simulasi ----
   const totalBiaya = baris.reduce((sum, b) => sum + b.biayaBulan, 0);
-  const pendapatan = (skenario: 'komitmenBulan' | 'rataRataBulan' | 'peakBulan') => rateCard.reduce((sum, rc) => {
+  const pendapatan = (skenario: 'komitmenBulan' | 'rataRataBulan' | 'peakBulan' | 'minBulan') => rateCard.reduce((sum, rc) => {
     const v = volArus(bucketKeArus[rc.bucket]);
     // Volume dalam UoM tarif: proporsional terhadap volume arus (palet→case/pcs/CBM/ton), kecuali basis tetap (m², stok rata-rata)
-    const vol = rc.volumeTetap ? rc.volumeTarif : (v ? v[skenario] : 0) * rc.rasioUom;
+    const q = !v ? 0 : skenario === 'minBulan' ? volumeDasarTarif(v, { pakaiMgv: false, basis: 'min' }).nilai : v[skenario];
+    const vol = rc.volumeTetap ? rc.volumeTarif : q * rc.rasioUom;
     return sum + rc.tarifPerUnit * vol;
   }, 0);
-  const simulasi = (['komitmenBulan', 'rataRataBulan', 'peakBulan'] as const).map(sk => {
+  const simulasi = (['komitmenBulan', 'minBulan', 'rataRataBulan', 'peakBulan'] as const).map(sk => {
     const rev = pendapatan(sk) * (1 - pphRate);          // pendapatan bersih setelah PPh 23 dipotong customer (PPN bukan pendapatan)
-    return { skenario: sk === 'komitmenBulan' ? 'Volume komitmen' : sk === 'rataRataBulan' ? 'Volume rata-rata' : 'Volume peak',
+    return { skenario: sk === 'komitmenBulan' ? 'Volume komitmen' : sk === 'minBulan' ? 'Volume min' : sk === 'rataRataBulan' ? 'Volume rata-rata' : 'Volume peak',
       pendapatanBulan: bulat(rev), invoiceInclPpn: bulat(pendapatan(sk) * (1 + ppn)), ppnBulan: bulat(pendapatan(sk) * ppn), biayaBulan: bulat(totalBiaya), gp: bulat(rev - totalBiaya), gpPersen: rev > 0 ? bulat((rev - totalBiaya) / rev, 4) : 0 };
   });
   const gpKomitmen = simulasi[0].gpPersen;

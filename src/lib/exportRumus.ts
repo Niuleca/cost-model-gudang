@@ -570,7 +570,7 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
       const v = vol[rc.bucket === 'storage' ? 'storage' : rc.bucket === 'handling_in' ? 'inbound' : rc.bucket === 'handling_out' ? 'outbound' : 'vas'];
       return rc.volumeTetap || !v ? `L${rr}*K${rr}` : `L${rr}*${v[key]}*J${rr}`;
     }).join('+') || '0';
-    const sim = h.simulasi[i];
+    const sim = h.simulasi.find(x => x.skenario === l) ?? h.simulasi[i];
     S9.baris(ks, [l, { f: `(${suku})*(1-PPh)`, v: sim?.pendapatanBulan }, { f: `(${suku})*(1+PPN)`, v: sim?.invoiceInclPpn }, { f: 'TotalBiaya', v: h.totalBiayaBulan },
       { f: `B${r}-D${r}`, v: sim?.gp }, { f: `IF(B${r}>0,E${r}/B${r},0)`, v: sim?.gpPersen }]);
   });

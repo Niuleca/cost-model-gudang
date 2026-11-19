@@ -161,7 +161,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       <div className="tablewrap"><table>
         <thead><tr><th>Skenario</th><th className="num">Pendapatan/bln</th><th className="num">Biaya/bln</th><th className="num">GP/bln</th><th className="num">GP%</th><th className="num">PPN/bln</th><th className="num">Invoice incl. PPN/bln</th>
           <th className="num">Pendapatan/thn</th><th className="num">Biaya/thn</th><th className="num">GP/thn</th><th className="num">GP selama kontrak ({kontrakBulan} bln)</th></tr></thead>
-        <tbody>{h.simulasi.map(s => <tr key={s.skenario}><td>{s.skenario}</td><td className="num">{rp(s.pendapatanBulan)}</td><td className="num">{rp(s.biayaBulan)}</td>
+        <tbody>{h.simulasi.map(s => <tr key={s.skenario}><td>{s.skenario === 'Volume komitmen' ? 'Volume komitmen (MGV)' : s.skenario === 'Volume min' ? 'Volume min (terendah)' : s.skenario === 'Volume rata-rata' ? 'Volume mid (rata-rata)' : s.skenario === 'Volume peak' ? 'Volume max (peak)' : s.skenario}</td><td className="num">{rp(s.pendapatanBulan)}</td><td className="num">{rp(s.biayaBulan)}</td>
           <td className="num">{rp(s.gp)}</td><td className="num"><b>{persen(s.gpPersen)}</b></td><td className="num">{rp(s.ppnBulan ?? 0)}</td><td className="num">{rp(s.invoiceInclPpn ?? 0)}</td>
           <td className="num">{rp(s.pendapatanBulan * 12)}</td><td className="num">{rp(s.biayaBulan * 12)}</td><td className="num">{rp(s.gp * 12)}</td><td className="num">{rp(s.gp * kontrakBulan)}</td></tr>)}</tbody>
       </table></div>
