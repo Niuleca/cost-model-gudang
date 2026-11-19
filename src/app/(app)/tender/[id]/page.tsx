@@ -11,6 +11,7 @@ import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInp
 import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, type KategoriRisiko, type TarifTambahanInput } from '@/lib/engine/index.ts';
 import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
 import { skemaVsmDefault, VSM_DEFAULT, tagDariDefault } from '@/lib/vsmDefault';
+import { alatRak, sesuaikanAlatRak, BATAS_ANGKAT_CBT_MM } from '@/lib/alatRak';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom } from '@/lib/engine/types';
@@ -331,6 +332,12 @@ export default function TenderPage() {
   // Hak edit mengikuti aturan berbagi di database (pembuat, dibagikan dengan hak Edit, Super Admin, approver quotation).
   const bisaEdit = !!t && !!profile && (hakEdit ?? (!!profile.is_master || t.created_by === profile.id));
   const bolehKelolaAkses = !!t && !!profile && (!!profile.is_master || t.created_by === profile.id);
+  // Alat aktivitas rak (putaway / replenishment / picking palet) mengikuti Warehouse Planning: CBT ⇄ RT (kecuali diubah manual di VSM)
+  useEffect(() => {
+    if (!t || !bisaEdit) return;
+    const baru = sesuaikanAlatRak(t.asumsi.aktivitas, t.asumsi.space?.excel, t.asumsi.batasAngkatCbtMm);
+    if (baru) { setT(x => x && ({ ...x, asumsi: { ...x.asumsi, aktivitas: baru } })); setKotor(true); }
+  }, [t?.asumsi.aktivitas, t?.asumsi.space, t?.asumsi.batasAngkatCbtMm, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
   const spaceH = useMemo(() => {
@@ -760,7 +767,8 @@ export default function TenderPage() {
                     {Array.from(new Set(prods.map(p => p.tahap))).map(th => (
                       <optgroup key={th} label={th}>{prods.filter(p => p.tahap === th).map(p => <option key={p.id} value={p.id}>{p.aktivitas} · {p.tool} · {p.prod_per_jam} {p.uom}/jam</option>)}</optgroup>))}
                   </select></td>
-                  <td><input aria-label="Equipment" list="dl-tool" value={x.tool} onChange={e => ub({ tool: e.target.value })} style={{ minWidth: 130 }} /></td>
+                  <td><input aria-label="Equipment" list="dl-tool" value={x.tool} onChange={e => ub({ tool: e.target.value, alatManual: true })} style={{ minWidth: 130 }} />
+                    {x.alatManual && x.porsiMuat?.muat === 'palet' && <div className="small muted">manual · <button type="button" className="linkbtn" onClick={() => ub({ alatManual: undefined })} title="Ikut otomatis lagi (CBT / RT dari tinggi rak)">otomatis</button></div>}</td>
                   <td><input aria-label="Alat pendukung" list="dl-tool" placeholder="mis. Scanner RDT" value={(x.alatTambahan ?? []).join(', ')}
                     onChange={e => ub({ alatTambahan: e.target.value.split(',').map(t => t.trimStart()) })} onBlur={e => ub({ alatTambahan: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })} style={{ minWidth: 130 }} /></td>
                   <td><select aria-label="Role" value={x.roleName} onChange={e => ub({ roleName: e.target.value })} style={{ minWidth: 160 }}>
@@ -816,6 +824,8 @@ export default function TenderPage() {
         <ProcessDesignPanel bagian="mhe" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
           jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />
         <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })} kontrakBulan={t.durasi_kontrak_bulan}
+          alatRak={{ ...alatRak(a.space.excel, a.batasAngkatCbtMm ?? BATAS_ANGKAT_CBT_MM), batasMm: a.batasAngkatCbtMm ?? BATAS_ANGKAT_CBT_MM, onBatas: mm => setA({ batasAngkatCbtMm: mm }),
+            manual: a.aktivitas.filter(x => x.alatManual && x.porsiMuat?.muat === 'palet').length }}
           kebutuhan={true
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
             : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />

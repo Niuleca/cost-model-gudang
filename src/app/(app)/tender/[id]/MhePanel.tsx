@@ -7,8 +7,10 @@ interface Item { id: number; kategori: string; item: string; harga_beli: number 
 type Mhe = MheInput & { priceItemId?: number };
 
 /** Kebutuhan MHE = equipment dari Value Stream Mapping (MHE Summary). User cukup memilih item harga per alat. */
-export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange, kontrakBulan }: {
+export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange, kontrakBulan, alatRak }: {
   kontrakBulan: number;
+  /** Pilihan otomatis CBT / RT untuk aktivitas rak + pengaturan tinggi angkat CBT */
+  alatRak?: { tool: 'CBT' | 'RT'; alasan: string; batasMm: number; onBatas: (mm: number) => void; manual: number };
   kebutuhan: { nama: string; fte: number | null; unit: number | null }[];   // dari process design / hasil hitung
   mhe: Mhe[]; items: Item[]; metodeExcel: boolean; onChange: (m: Mhe[]) => void;
 }) {
@@ -29,6 +31,13 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange,
       <h2>Kebutuhan MHE</h2>
       <p className="small muted">Daftar alat diambil otomatis dari Value Stream Mapping (kolom Equipment dan Alat pendukung).
         {metodeExcel ? ' Unit = ROUNDUP(FTE alat) + spare, sama dengan MHE Summary.' : ' Unit dihitung saat tombol Hitung (metode per shift).'} Pilih item harga supaya biayanya masuk cost model; alat tanpa item harga tidak dihitung biayanya.</p>
+      {alatRak && <div className="notice small" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+        <span>Alat rak (putaway, replenishment, picking palet) otomatis: <b>{alatRak.tool === 'RT' ? 'Reach Truck (RT)' : 'Forklift counterbalance (CBT)'}</b> — {alatRak.alasan}.
+          {alatRak.manual > 0 && <> {alatRak.manual} aktivitas diubah manual di Value Stream Mapping (tidak ikut otomatis).</>}</span>
+        <label className="row" style={{ gap: 6, margin: 0, flexWrap: 'nowrap' }}>Tinggi angkat maks CBT
+          <input type="number" step="any" min={1} aria-label="Tinggi angkat maksimal CBT (m)" value={alatRak.batasMm / 1000}
+            onChange={e => { const v = Number(e.target.value); if (v > 0) alatRak.onBatas(Math.round(v * 1000)); }} style={{ width: 70, minWidth: 70, textAlign: 'right' }} /> m</label>
+      </div>}
       <div className="tablewrap"><table>
         <thead><tr><th>Equipment (dari aktivitas)</th><th className="num">FTE</th><th className="num">Unit kebutuhan</th><th>Item harga</th><th>Mode</th>
           <th className="num">Harga</th><th className="num">Umur (bln)</th>{!metodeExcel && <th className="num">Ketersediaan %</th>}<th className="num">Spare %</th>

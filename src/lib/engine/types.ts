@@ -163,6 +163,7 @@ export interface AktivitasInput {
   pengaliUom: number;       // konversi uom arus -> uom aktivitas
   alatTambahan?: string[];  // alat pendukung (mis. Scanner RDT) — dihitung FTE-nya di process design
   volumeManual?: number | null; // override volume per bulan (sebelum %); kosong = peak arus × pengali
+  alatManual?: boolean;     // equipment diubah sendiri di VSM → tidak diganti otomatis (CBT ⇄ RT dari tinggi rak)
   nonaktif?: boolean;       // dimatikan di VSM Map (tidak dihitung biaya / manpower / MHE)
   porsiMuat?: { proses: 'unloading' | 'putaway' | 'replenishment' | 'picking' | 'loading'; muat: 'palet' | 'loose' | 'semua' }; // % volume ikut porsi palletize/loose
 }
