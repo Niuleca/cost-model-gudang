@@ -104,8 +104,10 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
 }
 
 export interface StartupAuto { aktif: boolean; persenOpex: number; persenManpower: number }
-export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, onHitung, driver, defaultDiisi, onNilaiStok, fasilitas }: {
-  lines: Baris[]; items: Item[]; kontrakBulan: number; onChange: (l: Baris[], tandaiDefault?: boolean) => void;
+export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, onHitung, driver, defaultDiisi, onNilaiStok, fasilitas, dibuang = [] }: {
+  /** kunci baris rekomendasi yang sengaja dihapus user — tidak ditambahkan otomatis lagi */
+  dibuang?: string[];
+  lines: Baris[]; items: Item[]; kontrakBulan: number; onChange: (l: Baris[], tandaiDefault?: boolean, dibuang?: string[]) => void;
   startup: StartupAuto; onStartup: (s: StartupAuto) => void;
   hasilBaris?: { deskripsi: string; biayaBulan: number; dasar: string }[]; onHitung: () => Promise<void> | void;
   driver: DriverBiaya; defaultDiisi: boolean; onNilaiStok: (v: number) => void; fasilitas: { nama: string; m2: number }[];
@@ -133,10 +135,12 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
   const siap = items.length > 0 && (driver.headcount > 0 || driver.luasM2 > 0);
   useEffect(() => {
     if (!siap || !def.length) return;
-    if (!lines.length && !defaultDiisi) { onChange(def, true); return; }
+    if (!lines.length && !defaultDiisi) { onChange(def.filter(d => !d.kunci || !dibuang.includes(d.kunci)), true); return; }
+    // otomatis penuh: baris rekomendasi ikut data tender + rekomendasi baru langsung masuk (kecuali yang pernah dihapus user)
     const baru = sinkronBiaya(lines, def);
-    if (baru) onChange(baru);
-  }, [def, siap, lines]); // eslint-disable-line react-hooks/exhaustive-deps
+    const tambah = kurangDefault(baru ?? lines, def).filter(d => d.kunci && !dibuang.includes(d.kunci));
+    if (baru || tambah.length) onChange([...(baru ?? lines), ...tambah]);
+  }, [def, siap, lines, dibuang.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
   const kurangSemua = kurangDefault(lines, def);
   const merahSemua = lines.filter(b => b.belumDiketahui).length;
   const ikut = lines.filter(b => b.kunci && b.qtyDefault != null && b.qty === b.qtyDefault).length;
@@ -158,7 +162,7 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
         {dv('Aset gedung', d.skenarioAset, !d.skenarioAset)}
       </div>
       <div className="row">
-        {kurangSemua.length > 0 && <button className="ghost" disabled={!items.length} onClick={() => onChange(tambahDefault(lines, def), true)}>Tambahkan {kurangSemua.length} item rekomendasi yang belum ada</button>}
+        {kurangSemua.length > 0 && <button className="ghost" disabled={!items.length} onClick={() => onChange(tambahDefault(lines, def), true, [])}>Tambahkan {kurangSemua.length} item rekomendasi yang belum ada</button>}
         {ikut > 0 && <span className="pill info">{ikut} baris ikut data tender otomatis</span>}
         {merahSemua > 0 && <span className="pill bad">{merahSemua} baris datanya belum ada</span>}
       </div>
@@ -215,9 +219,9 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
       </table></div>
       {perSeksi.map(({ s, rows }) => (
         <KartuSeksi key={s.id} s={s} rows={rows} items={items} kontrak={kontrakBulan} fasilitas={fasilitas}
-          kurang={kurangDefault(lines, def, s.id).length} onTambahDefault={() => onChange(tambahDefault(lines, def, s.id), true)}
+          kurang={kurangDefault(lines, def, s.id).length} onTambahDefault={() => onChange(tambahDefault(lines, def, s.id), true, dibuang.filter(k => !def.some(d => d.seksi === s.id && d.kunci === k)))}
           extra={s.id === 'startup' ? extraStartup : s.id === 'asuransi' ? extraAsuransi : undefined} otomatis={s.id === 'startup' ? otoStartup : undefined}
-          onUbah={ubah} onUbahBanyak={ubahBanyak} onHapus={i => onChange(lines.filter((_, j) => j !== i))}
+          onUbah={ubah} onUbahBanyak={ubahBanyak} onHapus={i => { const k = lines[i]?.kunci; onChange(lines.filter((_, j) => j !== i), undefined, k && !dibuang.includes(k) ? [...dibuang, k] : undefined); }}
           onTambah={() => onChange([...lines, { deskripsi: '', kelompok: s.kelompok, mode: s.mode, qty: 1, hargaSatuan: 0, seksi: s.id, ...(s.mode === 'beli' ? { umurBulan: 60 } : {}) }])} />
       ))}
     </div>);

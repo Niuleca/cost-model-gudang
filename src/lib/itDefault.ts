@@ -35,12 +35,14 @@ export function aturanIt(d: DriverIt, katalog: KatalogIt[] = []): { kunci: strin
   const shift = Math.max(1, d.shift || 1);
   const officeM2 = Math.max(0, d.officeM2 || 0);
   const gudangM2 = Math.max(0, d.luasM2 - officeM2);
-  const pc = Math.max(1, d.unitPc || ceil(d.userKantor * 0.6));
+  // PC dipakai bergantian antar shift: admin/staf per shift + 10% (historis Mondelez: 16 staf, 3 shift → 6 PC)
+  const stafKantor = Math.max(0, d.userKantor - d.manajer);
+  const pc = Math.max(1, d.unitPc || ceil((stafKantor / shift) * 1.1));
   const laptop = Math.max(1, d.unitLaptop || d.manajer);
   const user = Math.max(1, pc + laptop);
   const rfEst = d.operatorScan ? ceil((d.operatorScan / shift) * 1.1) : 0;
   const rf = Math.max(1, d.unitRf || rfEst);
-  const kamera = Math.max(8, ceil(d.luasM2 / 200));
+  const kamera = Math.max(8, ceil(d.luasM2 / 400));   // historis: 14.820 m² → 26–33 kamera (±1 per 450–570 m²)
   const ap = d.luasM2 > 0 ? Math.max(2, ceil(gudangM2 / 600)) + (officeM2 > 0 ? Math.max(1, ceil(officeM2 / 150)) : 1) : 0;
   const printerAio = Math.max(1, ceil(d.luasM2 / 5000)), printerBc = Math.max(1, ceil(d.luasM2 / 5000));
   const trx = d.orderBulan && d.orderBulan > 0 ? d.orderBulan : d.transaksiBulan;
@@ -54,7 +56,7 @@ export function aturanIt(d: DriverIt, katalog: KatalogIt[] = []): { kunci: strin
     { kunci: 'email', cari: /^Email$/i, qty: user, ket: 'per user (PC + laptop)' },
     { kunci: 'powerbi', cari: /^Power BI$/i, qty: Math.max(1, d.manajer), ket: 'per SPV / manager' },
     { kunci: 'hht', cari: /Scanner HHT/i, qty: rf, ket: d.unitRf ? 'unit RF di MHE Summary' : rfEst ? `${d.operatorScan} operator scan (checker/picker/receiving/inventory) ÷ ${shift} shift + 10% cadangan` : 'min. 1 (belum ada operator scan / RF di aktivitas)' },
-    { kunci: 'pc', cari: /^PC Desktop$/i, qty: pc, ket: d.unitPc ? 'unit PC di MHE Summary' : `≈ 60% user kantor (${d.userKantor})` },
+    { kunci: 'pc', cari: /^PC Desktop$/i, qty: pc, ket: d.unitPc ? 'unit PC di MHE Summary' : `staf kantor ${stafKantor} ÷ ${shift} shift + 10% (PC dipakai bergantian antar shift)` },
     { kunci: 'laptop', cari: /Laptop Operasional/i, qty: laptop, ket: d.unitLaptop ? 'unit laptop di MHE Summary' : 'per SPV / manager' },
     { kunci: 'dotmatrix', cari: /Printer Dot Matrix/i, qty: 1, ket: '1 per site (surat jalan)' },
     { kunci: 'aio', cari: /Printer All-in-One/i, qty: printerAio, ket: '1 per 5.000 m² (min. 1)' },
@@ -64,7 +66,7 @@ export function aturanIt(d: DriverIt, katalog: KatalogIt[] = []): { kunci: strin
     { kunci: 'ap', cari: /Access Point/i, qty: ap, ket: d.luasM2 > 0 ? `gudang ${rb(gudangM2)} m² ÷ 600 m² (cakupan RF di antara rak, min. 2) + office ${officeM2 ? `${rb(officeM2)} m² ÷ 150 m²` : '1 unit'}` : 'luas gudang belum ada (Warehouse Planning)' },
     { kunci: 'switch', cari: /Switch PoE/i, qty: ap ? Math.max(1, ceil((ap + kamera) / 20)) : 0, ket: `port PoE untuk ${ap} access point + ${kamera} kamera, 20 port terpakai per switch` },
     { kunci: 'lan', cari: /kabel LAN per titik/i, qty: ap ? ap + pc + printerAio + printerBc + 1 : 0, ket: 'titik access point + PC + printer + TV' },
-    { kunci: 'cctv', cari: /Kamera CCTV/i, qty: kamera, ket: `1 per 200 m² (min. 8) · luas ${rb(d.luasM2)} m²` },
+    { kunci: 'cctv', cari: /Kamera CCTV/i, qty: kamera, ket: `1 per 400 m² (min. 8) · luas ${rb(d.luasM2)} m² — cakupan dock, lorong utama, office & perimeter` },
     { kunci: 'nvr', cari: /^NVR$/i, qty: Math.max(1, ceil(kamera / 32)), ket: '1 per 32 kamera' },
     { kunci: 'tvcctv', cari: /TV Monitor CCTV/i, qty: 1, ket: '1 per site' },
     { kunci: 'kvm', cari: /^KVM$/i, qty: 1, ket: '1 per site' },

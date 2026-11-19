@@ -34,6 +34,7 @@ export interface Asumsi {
   air?: AirInput;                    // Utilities Management → Water
   nilaiStokRp?: number;              // nilai stok rata-rata (dasar premi asuransi)
   biayaDefaultDiisi?: boolean;       // daftar default biaya lain sudah pernah diisi otomatis
+  biayaDefaultDibuang?: string[];    // kunci rekomendasi yang dihapus user (tidak ditambahkan otomatis lagi)
   porsiMuat?: Partial<PorsiMuat>;   // porsi palletize vs loose per proses
   cutiTahunanHari: number;
   faktorProduktivitas: number;

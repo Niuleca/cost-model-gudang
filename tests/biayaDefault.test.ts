@@ -22,13 +22,14 @@ test('default biaya lain: qty dari manpower, luas, volume & kategori', () => {
   assert.equal(cari(rows, 'office.meja-staf').qty, 4);                 // 6 user kantor − 2 SPV
   assert.equal(cari(rows, 'office.kursi').qty, 10);                    // 6 + 4 kursi meeting
   assert.equal(cari(rows, 'atk.hvs').priceItemId, 4);                  // kemasan termurah (per rim)
-  assert.equal(cari(rows, 'atk.hvs').qty, 9);                          // 6 user + 3.000 order ÷ 1.000
+  assert.equal(cari(rows, 'atk.hvs').qty, 12);                         // 6 user + 3.000 order ÷ 500
   assert.equal(cari(rows, 'cons.stretch').qty, 140);                   // 2.800 palet keluar ÷ 20
-  assert.equal(cari(rows, 'palet').priceItemId, 9);                    // FMCG → palet plastik
+  assert.equal(cari(rows, 'palet').priceItemId, 8);                    // FMCG → palet kayu sewa (praktik historis)
+  assert.equal(cari(rows, 'palet').mode, 'sewa');
   assert.equal(cari(rows, 'palet').qty, 4200);
-  assert.equal(cari(rows, 'hse.apar').qty, 50);                        // 10.000 m² ÷ 200
-  assert.equal(cari(rows, 'svc.satpam').qty, 4);                       // 1 pos (luas tidak > 10.000) × 4
-  assert.equal(cari(rows, 'svc.satpam').hargaSatuan, Math.round(5938885 * 1.38 / 1000) * 1000);
+  assert.equal(cari(rows, 'hse.apar').qty, 40);                        // 10.000 m² ÷ 250
+  assert.equal(cari(rows, 'svc.satpam').qty, 3);                       // 1 pos (luas tidak > 10.000) × 3 (shift 12 jam)
+  assert.equal(cari(rows, 'svc.satpam').hargaSatuan, Math.round(5938885 * 1.43 / 1000) * 1000);
   const asr = cari(rows, 'asuransi.stok');
   assert.equal(asr.belumDiketahui, true); assert.equal(asr.qty, 0);    // nilai stok belum diisi → merah
   assert.equal(rows.some(r => r.kunci === 'hse.spill'), false);        // spill kit hanya DG / kimia
@@ -46,10 +47,10 @@ test('baris default ikut data tender selama qty belum diubah manual', () => {
   const edit = awal.map(r => (r.kunci === 'office.kursi' ? { ...r, qty: 15 } : r));
   const baru = sinkronBiaya(edit, biayaLainDefault({ ...d, luasM2: 12000, umk: 6000000 }, items))!;
   assert.ok(baru);
-  assert.equal(cari(baru, 'hse.apar').qty, 60);
+  assert.equal(cari(baru, 'hse.apar').qty, 48);
   assert.equal(cari(baru, 'office.kursi').qty, 15);                     // manual tetap
-  assert.equal(cari(baru, 'svc.satpam').qty, 8);                        // > 10.000 m² → pos patroli
-  assert.equal(cari(baru, 'svc.satpam').hargaSatuan, Math.round(6000000 * 1.38 / 1000) * 1000);
+  assert.equal(cari(baru, 'svc.satpam').qty, 6);                        // > 10.000 m² → pos patroli
+  assert.equal(cari(baru, 'svc.satpam').hargaSatuan, Math.round(6000000 * 1.43 / 1000) * 1000);
   assert.equal(sinkronBiaya(baru, biayaLainDefault({ ...d, luasM2: 12000, umk: 6000000 }, items)), null);
 });
 

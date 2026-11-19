@@ -45,7 +45,8 @@ export const UMUR_IT_DEFAULT = 36;
 export const perlakuanDefault = (kelompok: string): PerlakuanSekali => KELOMPOK_ASET.includes(kelompok) ? 'depresiasi' : 'amortisasi';
 export const perlakuanDari = (l: ItLine): PerlakuanSekali => l.perlakuanSekali ?? perlakuanDefault(l.kelompok);
 
-export interface ItSheet { kursUsd: number; nomorBap?: string; lines: ItLine[]; templateDiisi?: boolean }
+export interface ItSheet { kursUsd: number; nomorBap?: string; lines: ItLine[]; templateDiisi?: boolean;
+  /** kunci item template yang dihapus user — tidak ditambahkan otomatis lagi */ defaultDibuang?: string[] }
 export const IT_SHEET_DEFAULT: ItSheet = { kursUsd: 16000, lines: [] };
 
 export interface RingkasIt {

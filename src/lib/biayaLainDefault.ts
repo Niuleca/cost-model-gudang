@@ -33,8 +33,8 @@ export type BarisBiaya = CostLineInput & {
   hargaDefault?: number;   // harga hasil default terakhir; hargaSatuan = hargaDefault → ikut perubahan harga / UMK
 };
 
-/** Faktor biaya jasa outsourcing per orang terhadap UMK: BPJS ±14,2% + THR 8,3% + seragam & perlengkapan ±3%, × fee vendor 10%. */
-export const FAKTOR_OUTSOURCING = 1.38;
+/** Faktor biaya jasa outsourcing per orang terhadap UMK: BPJS, THR, pesangon, seragam & perlengkapan, training, fee vendor. */
+export const FAKTOR_OUTSOURCING = 1.43;   // historis RB Medan 2025: UMK Rp4,21 jt → Rp6,03 jt/orang (BPJS, THR, pesangon, kaporlap, training, fee 5%)
 const ceil = (v: number) => Math.ceil(Math.max(0, v) - 1e-9);
 const rb = (v: number) => Math.round(v).toLocaleString('id-ID');
 
@@ -75,7 +75,7 @@ export function aturanBiaya(d: DriverBiaya): Aturan[] {
   of('rak-dok', /^Rak Buku/i, 1, '1 per office', noUk);
   of('whiteboard', /^Whiteboard/i, uk > 8 ? 2 : 1, 'office + ruang meeting', noUk);
   of('ac', /^AC Split/i, ceil(officeM2 / 15), d.officeM2 > 0 ? `1 PK per 15 m² office (${rb(d.officeM2)} m²)` : `perkiraan office ${uk} orang × 6 m² — isi fasilitas Office di Warehouse Planning`, noUk && !(d.officeM2 > 0));
-  of('dispenser', /^Dispenser/i, Math.max(1, ceil(hc / 40)), 'pantry & area istirahat, 1 per 40 orang', noMp);
+  of('dispenser', /^Dispenser/i, Math.max(1, ceil(hc / 20)), 'pantry & area istirahat, 1 per 20 orang (historis 80 orang → 5)', noMp);
   of('telepon', /^Telepon Kantor/i, Math.max(1, ceil(uk / 4)), '1 per 4 user kantor (min. 1)', noUk);
   of('jam', /^Jam Dinding/i, 2, 'office + area gudang');
   of('kalkulator', /^Kalkulator Meja/i, uk, 'per user kantor', noUk);
@@ -88,7 +88,7 @@ export function aturanBiaya(d: DriverBiaya): Aturan[] {
   const u = Math.max(1, uk);
   const atk = (kunci: string, cari: RegExp, qty: number, dasar: string, belum = noMp, pilih: 'min' | 'max' = 'min') =>
     A.push({ kunci: `atk.${kunci}`, seksi: 'atk', kelompok: 'Consumable', mode: 'bulanan', kategori: ['ATK'], cari, pilih, qty, dasar, belum });
-  atk('hvs', /^Kertas HVS A4$/i, ceil(u + orderTot / 1000), `rim/bln: 1 per user kantor (${u})${orderTot ? ` + 1 per 1.000 order (${rb(orderTot)}/bln)` : ''}`);
+  atk('hvs', /^Kertas HVS A4$/i, ceil(u + orderTot / 500), `rim/bln: 1 per user kantor (${u})${orderTot ? ` + 1 per 500 order (picking list / dokumen 1 lembar per order, ${rb(orderTot)}/bln)` : ''}`);
   atk('pulpen', /^Pulpen$/i, 2 * u + ceil(ops / 2), `2 per user kantor + 1 per 2 operator (checker / picker)`);
   atk('spidol-perm', /^Spidol Permanent$/i, 2 + ceil(ops / 5), 'marking karton / palet: 1 per 5 operator + 2');
   atk('spidol-wb', /^Spidol Whiteboard$/i, 2, 'whiteboard office & briefing', noMp, 'max');
@@ -113,19 +113,20 @@ export function aturanBiaya(d: DriverBiaya): Aturan[] {
   if (KAT_FRAGILE.includes(kat)) cs('fragile', /^Lakban Fragile$/i, Math.max(2, ceil((d.orderOutBulan || d.paletOutBulan) / 50)), `kategori ${kat}: barang mudah pecah`, d.orderOutBulan <= 0 && noOut);
   const label = d.paletInBulan + (d.orderOutBulan || d.paletOutBulan);
   cs('label', /^Direct Thermal Label$/i, ceil(label / 500), label > 0 ? `label palet inbound (${rb(d.paletInBulan)}) + label kiriman outbound (${rb(d.orderOutBulan || d.paletOutBulan)}) ÷ ±500 label per roll` : 'Volume inbound / outbound belum ada (tab Volume)', !(label > 0));
-  cs('galon', /air minum galon/i, ceil((hc * 1.5 * d.hariKerjaBulan) / 19), `${hc} orang × 1,5 L × ${d.hariKerjaBulan} hari ÷ 19 L`, noMp, ['Konsumsi']);
+  cs('galon', /air minum galon/i, ceil((hc * 2 * d.hariKerjaBulan) / 19), `${hc} orang × 2 L × ${d.hariKerjaBulan} hari ÷ 19 L (historis ±3 galon/orang/bln)`, noMp, ['Konsumsi']);
 
   // ---------- Pallet ----------
-  const plastik = KAT_HIGIENIS.includes(kat) || kat === 'Chemicals (non-DG)' || kat === 'Dangerous Goods (DG)';
-  A.push({ kunci: 'palet', seksi: 'palet', kelompok: 'Consumable', mode: 'beli', kategori: ['Palet'], cari: plastik ? /^Pallet Plastik/i : /^Pallet Kayu/i,
-    qty: ceil(d.posisiPalet * 1.05), umur: plastik ? 60 : 24,
-    dasar: d.posisiPalet > 0 ? `${rb(d.posisiPalet)} posisi palet + 5% cadangan staging · ${plastik ? `plastik (higienis / tahan kimia untuk ${kat}), umur 60 bln` : 'kayu, umur 24 bln'}` : 'Posisi palet belum ada (Warehouse Planning)',
+  // historis: FMCG/umum memakai palet kayu SEWA (Mondelez Rp4.700, Abbott Rp6.000/palet/bln); plastik beli untuk farmasi, cold chain & kimia
+  const plastik = ['Healthcare & Pharma', 'Cold Chain', 'Chemicals (non-DG)', 'Dangerous Goods (DG)'].includes(kat);
+  A.push({ kunci: 'palet', seksi: 'palet', kelompok: 'Consumable', mode: plastik ? 'beli' : 'sewa', kategori: ['Palet'], cari: plastik ? /^Pallet Plastik/i : /^Pallet Kayu/i,
+    qty: ceil(d.posisiPalet * 1.05), umur: plastik ? 60 : undefined,
+    dasar: d.posisiPalet > 0 ? `${rb(d.posisiPalet)} posisi palet + 5% cadangan staging · ${plastik ? `plastik beli (higienis / tahan kimia untuk ${kat}), umur 60 bln` : 'kayu sewa per bulan (praktik historis FMCG / umum)'} — hapus bila palet disediakan customer` : 'Posisi palet belum ada (Warehouse Planning)',
     belum: !(d.posisiPalet > 0) });
 
   // ---------- HSE & Fire Protection ----------
   const hs = (kunci: string, cari: RegExp, qty: number, dasar: string, belum = false, mode: ModeBiaya = 'beli', umur?: number) =>
     A.push({ kunci: `hse.${kunci}`, seksi: 'hse', kelompok: 'HSE', mode, kategori: ['HSE'], cari, qty, dasar, belum, umur });
-  hs('apar', /^APAR/i, Math.max(2, ceil(d.luasM2 / 200)), noLuas ? ketLuas : `jarak antar APAR ≤ 15 m (Permenakertrans Per.04/MEN/1980) → ±1 per 200 m² · ${rb(d.luasM2)} m²`, noLuas);
+  hs('apar', /^APAR/i, Math.max(2, ceil(d.luasM2 / 250)), noLuas ? ketLuas : `jarak antar APAR ≤ 15 m (Permenakertrans Per.04/MEN/1980) → ±1 per 250 m² (historis 14.820 m² → 54 unit) · ${rb(d.luasM2)} m²`, noLuas);
   hs('p3k', /^P3K Kit/i, Math.max(1, ceil(hc / 25)), noMp ? ketMp : `1 kotak per ≤ 25 pekerja (Permenakertrans Per.15/MEN/VIII/2008) · ${hc} orang`, noMp);
   hs('rambu', /^Safety Sign/i, Math.max(2, ceil(d.luasM2 / 2000)), noLuas ? ketLuas : '1 set per zona ±2.000 m² (min. 2)', noLuas);
   hs('darurat', /^Emergency Lamp/i, Math.max(4, ceil(d.luasM2 / 200)), noLuas ? ketLuas : '1 per 200 m² jalur evakuasi (sama dengan Electrical)', noLuas);
@@ -164,17 +165,19 @@ export function aturanBiaya(d: DriverBiaya): Aturan[] {
   const ketOs = d.umk > 0 ? ` · harga = UMK lokasi ${rb(d.umk)} × ${String(FAKTOR_OUTSOURCING).replace('.', ',')} (BPJS, THR, seragam, fee vendor 10%)` : ' · UMK lokasi belum ada — harga dari Price Inquiry';
   const sv = (kunci: string, cari: RegExp, kategori: string[], qty: number, dasar: string, belum = false, harga?: number) =>
     A.push({ kunci: `svc.${kunci}`, seksi: 'services', kelompok: 'Lainnya', mode: 'bulanan', kategori, cari, qty, dasar, belum, harga });
-  const unitPest = Math.max(1, ceil(d.luasM2 / 5000));
-  sv('pest', /^Pest Control Umum/i, ['Pest Control'], unitPest, noLuas ? ketLuas : `kontrak per ±5.000 m² (${rb(d.luasM2)} m²)${KAT_HIGIENIS.includes(kat) ? ` · wajib audit higienis ${kat}` : ''}`, noLuas);
-  sv('rodent', /^Rodent Control/i, ['Pest Control'], unitPest, noLuas ? ketLuas : 'kontrak per ±5.000 m²', noLuas);
+  // historis: FMCG / food Rp1.000/m²/bln (Mondelez 14.820 m²) → 1 paket (umum + rodent ±Rp1,25 jt) per 1.250 m²; barang umum per 2.500 m²
+  const higienis = KAT_HIGIENIS.includes(kat), luasPest = higienis ? 1250 : 2500;
+  const unitPest = Math.max(1, ceil(d.luasM2 / luasPest));
+  sv('pest', /^Pest Control Umum/i, ['Pest Control'], unitPest, noLuas ? ketLuas : `1 paket per ${rb(luasPest)} m² (${rb(d.luasM2)} m²)${higienis ? ` · ${kat}: frekuensi tinggi untuk audit higienis (≈ Rp1.000/m²/bln)` : ' (≈ Rp500/m²/bln)'}`, noLuas);
+  sv('rodent', /^Rodent Control/i, ['Pest Control'], unitPest, noLuas ? ketLuas : `1 paket per ${rb(luasPest)} m²`, noLuas);
   if (KAT_RAYAP.includes(kat)) sv('rayap', /^Termite/i, ['Pest Control'], 1, `kategori ${kat}: kayu / kertas rawan rayap`);
   const pos = 1 + (d.luasM2 > 10000 ? 1 : 0) + (KAT_NILAI_TINGGI.includes(kat) ? 1 : 0);
-  const satpam = pos * 4;
+  const satpam = pos * 3;   // pola 12 jam: 2 shift + 1 libur per pos (historis Mondelez 2 pos = 6 orang)
   sv('satpam', /^Security Guard/i, ['Security'], satpam,
-    `${pos} pos jaga 24 jam (gerbang${d.luasM2 > 10000 ? ' + patroli gudang > 10.000 m²' : ''}${KAT_NILAI_TINGGI.includes(kat) ? ` + pos barang bernilai tinggi (${kat})` : ''}) × 4 orang (3 shift + 1 cadangan libur)${ketOs}`, false, hargaOs);
+    `${pos} pos jaga 24 jam (gerbang${d.luasM2 > 10000 ? ' + patroli gudang > 10.000 m²' : ''}${KAT_NILAI_TINGGI.includes(kat) ? ` + pos barang bernilai tinggi (${kat})` : ''}) × 3 orang (shift 12 jam: 2 jaga + 1 libur; ubah ke 4 bila shift 8 jam)${ketOs}`, false, hargaOs);
   if (satpam >= 8) sv('danru', /^Komandan Regu/i, ['Security'], 1, `komandan regu untuk ${satpam} satpam${d.umk > 0 ? ' · UMK × 1,1 × 1,38' : ''}`, false, d.umk > 0 ? Math.round(d.umk * 1.1 * FAKTOR_OUTSOURCING / 1000) * 1000 : undefined);
-  const cleaner = Math.max(1, ceil(gudangM2 / 2500) + ceil(Math.max(d.officeM2, uk > 0 ? 30 : 0) / 300));
-  sv('cleaning', /^Cleaning Service/i, ['Cleaning'], cleaner, noLuas ? ketLuas : `gudang ${rb(gudangM2)} m² ÷ 2.500 m² + office & toilet ÷ 300 m²${ketOs}`, noLuas, hargaOs);
+  const cleaner = Math.max(1, ceil(gudangM2 / 4000) + ceil(Math.max(d.officeM2, uk > 0 ? 30 : 0) / 300));   // historis 14.820 m² → 4 orang
+  sv('cleaning', /^Cleaning Service/i, ['Cleaning'], cleaner, noLuas ? ketLuas : `gudang ${rb(gudangM2)} m² ÷ 4.000 m² + office & toilet ÷ 300 m²${ketOs}`, noLuas, hargaOs);
   sv('chemical', /^Chemical & perlengkapan kebersihan/i, ['Cleaning'], Math.max(1, ceil(d.luasM2 / 1000)), noLuas ? ketLuas : 'paket per 1.000 m² per bulan', noLuas);
   sv('sampah', /^Pengangkutan sampah/i, ['Cleaning'], 1, 'sampah non-B3, 1 kontrak per site');
 

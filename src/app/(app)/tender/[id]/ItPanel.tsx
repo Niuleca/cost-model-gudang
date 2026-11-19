@@ -28,9 +28,12 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
     if (!driver || !katalog.length || !(driver.luasM2 > 0)) return;
     const def = itDefault(driver, katalog);
     if (!def.length) return;
-    if (!sheet.lines.length && !sheet.templateDiisi) { onChange({ ...sheet, lines: def, templateDiisi: true }); return; }
-    const baru = sinkronIt(sheet.lines, def);
-    if (baru) onChange({ ...sheet, lines: baru });
+    const buang = sheet.defaultDibuang ?? [];
+    if (!sheet.lines.length && !sheet.templateDiisi) { onChange({ ...sheet, lines: def.filter(d => !d.kunci || !buang.includes(d.kunci)), templateDiisi: true }); return; }
+    // otomatis penuh: qty ikut data tender + item template baru langsung masuk (kecuali yang pernah dihapus user)
+    const baru = sinkronIt(sheet.lines, def) ?? sheet.lines;
+    const tambah = def.filter(d => d.kunci && !buang.includes(d.kunci) && !baru.some(l => l.kunci === d.kunci || (l.catalogId != null && l.catalogId === d.catalogId)));
+    if (baru !== sheet.lines || tambah.length) onChange({ ...sheet, lines: [...baru, ...tambah] });
   }, [JSON.stringify(driver), katalog, sheet.lines]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const opsi = { kontrakBulan, bungaTahun: 0 }; // bunga tidak otomatis — pakai tab Loan & Interest Calculator
@@ -57,13 +60,13 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
       </div>
       {driver && (() => {
         const def = itDefault(driver, katalog);
-        const isi = (ganti: boolean) => { set(ganti ? def : [...sheet.lines, ...def.filter(d => !sheet.lines.some(l => l.kunci === d.kunci || (l.catalogId != null && l.catalogId === d.catalogId)))]); setKonfirm(false); };
+        const isi = (ganti: boolean) => { onChange({ ...sheet, defaultDibuang: [], lines: ganti ? def : [...sheet.lines, ...def.filter(d => !sheet.lines.some(l => l.kunci === d.kunci || (l.catalogId != null && l.catalogId === d.catalogId)))] }); setKonfirm(false); };
         const ikut = sheet.lines.filter(l => l.kunci && l.qtyDefault != null && l.qty === l.qtyDefault).length;
         const manual = sheet.lines.filter(l => l.kunci && l.qtyDefault != null && l.qty !== l.qtyDefault).length;
         return <div className="notice small" style={{ display: 'grid', gap: 6 }}>
           <div><b>Template IT otomatis</b> — {def.length} item dari katalog, qty dihitung dari:
             {' '}luas <b>{Math.round(driver.luasM2).toLocaleString('id-ID')} m²</b>{driver.officeM2 ? <> (office <b>{Math.round(driver.officeM2).toLocaleString('id-ID')} m²</b>)</> : null} · {driver.orderBulan ? <>order <b>{Math.round(driver.orderBulan).toLocaleString('id-ID')}/bln</b></> : <>transaksi <b>{Math.round(driver.transaksiBulan).toLocaleString('id-ID')} palet/bln</b></>} · user kantor <b>{driver.userKantor}</b> · SPV/manager <b>{driver.manajer}</b> · operator scan <b>{driver.operatorScan ?? 0}</b> · RF <b>{driver.unitRf}</b> · PC <b>{driver.unitPc}</b> · laptop <b>{driver.unitLaptop}</b>.
-            {' '}Aturan: WiFi AP 1 / 600 m² gudang + 1 / 150 m² office, switch PoE per 20 port (AP + CCTV), CCTV 1 / 200 m² (min. 8), NVR 1 / 32 kamera, printer 1 / 5.000 m², RF = unit RF di MHE Summary atau operator scan per shift + 10%, PC & laptop dari MHE Summary / user kantor, lisensi per user, WMS per order dengan slab sesuai volume.</div>
+            {' '}Aturan: WiFi AP 1 / 600 m² gudang + 1 / 150 m² office, switch PoE per 20 port (AP + CCTV), CCTV 1 / 400 m² (min. 8), NVR 1 / 32 kamera, printer 1 / 5.000 m², RF = unit RF di MHE Summary atau operator scan per shift + 10%, PC & laptop dari MHE Summary / user kantor, lisensi per user, WMS per order dengan slab sesuai volume.</div>
           <div className="row">
             {!sheet.lines.length
               ? <button className="ghost" disabled={!def.length} onClick={() => isi(true)}>Isi template IT</button>
@@ -122,7 +125,7 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
                   <td className="num" title={c.bunga ? `pokok ${rp(c.pokok)} + bunga ${rp(c.bunga)} · ${c.jenis} ${c.periode} bln` : c.jenis}>{c.total ? <b>{rp(c.total)}</b> : <span className="small muted">{p === 'tagih' && sekali ? 'di quotation' : '–'}</span>}</td>
                 </>;
               })()}
-              <td><button className="danger" title="Hapus baris" aria-label="Hapus" onClick={() => set(sheet.lines.filter((_, j) => j !== i))}>×</button></td>
+              <td><button className="danger" title="Hapus baris" aria-label="Hapus" onClick={() => { const k = sheet.lines[i]?.kunci; onChange({ ...sheet, lines: sheet.lines.filter((_, j) => j !== i), ...(k ? { defaultDibuang: [...new Set([...(sheet.defaultDibuang ?? []), k])] } : {}) }); }}>×</button></td>
             </tr>))])}
         </tbody>
       </table></div>
