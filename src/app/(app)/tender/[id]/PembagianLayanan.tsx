@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import type { HasilTender, Bucket, TenderInput } from '@/lib/engine/index.ts';
 import { rp, persen, BUCKET_LABEL } from '@/lib/format';
+import { uraiUom } from '@/lib/engine/types';
 
 export type AlokasiKategori = NonNullable<TenderInput['alokasiKategori']>;
 const OPS: Bucket[] = ['storage', 'handling_in', 'handling_out', 'vas'];
@@ -84,6 +85,17 @@ export function MatriksKategori({ h, nilai, onUbah, tenderId }: { h: HasilTender
         <span className="muted">Pola cepat:</span>
         {POLA.map(p => <button key={p.label} className="ghost" onClick={() => onUbah(p.buat(mx.map(r => r.kelompok)))}>{p.label}</button>)}
         <SamakanSemua kol={kol} onTerap={porsi => onUbah(Object.fromEntries(mx.map(r => [r.kelompok, porsi])))} />
+        {(() => {
+          // In/out sesuai volume: porsi handling (in + out) tiap kategori dibagi menurut volume palet ekuivalen in vs out → biaya per palet in ≈ out
+          const pal = (ar: string) => { const v = h.volume.find(x => x.arus === ar); return v ? (uraiUom(v, v.komitmenBulan).palet ?? v.komitmenBulan) : 0; };
+          const vin = pal('inbound'), vout = pal('outbound');
+          if (!(vin > 0 && vout > 0)) return null;
+          const ri = vin / (vin + vout);
+          return <button className="ghost" title={`Biaya handling dibagi sesuai volume: in ${Math.round(vin).toLocaleString('id-ID')} : out ${Math.round(vout).toLocaleString('id-ID')} palet eq. → tarif per palet in & out setara`}
+            onClick={() => onUbah(Object.fromEntries(mx.map(r => { const p = r.porsi as Record<Bucket, number>; const hd = (p.handling_in ?? 0) + (p.handling_out ?? 0);
+              return [r.kelompok, Object.fromEntries(kol.map(k => [k, k === 'handling_in' ? hd * ri : k === 'handling_out' ? hd * (1 - ri) : (p[k] ?? 0)]))]; })))}>
+            Handling in/out sesuai volume ({Math.round(ri * 100)}:{100 - Math.round(ri * 100)})</button>;
+        })()}
         {nDiubah > 0 && <button className="link-kecil" onClick={() => onUbah({})}>reset semua ke default simulasi</button>}
         <button className="link-kecil" onClick={() => setLihatDasar(x => !x)}>{lihatDasar ? 'sembunyikan' : 'tampilkan'} dasar default</button>
       </div>
