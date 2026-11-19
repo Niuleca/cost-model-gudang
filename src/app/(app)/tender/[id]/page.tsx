@@ -911,6 +911,8 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
   // Red flag bisa disembunyikan / ditampilkan — pilihan diingat di perangkat ini
   const [sembunyiFlag, setSembunyiFlagS] = useState<boolean>(() => { try { return localStorage.getItem('leca.sembunyiRedFlag') === '1'; } catch { return false; } });
   const setSembunyiFlag = (v: boolean) => { setSembunyiFlagS(v); try { localStorage.setItem('leca.sembunyiRedFlag', v ? '1' : '0'); } catch { /* abaikan */ } };
+  const [bagian, setBagianS] = useState<'ringkasan' | 'harga' | 'biaya' | 'operasional'>(() => { try { const v = localStorage.getItem('leca.hasilBagian'); return v === 'harga' || v === 'biaya' || v === 'operasional' ? v : 'ringkasan'; } catch { return 'ringkasan'; } });
+  const setBagian = (v: typeof bagian) => { setBagianS(v); try { localStorage.setItem('leca.hasilBagian', v); } catch { /* abaikan */ } };
   if (!hasil) return <div className="card"><p>Belum dihitung.</p><div className="row"><button onClick={onHitung}>Hitung sekarang</button></div></div>;
   const h = hasil;
   const kritis = h.redFlags.filter(f => f.level === 'kritis').length;
@@ -927,11 +929,39 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
           ['Jumlah manpower', `${h.totalHeadcount} orang`, 'headcount setelah rangkap'],
           ['Luas gudang', `${angka(h.space.totalM2)} m²`, gudang ? `${gudang.nama} · dari ${angka(Number(gudang.luas_m2))} m²` : 'gudang belum dipilih'],
         ];
-        return <div className="kpis kpis-hasil">{kpi.map(([l, v, k]) => <div key={l} className="kpi"><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}</div>)}</div>;
+        const kom = Object.entries(h.perKelompok ?? {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+        const totKom = kom.reduce((t2, [, v]) => t2 + v, 0) || 1;
+        const WARNA = ['#1e56a0', '#f28c28', '#0f766e', '#7c3aed', '#be123c', '#ca8a04', '#0891b2', '#4d7c0f', '#9a3412', '#475569'];
+        return <section className="hasil-hero" aria-label="Ringkasan hasil">
+          <div className="hasil-hero-kepala">
+            <div><h2 style={{ margin: 0 }}>Hasil hitung</h2>
+              {belumDisimpan ? <span className="small" style={{ color: 'var(--warn, #b45309)' }}>Dihitung ulang dari input terbaru dan <b>belum disimpan</b> — simpan supaya quotation & export memakai angka ini.</span>
+                : <span className="small muted">Sesuai versi tersimpan</span>}</div>
+            <div className="row hasil-aksi" style={{ margin: 0 }}><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
+          </div>
+          <div className="kpis kpis-hasil">{kpi.map(([l, v, k]) => <div key={l} className="kpi"><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}</div>)}</div>
+          {kom.length > 0 && <div className="komposisi">
+            <div className="komposisi-bar" role="img" aria-label={`Komposisi biaya: ${kom.map(([k, v]) => `${k} ${Math.round((v / totKom) * 100)}%`).join(', ')}`}>
+              {kom.map(([k, v], j) => <i key={k} style={{ width: `${(v / totKom) * 100}%`, background: WARNA[j % WARNA.length] }} title={`${k} · ${rp(v)}/bln · ${persen(v / totKom)}`} />)}</div>
+            <div className="komposisi-legenda">{kom.map(([k, v], j) => <span key={k}><i style={{ background: WARNA[j % WARNA.length] }} />{k} <b>{persen(v / totKom, 0)}</b></span>)}</div>
+          </div>}
+        </section>;
       })()}
-      {belumDisimpan && <p className="notice small">Hasil ini dihitung ulang dari input terbaru dan <b>belum disimpan</b> — tekan <b>Simpan hasil sebagai versi baru</b> supaya quotation & export memakai angka ini.</p>}
-      <div className="row hasil-aksi"><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
+      <div className="tabs hasil-tab" role="tablist" aria-label="Bagian hasil">
+        {([['ringkasan', 'Ringkasan & red flag', 'hasil'], ['harga', 'Harga & margin', 'isian'], ['biaya', 'Rincian biaya', 'hasil'], ['operasional', 'Manpower, MHE & space', 'hasil']] as const).map(([k, l, j]) => (
+          <button key={k} role="tab" aria-selected={bagian === k} className={bagian === k ? 'on' : ''} onClick={() => setBagian(k)}>{l}{j === 'isian' && <span className="pill warn" style={{ marginLeft: 6, fontSize: 11 }}>ada isian</span>}</button>))}
+      </div>
 
+      {bagian === 'ringkasan' && <>
+      <div className="card">
+        <h2>Tarif per layanan</h2>
+        <div className="tablewrap"><table>
+          <thead><tr><th>Layanan</th><th>Satuan</th><th className="num">Volume komitmen/bln</th><th className="num">Biaya/bln</th><th className="num">GP%</th><th className="num">Tarif {pajak.ppn === 'include' ? 'incl.' : 'excl.'} PPN</th></tr></thead>
+          <tbody>{h.rateCard.map(r => <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td>per {r.uom}</td><td className="num">{angka(r.volumeKomitmen)}</td><td className="num">{rp(r.biayaBulan)}</td>
+            <td className="num">{persen(r.gpPersen)}</td><td className="num"><b>{rp(pajak.ppn === 'include' ? (r.tarifInclPpn ?? r.tarifPerUnit) : r.tarifPerUnit)}</b></td></tr>)}</tbody>
+        </table></div>
+        <div className="row"><button className="ghost" onClick={() => setBagian('harga')}>Atur satuan tarif & GP% →</button></div>
+      </div>
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2>Red flag {kritis > 0 ? <span className="pill bad">{kritis} kritis</span> : <span className="pill ok">tidak ada yang kritis</span>}</h2>
@@ -957,10 +987,11 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
         <span className="small"><b>Pembagian biaya ke layanan:</b> {h.alokasiLayanan.matriks?.filter(r => r.override).length ? `${h.alokasiLayanan.matriks.filter(r => r.override).length} kategori diubah` : 'default simulasi (cost-to-serve)'}
           {' · '}{h.rateCard.map(r => `${BUCKET_LABEL[r.bucket]} ${persen(r.biayaBulan / (h.marginTotal.biayaBulan || 1))}`).join(' · ')}</span>
         <button className="ghost" onClick={onBukaAlokasi}>Atur di Cost Allocation →</button></div>}
-      <HasilKomersial hariTarif={hariTarif} onHariTarif={onHariTarif} h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} uomRateCard={uomRateCard} onUomRateCard={onUomRateCard} uomManual={uomManual} onUomManual={onUomManual}
-        layananJual={layananJual} onLayananJual={onLayananJual} tambahan={tambahan} onTambahan={onTambahan} />
+      </>}
+      {bagian === 'harga' && <HasilKomersial bagian="harga" hariTarif={hariTarif} onHariTarif={onHariTarif} h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} uomRateCard={uomRateCard} onUomRateCard={onUomRateCard} uomManual={uomManual} onUomManual={onUomManual}
+        layananJual={layananJual} onLayananJual={onLayananJual} tambahan={tambahan} onTambahan={onTambahan} />}
 
-      <div className="grid2">
+      {bagian === 'operasional' && <><div className="grid2">
         <div className="card">
           <h2><T>Kalender & volume desain</T></h2>
           <table><tbody>
@@ -1008,7 +1039,9 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
             {nol > 0 && <p className="small muted">{nol} alat tidak dipakai (0 unit) disembunyikan: {h.mhe.filter(m => !(m.unit > 0 || (m.spare ?? 0) > 0)).map(m => `${m.nama} (${m.tool})`).join(', ')}.</p>}</>; })()}
       </div>
 
-      <div className="card">
+      </>}
+
+      {bagian === 'biaya' && <><div className="card">
         <h2><T>Rincian biaya per bulan</T></h2>
         <p className="small muted">Dikelompokkan per kategori. Klik <b>Rincian & revisi ↗</b> untuk membuka kategori di tab baru dan merevisi harganya.</p>
         <div className="tablewrap"><table>
@@ -1025,7 +1058,7 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
             <tr className="pd-sub"><td colSpan={3}><b>Total</b></td><td className="num out">{rp(h.totalBiayaBulan)}</td></tr></tbody>
         </table></div>
       </div>
-      <div className="row hasil-aksi"><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
+      <HasilKomersial bagian="biaya" h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} /></>}
     </>
   );
 }

@@ -18,7 +18,9 @@ const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { s
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
 export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif }: {
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, bagian = 'semua' }: {
+  /** 'harga' = rate card, margin, simulasi & kurs · 'biaya' = porsi & rincian biaya · 'semua' = keduanya */
+  bagian?: 'harga' | 'biaya' | 'semua';
   hariTarif?: number; onHariTarif?: (n: number | undefined) => void;
   layananJual?: Partial<Record<Bucket, 'jual' | 'termasuk'>>; onLayananJual?: (x: Partial<Record<Bucket, 'jual' | 'termasuk'>>) => void;
   tambahan?: TarifTambahanInput[]; onTambahan?: (x: TarifTambahanInput[]) => void;
@@ -54,8 +56,10 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
   const totK = kelompok.reduce((s, [, v]) => s + v, 0) || 1;
 
   return (<>
-    <div className="card">
+    {bagian !== 'biaya' && <><div className="card">
       <h2>Rate card & margin</h2>
+      <fieldset className="isian">
+      <legend>Isian Anda · pajak & layanan yang dijual</legend>
       <div className="pajak-bar">
         <label className="f" htmlFor="pj-pph">PPh 23 ({(pphPersen * 100).toFixed(1)}%)
           <select id="pj-pph" value={pajak.pph} onChange={e => onPajak({ ...pajak, pph: e.target.value as Pajak['pph'] })}>
@@ -77,8 +81,10 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
         {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>
       {onLayananJual && <LayananDijual h={h} nilai={layananJual ?? {}} onUbah={onLayananJual} />}
+      </fieldset>
+      <p className="small muted legenda-isian"><span className="contoh-isian" /> kolom berwarna = isian Anda (satuan tarif & GP%); kolom lain = hasil hitung.</p>
       <div className="tablewrap"><table>
-        <thead><tr><th>Layanan</th><th>Satuan tarif / UoM</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num">GP% (input)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
+        <thead><tr><th>Layanan</th><th className="th-isian">Satuan tarif / UoM</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num th-isian">GP% (isian)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
         <tbody>
           {h.rateCard.map(r => {
             const b = r.bucket as Bucket, v = marginManual[b];
@@ -86,7 +92,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
             const pilihan = uomRateCard?.[b];
             const manAktif = !!man && pilihan === man.uom;
             const sama = (a2: string, c2: string) => a2.toLowerCase() === c2.toLowerCase();
-            return <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td>{onUomRateCard
+            return <tr key={r.bucket}><td>{BUCKET_LABEL[r.bucket]}</td><td className="td-isian">{onUomRateCard
                 ? <><select aria-label={`Satuan tarif ${BUCKET_LABEL[r.bucket]}`} value={manAktif ? (man!.uom || '__ketik__') : r.uom} style={{ minWidth: 170 }}
                     onChange={e => {
                       const v = e.target.value, x = { ...(uomRateCard ?? {}) }, m = { ...(uomManual ?? {}) };
@@ -119,7 +125,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
                     onChange={e => { const n = Number(e.target.value); onHariTarif(n > 0 ? n : undefined); }} /> : <b>{hariTarif ?? 30}</b>}<span className="muted">hari</span></div>}</td>
               <td className="num">{angka(r.volumeKomitmen)}</td>
               <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaPerUnit)}</td>
-              <td className="num"><input aria-label={`Margin ${BUCKET_LABEL[r.bucket]}`} type="number" step="0.1" value={v == null ? '' : Math.round(v * 1000) / 10}
+              <td className="num td-isian"><input aria-label={`Margin ${BUCKET_LABEL[r.bucket]}`} type="number" step="0.1" value={v == null ? '' : Math.round(v * 1000) / 10}
                 placeholder={(Math.round((r.gpDefault ?? 0) * 1000) / 10).toString()} onChange={e => setM(b, e.target.value)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /> %
                 {v == null && <div className="small muted">default</div>}</td>
               <td className="num">{rp(r.hargaBulan)}</td>
@@ -178,7 +184,8 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       </div>}
     </div>
 
-    <div className="card">
+    </>}
+    {bagian !== 'harga' && <><div className="card">
       <h2>Porsi biaya per kategori</h2>
       <p className="small muted">Klik kategori untuk membuka rinciannya di tab baru — harga tiap baris bisa direvisi di sana.</p>
       <div className="tablewrap"><table>
@@ -192,7 +199,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       </table></div>
     </div>
 
-    <RincianJenis h={h} />
+    <RincianJenis h={h} /></>}
   </>);
 }
 

@@ -1036,3 +1036,25 @@ tr.aktif td { background: #f5f3ff; }
 .vol-kartu { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .vol-kartu > div { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .vol-kartu b { font-size: 22px; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* ---------- Result: hero hasil, komposisi biaya, pemisah isian vs hasil */
+.hasil-hero { display: grid; gap: 14px; padding: 18px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: var(--radius, 12px);
+  background: linear-gradient(180deg, #f5f8fd 0%, #fff 70%); }
+.hasil-hero-kepala { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hasil-hero .kpis { margin: 0; }
+.komposisi { display: grid; gap: 8px; }
+.komposisi-bar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--line); }
+.komposisi-bar i { display: block; height: 100%; min-width: 2px; }
+.komposisi-bar i + i { box-shadow: inset 1px 0 0 rgba(255,255,255,.7); }
+.komposisi-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--g700, #334155); }
+.komposisi-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.komposisi-legenda i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.hasil-tab { margin-bottom: 12px; flex-wrap: wrap; }
+fieldset.isian { border: 1px solid #f5d9a8; background: #fffaf0; border-radius: 10px; padding: 10px 14px 12px; margin: 0 0 12px; }
+fieldset.isian > legend { padding: 0 6px; font-size: 12.5px; font-weight: 600; color: #92400e; }
+th.th-isian { background: #fdecc8 !important; color: #78350f; }
+td.td-isian { background: #fffaf0; }
+.legenda-isian { display: flex; align-items: center; gap: 6px; }
+.contoh-isian { display: inline-block; width: 14px; height: 10px; border-radius: 3px; background: #fdecc8; border: 1px solid #f5d9a8; }
+@media (max-width: 640px) { .hasil-hero { padding: 12px; } .hasil-hero-kepala .hasil-aksi { width: 100%; } }
+@media (max-width: 480px) { .kpis-hasil .kpi b { font-size: 17px; white-space: normal; overflow-wrap: anywhere; } .kpis-hasil .kpi { padding: 10px 12px; } }
