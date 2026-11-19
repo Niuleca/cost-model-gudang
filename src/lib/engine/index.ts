@@ -382,6 +382,13 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     for (const r of Object.values(per)) for (const k of OPS4) r.porsi[k] = r.total > 0 ? r.porsi[k] / r.total : 0;
     return per;
   };
+  // Handling in & out setara per palet: porsi handling (in + out) tiap baris dibagi menurut volume palet ekuivalen komitmen
+  const palArus = (ar: Arus) => { const v = volArus(ar); return v ? (uraiUom(v, v.komitmenBulan).palet ?? 0) : 0; };
+  const vIn = palArus('inbound'), vOut = palArus('outbound');
+  const setara = t.handlingSetara !== false && vIn > 0 && vOut > 0;
+  const setarakan = () => { if (!setara) return; const ri = vIn / (vIn + vOut);
+    for (const b of baris) { const hd = (b.alokasi.handling_in ?? 0) + (b.alokasi.handling_out ?? 0); if (hd > 0) b.alokasi = { ...b.alokasi, handling_in: hd * ri, handling_out: hd * (1 - ri) }; } };
+  setarakan();
   const matriksDefault = matriksEfektif(baris);
   const ovKat = t.alokasiKategori ?? {};
   const katOverride: string[] = [];
@@ -396,6 +403,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     for (const k of OPS4) al[k] = Math.max(0, Number(o[k]) || 0) / jml;
     for (const b of baris) if (b.kelompok === kel) b.alokasi = al;
   }
+  if (katOverride.length) setarakan();
   const matriksDipakai = katOverride.length ? matriksEfektif(baris) : matriksDefault;
   const matriksKategori = Object.entries(matriksDipakai).filter(([, r]) => r.total > 0).sort((a, b) => b[1].total - a[1].total).map(([kelompok, r]) => ({
     kelompok, biayaBulan: bulat(r.total), override: katOverride.includes(kelompok),
@@ -429,7 +437,8 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     return acc;
   }, {} as Record<string, { kelompok: string; total: number; perBucket: Record<Bucket, number> }>)).filter(r => r.total > 0)
     .map(r => ({ kelompok: r.kelompok, total: bulat(r.total), perBucket: Object.fromEntries(BUCKETS.map(k => [k, bulat(r.perBucket[k])])) as Record<Bucket, number> }));
-  const alokasiLayanan = { porsiLayanan, porsiManajemen: porsiOps, rincian: rincianAlokasi, matriks: matriksKategori };
+  const alokasiLayanan = { porsiLayanan, porsiManajemen: porsiOps, rincian: rincianAlokasi, matriks: matriksKategori,
+    handlingSetara: setara ? { porsiIn: bulat(vIn / (vIn + vOut), 4), paletIn: bulat(vIn), paletOut: bulat(vOut) } : null };
 
   // ---- 11. Harga & rate card ----
   // Pajak (istilah komersial): PPh EXCLUDE = harga belum termasuk PPh → ditanggung customer → tarif di-gross-up;

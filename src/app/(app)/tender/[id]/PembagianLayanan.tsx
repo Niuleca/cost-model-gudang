@@ -56,10 +56,11 @@ function SamakanSemua({ kol, onTerap }: { kol: Bucket[]; onTerap: (p: Partial<Re
 }
 
 /** Matriks pembagian biaya per kategori → layanan. */
-export function MatriksKategori({ h, nilai, onUbah, tenderId }: { h: HasilTender; nilai: AlokasiKategori; onUbah: (a: AlokasiKategori) => void; tenderId: string }) {
+export function MatriksKategori({ h, nilai, onUbah, tenderId, setara, onSetara }: { h: HasilTender; nilai: AlokasiKategori; onUbah: (a: AlokasiKategori) => void; tenderId: string; setara?: boolean; onSetara?: (v: boolean) => void }) {
   const [lihatDasar, setLihatDasar] = useState(false);
   const al = h.alokasiLayanan;
   if (!al?.matriks) return null;
+  const hs = al.handlingSetara ?? null;
   const mx = al.matriks;
   const kol = OPS.filter(b => b !== 'vas' || mx.some(r => (r.porsiDefault.vas ?? 0) > 0 || (r.porsi.vas ?? 0) > 0 || (nilai[r.kelompok]?.vas ?? 0) > 0) || h.rateCard.some(r => r.bucket === 'vas'));
   const isi = (kel: string) => nilai[kel] ?? null;
@@ -89,7 +90,7 @@ export function MatriksKategori({ h, nilai, onUbah, tenderId }: { h: HasilTender
           // In/out sesuai volume: porsi handling (in + out) tiap kategori dibagi menurut volume palet ekuivalen in vs out → biaya per palet in ≈ out
           const pal = (ar: string) => { const v = h.volume.find(x => x.arus === ar); return v ? (uraiUom(v, v.komitmenBulan).palet ?? v.komitmenBulan) : 0; };
           const vin = pal('inbound'), vout = pal('outbound');
-          if (!(vin > 0 && vout > 0)) return null;
+          if (hs || !(vin > 0 && vout > 0)) return null;
           const ri = vin / (vin + vout);
           return <button className="ghost" title={`Biaya handling dibagi sesuai volume: in ${Math.round(vin).toLocaleString('id-ID')} : out ${Math.round(vout).toLocaleString('id-ID')} palet eq. → tarif per palet in & out setara`}
             onClick={() => onUbah(Object.fromEntries(mx.map(r => { const p = r.porsi as Record<Bucket, number>; const hd = (p.handling_in ?? 0) + (p.handling_out ?? 0);
@@ -99,11 +100,16 @@ export function MatriksKategori({ h, nilai, onUbah, tenderId }: { h: HasilTender
         {nDiubah > 0 && <button className="link-kecil" onClick={() => onUbah({})}>reset semua ke default simulasi</button>}
         <button className="link-kecil" onClick={() => setLihatDasar(x => !x)}>{lihatDasar ? 'sembunyikan' : 'tampilkan'} dasar default</button>
       </div>
+      {onSetara && <label className="notice small" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: 0 }}>
+        <input type="checkbox" checked={!!setara} onChange={e => onSetara(e.target.checked)} style={{ marginTop: 3 }} />
+        <span><b>Tarif handling in & out setara per palet</b> — biaya handling tiap kategori dibagi menurut volume
+          {hs ? <> in {hs.paletIn.toLocaleString('id-ID')} : out {hs.paletOut.toLocaleString('id-ID')} palet eq. (<b>{Math.round(hs.porsiIn * 100)} : {100 - Math.round(hs.porsiIn * 100)}</b>)</> : ' in : out'}.
+          {' '}Matikan bila ingin membagi in/out sendiri (mis. sesuai beban kerja); porsi storage tetap mengikuti isian.</span></label>}
       <div className="tablewrap fit"><table className="tabel-fit tabel-matriks">
         <thead><tr><th>Kategori</th><th className="num">Biaya/bln</th>{kol.map(b => <th key={b} className="num">{BUCKET_LABEL[b]}</th>)}<th className="num">Total</th><th>Sumber</th>{lihatDasar && <th>Dasar default (simulasi)</th>}</tr></thead>
         <tbody>{mx.map(r => {
           const o = isi(r.kelompok);
-          const nilaiSel = (b: Bucket) => o ? (o[b] ?? 0) : (r.porsi[b] ?? 0);
+          const nilaiSel = (b: Bucket) => (hs && (b === 'handling_in' || b === 'handling_out')) ? (r.porsi[b] ?? 0) : o ? (o[b] ?? 0) : (r.porsi[b] ?? 0);
           const jml = kol.reduce((a, b) => a + nilaiSel(b), 0);
           const salah = Math.abs(jml - 1) > 0.0005;
           return <tr key={r.kelompok} className={r.override ? 'baris-ubah' : undefined}>
@@ -127,15 +133,16 @@ export function MatriksKategori({ h, nilai, onUbah, tenderId }: { h: HasilTender
 }
 
 /** Isi tab Cost Allocation. */
-export default function CostAllocation({ h, alokasiKategori, onAlokasiKategori, tenderId, onKeResult }: {
+export default function CostAllocation({ h, alokasiKategori, onAlokasiKategori, tenderId, onKeResult, handlingSetara, onHandlingSetara }: {
   h: HasilTender | null; alokasiKategori: AlokasiKategori; onAlokasiKategori: (a: AlokasiKategori) => void; tenderId: string; onKeResult: () => void;
+  handlingSetara?: boolean; onHandlingSetara?: (v: boolean) => void;
 }) {
   if (!h) return <div className="card"><p className="muted" style={{ margin: 0 }}>Menghitung…</p></div>;
   const salah = h.redFlags.filter(f => f.kode === 'VOLUME_DESIMAL');
   return <div style={{ display: 'grid', gap: 16 }}>
     {salah.length > 0 && <div className="notice small" role="alert" style={{ borderColor: 'var(--bad, #c0392b)' }}>
       <b>Tarif tidak wajar karena volume:</b>{salah.map((f, i) => <div key={i}>{f.pesan}</div>)}</div>}
-    <MatriksKategori h={h} nilai={alokasiKategori} onUbah={onAlokasiKategori} tenderId={tenderId} />
+    <MatriksKategori h={h} nilai={alokasiKategori} onUbah={onAlokasiKategori} tenderId={tenderId} setara={handlingSetara} onSetara={onHandlingSetara} />
     <div className="row" style={{ justifyContent: 'flex-end' }}><button onClick={onKeResult}>Lihat Rate card & margin →</button></div>
   </div>;
 }

@@ -323,7 +323,7 @@ export default function TenderPage() {
   }, [tab, !!t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Margin diubah di tab Hasil → hitung ulang otomatis (tanpa pindah tab)
-  const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}, t?.asumsi.uomManual ?? {}, t?.asumsi.hariTarifHarian ?? null, t?.asumsi.alokasiKategori ?? null, t?.asumsi.layananJual ?? null, t?.asumsi.tarifTambahan ?? null]);
+  const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}, t?.asumsi.uomManual ?? {}, t?.asumsi.hariTarifHarian ?? null, t?.asumsi.alokasiKategori ?? null, t?.asumsi.handlingSetara ?? null, t?.asumsi.layananJual ?? null, t?.asumsi.tarifTambahan ?? null]);
   useEffect(() => {
     if (!hasil || (tab !== 'Result' && tab !== 'Cost Allocation')) return;
     const id = setTimeout(() => { hitung(false); }, 400);
@@ -877,7 +877,8 @@ export default function TenderPage() {
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} hariTarif={a.hariTarifHarian} onHariTarif={hariTarifHarian => setA({ hariTarifHarian })} uomManual={a.uomManual ?? {}} onUomManual={uomManual => setA({ uomManual })} onBukaAlokasi={() => setTab('Cost Allocation')}
         layananJual={a.layananJual ?? {}} onLayananJual={layananJual => setA({ layananJual })} tambahan={a.tarifTambahan ?? []} onTambahan={tarifTambahan => setA({ tarifTambahan })} />}
       {tab === 'Cost Allocation' && <CostAllocation h={hasil} tenderId={t.id} onKeResult={() => setTab('Result')}
-        alokasiKategori={a.alokasiKategori ?? {}} onAlokasiKategori={alokasiKategori => setA({ alokasiKategori })} />}
+        alokasiKategori={a.alokasiKategori ?? {}} onAlokasiKategori={alokasiKategori => setA({ alokasiKategori })}
+        handlingSetara={a.handlingSetara !== false} onHandlingSetara={v => setA({ handlingSetara: v })} />}
       {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
       {tab === 'Export' && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}

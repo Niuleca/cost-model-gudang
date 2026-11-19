@@ -283,6 +283,8 @@ export interface TenderInput {
   tarifTambahan?: TarifTambahanInput[];
   /** Matriks pembagian biaya per kategori (Fasilitas, Manpower, MHE, …) ke layanan; kategori yang diisi menggantikan alokasi per baris. Pecahan, total 1. */
   alokasiKategori?: Partial<Record<string, Partial<Record<Bucket, number>> | null>>;
+  /** Biaya handling (in + out) tiap baris dibagi menurut volume palet ekuivalen in : out → tarif per palet in & out setara. Default aktif. */
+  handlingSetara?: boolean;
   /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */
   startupAuto?: { aktif: boolean; persenOpex: number; persenManpower: number };
   /** Biaya per orang per bulan diisi manual (lama — tidak dipakai lagi). */

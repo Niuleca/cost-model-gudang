@@ -72,3 +72,14 @@ test('layanan termasuk: biaya dipindah ke layanan yang dijual, total & simulasi 
   assert.equal(lb.tarifPerUnit, 520);   // 350 ÷ 0,7 = 500 → gross-up PPh 2% (exclude) = 510,2 → dibulatkan 10 ke atas = 520
   assert.ok(Math.abs(lb.pendapatanBulan - 520 * 1000 * 0.98) <= 1);
 });
+
+test('Handling in & out setara per palet (default): biaya handling dibagi menurut volume palet', () => {
+  const sama = (p: Record<string, number>) => Object.fromEntries(['Manpower', 'MHE', 'Overhead', 'Utilitas', 'Consumable', 'IT', 'HSE', 'Lainnya', 'Office', 'Asuransi'].map(k => [k, p]));
+  const h = hitungTender({ ...contohTender, alokasiKategori: sama({ handling_in: 0.5, handling_out: 0.5 }) }, contohMaster);
+  const rc = (b: string) => h.rateCard.find(r => r.bucket === b)!;
+  assert.ok(h.alokasiLayanan.handlingSetara);
+  const perPalet = (b: string) => rc(b).biayaBulan / (rc(b).volumeKomitmenArus || 1);
+  if (rc('handling_in').satuan === rc('handling_out').satuan) assert.ok(Math.abs(perPalet('handling_in') / perPalet('handling_out') - 1) < 0.02);
+  const mati = hitungTender({ ...contohTender, handlingSetara: false, alokasiKategori: sama({ handling_in: 0.5, handling_out: 0.5 }) }, contohMaster);
+  assert.equal(mati.alokasiLayanan.handlingSetara, null);
+});
