@@ -19,8 +19,28 @@ export interface VolumeInput {
   konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; // paletIsi: isi [UoM baris] per palet (case / kemasan / pcs)
   /** Parameter muatan tender (runtime, tidak disimpan): disisipkan oleh volumeEfektif(…, muatan) supaya konversi CBM/ton/kg ↔ palet konsisten di semua hitungan. */
   muatan?: Partial<Muatan>;
+  minBulan?: number;         // volume terendah per bulan (opsional) — dasar tarif "Min"
   /** Baris gabungan (runtime): rincian baris asli, mis. "3.217 karton + 2.842 pail + 3.121 drum" */
   rincian?: string;
+  /** Baris gabungan (runtime): jumlah unit asli (karton + pail + drum …) per basis volume */
+  unitAsli?: Record<KunciVolume, number>;
+  /** Baris gabungan (runtime): rincian per basis volume */
+  rincianPer?: Record<KunciVolume, string>;
+}
+export type KunciVolume = 'rataRataBulan' | 'peakBulan' | 'komitmenBulan' | 'minBulan';
+/** Dasar volume tarif: pakai MGV (komitmen) atau Mid (rata-rata) / Min (terendah) / Max (peak). */
+export interface BasisTarif { pakaiMgv: boolean; basis: 'mid' | 'min' | 'max' }
+export const BASIS_TARIF_DEFAULT: BasisTarif = { pakaiMgv: true, basis: 'mid' };
+export const LABEL_BASIS_TARIF = { mgv: 'MGV (komitmen)', mid: 'Mid (rata-rata)', min: 'Min (terendah)', max: 'Max (peak)' } as const;
+/** Kunci volume dasar tarif + nilainya untuk satu baris volume. Min: isian Min/bln, bila kosong = terendah dari rata-rata / komitmen / peak. */
+export function volumeDasarTarif(v: Pick<VolumeInput, KunciVolume> | undefined, bt?: Partial<BasisTarif> | null) {
+  const b = { ...BASIS_TARIF_DEFAULT, ...(bt ?? {}) };
+  const kode = b.pakaiMgv ? 'mgv' : b.basis;
+  if (!v) return { kode, label: LABEL_BASIS_TARIF[kode], kunci: 'komitmenBulan' as KunciVolume, nilai: 0 };
+  const kunci: KunciVolume = kode === 'mgv' ? 'komitmenBulan' : kode === 'mid' ? 'rataRataBulan' : kode === 'max' ? 'peakBulan' : 'minBulan';
+  let nilai = Number(v[kunci]) || 0;
+  if (kunci === 'minBulan' && !(nilai > 0)) { const xs = [v.rataRataBulan, v.komitmenBulan, v.peakBulan].map(Number).filter(x => x > 0); nilai = xs.length ? Math.min(...xs) : 0; }
+  return { kode, label: LABEL_BASIS_TARIF[kode], kunci, nilai };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -285,6 +305,7 @@ export interface TenderInput {
   alokasiKategori?: Partial<Record<string, Partial<Record<Bucket, number>> | null>>;
   /** Biaya handling (in + out) tiap baris dibagi menurut volume palet ekuivalen in : out → tarif per palet in & out setara. Default aktif. */
   handlingSetara?: boolean;
+  basisTarif?: Partial<BasisTarif>;
   /** Startup & implementation otomatis (biaya sekali, diamortisasi selama kontrak). */
   startupAuto?: { aktif: boolean; persenOpex: number; persenManpower: number };
   /** Biaya per orang per bulan diisi manual (lama — tidak dipakai lagi). */
@@ -421,13 +442,18 @@ export function gabungPerArus<V extends VolumeInput>(vs: V[]): V[] {
     if (bisa.length <= 1) { out.push(...xs); continue; }
     const ur = (k: 'rataRataBulan' | 'peakBulan' | 'komitmenBulan') => bisa.map(x => uraiUom(x, Number(x[k]) || 0));
     const sum = (k: 'rataRataBulan' | 'peakBulan' | 'komitmenBulan') => ur(k).reduce((s2, u) => s2 + (u.palet ?? 0), 0);
+    const minP = bisa.reduce((s2, x) => s2 + (uraiUom(x, volumeDasarTarif(x, { pakaiMgv: false, basis: 'min' }).nilai).palet ?? 0), 0);
+    const unit = (k: KunciVolume) => bisa.reduce((s2, x) => s2 + (k === 'minBulan' ? volumeDasarTarif(x, { pakaiMgv: false, basis: 'min' }).nilai : Number(x[k]) || 0), 0);
     const uk = ur('komitmenBulan'), kom = sum('komitmenBulan');
     const semuaCase = uk.every(u => u.case != null), semuaPcs = uk.every(u => u.pcs != null);
     const cs = uk.reduce((s2, u) => s2 + (u.case ?? 0), 0), pcs = uk.reduce((s2, u) => s2 + (u.pcs ?? 0), 0);
     const per1 = semuaCase && kom > 0 ? Math.round((cs / kom) * 100) / 100 : 0;
     const per2 = semuaCase && semuaPcs && cs > 0 ? Math.round((pcs / cs) * 100) / 100 : 0;
     out.push({ ...bisa[0], arus: ar, uom: 'palet', rataRataBulan: sum('rataRataBulan'), peakBulan: sum('peakBulan'), komitmenBulan: kom,
-      konversi: { uom1: 'case', per1, uom2: 'pcs', per2 }, rincian: bisa.map(x => `${fm(Number(x.komitmenBulan) || 0)} ${x.uom}`).join(' + ') } as V);
+      minBulan: minP, konversi: { uom1: 'case', per1, uom2: 'pcs', per2 }, rincian: bisa.map(x => `${fm(Number(x.komitmenBulan) || 0)} ${x.uom}`).join(' + '),
+      unitAsli: { rataRataBulan: unit('rataRataBulan'), peakBulan: unit('peakBulan'), komitmenBulan: unit('komitmenBulan'), minBulan: unit('minBulan') },
+      rincianPer: Object.fromEntries((['rataRataBulan', 'peakBulan', 'komitmenBulan', 'minBulan'] as KunciVolume[]).map(k => [k,
+        bisa.map(x => `${fm(k === 'minBulan' ? volumeDasarTarif(x, { pakaiMgv: false, basis: 'min' }).nilai : Number(x[k]) || 0)} ${x.uom}`).join(' + ')])) as Record<KunciVolume, string> } as V);
     out.push(...lain);
   }
   return out;

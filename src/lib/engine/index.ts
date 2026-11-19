@@ -5,7 +5,7 @@
 
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
-import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, type Muatan } from './types';
+import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, volumeDasarTarif, type Muatan, type KunciVolume } from './types';
 import { PARAM_BIAYA_MP_DEFAULT, rincianBiayaRole } from './biayaMp';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
@@ -469,10 +469,11 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     const hargaSebelumPph = manual ? biaya / (1 - gpIn) : hargaDefault;
     const harga = hargaSebelumPph / (1 - g);
     const v = volArus(bucketKeArus[b]);
-    const komitmen = v?.komitmenBulan ?? 0;
-    if (biaya > 0 && komitmen <= 0) flags.push({ level: 'kritis', kode: 'KOMITMEN_NOL', pesan: `Biaya ${b} ada tetapi volume komitmen ${bucketKeArus[b]} = 0, tarif tidak bisa dihitung.` });
+    const dasarVol = volumeDasarTarif(v, t.basisTarif);
+    const komitmen = dasarVol.nilai;
+    if (biaya > 0 && komitmen <= 0) flags.push({ level: 'kritis', kode: 'KOMITMEN_NOL', pesan: `Biaya ${b} ada tetapi volume ${dasarVol.label} ${bucketKeArus[b]} = 0, tarif tidak bisa dihitung.` });
     // Opsi UoM tarif: volume komitmen dikonversi ke palet / case / pcs / CBM / ton (+ m² untuk storage)
-    const opsiUom = opsiUomRateCard(b, v, komitmen, space.totalM2, t.konversiPalet, { ton: t.stokTon, cbm: t.stokCbm, liter: t.stokLiter }, t.uomManual?.[b], t.hariTarifHarian)
+    const opsiUom = opsiUomRateCard(b, v, komitmen, space.totalM2, t.konversiPalet, { ton: t.stokTon, cbm: t.stokCbm, liter: t.stokLiter }, t.uomManual?.[b], t.hariTarifHarian, dasarVol)
       .map(o => ({ ...o, tarifExcl: o.volume > 0 ? roundupHarga(harga / o.volume) : 0 }));
     // pilihan tersimpan: cocok persis, atau satuan sejenis (case = karton, ton → kg, cbm = CBM)
     const pil = t.uomRateCard?.[b];
@@ -489,7 +490,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
       marginDefault: biaya > 0 ? bulat(hargaDefault / biaya - 1, 4) : 0, marginManual: manual, hargaSebelumPph: bulat(hargaSebelumPph),
       gpPersen: hargaSebelumPph > 0 ? bulat(1 - biaya / hargaSebelumPph, 4) : 0,                       // GP% atas pendapatan (sebelum PPh)
       gpDefault: hargaDefault > 0 ? bulat(1 - biaya / hargaDefault, 4) : 0,
-      volumeKomitmen: volTarif, volumeKomitmenArus: komitmen, biayaPerUnit: volTarif > 0 ? bulat(biaya / volTarif, 2) : 0,
+      volumeKomitmen: volTarif, volumeKomitmenArus: komitmen, basisVolume: dasarVol.label, biayaPerUnit: volTarif > 0 ? bulat(biaya / volTarif, 2) : 0,
       tarifPerUnit: tarifExcl,                       // tarif belum PPN (dasar pendapatan)
       tarifInclPpn: tarifIncl, ppnPerUnit: tarifIncl - tarifExcl,
       tarifQuote: pajak.ppn === 'include' ? tarifIncl : tarifExcl,   // tarif yang ditampilkan di penawaran
@@ -614,11 +615,15 @@ export function biayaPerOrangDari(m: MasterData, j: JobLevel | undefined) {
 }
 
 /** Opsi UoM untuk tarif layanan — volume per bulan dalam tiap UoM. */
-export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; muatan?: Partial<Muatan>; rincian?: string } | undefined, komitmen: number,
-  luasM2: number, kp?: Partial<Muatan>, stok?: { ton?: number; cbm?: number; liter?: number }, manual?: { uom: string; volume: number }, hariTarif?: number) {
+export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; muatan?: Partial<Muatan>; rincian?: string; rincianPer?: Record<KunciVolume, string>; unitAsli?: Record<KunciVolume, number> } | undefined, komitmen: number,
+  luasM2: number, kp?: Partial<Muatan>, stok?: { ton?: number; cbm?: number; liter?: number }, manual?: { uom: string; volume: number }, hariTarif?: number,
+  dasarVol?: { label: string; kunci: KunciVolume }) {
   const out: { uom: string; volume: number; dasar: string; tetap?: boolean }[] = [];
   const u = v?.uom ?? 'unit';
-  out.push({ uom: u, volume: komitmen, dasar: v?.rincian ? `gabungan ${v.rincian} = ${komitmen.toLocaleString('id-ID', { maximumFractionDigits: 2 })} ${u}` : `volume komitmen ${u}` });
+  const lb = dasarVol?.label ?? 'MGV (komitmen)', rinci = dasarVol && v?.rincianPer ? v.rincianPer[dasarVol.kunci] : v?.rincian;
+  out.push({ uom: u, volume: komitmen, dasar: rinci ? `${lb}: ${rinci} = ${komitmen.toLocaleString('id-ID', { maximumFractionDigits: 2 })} ${u}` : `volume ${lb} ${komitmen.toLocaleString('id-ID', { maximumFractionDigits: 2 })} ${u}` });
+  // baris gabungan: tarif per unit asli (karton / pail / drum dijumlah apa adanya)
+  if (v?.unitAsli && dasarVol) { const nu = v.unitAsli[dasarVol.kunci]; if (nu > 0) out.push({ uom: 'unit (campuran)', volume: nu, dasar: `${lb}: ${rinci} = ${nu.toLocaleString('id-ID')} unit` }); }
   const k = v?.konversi;
   if (k && k.per1 > 0 && k.uom1) out.push({ uom: k.uom1, volume: komitmen * k.per1, dasar: `${u} × ${k.per1} ${k.uom1}` });
   if (k && k.per1 > 0 && k.per2 > 0 && k.uom2 && kelasUom(u) === 'palet') out.push({ uom: k.uom2, volume: komitmen * k.per1 * k.per2, dasar: `${u} × ${k.per1} × ${k.per2} ${k.uom2}` });

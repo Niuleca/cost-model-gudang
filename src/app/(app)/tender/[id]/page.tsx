@@ -15,7 +15,7 @@ import { alatRak, sesuaikanAlatRak, BATAS_ANGKAT_CBT_MM } from '@/lib/alatRak';
 import { RE_SECURITY, RE_CLEANING } from '@/lib/biayaLainDefault';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
-import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus } from '@/lib/engine/types';
+import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, type BasisTarif } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
@@ -323,7 +323,7 @@ export default function TenderPage() {
   }, [tab, !!t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Margin diubah di tab Hasil → hitung ulang otomatis (tanpa pindah tab)
-  const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}, t?.asumsi.uomManual ?? {}, t?.asumsi.hariTarifHarian ?? null, t?.asumsi.alokasiKategori ?? null, t?.asumsi.handlingSetara ?? null, t?.asumsi.layananJual ?? null, t?.asumsi.tarifTambahan ?? null]);
+  const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}, t?.asumsi.uomManual ?? {}, t?.asumsi.hariTarifHarian ?? null, t?.asumsi.alokasiKategori ?? null, t?.asumsi.handlingSetara ?? null, t?.asumsi.basisTarif ?? null, t?.asumsi.layananJual ?? null, t?.asumsi.tarifTambahan ?? null]);
   useEffect(() => {
     if (!hasil || (tab !== 'Result' && tab !== 'Cost Allocation')) return;
     const id = setTimeout(() => { hitung(false); }, 400);
@@ -557,7 +557,7 @@ export default function TenderPage() {
               ({xs.map(({ v }) => Math.round(v.peakBulan * 1000).toLocaleString('id-ID')).join(' · ')}). Inilah yang membuat tarif handling per unit sangat besar.{' '}
               <button className="ghost" onClick={() => setA({ volumes: a.volumes.map((v, i) => xs.some(x => x.i === i) ? { ...v, rataRataBulan: kali(v.rataRataBulan), peakBulan: kali(v.peakBulan), komitmenBulan: kali(v.komitmenBulan) } : v) })}>Perbaiki jadi ribuan (× 1.000)</button></p>; })()}
           <div className="tablewrap"><table>
-            <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln</th><th className="num">Faktor peak</th><th title="Berapa satuan baris ini dalam 1 palet (atau isi 1 palet untuk baris palet)">Isi per palet</th><th title="Isi kecil per kemasan: 1 case = … pcs / kg / liter">Isi per kemasan</th><th></th></tr></thead>
+            <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln (MGV)</th><th className="num" title="Volume terendah per bulan (opsional) — dasar tarif Min">Min/bln</th><th className="num">Faktor peak</th><th title="Berapa satuan baris ini dalam 1 palet (atau isi 1 palet untuk baris palet)">Isi per palet</th><th title="Isi kecil per kemasan: 1 case = … pcs / kg / liter">Isi per kemasan</th><th></th></tr></thead>
             <tbody>{a.volumes.map((v, i) => (
               <tr key={i}>
                 <td><select aria-label="Arus" value={v.arus} style={{ minWidth: 130 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>
@@ -570,6 +570,8 @@ export default function TenderPage() {
                       ? { rataRataBulan: n, ...(!(v.peakBulan > 0) || v.peakBulan === v.rataRataBulan ? { peakBulan: n } : {}), ...(!(v.komitmenBulan > 0) || v.komitmenBulan === v.rataRataBulan ? { komitmenBulan: n } : {}) }
                       : { [k]: n }) })} /></td>
                 ))}
+                <td className="num"><AngkaVolume aria-label="minBulan" value={v.minBulan || undefined} placeholder={(() => { const xs = [v.rataRataBulan, v.komitmenBulan, v.peakBulan].map(Number).filter(x => x > 0); return xs.length ? Math.min(...xs).toLocaleString('id-ID') : ''; })()}
+                  onValue={n => setA({ volumes: ubahArray(a.volumes, i, { minBulan: n > 0 ? n : undefined }) })} /></td>
                 <td className="num">{v.rataRataBulan > 0 ? (v.peakBulan / v.rataRataBulan).toFixed(2) + '×' : '—'}</td>
                 <SelKonversi v={volEfBaris[i] ?? v} onKonversi={konversi => setA({ volumes: ubahArray(a.volumes, i, { konversi }) })} />
                 <td><button className="danger" onClick={() => setA({ volumes: a.volumes.filter((_, j) => j !== i) })}>Hapus</button></td>
@@ -875,7 +877,8 @@ export default function TenderPage() {
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} hariTarif={a.hariTarifHarian} onHariTarif={hariTarifHarian => setA({ hariTarifHarian })} uomManual={a.uomManual ?? {}} onUomManual={uomManual => setA({ uomManual })} onBukaAlokasi={() => setTab('Cost Allocation')}
-        layananJual={a.layananJual ?? {}} onLayananJual={layananJual => setA({ layananJual })} tambahan={a.tarifTambahan ?? []} onTambahan={tarifTambahan => setA({ tarifTambahan })} />}
+        layananJual={a.layananJual ?? {}} onLayananJual={layananJual => setA({ layananJual })} tambahan={a.tarifTambahan ?? []} onTambahan={tarifTambahan => setA({ tarifTambahan })}
+        basisTarif={a.basisTarif} onBasisTarif={basisTarif => setA({ basisTarif })} />}
       {tab === 'Cost Allocation' && <CostAllocation h={hasil} tenderId={t.id} onKeResult={() => setTab('Result')}
         alokasiKategori={a.alokasiKategori ?? {}} onAlokasiKategori={alokasiKategori => setA({ alokasiKategori })}
         handlingSetara={a.handlingSetara !== false} onHandlingSetara={v => setA({ handlingSetara: v })} />}
@@ -907,7 +910,8 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, uomManual, onUomManual, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, onBukaTab, saran }: {
+function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, uomManual, onUomManual, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, onBukaTab, saran, basisTarif, onBasisTarif }: {
+  basisTarif?: Partial<BasisTarif>; onBasisTarif: (b: BasisTarif) => void;
   onBukaAlokasi: () => void; hariTarif?: number; onHariTarif: (n: number | undefined) => void;
   onBukaTab: (tab: string) => void; saran: Saran[];
   uomManual: Partial<Record<Bucket, { uom: string; volume: number }>>; onUomManual: (u: Partial<Record<Bucket, { uom: string; volume: number }>>) => void;
@@ -1000,7 +1004,7 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
         <button className="ghost" onClick={onBukaAlokasi}>Atur di Cost Allocation →</button></div>}
       </>}
       {bagian === 'harga' && <HasilKomersial bagian="harga" hariTarif={hariTarif} onHariTarif={onHariTarif} h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} uomRateCard={uomRateCard} onUomRateCard={onUomRateCard} uomManual={uomManual} onUomManual={onUomManual}
-        layananJual={layananJual} onLayananJual={onLayananJual} tambahan={tambahan} onTambahan={onTambahan} />}
+        layananJual={layananJual} onLayananJual={onLayananJual} tambahan={tambahan} onTambahan={onTambahan} basisTarif={basisTarif} onBasisTarif={onBasisTarif} />}
 
       {bagian === 'operasional' && <><div className="grid2">
         <div className="card">

@@ -2,6 +2,7 @@
 import { UOM_TARIF_STANDAR } from '@/lib/engine/index.ts';
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { BASIS_TARIF_DEFAULT, type BasisTarif } from '@/lib/engine/types';
 import type { HasilTender, Bucket } from '@/lib/engine/index.ts';
 import { rp, angka, persen, BUCKET_LABEL } from '@/lib/format';
 import type { TarifTambahanInput } from '@/lib/engine/index.ts';
@@ -18,7 +19,8 @@ const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { s
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
 export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, bagian = 'semua' }: {
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, bagian = 'semua', basisTarif, onBasisTarif }: {
+  basisTarif?: Partial<BasisTarif>; onBasisTarif?: (b: BasisTarif) => void;
   /** 'harga' = rate card, margin, simulasi & kurs · 'biaya' = porsi & rincian biaya · 'semua' = keduanya */
   bagian?: 'harga' | 'biaya' | 'semua';
   hariTarif?: number; onHariTarif?: (n: number | undefined) => void;
@@ -81,10 +83,22 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
         {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>
       {onLayananJual && <LayananDijual h={h} nilai={layananJual ?? {}} onUbah={onLayananJual} />}
+      {onBasisTarif && (() => { const bt = { ...BASIS_TARIF_DEFAULT, ...(basisTarif ?? {}) };
+        return <div className="umk-box" style={{ alignItems: 'center' }}>
+          <b className="small">Dasar volume tarif:</b>
+          <label className="row small" style={{ gap: 4, flexWrap: 'nowrap' }}><input type="checkbox" style={{ width: 'auto' }} checked={bt.pakaiMgv}
+            onChange={e => onBasisTarif({ ...bt, pakaiMgv: e.target.checked })} />Pakai MGV (volume komitmen)</label>
+          {!bt.pakaiMgv && <select aria-label="Basis volume tarif" value={bt.basis} onChange={e => onBasisTarif({ ...bt, basis: e.target.value as BasisTarif['basis'] })} style={{ width: 'auto' }}>
+            <option value="mid">Mid — rata-rata/bln</option><option value="min">Min — volume terendah</option><option value="max">Max — volume maksimal (peak)</option></select>}
+          <span className="small muted" style={{ flex: 1, minWidth: 240 }}>{bt.pakaiMgv
+            ? 'Tarif = harga ÷ volume komitmen (MGV) di tab Volume. Hilangkan centang untuk memakai volume Mid / Min / Max.'
+            : bt.basis === 'min' ? 'Min = kolom Min/bln di tab Volume; bila kosong dipakai yang terendah dari rata-rata, komitmen & peak.' : bt.basis === 'mid' ? 'Mid = kolom Rata-rata/bln di tab Volume.' : 'Max = kolom Peak/bln di tab Volume.'}
+            {' '}Volume dalam satuan tarif yang dipilih (mis. palet = karton + pail + drum dikonversi ke palet; pilih "unit (campuran)" untuk jumlah unit apa adanya).</span>
+        </div>; })()}
       </fieldset>
       <p className="small muted legenda-isian"><span className="contoh-isian" /> kolom berwarna = isian Anda (satuan tarif & GP%); kolom lain = hasil hitung.</p>
       <div className="tablewrap"><table>
-        <thead><tr><th>Layanan</th><th className="th-isian">Satuan tarif / UoM</th><th className="num">Volume komitmen</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num th-isian">GP% (isian)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
+        <thead><tr><th>Layanan</th><th className="th-isian">Satuan tarif / UoM</th><th className="num">Volume {h.rateCard[0]?.basisVolume ?? 'komitmen'}</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num th-isian">GP% (isian)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
         <tbody>
           {h.rateCard.map(r => {
             const b = r.bucket as Bucket, v = marginManual[b];

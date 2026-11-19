@@ -83,3 +83,16 @@ test('Handling in & out setara per palet (default): biaya handling dibagi menuru
   const mati = hitungTender({ ...contohTender, handlingSetara: false, alokasiKategori: sama({ handling_in: 0.5, handling_out: 0.5 }) }, contohMaster);
   assert.equal(mati.alokasiLayanan.handlingSetara, null);
 });
+
+test('Dasar volume tarif: MGV (default) atau Mid / Min / Max', async () => {
+  const { volumeDasarTarif } = await import('../src/lib/engine/types.ts');
+  const v = { rataRataBulan: 1000, peakBulan: 1500, komitmenBulan: 800, minBulan: undefined as number | undefined };
+  assert.equal(volumeDasarTarif(v).nilai, 800);
+  assert.equal(volumeDasarTarif(v, { pakaiMgv: false, basis: 'mid' }).nilai, 1000);
+  assert.equal(volumeDasarTarif(v, { pakaiMgv: false, basis: 'max' }).nilai, 1500);
+  assert.equal(volumeDasarTarif(v, { pakaiMgv: false, basis: 'min' }).nilai, 800);
+  assert.equal(volumeDasarTarif({ ...v, minBulan: 600 }, { pakaiMgv: false, basis: 'min' }).nilai, 600);
+  const mgv = hitungTender(contohTender, contohMaster), max = hitungTender({ ...contohTender, basisTarif: { pakaiMgv: false, basis: 'max' } }, contohMaster);
+  const s = (h: typeof mgv) => h.rateCard.find(r => r.bucket === 'handling_in')!;
+  if (s(mgv).volumeKomitmenArus !== s(max).volumeKomitmenArus) assert.ok(s(max).tarifPerUnit < s(mgv).tarifPerUnit);
+});
