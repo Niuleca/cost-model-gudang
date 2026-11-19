@@ -5,7 +5,7 @@
 
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
-import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, type Muatan } from './types';
+import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, type Muatan } from './types';
 import { PARAM_BIAYA_MP_DEFAULT, rincianBiayaRole } from './biayaMp';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
@@ -67,12 +67,14 @@ export function hitungKalender(tahun: number, hariKerjaPerMinggu: number, holida
 // ---------------------------------------------------------------------------
 // Fungsi utama
 // ---------------------------------------------------------------------------
-export function hitungTender(t: TenderInput, m: MasterData) {
+export function hitungTender(t0: TenderInput, m: MasterData) {
   const flags: RedFlag[] = [];
+  for (const { v } of volumeSalahRibuan(t0.volumes)) flags.push({ level: 'kritis', kode: 'VOLUME_DESIMAL', pesan: `Volume ${v.arus} ${v.uom} tercatat ${String(v.peakBulan).replace('.', ',')} per bulan (desimal) — kemungkinan maksudnya ${Math.round(v.peakBulan * 1000).toLocaleString('id-ID')}. Tarif per unit jadi sangat besar. Perbaiki di tab Volume.` });
+  // beberapa baris per arus (karton + pail + drum …) → satu volume arus dalam palet ekuivalen
+  const t: TenderInput = { ...t0, volumes: gabungPerArus(t0.volumes) };
   const kal = hitungKalender(t.tahun, t.hariKerjaPerMinggu, m.holidays, t.cutiTahunanHari);
 
   // ---- 2. Volume desain (peak) ----
-  for (const { v } of volumeSalahRibuan(t.volumes)) flags.push({ level: 'kritis', kode: 'VOLUME_DESIMAL', pesan: `Volume ${v.arus} ${v.uom} tercatat ${String(v.peakBulan).replace('.', ',')} per bulan (desimal) — kemungkinan maksudnya ${Math.round(v.peakBulan * 1000).toLocaleString('id-ID')}. Tarif per unit jadi sangat besar. Perbaiki di tab Volume.` });
   const volume = t.volumes.map(v => {
     if (v.peakBulan < v.rataRataBulan) flags.push({ level: 'kritis', kode: 'PEAK_LT_AVG', pesan: `Peak ${v.arus} (${v.uom}) lebih kecil dari rata-rata.` });
     if (v.komitmenBulan > v.peakBulan) flags.push({ level: 'peringatan', kode: 'MGV_GT_PEAK', pesan: `Volume komitmen ${v.arus} melebihi peak.` });
@@ -603,11 +605,11 @@ export function biayaPerOrangDari(m: MasterData, j: JobLevel | undefined) {
 }
 
 /** Opsi UoM untuk tarif layanan — volume per bulan dalam tiap UoM. */
-export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; muatan?: Partial<Muatan> } | undefined, komitmen: number,
+export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; muatan?: Partial<Muatan>; rincian?: string } | undefined, komitmen: number,
   luasM2: number, kp?: Partial<Muatan>, stok?: { ton?: number; cbm?: number; liter?: number }, manual?: { uom: string; volume: number }, hariTarif?: number) {
   const out: { uom: string; volume: number; dasar: string; tetap?: boolean }[] = [];
   const u = v?.uom ?? 'unit';
-  out.push({ uom: u, volume: komitmen, dasar: `volume komitmen ${u}` });
+  out.push({ uom: u, volume: komitmen, dasar: v?.rincian ? `gabungan ${v.rincian} = ${komitmen.toLocaleString('id-ID', { maximumFractionDigits: 2 })} ${u}` : `volume komitmen ${u}` });
   const k = v?.konversi;
   if (k && k.per1 > 0 && k.uom1) out.push({ uom: k.uom1, volume: komitmen * k.per1, dasar: `${u} × ${k.per1} ${k.uom1}` });
   if (k && k.per1 > 0 && k.per2 > 0 && k.uom2 && kelasUom(u) === 'palet') out.push({ uom: k.uom2, volume: komitmen * k.per1 * k.per2, dasar: `${u} × ${k.per1} × ${k.per2} ${k.uom2}` });

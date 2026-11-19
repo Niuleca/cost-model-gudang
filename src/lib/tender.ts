@@ -1,7 +1,7 @@
 import type { VsmInput } from '@/lib/vsmSop';
 import { airKeCostLines, type AirInput } from './air';
 import { aktivitasDenganOrderAdmin, stokDariPalet } from '@/lib/profilVolume';
-import { volumeEfektif, MUATAN_DEFAULT } from '@/lib/engine/types';
+import { volumeEfektif, gabungPerArus, MUATAN_DEFAULT } from '@/lib/engine/types';
 import { VSM_DEFAULT } from '@/lib/vsmDefault';
 import { sesuaikanAlatRak } from '@/lib/alatRak';
 import { terapkanPorsiMuat, type PorsiMuat } from '@/lib/porsiMuat';
@@ -135,7 +135,7 @@ export function keInput(t: TenderRow): TenderInput {
     customer: t.customer, provinsi: t.provinsi, kabKota: t.kab_kota, tahun,
     durasiKontrakBulan: t.durasi_kontrak_bulan, jumlahShift: t.jumlah_shift, jamEfektifPerShift: Number(t.jam_efektif_per_shift),
     hariKerjaPerMinggu: t.hari_kerja_per_minggu, cutiTahunanHari: a.cutiTahunanHari, skenarioAset: t.skenario_aset,
-    paymentTermHari: t.payment_term_hari, volumes: volumeEfektif(a.volumes, a.profilVolume?.param), aktivitas: aktivitasDenganOrderAdmin(terapkanPorsiMuat(aktivitasAktif(sesuaikanAlatRak(a.aktivitas, a.space?.excel, a.batasAngkatCbtMm) ?? a.aktivitas), a.porsiMuat), volumeEfektif(a.volumes, a.profilVolume?.param), a.profilVolume, a.processDesign?.hariKerjaBulan ?? 25), peranTetap: a.peranTetap, alatSupervisor: a.alatSupervisor ?? [],
+    paymentTermHari: t.payment_term_hari, volumes: volumeEfektif(a.volumes, a.profilVolume?.param), aktivitas: aktivitasDenganOrderAdmin(terapkanPorsiMuat(aktivitasAktif(sesuaikanAlatRak(a.aktivitas, a.space?.excel, a.batasAngkatCbtMm) ?? a.aktivitas), a.porsiMuat), gabungPerArus(volumeEfektif(a.volumes, a.profilVolume?.param)), a.profilVolume, a.processDesign?.hariKerjaBulan ?? 25), peranTetap: a.peranTetap, alatSupervisor: a.alatSupervisor ?? [],
     spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, faktorProduktivitas: a.faktorProduktivitas,
     efisiensi: a.efisiensi, mhe: a.mhe, listrik: a.listrik,
     space: a.gudang ? { ...a.space, luasTersediaM2: Number(a.gudang.luas_m2), namaGudang: a.gudang.nama,

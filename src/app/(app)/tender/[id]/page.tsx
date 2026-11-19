@@ -15,7 +15,7 @@ import { alatRak, sesuaikanAlatRak, BATAS_ANGKAT_CBT_MM } from '@/lib/alatRak';
 import { RE_SECURITY, RE_CLEANING } from '@/lib/biayaLainDefault';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
-import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan } from '@/lib/engine/types';
+import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
@@ -343,10 +343,10 @@ export default function TenderPage() {
   const toolsDipakai = useMemo(() => Array.from(new Set((t?.asumsi.aktivitas ?? []).map(a => a.tool).filter(x => x && x !== 'Manual'))), [t]);
   const spaceH = useMemo(() => {
     if (!t) return null;
-    const v = (ar: Arus) => paletEkuivalen(volumeEfektif(t.asumsi.volumes, t.asumsi.profilVolume?.param).find(x => x.arus === ar)).palet;
+    const v = (ar: Arus) => paletEkuivalen(gabungPerArus(volumeEfektif(t.asumsi.volumes, t.asumsi.profilVolume?.param)).find(x => x.arus === ar)).palet;
     return hitungSpaceExcel(lengkapiSpaceExcel(t.asumsi.space.excel), v('storage'), v('inbound'), v('outbound'), t.jumlah_shift);
   }, [t]);
-  const pdFull = useMemo(() => t ? hitungProcessDesign(aktivitasDenganOrderAdmin(terapkanPorsiMuat(aktivitasAktif(t.asumsi.aktivitas), t.asumsi.porsiMuat), volumeEfektif(t.asumsi.volumes, t.asumsi.profilVolume?.param), t.asumsi.profilVolume, t.asumsi.processDesign?.hariKerjaBulan ?? 25), volumeEfektif(t.asumsi.volumes, t.asumsi.profilVolume?.param), { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
+  const pdFull = useMemo(() => t ? hitungProcessDesign(aktivitasDenganOrderAdmin(terapkanPorsiMuat(aktivitasAktif(t.asumsi.aktivitas), t.asumsi.porsiMuat), gabungPerArus(volumeEfektif(t.asumsi.volumes, t.asumsi.profilVolume?.param)), t.asumsi.profilVolume, t.asumsi.processDesign?.hariKerjaBulan ?? 25), gabungPerArus(volumeEfektif(t.asumsi.volumes, t.asumsi.profilVolume?.param)), { ...PD_DEFAULT, ...(t.asumsi.processDesign ?? {}) },
     t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift,
     { spanOfControl: t.asumsi.spanOfControl, roleSupervisor: t.asumsi.roleSupervisor, alatSupervisor: t.asumsi.alatSupervisor, peranTetap: t.asumsi.peranTetap }) : null, [t]);
   const pdMhe = pdFull?.mhe ?? [];
@@ -375,7 +375,8 @@ export default function TenderPage() {
   if (!t) return <p className="muted">{pesan ?? 'Memuat tender…'}</p>;
   const a = t.asumsi;
   const hariOps = a.processDesign?.hariKerjaBulan ?? 25;
-  const volEf = volumeEfektif(a.volumes, a.profilVolume?.param);
+  const volEfBaris = volumeEfektif(a.volumes, a.profilVolume?.param);   // per baris (tabel Volume & ringkasan per satuan)
+  const volEf = gabungPerArus(volEfBaris);                              // per arus (beberapa baris karton + pail + drum → total palet ekuivalen)
   const aktEf = aktivitasDenganOrderAdmin(terapkanPorsiMuat(a.aktivitas, a.porsiMuat), volEf, a.profilVolume, hariOps);
   const aktEfAktif = aktivitasDenganOrderAdmin(terapkanPorsiMuat(aktivitasAktif(a.aktivitas), a.porsiMuat), volEf, a.profilVolume, hariOps);   // hanya aktivitas aktif (VSM Map) → process design / manpower / MHE
   const paramMp = { ...PARAM_BIAYA_MP_DEFAULT, batasUpahPensiun: masterMp?.payroll.batasUpahJp || PARAM_BIAYA_MP_DEFAULT.batasUpahPensiun, batasUpahKs: masterMp?.payroll.batasUpahKes || PARAM_BIAYA_MP_DEFAULT.batasUpahKs, ...(a.paramBiayaMp ?? {}) };
@@ -570,12 +571,12 @@ export default function TenderPage() {
                       : { [k]: n }) })} /></td>
                 ))}
                 <td className="num">{v.rataRataBulan > 0 ? (v.peakBulan / v.rataRataBulan).toFixed(2) + '×' : '—'}</td>
-                <SelKonversi v={volEf[i] ?? v} onKonversi={konversi => setA({ volumes: ubahArray(a.volumes, i, { konversi }) })} />
+                <SelKonversi v={volEfBaris[i] ?? v} onKonversi={konversi => setA({ volumes: ubahArray(a.volumes, i, { konversi }) })} />
                 <td><button className="danger" onClick={() => setA({ volumes: a.volumes.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}
             </tbody></table></div>
-          <RingkasanVolumeSemuaUom volumes={volEf} muatan={a.profilVolume?.param} basis={basisRingkas} hariOps={hariOps} />
-          <RingkasanOrder volumes={volEf} basis={basisRingkas} hariOps={hariOps} utama={a.satuanUtamaOrder ?? 'input'} onUtama={u => setA({ satuanUtamaOrder: u })}
+          <RingkasanVolumeSemuaUom volumes={volEfBaris} muatan={a.profilVolume?.param} basis={basisRingkas} hariOps={hariOps} />
+          <RingkasanOrder volumes={volEfBaris} basis={basisRingkas} hariOps={hariOps} utama={a.satuanUtamaOrder ?? 'input'} onUtama={u => setA({ satuanUtamaOrder: u })}
             labelArus={x => ARUS.find(o => o.v === x)?.l ?? x}
             ekstra={<label className="f" htmlFor="basis-ringkas">Basis
               <select id="basis-ringkas" value={basisRingkas} onChange={e => setBasisRingkas(e.target.value as typeof basisRingkas)} style={{ minWidth: 150 }}>

@@ -75,3 +75,17 @@ test('Volume salah ketik ribuan (10.673 tersimpan 10,673) terdeteksi', async () 
   ];
   assert.deepEqual(volumeSalahRibuan(vs).map(x => x.i), [1]);
 });
+
+test('Beberapa baris per arus (karton + pail + drum) dijumlah dalam palet ekuivalen', async () => {
+  const { gabungPerArus } = await import('../src/lib/engine/types.ts');
+  const row = (uom: string, q: number, konversi: VolumeInput['konversi']): VolumeInput => ({ arus: 'inbound', uom, rataRataBulan: q, peakBulan: q, komitmenBulan: q, konversi });
+  const g = gabungPerArus([
+    row('karton', 3217, { uom1: 'case', per1: 0, uom2: 'pcs', per2: 24, paletIsi: 1 }),
+    row('pail', 2842, { uom1: 'pail', per1: 16, uom2: 'pail', per2: 1 }),   // isian lama: 1 palet = 16 pail
+    row('drum', 3121, { uom1: 'case', per1: 4, uom2: 'pcs', per2: 1 }),
+  ]);
+  assert.equal(g.length, 1);
+  assert.equal(g[0].uom, 'palet');
+  assert.ok(Math.abs(g[0].komitmenBulan - (3217 + 2842 / 16 + 3121 / 4)) < 1e-6);
+  assert.match(g[0].rincian ?? '', /karton \+ .*pail \+ .*drum/);
+});

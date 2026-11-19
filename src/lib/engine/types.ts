@@ -19,6 +19,8 @@ export interface VolumeInput {
   konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; // paletIsi: isi [UoM baris] per palet (case / kemasan / pcs)
   /** Parameter muatan tender (runtime, tidak disimpan): disisipkan oleh volumeEfektif(…, muatan) supaya konversi CBM/ton/kg ↔ palet konsisten di semua hitungan. */
   muatan?: Partial<Muatan>;
+  /** Baris gabungan (runtime): rincian baris asli, mis. "3.217 karton + 2.842 pail + 3.121 drum" */
+  rincian?: string;
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -65,7 +67,8 @@ export function uraiUom(v: Pick<VolumeInput, 'uom' | 'konversi' | 'muatan'> | un
   const out: UraiUom = { palet: null, case: null, pcs: null, kg: null, cbm: null, liter: null, paletPasti: false, dasar: [], kurang: [] };
   if (!v) return out;
   const kl = kelasUom(v.uom), k = v.konversi;
-  const isi = n(k?.paletIsi);                                           // [UoM baris] per palet (kemasan / case / pcs)
+  // [UoM baris] per palet (kemasan / case / pcs). Isian versi lama (kolom pertama = per1) berarti "1 palet = per1 [UoM baris]" → dipakai bila paletIsi kosong.
+  const isi = n(k?.paletIsi) || ((kl === 'case' || kl === 'kemasan') && k && n(k.per1) ? n(k.per1) : 0);
   const cppEst = n(m.cbmPerCase) > 0 ? Math.floor(m.cbmPerPalet / n(m.cbmPerCase)) : 0;
   // isi palet untuk baris palet: 1 palet = per1 case
   const cppPalet = kl === 'palet' && k && n(k.per1) && kelasUom(k.uom1) === 'case' ? n(k.per1) : 0;
@@ -399,4 +402,31 @@ export function volumeSalahRibuan(volumes: VolumeInput[]) {
   const besar = volumes.some(v => (Number(v.peakBulan) || 0) >= 100 || (Number(v.rataRataBulan) || 0) >= 100);
   const curiga = (x: number) => x > 0 && x < 1000 && Math.abs(Math.round(x * 1000) - x * 1000) < 1e-6 && Math.round(x * 1000) % 10 !== 0;   // tepat 3 angka desimal
   return besar ? volumes.map((v, i) => ({ v, i })).filter(({ v }) => (['rataRataBulan', 'peakBulan', 'komitmenBulan'] as const).some(k => curiga(Number(v[k]) || 0))) : [];
+}
+
+/** Beberapa baris volume dengan arus sama (mis. inbound karton + pail + drum) digabung jadi satu baris palet ekuivalen
+ *  supaya space, manpower, rate card & simulasi memakai TOTAL volume arus (bukan baris pertama saja).
+ *  Baris yang tidak bisa dihitung ke palet (satuan transaksi) dibiarkan terpisah. Satu baris per arus → tidak berubah. */
+export function gabungPerArus<V extends VolumeInput>(vs: V[]): V[] {
+  const urut: string[] = []; const g = new Map<string, V[]>();
+  for (const v of vs ?? []) { if (!g.has(v.arus)) { g.set(v.arus, []); urut.push(v.arus); } g.get(v.arus)!.push(v); }
+  const out: V[] = [];
+  const fm = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+  for (const ar of urut) {
+    const xs = g.get(ar)!;
+    if (xs.length === 1) { out.push(xs[0]); continue; }
+    const bisa = xs.filter(x => uraiUom(x, 1).palet != null), lain = xs.filter(x => !bisa.includes(x));
+    if (bisa.length <= 1) { out.push(...xs); continue; }
+    const ur = (k: 'rataRataBulan' | 'peakBulan' | 'komitmenBulan') => bisa.map(x => uraiUom(x, Number(x[k]) || 0));
+    const sum = (k: 'rataRataBulan' | 'peakBulan' | 'komitmenBulan') => ur(k).reduce((s2, u) => s2 + (u.palet ?? 0), 0);
+    const uk = ur('komitmenBulan'), kom = sum('komitmenBulan');
+    const semuaCase = uk.every(u => u.case != null), semuaPcs = uk.every(u => u.pcs != null);
+    const cs = uk.reduce((s2, u) => s2 + (u.case ?? 0), 0), pcs = uk.reduce((s2, u) => s2 + (u.pcs ?? 0), 0);
+    const per1 = semuaCase && kom > 0 ? Math.round((cs / kom) * 100) / 100 : 0;
+    const per2 = semuaCase && semuaPcs && cs > 0 ? Math.round((pcs / cs) * 100) / 100 : 0;
+    out.push({ ...bisa[0], arus: ar, uom: 'palet', rataRataBulan: sum('rataRataBulan'), peakBulan: sum('peakBulan'), komitmenBulan: kom,
+      konversi: { uom1: 'case', per1, uom2: 'pcs', per2 }, rincian: bisa.map(x => `${fm(Number(x.komitmenBulan) || 0)} ${x.uom}`).join(' + ') } as V);
+    out.push(...lain);
+  }
+  return out;
 }

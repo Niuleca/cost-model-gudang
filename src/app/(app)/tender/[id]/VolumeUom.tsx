@@ -1,7 +1,7 @@
 'use client';
 // Tab Volume: pilihan UoM lengkap (dikelompokkan), isian konversi per baris sesuai jenis satuan,
 // dan Ringkasan volume semua satuan (palet / posisi palet / CBM / ton / case / pcs / liter) dari satu mesin konversi.
-import { kelasUom, uraiUom, MUATAN_DEFAULT, type KelasUom, type Muatan, type VolumeInput } from '@/lib/engine/types';
+import { gabungPerArus, kelasUom, uraiUom, MUATAN_DEFAULT, type KelasUom, type Muatan, type VolumeInput } from '@/lib/engine/types';
 import { AngkaInput } from '@/components/fields';
 
 /** Daftar UoM volume, dikelompokkan untuk drop list. */
@@ -120,7 +120,13 @@ export function RingkasanVolumeSemuaUom({ volumes, muatan, basis, hariOps }: {
             <td className="num">{stok || u.palet == null || !(hariOps > 0) ? '—' : f(u.palet / hariOps, 1)}</td>
             <td className="small muted" style={{ minWidth: 200 }}>{[...u.dasar, ...u.kurang.map(x => `⚠ ${x}`)].join(' · ') || '—'}</td>
           </tr>;
-        })}</tbody>
+        })}
+        {gabungPerArus(volumes).filter(v => v.rincian).map((v, i) => { const q = Number(v[basis]) || 0, u = uraiUom(v, q, m), stok = v.arus === 'storage';
+          return <tr key={`tot${i}`} className="pd-sub"><td><b>Total {ARUS_LABEL[v.arus] ?? v.arus}</b></td>
+            <td className="num"><b>{f(q, 1)}</b> palet eq.</td><td className="num"><b>{f(u.palet, 1)}</b></td><td className="num">{f(u.cbm, 1)}</td>
+            <td className="num">{f(u.kg != null ? u.kg / 1000 : null, 2)}</td><td className="num">—</td><td className="num">—</td><td className="num">{f(u.liter)}</td>
+            <td className="num">{stok || !(hariOps > 0) ? '—' : <b>{f(q / hariOps, 1)}</b>}</td><td className="small muted">gabungan {v.rincian} — dipakai space, manpower & tarif</td></tr>; })}
+        </tbody>
       </table></div>
       <p className="small muted" style={{ margin: 0 }}>Semua angka memakai konversi yang sama dengan hitungan space, manpower dan tarif. Posisi palet storage = stok dalam palet ekuivalen (dibulatkan ke atas).</p>
     </div>
@@ -173,6 +179,12 @@ export function RingkasanOrder({ volumes, basis, hariOps, utama, onUtama, labelA
           <td className="num">{stok ? <span className="muted">–</span> : sel(v, hariOps > 0 ? bln / hariOps : 0)}</td>
           <td className="num">{sel(v, bln)}</td>
           <td className="num">{stok ? <span className="muted">–</span> : sel(v, bln * 12)}</td></tr>;
-      })}</tbody></table></div>
+      })}
+      {gabungPerArus(volumes).filter(v => v.rincian).map((v, i) => { const bln = Number(v[basis]) || 0, stok = v.arus === 'storage';
+        return <tr key={`tot${i}`} className="pd-sub"><td><b>Total {labelArus(v.arus)}</b><div className="small muted">{v.rincian}</div></td>
+          <td className="num">{stok ? <span className="muted">–</span> : sel(v, hariOps > 0 ? bln / hariOps : 0)}</td>
+          <td className="num">{sel(v, bln)}</td>
+          <td className="num">{stok ? <span className="muted">–</span> : sel(v, bln * 12)}</td></tr>; })}
+      </tbody></table></div>
   </>;
 }
