@@ -1,7 +1,7 @@
 import type { VsmInput } from '@/lib/vsmSop';
 import { airKeCostLines, type AirInput } from './air';
 import { aktivitasDenganOrderAdmin, stokDariPalet } from '@/lib/profilVolume';
-import { volumeEfektif } from '@/lib/engine/types';
+import { volumeEfektif, MUATAN_DEFAULT } from '@/lib/engine/types';
 import { VSM_DEFAULT } from '@/lib/vsmDefault';
 import { terapkanPorsiMuat, type PorsiMuat } from '@/lib/porsiMuat';
 import { PD_DEFAULT, type ProcessDesignInput } from '@/lib/engine/processDesign';
@@ -129,7 +129,7 @@ export function keInput(t: TenderRow): TenderInput {
     customer: t.customer, provinsi: t.provinsi, kabKota: t.kab_kota, tahun,
     durasiKontrakBulan: t.durasi_kontrak_bulan, jumlahShift: t.jumlah_shift, jamEfektifPerShift: Number(t.jam_efektif_per_shift),
     hariKerjaPerMinggu: t.hari_kerja_per_minggu, cutiTahunanHari: a.cutiTahunanHari, skenarioAset: t.skenario_aset,
-    paymentTermHari: t.payment_term_hari, volumes: volumeEfektif(a.volumes), aktivitas: aktivitasDenganOrderAdmin(terapkanPorsiMuat(aktivitasAktif(a.aktivitas), a.porsiMuat), volumeEfektif(a.volumes), a.profilVolume, a.processDesign?.hariKerjaBulan ?? 25), peranTetap: a.peranTetap, alatSupervisor: a.alatSupervisor ?? [],
+    paymentTermHari: t.payment_term_hari, volumes: volumeEfektif(a.volumes, a.profilVolume?.param), aktivitas: aktivitasDenganOrderAdmin(terapkanPorsiMuat(aktivitasAktif(a.aktivitas), a.porsiMuat), volumeEfektif(a.volumes, a.profilVolume?.param), a.profilVolume, a.processDesign?.hariKerjaBulan ?? 25), peranTetap: a.peranTetap, alatSupervisor: a.alatSupervisor ?? [],
     spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, faktorProduktivitas: a.faktorProduktivitas,
     efisiensi: a.efisiensi, mhe: a.mhe, listrik: a.listrik,
     space: a.gudang ? { ...a.space, luasTersediaM2: Number(a.gudang.luas_m2), namaGudang: a.gudang.nama,
@@ -140,8 +140,8 @@ export function keInput(t: TenderRow): TenderInput {
     costLines: [...a.costLines, ...itKeCostLines(a.it ?? IT_SHEET_DEFAULT), ...airKeCostLines(a.air)],
     tarifListrikKwh: a.tarifListrikKwh, advanceSewaBulan: 0, depositBulan: 0,   // biaya modal sewa dihapus dari input
     listrikSimulasi: a.listrikSimulasi ?? null, marginManual: a.marginManual ?? {}, alokasiKategori: a.alokasiKategori, layananJual: a.layananJual, hariTarifHarian: a.hariTarifHarian, tarifTambahan: a.tarifTambahan, pajak: a.pajak ?? PAJAK_DEFAULT, startupAuto: a.startupAuto ?? STARTUP_DEFAULT, rincianBiayaMp: a.rincianBiayaMp ?? {}, paramBiayaMp: a.paramBiayaMp ?? {}, levelGaji: a.levelGaji ?? {}, levelRole: a.levelRole ?? {}, uomRateCard: a.uomRateCard ?? {}, uomManual: a.uomManual ?? {}, revisiBiaya: a.revisiBiaya ?? {}, interestCost: a.interestCost,
-    konversiPalet: { cbmPerPalet: a.profilVolume?.param?.cbmPerPalet ?? 1.5, tonPerPalet: a.profilVolume?.param?.tonPerPalet ?? 0.8 }, eskalasiManpower: { ...ESKALASI_DEFAULT, ...(a.eskalasiManpower ?? {}), mulai: a.eskalasiManpower?.mulai || t.tanggal_go_live?.slice(0, 7) || null },
-    ...(() => { const sp = stokDariPalet(volumeEfektif(a.volumes), a.profilVolume); return sp.palet > 0
+    konversiPalet: { ...MUATAN_DEFAULT, ...(a.profilVolume?.param ?? {}) }, eskalasiManpower: { ...ESKALASI_DEFAULT, ...(a.eskalasiManpower ?? {}), mulai: a.eskalasiManpower?.mulai || t.tanggal_go_live?.slice(0, 7) || null },
+    ...(() => { const sp = stokDariPalet(volumeEfektif(a.volumes, a.profilVolume?.param), a.profilVolume); return sp.palet > 0
       ? { stokTon: sp.ton || undefined, stokCbm: sp.cbm || undefined, stokLiter: sp.liter || undefined }
       : { stokTon: a.stokTon, stokCbm: a.stokCbm, stokLiter: a.stokLiter }; })(),
     metodeManpower: 'excel', processDesign:   // hanya metode FTE (process design) yang dipakai

@@ -1,7 +1,7 @@
 // Profil order inbound & outbound — mengikuti volume di tabel Volume:
 // volume/bln (palet eq.) ÷ hari operasional = palet/hari → dipecah per moda dengan % →
 // dikonversi ke satuan moda (kontainer / palet / case / pcs) → jumlah mobil per hari (cek palet, CBM, ton).
-import type { AktivitasInput, VolumeInput } from '@/lib/engine/types';
+import { uraiUom, kelasUom, type AktivitasInput, type VolumeInput } from '@/lib/engine/types';
 
 export type ModaOrder = 'cont20' | 'cont40' | 'cont40hc' | 'palet' | 'case' | 'unit';
 export type BasisVolume = 'peakBulan' | 'rataRataBulan' | 'komitmenBulan';
@@ -82,22 +82,18 @@ const isCase = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].
 /** Volume arus per bulan dalam palet ekuivalen + default isi case/pcs dari konversi Volume. */
 export function volumePalet(v: VolumeInput | undefined, basis: BasisVolume, param?: ParamProfil) {
   const k = v?.konversi;
+  const pr = { ...PARAM_DEFAULT, ...(param ?? {}) };
+  const est = pr.cbmPerCase > 0 ? Math.floor(pr.cbmPerPalet / pr.cbmPerCase) : 0;
   const cppDef = k && k.per1 > 0 && isCase(k.uom1) ? k.per1 : 0;
   const upcDef = k && k.per2 > 0 ? k.per2 : 0;
   if (!v) return { paletBulan: 0, cpp: cppDef, upc: upcDef, ok: false, ket: 'arus belum ada di tabel Volume' };
   const q = Number(v[basis]) || 0;
-  const u = v.uom.trim().toLowerCase();
-  if (u === 'palet' || u === 'pallet') return { paletBulan: q, cpp: cppDef, upc: upcDef, ok: true, ket: '' };
-  // UoM volume case/karton: dibalik ke palet memakai isi karton per palet
-  if (isCase(u) && k?.paletIsi && k.paletIsi > 0) return { paletBulan: q / k.paletIsi, cpp: k.paletIsi, upc: k.per2 > 0 ? k.per2 : 0, ok: true, ket: '' };
-  // Belum diisi: perkiraan isi per palet = CBM per palet ÷ CBM per case (parameter muatan)
-  const pr = { ...PARAM_DEFAULT, ...(param ?? {}) };
-  const est = pr.cbmPerCase > 0 ? Math.floor(pr.cbmPerPalet / pr.cbmPerCase) : 0;
-  if (isCase(u) && est > 0) return { paletBulan: q / est, cpp: est, upc: upcDef, ok: true,
-    ket: `UoM volume ${v.uom}: dihitung ${est} ${v.uom}/palet (= ${pr.cbmPerPalet} CBM/palet ÷ ${pr.cbmPerCase} CBM/case). Isi "1 palet = … ${v.uom}" di tabel Volume agar sesuai.` };
-  if (isCase(u)) return { paletBulan: 0, cpp: 0, upc: upcDef, ok: false, ket: `UoM volume ${v.uom} — isi "1 palet = … ${v.uom}" di tabel Volume agar bisa dihitung ke palet` };
-  // UoM volume bukan palet: konversi ke palet butuh isi case per palet (k.per1 = isi per uom volume tidak membantu)
-  return { paletBulan: 0, cpp: cppDef, upc: upcDef, ok: false, ket: `UoM volume ${v.uom} — ubah ke palet agar bisa dipecah` };
+  const kl = kelasUom(v.uom);
+  const u = uraiUom(v, q, pr);
+  const cpp = kl === 'case' ? (k?.paletIsi && k.paletIsi > 0 ? k.paletIsi : est) : cppDef;
+  if (u.palet == null) return { paletBulan: 0, cpp, upc: upcDef, ok: false, ket: `UoM volume ${v.uom} — ${u.kurang[0] ?? u.dasar[0] ?? 'tidak bisa dihitung ke palet'}` };
+  return { paletBulan: u.palet, cpp, upc: upcDef, ok: true,
+    ket: u.paletPasti || kl === 'palet' ? '' : `UoM volume ${v.uom}: ${u.dasar.join('; ')}. ${u.kurang.join('; ')}`.trim() };
 }
 
 export interface HasilBaris {
@@ -208,6 +204,9 @@ const f = (x: number) => (Math.round(x * 100) / 100).toLocaleString('id-ID');
 export function stokDariPalet(volumes: VolumeInput[], profil: ProfilVolume | undefined) {
   const param = { ...PARAM_DEFAULT, ...(profil?.param ?? {}) };
   const st = volumes.find(v => v.arus === 'storage');
-  const palet = st && /^pal(l)?et$/i.test(st.uom.trim()) ? Number(st.rataRataBulan) || 0 : 0;
-  return { palet, ton: palet * param.tonPerPalet, kg: palet * param.tonPerPalet * 1000, cbm: palet * param.cbmPerPalet, liter: palet * (param.literPerPalet ?? 0), param };
+  // UoM storage apa pun (palet, CBM, ton, case, bag …) → semua satuan lewat konversi terpadu
+  const u = uraiUom(st, Number(st?.rataRataBulan) || 0, param);
+  const palet = u.palet ?? 0;
+  const kg = u.kg ?? palet * param.tonPerPalet * 1000;
+  return { palet, ton: kg / 1000, kg, cbm: u.cbm ?? palet * param.cbmPerPalet, liter: u.liter ?? palet * (param.literPerPalet ?? 0), param, urai: u };
 }

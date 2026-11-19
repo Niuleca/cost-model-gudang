@@ -16,43 +16,139 @@ export interface VolumeInput {
   peakBulan: number;        // dipakai untuk sizing
   komitmenBulan: number;    // dipakai untuk billing (MGV)
   /** Isi per UoM: 1 [uom] = per1 [uom1]; 1 [uom1] = per2 [uom2]. Mis. 1 palet = 40 case, 1 case = 24 pcs. */
-  konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; // paletIsi: isi karton/case per palet (UoM volume case)
+  konversi?: { uom1: string; per1: number; uom2: string; per2: number; paletIsi?: number }; // paletIsi: isi [UoM baris] per palet (case / kemasan / pcs)
+  /** Parameter muatan tender (runtime, tidak disimpan): disisipkan oleh volumeEfektif(…, muatan) supaya konversi CBM/ton/kg ↔ palet konsisten di semua hitungan. */
+  muatan?: Partial<Muatan>;
 }
 
-/** Faktor konversi dari UoM volume arus ke UoM lain (1 bila sama, null bila tidak dikenal). */
-export function faktorUom(v: VolumeInput | undefined, uom: string): number | null {
-  if (!v) return null;
-  // case = karton = dus = carton = ctn dianggap sama
-  const n = (x: string) => { const y = x.trim().toLowerCase(); return ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes(y) ? 'case' : ['pcs', 'pc', 'piece', 'unit', 'ea'].includes(y) ? 'pcs' : y; };
-  if (n(v.uom) === n(uom)) return 1;
-  const k = v.konversi;
-  if (!k) return null;
-  // Volume dalam case/karton → dibalik ke palet: 1 palet = paletIsi case; 1 case = per2 pcs
-  if (n(v.uom) === 'case') {
-    if (/^pal(l)?et$/i.test(uom.trim())) return k.paletIsi && k.paletIsi > 0 ? 1 / k.paletIsi : null;
-    if (k.uom2 && n(k.uom2) === n(uom) && k.per2 > 0) return k.per2;
+// ---------------------------------------------------------------------------------------------------------
+// KONVERSI UoM TERPADU
+// Satu jalur: [UoM volume] → palet ekuivalen → semua UoM lain (case, pcs, kg, ton, CBM, liter).
+// Faktor per baris (tab Volume): 1 palet = paletIsi [UoM baris] (kemasan) atau 1 palet = per1 [uom1] (baris palet);
+// isi kecil: 1 [kemasan] = per2 [uom2]. Faktor ukuran/berat per palet & per case dari Parameter muatan (tab Volume / Produk).
+// ---------------------------------------------------------------------------------------------------------
+export interface Muatan { cbmPerPalet: number; tonPerPalet: number; literPerPalet?: number; cbmPerCase?: number; kgPerCase?: number }
+export const MUATAN_DEFAULT: Muatan = { tonPerPalet: 0.8, cbmPerPalet: 1.5, cbmPerCase: 0.04, kgPerCase: 12 };
+export type KelasUom = 'palet' | 'case' | 'kemasan' | 'pcs' | 'kg' | 'ton' | 'cbm' | 'liter' | 'transaksi' | 'lain';
+const U_CASE = ['case', 'karton', 'dus', 'carton', 'ctn', 'box', 'cs'];
+const U_PCS = ['pcs', 'pc', 'piece', 'unit', 'ea', 'each', 'botol', 'kaleng', 'sachet', 'set', 'pair', 'pasang', 'lembar', 'sheet'];
+const U_KEMASAN = ['bag', 'sak', 'karung', 'pail', 'drum', 'ibc', 'pack', 'roll', 'inner', 'bale', 'bal', 'bundle', 'jumbo_bag', 'jumbo bag', 'fibc', 'crate', 'reel', 'coil', 'tote', 'jerrycan', 'jerigen', 'tray', 'krat'];
+const U_TRANS = ['order', 'line', 'lokasi', 'sku', 'do', 'trip', 'shipment', 'dokumen', 'container', 'kontainer', 'truk', 'event'];
+/** Kelas satuan: menentukan cara dikonversi. */
+export function kelasUom(u: string | undefined): KelasUom {
+  const x = (u ?? '').trim().toLowerCase().replace(/³/g, '3');
+  if (/^pal(l)?et(s)?$|^plt$/.test(x)) return 'palet';
+  if (U_CASE.includes(x)) return 'case';
+  if (U_PCS.includes(x)) return 'pcs';
+  if (['kg', 'kgs', 'kilogram'].includes(x)) return 'kg';
+  if (['ton', 'tonne', 'mt', 't'].includes(x)) return 'ton';
+  if (['cbm', 'm3', 'kubik'].includes(x)) return 'cbm';
+  if (['liter', 'litre', 'l', 'ltr'].includes(x)) return 'liter';
+  if (U_KEMASAN.includes(x)) return 'kemasan';
+  if (U_TRANS.some(t => x === t || x.startsWith(t + ' '))) return 'transaksi';
+  return 'lain';
+}
+const muatanOk = (m?: Partial<Muatan> | null): Muatan => ({ ...MUATAN_DEFAULT, ...Object.fromEntries(Object.entries(m ?? {}).filter(([, v]) => Number(v) > 0)) } as Muatan);
+const n = (x: unknown) => (Number(x) > 0 ? Number(x) : 0);
+
+export interface UraiUom {
+  palet: number | null; case: number | null; pcs: number | null; kg: number | null; cbm: number | null; liter: number | null;
+  /** palet: true = dari isian baris / satuan ukur (bukan perkiraan) */
+  paletPasti: boolean;
+  /** catatan cara hitung & kekurangan data (untuk ditampilkan) */
+  dasar: string[]; kurang: string[];
+}
+/** Pecah qty sebuah baris volume ke semua UoM. null = tidak bisa dihitung (data kurang / satuan transaksi). */
+export function uraiUom(v: Pick<VolumeInput, 'uom' | 'konversi' | 'muatan'> | undefined, qty: number, muatan?: Partial<Muatan> | null): UraiUom {
+  const m = muatanOk(muatan ?? v?.muatan);
+  const q = Math.max(0, Number(qty) || 0);
+  const out: UraiUom = { palet: null, case: null, pcs: null, kg: null, cbm: null, liter: null, paletPasti: false, dasar: [], kurang: [] };
+  if (!v) return out;
+  const kl = kelasUom(v.uom), k = v.konversi;
+  const isi = n(k?.paletIsi);                                           // [UoM baris] per palet (kemasan / case / pcs)
+  const cppEst = n(m.cbmPerCase) > 0 ? Math.floor(m.cbmPerPalet / n(m.cbmPerCase)) : 0;
+  // isi palet untuk baris palet: 1 palet = per1 case
+  const cppPalet = kl === 'palet' && k && n(k.per1) && kelasUom(k.uom1) === 'case' ? n(k.per1) : 0;
+  // isi kecil (pcs) per kemasan / case
+  const kecil = k && n(k.per2) && k.uom2 ? { per: n(k.per2), kls: kelasUom(k.uom2), uom: k.uom2 } : null;
+  switch (kl) {
+    case 'palet': out.palet = q; out.paletPasti = true; break;
+    case 'cbm': out.palet = q / m.cbmPerPalet; out.cbm = q; out.paletPasti = true; out.dasar.push(`${m.cbmPerPalet} CBM/palet`); break;
+    case 'kg': out.palet = q / (m.tonPerPalet * 1000); out.kg = q; out.paletPasti = true; out.dasar.push(`${Math.round(m.tonPerPalet * 1000)} kg/palet`); break;
+    case 'ton': out.palet = q / m.tonPerPalet; out.kg = q * 1000; out.paletPasti = true; out.dasar.push(`${Math.round(m.tonPerPalet * 1000)} kg/palet`); break;
+    case 'liter':
+      if (n(m.literPerPalet)) { out.palet = q / n(m.literPerPalet); out.paletPasti = true; out.dasar.push(`${m.literPerPalet} liter/palet`); }
+      else out.kurang.push('isi "Isi cair per palet" di Parameter muatan');
+      out.liter = q; break;
+    case 'case':
+      out.case = q;
+      if (isi) { out.palet = q / isi; out.paletPasti = true; out.dasar.push(`1 palet = ${isi} ${v.uom}`); }
+      else if (cppEst) { out.palet = q / cppEst; out.dasar.push(`perkiraan ${cppEst} ${v.uom}/palet (${m.cbmPerPalet} ÷ ${m.cbmPerCase} CBM)`); out.kurang.push(`isi "1 palet = … ${v.uom}" agar pasti`); }
+      else out.kurang.push(`isi "1 palet = … ${v.uom}"`);
+      break;
+    case 'kemasan': case 'pcs':
+      if (isi) { out.palet = q / isi; out.paletPasti = true; out.dasar.push(`1 palet = ${isi} ${v.uom}`); }
+      else if (kecil?.kls === 'kg') { out.palet = (q * kecil.per) / (m.tonPerPalet * 1000); out.dasar.push(`perkiraan dari berat ${kecil.per} kg/${v.uom}`); out.kurang.push(`isi "1 palet = … ${v.uom}" agar pasti`); }
+      else out.kurang.push(`isi "1 palet = … ${v.uom}"`);
+      if (kl === 'pcs') out.pcs = q;
+      break;
+    case 'transaksi': out.dasar.push(`${v.uom} = satuan transaksi (bukan barang fisik), tidak dikonversi`); break;
+    default: out.kurang.push(`satuan "${v.uom}" belum dikenal — pilih dari daftar`);
   }
-  if (k.uom1 && n(k.uom1) === n(uom) && k.per1 > 0) return k.per1;
-  if (k.uom2 && n(k.uom2) === n(uom) && k.per1 > 0 && k.per2 > 0) return k.per1 * k.per2;
-  return null;
+  const P = out.palet;
+  if (P != null) {
+    if (out.cbm == null) out.cbm = P * m.cbmPerPalet;
+    if (out.kg == null) out.kg = P * m.tonPerPalet * 1000;
+    if (out.liter == null && n(m.literPerPalet)) out.liter = P * n(m.literPerPalet);
+    if (out.case == null && kl !== 'kemasan' && kl !== 'pcs' && kl !== 'transaksi') {   // bag / drum / pcs bukan case
+      const cpp = cppPalet || cppEst;
+      if (cpp) { out.case = P * cpp; if (!cppPalet) out.dasar.push(`case: perkiraan ${cpp}/palet`); }
+    }
+  }
+  // pcs: dari isi kecil per case/kemasan, atau baris palet (1 palet = per1 case, 1 case = per2 pcs)
+  if (out.pcs == null && kecil && kecil.kls === 'pcs') {
+    if ((kl === 'case' || kl === 'kemasan')) out.pcs = q * kecil.per;
+    else if (kl === 'palet' && cppPalet) out.pcs = q * cppPalet * kecil.per;
+    else if (out.case != null) out.pcs = out.case * kecil.per;
+  }
+  if (out.liter == null && kecil?.kls === 'liter' && (kl === 'case' || kl === 'kemasan')) out.liter = q * kecil.per;
+  return out;
 }
 
-/** Volume dalam palet ekuivalen: UoM palet = apa adanya; UoM case/karton dibagi isi per palet (bila diisi). */
-export function paletEkuivalen(v: VolumeInput | undefined, basis: 'peakBulan' | 'rataRataBulan' | 'komitmenBulan' = 'peakBulan'): { palet: number; ok: boolean } {
+/** Faktor konversi dari UoM volume arus ke UoM lain (1 bila sama, null bila tidak bisa dihitung). */
+export function faktorUom(v: VolumeInput | undefined, uom: string, muatan?: Partial<Muatan> | null): number | null {
+  if (!v) return null;
+  const a = kelasUom(v.uom), b = kelasUom(uom);
+  const sama = (x: string) => x.trim().toLowerCase();
+  if (sama(v.uom) === sama(uom) || (a === b && (a === 'case' || a === 'pcs' || a === 'palet' || a === 'cbm' || a === 'kg' || a === 'ton' || a === 'liter'))) return 1;
+  const k = v.konversi;
+  // rantai isian baris: 1 [uom] = per1 [uom1]; 1 [uom1] = per2 [uom2]
+  if (k?.uom1 && sama(k.uom1) === sama(uom) && n(k.per1) && a === 'palet') return n(k.per1);
+  if (k?.uom2 && (sama(k.uom2) === sama(uom) || (kelasUom(k.uom2) === b && b === 'pcs')) && n(k.per2)) {
+    if (a === 'case' || a === 'kemasan') return n(k.per2);
+    if (a === 'palet' && n(k.per1)) return n(k.per1) * n(k.per2);
+  }
+  if (k?.uom1 && kelasUom(k.uom1) === b && b === 'case' && a === 'palet' && n(k.per1)) return n(k.per1);
+  if (a === 'transaksi' || b === 'transaksi') return null;
+  // lewat palet ekuivalen (satuan ukur / isi per palet / parameter muatan)
+  const u = uraiUom(v, 1, muatan);
+  const tgt = b === 'palet' ? u.palet : b === 'case' ? u.case : b === 'pcs' ? u.pcs : b === 'kg' ? u.kg : b === 'ton' ? (u.kg != null ? u.kg / 1000 : null)
+    : b === 'cbm' ? u.cbm : b === 'liter' ? u.liter : null;
+  return tgt != null && tgt > 0 ? tgt : null;
+}
+
+/** Volume dalam palet ekuivalen (UoM apa pun → palet). ok = dari isian / satuan ukur, bukan perkiraan atau 1:1. */
+export function paletEkuivalen(v: VolumeInput | undefined, basis: 'peakBulan' | 'rataRataBulan' | 'komitmenBulan' = 'peakBulan', muatan?: Partial<Muatan> | null): { palet: number; ok: boolean } {
   if (!v) return { palet: 0, ok: false };
-  const q = Number(v[basis]) || 0;
-  if (/^pal(l)?et$/i.test(v.uom.trim())) return { palet: q, ok: true };
-  const f = faktorUom(v, 'palet');
-  if (f != null && f > 0) return { palet: q * f, ok: true };
-  // case/karton tanpa isi per palet: tidak bisa dihitung ke palet (jangan dianggap palet)
-  return ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes(v.uom.trim().toLowerCase()) ? { palet: 0, ok: false } : { palet: q, ok: false };
+  const u = uraiUom(v, Number(v[basis]) || 0, muatan);
+  return { palet: u.palet ?? 0, ok: u.palet != null && u.paletPasti };
 }
 
 /** Pengali efektif aktivitas: pengali manual bila ≠ 1; bila 1 dan UoM aktivitas beda dari UoM arus → pakai konversi Volume. */
-export function pengaliEfektif(a: { uom: string; pengaliUom: number }, v: VolumeInput | undefined): number {
+export function pengaliEfektif(a: { uom: string; pengaliUom: number }, v: VolumeInput | undefined, muatan?: Partial<Muatan> | null): number {
   const p = a.pengaliUom || 1;
   if (p !== 1) return p;
-  return faktorUom(v, a.uom) ?? 1;
+  return faktorUom(v, a.uom, muatan) ?? 1;
 }
 
 export interface AktivitasInput {
@@ -72,10 +168,10 @@ export interface AktivitasInput {
 }
 
 /** Volume efektif: Peak kosong → rata-rata (lalu komitmen); Komitmen kosong → rata-rata (lalu peak). Input asli tidak diubah. */
-export function volumeEfektif<V extends { rataRataBulan: number; peakBulan: number; komitmenBulan: number }>(vs: V[]): V[] {
+export function volumeEfektif<V extends { rataRataBulan: number; peakBulan: number; komitmenBulan: number }>(vs: V[], muatan?: Partial<Muatan> | null): V[] {
   return (vs ?? []).map(v => {
     const avg = Number(v.rataRataBulan) || 0, pk = Number(v.peakBulan) || 0, km = Number(v.komitmenBulan) || 0;
-    return { ...v, peakBulan: pk > 0 ? pk : avg > 0 ? avg : km, komitmenBulan: km > 0 ? km : avg > 0 ? avg : pk };
+    return { ...v, peakBulan: pk > 0 ? pk : avg > 0 ? avg : km, komitmenBulan: km > 0 ? km : avg > 0 ? avg : pk, ...(muatan ? { muatan } : {}) };
   });
 }
 
@@ -201,7 +297,7 @@ export interface TenderInput {
   revisiBiaya?: Record<string, number>;
   interestCost?: InterestCost;
   /** Konversi palet → CBM/ton untuk opsi UoM rate card (dari parameter profil order). */
-  konversiPalet?: { cbmPerPalet: number; tonPerPalet: number };
+  konversiPalet?: Partial<Muatan>;
   levelRole?: Record<string, import('./biayaMp').LevelJabatan>;
   /** Kenaikan biaya manpower per tahun kontrak (0.05 = 5%/thn). Biaya/bln = total kontrak ÷ bulan kontrak. */
   eskalasiManpower?: { persenTahun: number; mulai?: string | null };

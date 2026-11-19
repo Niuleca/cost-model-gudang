@@ -1030,3 +1030,9 @@ tr.aktif td { background: #f5f3ff; }
 .sim2d-tata.mode-app .sim2d-tengah .tabs { padding: 3px; }
 .sim2d-tata.mode-app .sim2d-tengah .tabs button { padding: 4px 9px; font-size: 12.5px; }
 .sim2d-tata.mode-app .sim2d-tengah > .row { row-gap: 6px; }
+
+/* ---------- Volume: ringkasan semua satuan */
+.vol-semua { display: grid; gap: 12px; margin-top: 14px; background: var(--g50, #f8fafc); }
+.vol-kartu { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.vol-kartu > div { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.vol-kartu b { font-size: 22px; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--ink); }
