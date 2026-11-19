@@ -79,20 +79,34 @@ export const PARAM_DEFAULT: ParamProfil = { tonPerPalet: 0.8, cbmPerPalet: 1.5, 
 
 const isCase = (u: string) => ['case', 'karton', 'dus', 'carton', 'ctn', 'box'].includes(u.trim().toLowerCase());
 
-/** Volume arus per bulan dalam palet ekuivalen + default isi case/pcs dari konversi Volume. */
-export function volumePalet(v: VolumeInput | undefined, basis: BasisVolume, param?: ParamProfil) {
-  const k = v?.konversi;
+/** Isi case per palet & unit per case untuk satu baris volume (tanpa estimasi). */
+function isiDariKonversi(v: VolumeInput | undefined) {
+  const k = v?.konversi; if (!v || !k) return { cpp: 0, upc: 0 };
+  const kl = kelasUom(v.uom);
+  const cpp = kl === 'case' || kl === 'kemasan' ? (k.paletIsi && k.paletIsi > 0 ? k.paletIsi : 0)
+    : kl === 'palet' && k.per1 > 0 && (isCase(k.uom1) || kelasUom(k.uom1) === 'case') ? k.per1 : 0;
+  const upc = kl === 'palet' ? (k.per2 > 0 ? k.per2 : 0) : (kl === 'case' || kl === 'kemasan') && k.per2 > 0 ? k.per2 : 0;
+  return { cpp, upc };
+}
+
+/** Volume arus per bulan dalam palet ekuivalen + default isi case/pcs.
+ *  Urutan sumber isi case per palet: konversi baris arus ini → konversi baris volume lain (mis. storage / outbound, juga hasil sinkron Produk)
+ *  → perkiraan dari Parameter muatan (CBM per palet ÷ CBM per case). Jadi kontainer / truk loose case tidak pernah 0 karena isian kosong. */
+export function volumePalet(v: VolumeInput | undefined, basis: BasisVolume, param?: ParamProfil, semua: VolumeInput[] = []) {
   const pr = { ...PARAM_DEFAULT, ...(param ?? {}) };
-  const est = pr.cbmPerCase > 0 ? Math.floor(pr.cbmPerPalet / pr.cbmPerCase) : 0;
-  const cppDef = k && k.per1 > 0 && isCase(k.uom1) ? k.per1 : 0;
-  const upcDef = k && k.per2 > 0 ? k.per2 : 0;
-  if (!v) return { paletBulan: 0, cpp: cppDef, upc: upcDef, ok: false, ket: 'arus belum ada di tabel Volume' };
+  const est = pr.cbmPerCase > 0 ? Math.floor(pr.cbmPerPalet / pr.cbmPerCase + 1e-9) : 0;
+  const sendiri = isiDariKonversi(v);
+  const lain = semua.filter(x => x !== v && x.arus !== v?.arus).map(isiDariKonversi);
+  const cppLain = lain.find(x => x.cpp > 0)?.cpp ?? 0, upcLain = lain.find(x => x.upc > 0)?.upc ?? 0;
+  const cpp = sendiri.cpp || cppLain || est;
+  const cppSumber = sendiri.cpp ? 'konversi Volume' : cppLain ? 'konversi baris volume lain' : est ? `perkiraan ${pr.cbmPerPalet} CBM/palet ÷ ${pr.cbmPerCase} CBM/case` : '';
+  const upc = sendiri.upc || upcLain;
+  if (!v) return { paletBulan: 0, cpp, upc, cppSumber, ok: false, ket: 'arus belum ada di tabel Volume' };
   const q = Number(v[basis]) || 0;
   const kl = kelasUom(v.uom);
   const u = uraiUom(v, q, pr);
-  const cpp = kl === 'case' ? (k?.paletIsi && k.paletIsi > 0 ? k.paletIsi : est) : cppDef;
-  if (u.palet == null) return { paletBulan: 0, cpp, upc: upcDef, ok: false, ket: `UoM volume ${v.uom} — ${u.kurang[0] ?? u.dasar[0] ?? 'tidak bisa dihitung ke palet'}` };
-  return { paletBulan: u.palet, cpp, upc: upcDef, ok: true,
+  if (u.palet == null) return { paletBulan: 0, cpp, upc, cppSumber, ok: false, ket: `UoM volume ${v.uom} — ${u.kurang[0] ?? u.dasar[0] ?? 'tidak bisa dihitung ke palet'}` };
+  return { paletBulan: u.palet, cpp, upc, cppSumber, ok: true,
     ket: u.paletPasti || kl === 'palet' ? '' : `UoM volume ${v.uom}: ${u.dasar.join('; ')}. ${u.kurang.join('; ')}`.trim() };
 }
 
@@ -171,7 +185,7 @@ export function orderAdmin(profil: ProfilVolume | undefined, volumes: VolumeInpu
   const satu = (arus: 'inbound' | 'outbound') => {
     const rows = profil[arus] ?? [];
     if (!rows.length) return kosong;
-    const vp = volumePalet(volumes.find(v => v.arus === arus), profil.basis ?? 'peakBulan', param);
+    const vp = volumePalet(volumes.find(v => v.arus === arus), profil.basis ?? 'peakBulan', param, volumes);
     const h = hitungProfil(rows, hariBulan > 0 ? vp.paletBulan / hariBulan : 0, param, kendaraan, { cpp: vp.cpp, upc: vp.upc }, hariBulan);
     const mobilHari = h.totalMobilBulat, orderHari = mobilHari * perMobil;
     return { mobilHari, orderHari, orderBulan: orderHari * hariBulan };

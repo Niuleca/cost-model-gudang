@@ -126,3 +126,53 @@ export function RingkasanVolumeSemuaUom({ volumes, muatan, basis, hariOps }: {
     </div>
   );
 }
+
+/** Satuan utama Ringkasan order — semua arus dikonversi ke satuan ini, satuan lain ditampilkan di bawahnya. */
+export type SatuanUtama = 'input' | 'palet' | 'case' | 'pcs' | 'cbm' | 'ton';
+export const SATUAN_UTAMA: { v: SatuanUtama; l: string }[] = [
+  { v: 'input', l: 'Sesuai input (UoM tiap baris)' }, { v: 'palet', l: 'Palet' }, { v: 'case', l: 'Case / karton' },
+  { v: 'pcs', l: 'Pcs' }, { v: 'cbm', l: 'CBM' }, { v: 'ton', l: 'Ton' },
+];
+const SAT_LABEL: Record<Exclude<SatuanUtama, 'input'>, string> = { palet: 'palet', case: 'case', pcs: 'pcs', cbm: 'CBM', ton: 'ton' };
+
+/** Ringkasan order per hari / bulan / tahun dalam satuan utama + konversi ke palet, case, pcs, CBM, ton (kosong bila tidak bisa dikonversi). */
+export function RingkasanOrder({ volumes, basis, hariOps, utama, onUtama, labelArus, ekstra }: {
+  ekstra?: React.ReactNode; volumes: VolumeInput[]; basis: 'peakBulan' | 'rataRataBulan' | 'komitmenBulan'; hariOps: number;
+  utama: SatuanUtama; onUtama: (u: SatuanUtama) => void; labelArus: (a: string) => string;
+}) {
+  const nilai = (v: VolumeInput, q: number): Record<Exclude<SatuanUtama, 'input'>, number | null> => {
+    const u = uraiUom(v, q);
+    return { palet: u.palet, case: u.case, pcs: u.pcs, cbm: u.cbm, ton: u.kg != null ? u.kg / 1000 : null };
+  };
+  const fx = (x: number | null) => (x == null ? '—' : x.toLocaleString('id-ID', { maximumFractionDigits: Math.abs(x) < 100 && x % 1 ? (Math.abs(x) < 10 ? 2 : 1) : 0 }));
+  const sel = (v: VolumeInput, q: number) => {
+    const n = nilai(v, q), kl = kelasUom(v.uom);
+    const lain = (Object.keys(SAT_LABEL) as (keyof typeof SAT_LABEL)[]).filter(k => k !== utama);
+    const pasti = uraiUom(v, q).paletPasti;
+    return <>
+      {utama === 'input' ? <b>{fx(q)} {v.uom}</b>
+        : n[utama] == null ? <span className="muted" title={`${v.uom} tidak bisa dikonversi ke ${SAT_LABEL[utama]} — lengkapi isi per palet / Parameter muatan`}>—</span>
+        : <b>{fx(n[utama])} {SAT_LABEL[utama]}</b>}
+      {utama !== 'input' && <div className="small muted">input {fx(q)} {v.uom}</div>}
+      {lain.filter(k => kelasUom(k) !== kl).map(k => n[k] == null ? null
+        : <div key={k} className="small muted">{fx(n[k])} {SAT_LABEL[k]}{k === 'palet' && !pasti && kl !== 'palet' ? ' (perkiraan)' : ''}</div>)}
+    </>;
+  };
+  return <>
+    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
+      <h3 style={{ margin: 0 }}>Ringkasan order</h3>
+      <div className="row" style={{ alignItems: 'end' }}>{ekstra}<label className="f" htmlFor="satuan-utama">Satuan utama
+        <select id="satuan-utama" value={utama} onChange={e => onUtama(e.target.value as SatuanUtama)} style={{ minWidth: 190 }}>
+          {SATUAN_UTAMA.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}</select></label></div>
+    </div>
+    <div className="tablewrap"><table>
+      <thead><tr><th>Arus</th><th className="num">Per hari</th><th className="num">Per bulan</th><th className="num">Per tahun</th></tr></thead>
+      <tbody>{volumes.map((v, i) => {
+        const bln = Number(v[basis]) || 0, stok = v.arus === 'storage';
+        return <tr key={i}><td>{labelArus(v.arus)}{stok && <div className="small muted">stok tersimpan (posisi), bukan arus</div>}</td>
+          <td className="num">{stok ? <span className="muted">–</span> : sel(v, hariOps > 0 ? bln / hariOps : 0)}</td>
+          <td className="num">{sel(v, bln)}</td>
+          <td className="num">{stok ? <span className="muted">–</span> : sel(v, bln * 12)}</td></tr>;
+      })}</tbody></table></div>
+  </>;
+}

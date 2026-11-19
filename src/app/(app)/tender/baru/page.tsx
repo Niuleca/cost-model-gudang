@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import TombolPanduan from '@/components/TombolPanduan';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT } from '@/lib/tender';
@@ -70,8 +71,7 @@ export default function TenderBaru() {
         </div>
         {err && <p className="error small">{err}</p>}
         <div className="row"><button type="submit" disabled={sibuk}>{sibuk ? 'Membuat…' : 'Buat tender & lanjut isi asumsi'}</button>
-          <a className="btn ghost" href="/panduan-leca.pdf" target="_blank" rel="noopener">Baca saya sebelum mulai</a>
-          <a className="btn ghost" href="/panduan-leca.docx" download="Read_Me_Leca.docx">Read me (Word)</a></div>
+          <TombolPanduan label="Baca panduan sebelum mulai" /></div>
       </form>
     </>
   );

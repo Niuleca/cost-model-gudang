@@ -7,7 +7,7 @@ import { AngkaBebas } from '@/components/fields';
 import { useSatuanPanjang } from '@/lib/satuanPanjang';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, keInput, muatMaster, type TenderRow } from '@/lib/tender';
 import { IT_SHEET_DEFAULT } from '@/lib/it';
@@ -572,19 +572,12 @@ export default function DesainGudang() {
           {(besarEd || penuhEd) && laci && <button type="button" className="laci-tutup" aria-label="Tutup panel" onClick={() => setLaci(null)} />}
           {/* ---------- kiri: alat & komponen */}
           <div className="card sim2d-kiri">
-            <div className="eyebrow">Mode</div>
-            <div className="tabs">
-              {([['pilih', 'Pilih / geser'], ['blok', 'Seleksi blok'], ['geser', 'Pan'], ['ukur', 'Ukur jarak'], ['kolom', '＋ Kolom (klik)']] as [Mode, string][]).map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)} title={k === 'kolom' ? 'Klik di denah untuk menaruh kolom; otomatis sejajar dengan kolom terdekat dan menampilkan jarak as ke as' : undefined}>{l}</button>)}
-            </div>
+            <div className="eyebrow">Snap</div>
             <div className="grid2" style={{ gap: 6 }}>
               <label className="f">Snap grid
                 <select value={grid} onChange={e => setGrid(Number(e.target.value))}>{[0, 0.05, 0.1, 0.25, 0.5, 1].map(g => <option key={g} value={g}>{g ? `${g} m` : 'tanpa'}</option>)}</select>
               </label>
               <label className="sim3d-cek" style={{ alignSelf: 'end' }}><input type="checkbox" checked={snapTepi} onChange={e => setSnapTepi(e.target.checked)} />Tempel ke tepi</label>
-            </div>
-            <div className="row">
-              <button className="ghost" onClick={undo} title="Ctrl+Z">↶ Undo</button><button className="ghost" onClick={redo} title="Ctrl+Y">↷ Redo</button>
-              <button className="ghost" onClick={() => ed2.current?.pasFit()}>Pas layar</button>
             </div>
             <details className="sim2d-detail" ref={panelLapis} open>
               <summary className="eyebrow">Layer</summary>
@@ -699,40 +692,58 @@ export default function DesainGudang() {
 
           {/* ---------- tengah: kanvas */}
           <div className="sim2d-tengah">
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <div className="row">
-                <div className="tabs">{([['2d', '2D'], ['split', '2D + 3D'], ['3d', '3D']] as const).map(([k, l]) => <button key={k} className={tampil === k ? 'on' : ''} onClick={() => setTampil(k)}>{l}</button>)}</div>
-                <div className="tabs" title="Potongan 2D bagian dalam gudang: tiang, beam, palet per level, lebar lorong">
-                  {([['kiri', 'Potongan kiri'], ['kanan', 'Potongan kanan'], ['depan', 'Potongan depan']] as [ArahPotong, string][]).map(([k, l]) => (
-                    <button key={k} className={potongan?.arah === k ? 'on' : ''} onClick={() => {
+            <div className={`sim2d-kanvas ${tampil}`}>
+              {/* toolbar di dalam layar (gaya SketchUp / AutoCAD): tampilan, potongan, kamera 3D, ukuran editor */}
+              <div className="kb-atas" role="toolbar" aria-label="Tampilan layout">
+                <div className="kb-grup" role="group" aria-label="Tampilan">
+                  {([['2d', '2D', 'Denah 2D saja'], ['split', '2D + 3D', '2D dan 3D berdampingan'], ['3d', '3D', '3D saja']] as const).map(([k, l, t]) => <button key={k} type="button" className={tampil === k ? 'on' : ''} title={t} onClick={() => setTampil(k)}>{l}</button>)}
+                </div>
+                <div className="kb-grup" role="group" aria-label="Potongan" title="Potongan 2D bagian dalam gudang: tiang, beam, palet per level, lebar lorong">
+                  <span className="kb-label">Potongan</span>
+                  {([['kiri', 'Kiri'], ['kanan', 'Kanan'], ['depan', 'Depan']] as [ArahPotong, string][]).map(([k, l]) => (
+                    <button key={k} type="button" className={potongan?.arah === k ? 'on' : ''} onClick={() => {
                       if (potongan?.arah === k) { setPotongan(null); return; }
                       const tetap = potongan && (potongan.arah === 'depan') === (k === 'depan');
                       setPotongan({ arah: k, nilai: tetap ? potongan!.nilai : potongAwal(edit, k) }); if (tampil === '2d') setTampil('split');
                     }}>{l}</button>
                   ))}
                 </div>
-                {tampil !== '2d' && (<>
-                  <div className="tabs">{([['iso', 'Iso'], ['atas', 'Atas'], ['dock', 'Dock'], ['lorong', 'Lorong']] as [Kamera, string][]).map(([k, l]) => <button key={k} onClick={() => { setPotongan(null); setTimeout(() => api3.current?.kamera(k), 0); }}>{l}</button>)}</div>
-                  <label className="small sim3d-cek" title="Leca = visual Leca Game (model 3D detail, palet bertekstur); skematik = model sederhana">Gaya 3D
-                    <select value={gaya3d} onChange={e => setGaya3d(e.target.value as 'leca' | 'skematik')}><option value="leca">Leca (detail)</option><option value="skematik">Skematik</option></select></label>
-                  {([['label', 'Label'], ['orang', 'Manpower'], ['truk', 'Truk'], ['dinding', 'Dinding'], ['atap', 'Atap']] as [keyof OpsiViewer, string][]).map(([k, l]) => (
-                    <label key={k} className="sim3d-cek small"><input type="checkbox" checked={opsi3d[k]} onChange={e => setOpsi3d(o => ({ ...o, [k]: e.target.checked }))} />{l}</label>
-                  ))}
-                </>)}
+                {tampil !== '2d' && <div className="kb-grup" role="group" aria-label="Kamera 3D">
+                  <span className="kb-label">Kamera</span>
+                  {([['iso', 'Iso'], ['atas', 'Atas'], ['dock', 'Dock'], ['lorong', 'Lorong']] as [Kamera, string][]).map(([k, l]) => <button key={k} type="button" onClick={() => { setPotongan(null); setTimeout(() => api3.current?.kamera(k), 0); }}>{l}</button>)}
+                  <details className="kb-menu">
+                    <summary title="Gaya 3D & objek yang ditampilkan">Tampilan ▾</summary>
+                    <div className="kb-menu-isi">
+                      <label className="small">Gaya 3D
+                        <select value={gaya3d} onChange={e => setGaya3d(e.target.value as 'leca' | 'skematik')}><option value="leca">Leca (detail)</option><option value="skematik">Skematik</option></select></label>
+                      {([['label', 'Label'], ['orang', 'Manpower'], ['truk', 'Truk'], ['dinding', 'Dinding'], ['atap', 'Atap']] as [keyof OpsiViewer, string][]).map(([k, l]) => (
+                        <label key={k} className="sim3d-cek small"><input type="checkbox" checked={opsi3d[k]} onChange={e => setOpsi3d(o => ({ ...o, [k]: e.target.checked }))} />{l}</label>
+                      ))}
+                    </div>
+                  </details>
+                </div>}
+                <span className="kb-isi" />
+                <span className="kb-info">{edit.komponen.length} komponen{edit.ukur.length > 0 && <> · {edit.ukur.length} ukur <button type="button" className="kb-teks" onClick={() => aksi(e => ({ ...e, ukur: [] }))}>hapus</button></>}</span>
+                <div className="kb-grup" role="group" aria-label="Ukuran editor">
+                  {(besarEd || penuhEd) && <>
+                    <button type="button" className={`app-laci${laci === 'kiri' ? ' on' : ''}`} onClick={() => setLaci(l => (l === 'kiri' ? null : 'kiri'))} title="Alat, mode & komponen">☰ Alat</button>
+                    <button type="button" className={`app-laci kanan${laci === 'kanan' ? ' on' : ''}`} onClick={() => setLaci(l => (l === 'kanan' ? null : 'kanan'))} title="Properti komponen terpilih & kapasitas">⚙ Properti</button>
+                  </>}
+                  <button type="button" className={`app-panel${tanpaPanel ? ' on' : ''}`} onClick={() => setTanpaPanel(v => !v)} title={tanpaPanel ? 'Tampilkan panel alat & properti' : 'Sembunyikan panel alat & properti supaya kanvas lebih lebar'}>{tanpaPanel ? '◨ Panel' : '◧ Panel'}</button>
+                  <button type="button" className={besarEd || penuhEd ? 'on' : ''} onClick={() => modeEditPenuh(!(besarEd || penuhEd))}
+                    title={besarEd || penuhEd ? 'Kembali ke halaman (Esc)' : 'Edit layout di layar penuh seperti aplikasi — menu & halaman disembunyikan'}>{besarEd || penuhEd ? '✕ Keluar' : '⛶ Layar penuh'}</button>
+                </div>
               </div>
-              <div className="tabs" role="group" aria-label="Ukuran editor">
-                {(besarEd || penuhEd) && <>
-                  <button type="button" className={`app-laci${laci === 'kiri' ? ' on' : ''}`} onClick={() => setLaci(l => (l === 'kiri' ? null : 'kiri'))} title="Alat, mode & komponen">☰ Alat</button>
-                  <button type="button" className={`app-laci kanan${laci === 'kanan' ? ' on' : ''}`} onClick={() => setLaci(l => (l === 'kanan' ? null : 'kanan'))} title="Properti komponen terpilih & kapasitas">⚙ Properti</button>
-                </>}
-                <button type="button" className={`app-panel${tanpaPanel ? ' on' : ''}`} onClick={() => setTanpaPanel(v => !v)} title="Sembunyikan / tampilkan panel alat & properti supaya kanvas lebih lebar">{tanpaPanel ? '◨ Tampilkan panel' : '◧ Sembunyikan panel'}</button>
-                <button type="button" className={besarEd || penuhEd ? 'on' : ''} onClick={() => modeEditPenuh(!(besarEd || penuhEd))}
-                  title={besarEd || penuhEd ? 'Kembali ke halaman (Esc)' : 'Edit layout di layar penuh seperti aplikasi — menu & halaman disembunyikan'}>{besarEd || penuhEd ? '✕ Keluar mode penuh' : '⛶ Mode edit penuh'}</button>
-              </div>
-              <span className="small muted">{edit.komponen.length} komponen · {edit.ukur.length} garis ukur {edit.ukur.length > 0 && <button className="ghost" style={{ padding: '2px 8px', marginLeft: 6 }} onClick={() => aksi(e => ({ ...e, ukur: [] }))}>hapus ukur</button>}</span>
-            </div>
-            <div className={`sim2d-kanvas ${tampil}`}>
               <div className="sim2d-panel2d" style={{ display: tampil === '3d' ? 'none' : undefined }}>
+                <div className="kb-palet" role="toolbar" aria-label="Alat gambar" aria-orientation="vertical">
+                  {([['pilih', 'Pilih', 'Pilih / geser objek'], ['blok', 'Blok', 'Seleksi blok — tarik kotak untuk memilih banyak'], ['geser', 'Pan', 'Geser tampilan (pan) — juga klik tengah / dua jari'], ['ukur', 'Ukur', 'Ukur jarak'], ['kolom', 'Kolom', 'Klik di denah untuk menaruh kolom (sejajar otomatis dengan kolom terdekat)']] as [Mode, string, string][]).map(([k, l, t]) => (
+                    <button key={k} type="button" className={mode === k ? 'on' : ''} title={t} aria-pressed={mode === k} onClick={() => setMode(mode === k && k !== 'pilih' ? 'pilih' : k)}>
+                      <IkonAlat jenis={k} /><span>{l}</span></button>))}
+                  <i className="kb-sekat" />
+                  <button type="button" title="Undo (Ctrl+Z)" onClick={undo}><IkonAlat jenis="undo" /><span>Undo</span></button>
+                  <button type="button" title="Redo (Ctrl+Y)" onClick={redo}><IkonAlat jenis="redo" /><span>Redo</span></button>
+                  <button type="button" title="Pas layar (0)" onClick={() => ed2.current?.pasFit()}><IkonAlat jenis="pas" /><span>Pas</span></button>
+                </div>
                 <Editor2D ref={ed2} edit={edit} pilih={pilih} setPilih={setPilih} multi={multi} setMulti={setMulti} mulaiAksi={mulaiAksi} ubah={ubah} mode={mode} grid={grid} snapTepi={snapTepi} taruhKolom={taruhKolom} ukuranKolom={acuanKolom ?? Math.max(0.2, gridPilar.ukuran)}
                   barisPilih={barisPilih} setBarisPilih={setBarisPilih} lapisan={lapisan}
                   perintah={{ undo, redo, hapus: hapusSeleksi, putar: putarSeleksi, pecah, setMode, setGrid, bukaLapisan: () => { if (panelLapis.current) { panelLapis.current.open = true; panelLapis.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } } }}
@@ -1069,4 +1080,19 @@ export default function DesainGudang() {
       )}
     </>
   );
+}
+
+/** Ikon alat kanvas (garis sederhana, 22 px) */
+function IkonAlat({ jenis }: { jenis: Mode | 'undo' | 'redo' | 'pas' }) {
+  const d: Record<string, ReactNode> = {
+    pilih: <path d="M5 3l13 7-6 1.6L9.5 18z" />,
+    blok: <><rect x="3.5" y="3.5" width="15" height="15" rx="1" strokeDasharray="3 2.4" /><path d="M11 9l7 3.6-3 .9-1.4 3z" /></>,
+    geser: <path d="M11 2.5v17M2.5 11h17M11 2.5l-2.5 2.5M11 2.5l2.5 2.5M11 19.5l-2.5-2.5M11 19.5l2.5-2.5M2.5 11l2.5-2.5M2.5 11l2.5 2.5M19.5 11l-2.5-2.5M19.5 11l-2.5 2.5" />,
+    ukur: <><path d="M2.5 14.5l12-12 5 5-12 12z" /><path d="M6 11l2 2M8.5 8.5l1.5 1.5M11 6l2 2M13.5 3.5l1.5 1.5" /></>,
+    kolom: <><rect x="7" y="7" width="8" height="8" fill="currentColor" stroke="none" /><path d="M3 3v3M3 3h3M19 3v3M19 3h-3M3 19v-3M3 19h3M19 19v-3M19 19h-3" /></>,
+    undo: <path d="M8 5L3.5 9.5 8 14M3.5 9.5H13a5 5 0 010 10H9" />,
+    redo: <path d="M14 5l4.5 4.5L14 14M18.5 9.5H9a5 5 0 000 10h4" />,
+    pas: <path d="M3 8V3h5M14 3h5v5M19 14v5h-5M8 19H3v-5M7 7h8v8H7z" />,
+  };
+  return <svg viewBox="0 0 22 22" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d[jenis]}</svg>;
 }

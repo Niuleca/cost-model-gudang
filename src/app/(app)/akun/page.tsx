@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import InputPassword from '@/components/InputPassword';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { useProfile } from '@/lib/useProfile';
+import { useProfile, muatUlangProfil } from '@/lib/useProfile';
 import { ROLE_LABEL } from '@/lib/format';
 import BrandingProfil from '@/components/BrandingProfil';
 
@@ -31,6 +31,7 @@ export default function AkunPage() {
     const telepon = f.telepon.trim();
     if (telepon && !/^\+?[0-9 ()-]{8,20}$/.test(telepon)) { setPesanProfil('Nomor telepon tidak valid (contoh: 0812-3456-7890 atau +62 812 3456 7890).'); return; }
     const { error } = await supabaseBrowser().from('profiles').update({ full_name: f.full_name.trim(), username, telepon: telepon || null, jabatan: f.jabatan.trim() || null, perusahaan: f.perusahaan.trim() || null }).eq('id', profile.id);
+    if (!error) muatUlangProfil();
     setPesanProfil(error ? (/profiles_username_unik|duplicate/.test(error.message) ? `User ID "${username}" sudah dipakai akun lain.` : error.message) : 'Profil tersimpan. Dipakai otomatis sebagai penanda tangan quotation.');
   }
   async function simpan(e: React.FormEvent) {

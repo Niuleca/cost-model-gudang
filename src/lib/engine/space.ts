@@ -7,7 +7,8 @@ export interface RakDim { koridor: number; depth: number; width: number; paletPe
 export interface StagingIn { porsiMinggu: number; hariPerMinggu: number; sequence: number; m2PerPalet: number; tumpuk: number; unitPerPalet: number; volumePerShiftManual?: number | null }
 export interface Porsi { spr: number; ddr: number; block: number; floor: number }   // porsi PP per metode simpan (total = 100%)
 /** Jenis palet yang dipakai di gudang (Key Assumption). Porsi = % pemakaian (dinormalkan bila total ≠ 100%). */
-export interface PaletTipe { id: string; nama: string; panjang: number; lebar: number; tebalMm: number; porsi: number }
+export interface PaletTipe { id: string; nama: string; panjang: number; lebar: number; tebalMm: number; porsi: number;
+  /** Tinggi produk di atas palet (mm, tanpa tebal palet) — kosong = pakai Product di Warehouse Planning */ tinggiProdukMm?: number | null }
 /** Input cek kekuatan rak & lantai (Warehouse Planning). Kosong / 0 = otomatis. */
 export interface KekuatanInput {
   beratPaletKg?: number | null;     // berat per palet; kosong = palet rak terberat dari Produk (atau Parameter muatan)
@@ -115,12 +116,18 @@ export function ringkasPalet(list: PaletTipe[]) {
   const luasRata = xs.reduce((a, p, i) => a + bobot[i] * (Number(p.panjang) || 0) * (Number(p.lebar) || 0), 0);
   const tebalMaks = Math.max(0, ...xs.map(p => Number(p.tebalMm) || 0));
   const dominan = xs.reduce((m, p) => ((Number(p.porsi) || 0) > (Number(m.porsi) || 0) ? p : m), xs[0]);
-  return { list: xs, bobot, totalPorsi: tot, luasRata, tebalMaks, dominan };
+  // tinggi produk: terbesar → bukaan rak (Product); CBM muatan per palet = P × L × tinggi produk (rata-rata tertimbang)
+  const adaTinggi = xs.some(p => Number(p.tinggiProdukMm) > 0);
+  const tinggiProdukMaks = Math.max(0, ...xs.map(p => Number(p.tinggiProdukMm) || 0));
+  const cbmMuatan = (p: PaletTipe) => (Number(p.panjang) || 0) * (Number(p.lebar) || 0) * (Number(p.tinggiProdukMm) || 0) / 1000;
+  const cbmRata = adaTinggi ? xs.reduce((a, p, i) => a + bobot[i] * cbmMuatan(p), 0) : 0;
+  return { list: xs, bobot, totalPorsi: tot, luasRata, tebalMaks, dominan, adaTinggi, tinggiProdukMaks, cbmRata, cbmMuatan };
 }
 function turunanPalet(x?: Partial<SpaceExcel> | null): Pick<SpaceExcel, 'palet' | 'paletTipe' | 'rak'> {
   const list = daftarPalet(x), r = ringkasPalet(list);
   return { paletTipe: list, palet: { panjang: r.dominan.panjang, lebar: r.dominan.lebar },
-    rak: { ...SPACE_EXCEL_DEFAULT.rak, ...(x?.rak ?? {}), palletMm: r.tebalMaks || Number(x?.rak?.palletMm) || SPACE_EXCEL_DEFAULT.rak.palletMm } };
+    rak: { ...SPACE_EXCEL_DEFAULT.rak, ...(x?.rak ?? {}), palletMm: r.tebalMaks || Number(x?.rak?.palletMm) || SPACE_EXCEL_DEFAULT.rak.palletMm,
+      ...(r.adaTinggi && r.tinggiProdukMaks > 0 ? { productMm: r.tinggiProdukMaks } : {}) } };
 }
 
 export const lengkapiSpaceExcel = (x?: Partial<SpaceExcel> | null): SpaceExcel => ({

@@ -1,8 +1,10 @@
 'use client';
+import { useSudahMasuk } from './LinkMasuk';
 import { useEffect, useState } from 'react';
 
 // Menu HP: tombol ☰ membuka lembar menu (Beranda · Contact · Login); tertutup otomatis setelah memilih.
-export default function MenuHp({ masuk }: { masuk: boolean }) {
+export default function MenuHp() {
+  const masuk = useSudahMasuk();
   const [buka, setBuka] = useState(false);
   useEffect(() => {
     if (!buka) return;

@@ -538,7 +538,8 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         zs.forEach((z, i) => el.push(<line key={`gz${i}`} x1={k.x} y1={z} x2={k.x + k.w} y2={z} stroke="#0f766e" strokeWidth={fs * 0.03} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} style={{ pointerEvents: 'none' }} />));
       }
       for (const c of kol) el.push(<g key={c.id}><rect x={c.x - fs * 0.22} y={c.z - fs * 0.22} width={c.w + fs * 0.44} height={c.d + fs * 0.44} fill="transparent" data-ekspor="tidak" />
-        {(() => { const v = minPx(kasar ? 10 : 8), cw = Math.max(c.w, v), cd = Math.max(c.d, v); return <rect x={c.x + c.w / 2 - cw / 2} y={c.z + c.d / 2 - cd / 2} width={cw} height={cd} fill={w.isi} stroke={dipilih ? '#f97316' : '#1e293b'} strokeWidth={fs * 0.05} />; })()}</g>);
+        <rect x={c.x} y={c.z} width={c.w} height={c.d} fill={w.isi} stroke={dipilih ? '#f97316' : '#1e293b'} strokeWidth={Math.min(fs * 0.05, Math.min(c.w, c.d) * 0.12)} />
+        {Math.min(c.w, c.d) < minPx(4) && <circle cx={c.x + c.w / 2} cy={c.z + c.d / 2} r={minPx(kasar ? 6 : 5)} fill="none" stroke={dipilih ? '#f97316' : '#334155'} strokeWidth={minPx(1.2)} style={{ pointerEvents: 'none' }} />}</g>);
       el.push(<text key="t" x={k.x + fs * 0.3} y={k.z - fs * 0.45} fontSize={fs * 0.75} fill="#0f766e" style={{ paintOrder: 'stroke', stroke: '#ffffffcc', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>
         {k.label} · {xs.length} × {zs.length} as · {kol.length} kolom</text>);
       return <g key={k.id} onPointerDown={e => { e.stopPropagation(); turun(e, k.id); }} style={{ cursor: mode === 'pilih' || setMultiSet.has(k.id) ? 'move' : undefined, pointerEvents: bisaPilih(k) ? undefined : 'none' }}>{el}</g>;
@@ -616,11 +617,12 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     }
     // kolom kecil: area pegang transparan lebih besar supaya mudah diseret
     if (k.jenis === 'kolom') {
-      // kolom kecil di layar: tanda minimum ±9 px supaya tetap terlihat, area pegang ±28 px supaya mudah diseret (jari / mouse)
-      const vis = minPx(kasar ? 11 : 9), hitR = minPx(kasar ? 34 : 24);
-      if (k.w < vis || k.d < vis) {
+      // kolom selalu digambar dengan ukuran asli (perubahan ukuran langsung terlihat). Bila sangat kecil di layar (< 4 px)
+      // diberi cincin penanda (tidak menutupi ukuran asli); area pegang ±24 px supaya mudah diseret (jari / mouse)
+      const hitR = minPx(kasar ? 34 : 24);
+      if (Math.min(k.w, k.d) < minPx(4)) {
         const cx = k.x + k.w / 2, cz = k.z + k.d / 2;
-        el.push(<rect key="tanda" x={cx - vis / 2} y={cz - vis / 2} width={vis} height={vis} fill={dipilih ? '#f97316' : '#334155'} stroke="#fff" strokeWidth={fs * 0.06} style={{ pointerEvents: 'none' }} />);
+        el.push(<circle key="tanda" cx={cx} cy={cz} r={minPx(kasar ? 7 : 6)} fill="none" stroke={dipilih ? '#f97316' : '#334155'} strokeWidth={minPx(1.4)} style={{ pointerEvents: 'none' }} />);
       }
       const pw = Math.max(fs * 0.22, (hitR - k.w) / 2), pd = Math.max(fs * 0.22, (hitR - k.d) / 2);
       el.unshift(<rect key="hit" data-ekspor="tidak" x={k.x - pw} y={k.z - pd} width={k.w + 2 * pw} height={k.d + 2 * pd} fill="transparent" />);
@@ -716,7 +718,8 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
           <g data-ekspor="tidak" style={{ pointerEvents: 'none' }}>
             {t.sejajarX != null && <line x1={t.x} y1={0} x2={t.x} y2={g.W} stroke="#2563eb" strokeWidth={fs * 0.05} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />}
             {t.sejajarZ != null && <line x1={0} y1={t.z} x2={g.L} y2={t.z} stroke="#2563eb" strokeWidth={fs * 0.05} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />}
-            {(() => { const w = Math.max(ukKolom.w, minPx(10)), d = Math.max(ukKolom.d, minPx(10)); return <rect x={t.x - w / 2} y={t.z - d / 2} width={w} height={d} fill="rgba(71,85,105,0.55)" stroke="#0f172a" strokeWidth={fs * 0.06} />; })()}
+            <rect x={t.x - ukKolom.w / 2} y={t.z - ukKolom.d / 2} width={ukKolom.w} height={ukKolom.d} fill="rgba(71,85,105,0.55)" stroke="#0f172a" strokeWidth={Math.min(fs * 0.06, Math.min(ukKolom.w, ukKolom.d) * 0.12)} />
+            {Math.min(ukKolom.w, ukKolom.d) < minPx(4) && <circle cx={t.x} cy={t.z} r={minPx(6)} fill="none" stroke="#0f172a" strokeWidth={minPx(1.2)} />}
             {t.kiri && garisUkur(t.kiri.x, t.z - u, t.x, t.z - u, `${f1(t.x - t.kiri.x)} m`, '#2563eb', 'kolomX', false)}
             {t.atas && garisUkur(t.x + u, t.atas.z, t.x + u, t.z, `${f1(t.z - t.atas.z)} m`, '#2563eb', 'kolomZ', false)}
             <text x={t.x + u} y={t.z + u * 2 + fs * 0.6} fontSize={fs * 0.7} fill="#0f172a">klik = taruh kolom {f1(ukKolom.w)} × {f1(ukKolom.d)} m ({f1(t.x)}; {f1(t.z)})</text>

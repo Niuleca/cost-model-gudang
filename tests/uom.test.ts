@@ -52,3 +52,16 @@ test('opsi tarif storage untuk volume CBM berisi palet & kg', () => {
   assert.equal(cari('cbm'), 4000); assert.equal(cari('palet'), 2500); assert.equal(cari('kg'), 1_250_000);
   assert.ok(!o.some(x => !Number.isFinite(x.volume)));
 });
+
+test('Profil order: kontainer loose case tidak 0 walau isi case/palet kosong', async () => {
+  const { volumePalet, hitungProfil, KENDARAAN_DEFAULT, PARAM_DEFAULT } = await import('../src/lib/profilVolume.ts');
+  const inb: VolumeInput = { arus: 'inbound', uom: 'palet', rataRataBulan: 1500, peakBulan: 1500, komitmenBulan: 1500 };
+  const vp = volumePalet(inb, 'peakBulan', PARAM_DEFAULT, [inb]);
+  assert.equal(vp.cpp, 37);                      // 1,5 CBM ÷ 0,04 CBM per case
+  const h = hitungProfil([{ moda: 'cont40hc', persen: 1, muatan: 'case' }], vp.paletBulan / 25, PARAM_DEFAULT, KENDARAAN_DEFAULT, vp, 25);
+  assert.equal(h.hasil[0].qtyHari, 60 * 37);
+  assert.equal(h.hasil[0].mobil?.bulat, 2);
+  // isi dari baris volume lain (mis. outbound karton 48 per palet) dipakai lebih dulu
+  const out: VolumeInput = { arus: 'outbound', uom: 'karton', rataRataBulan: 1000, peakBulan: 1000, komitmenBulan: 1000, konversi: { uom1: 'case', per1: 0, uom2: 'pcs', per2: 12, paletIsi: 48 } };
+  assert.equal(volumePalet(inb, 'peakBulan', PARAM_DEFAULT, [inb, out]).cpp, 48);
+});

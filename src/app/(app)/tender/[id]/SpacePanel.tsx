@@ -1,5 +1,5 @@
 'use client';
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { hitungKekuatan, hitungSpaceExcel, lengkapiSpaceExcel, type HasilKekuatan, type KekuatanInput, type SpaceExcel, type StagingIn, type RakDim, type Porsi, type StatusBeban } from '@/lib/engine/space';
 import { angka } from '@/lib/format';
 import { InputPanjang, useSatuanPanjang, type SatuanPanjang } from '@/lib/satuanPanjang';
@@ -172,10 +172,11 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
             <VisualRak x={x} lv={h.level} />
             <table className="sp-tabel sp-kecil"><tbody>
               <tr className="sp-judul"><td>Dimensi</td><td className="num">Number</td><td>UoM</td></tr>
-              {([['Center height', 'centerMm'], ['Side height', 'sideMm'], ['Beam', 'beamMm'], ['Pallet', 'palletMm'], ['Product', 'productMm'], ['Clearance', 'clearanceMm']] as const).map(([l, k]) => (
-                <tr key={k} className={k === 'clearanceMm' ? 'sp-hijau' : ''}><td>{l}</td><td className="num">{k === 'palletMm'
-                  ? <span title="Tebal palet terbesar dari Key Assumption → Jenis palet">{sp.fmt(x.rak.palletMm, 'mm', { tanpaSatuan: true })}</span>
-                  : pjn(x.rak[k], 'mm', v => set({ rak: { ...x.rak, [k]: Math.round((v ?? 0) * 1000) / 1000 } }), { w: 90 })}</td><td>{k === 'palletMm' ? <span className="small muted">{U} · dari Jenis palet</span> : U}</td></tr>))}
+              {([['Center height', 'centerMm'], ['Side height', 'sideMm'], ['Beam', 'beamMm'], ['Pallet', 'palletMm'], ['Product', 'productMm'], ['Clearance', 'clearanceMm']] as const).map(([l, k]) => (<React.Fragment key={k}>
+                {(() => { const dariPalet = k === 'palletMm' || (k === 'productMm' && (x.paletTipe ?? []).some(p => Number(p.tinggiProdukMm) > 0));
+                return <tr key={k} className={k === 'clearanceMm' ? 'sp-hijau' : ''}><td>{l}</td><td className="num">{dariPalet
+                  ? <span title={k === 'palletMm' ? 'Tebal palet terbesar dari Key Assumption → Jenis palet' : 'Tinggi produk terbesar dari Key Assumption → Jenis palet'}>{sp.fmt(x.rak[k], 'mm', { tanpaSatuan: true })}</span>
+                  : pjn(x.rak[k], 'mm', v => set({ rak: { ...x.rak, [k]: Math.round((v ?? 0) * 1000) / 1000 } }), { w: 90 })}</td><td>{dariPalet ? <span className="small muted">{U} · dari Jenis palet</span> : U}</td></tr>; })()}</React.Fragment>))}
               <tr><td>Total height / pallet (level 2 up)</td><td className="num">{sp.fmt(h.level.levelN, 'mm', { tanpaSatuan: true })}</td><td>{U}</td></tr>
               <tr><td>Total height / pallet (level 1)</td><td className="num">{sp.fmt(h.level.level1, 'mm', { tanpaSatuan: true })}</td><td>{U}</td></tr>
               <tr><td>Level manual (opsional)</td><td className="num">{inp(x.rak.levelManual ?? null, v => set({ rak: { ...x.rak, levelManual: v } }), { w: 90, kosong: true, ph: String(h.level.auto) })}</td><td>level</td></tr>

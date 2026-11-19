@@ -14,8 +14,10 @@ const BASIS: { v: BasisVolume; l: string }[] = [
 const pct = (x: number) => `${(x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
 
 /** Profil order inbound/outbound: volume/bln dari tabel Volume ÷ hari operasional → dipecah per moda (%) → mobil per hari. */
-export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onChange }: {
+export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onChange, ringkas = false }: {
   profil?: ProfilVolume; volumes: VolumeInput[]; hariBulan: number; onChange: (p: ProfilVolume) => void;
+  /** Key Assumption: hanya moda & kendaraan (tanpa rincian rumus, order admin, kapasitas kendaraan) — data sama dengan tab Volume */
+  ringkas?: boolean;
 }) {
   const p: ProfilVolume = { ...PROFIL_KOSONG, ...(pIn ?? {}), param: { ...PARAM_DEFAULT, ...(pIn?.param ?? {}) } };
   const basis: BasisVolume = p.basis ?? 'peakBulan';
@@ -28,7 +30,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
     const rows = p[arus];
     const out = arus === 'outbound';
     const vol = volumes.find(v => v.arus === arus);
-    const vp = volumePalet(vol, basis, p.param);
+    const vp = volumePalet(vol, basis, p.param, volumes);
     const paletHari = hariBulan > 0 ? vp.paletBulan / hariBulan : 0;
     const h = hitungProfil(rows, paletHari, p.param, kendaraan, { cpp: vp.cpp, upc: vp.upc }, hariBulan);
     const set = (i: number, patch: Partial<BarisProfil>) => onChange({ ...p, [arus]: rows.map((r, j) => j === i ? { ...r, ...patch } : r) });
@@ -36,7 +38,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
     return (
       <div style={{ minWidth: 0, display: 'grid', gap: 8 }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h3>{out ? 'Outbound (pengiriman · kontainer / land transport)' : 'Inbound (penerimaan · kontainer / land transport)'}</h3>
+          <h3>{out ? 'Outbound (export kontainer / lokal truk)' : 'Inbound (import kontainer / lokal · pabrik truk)'}</h3>
           <span className="pill info">{angka(vp.paletBulan)} palet/bln ÷ {hariBulan} hari = <b>{angka(paletHari, 1)} palet/hari</b></span>
         </div>
         {vp.ket && <p className="small" style={{ color: 'var(--warn, #b45309)' }}>{vp.ket}</p>}
@@ -52,8 +54,8 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
               const m = x.mobil;
               return <Fragment key={i}><tr>
                 <td><select aria-label="Moda" value={r.moda} onChange={e => set(i, { moda: e.target.value as BarisProfil['moda'] })} style={{ minWidth: 170 }}>
-                  <optgroup label="Kontainer">{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>
-                  <optgroup label="Land transport (truk)">{MODA.filter(o => !o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup></select>
+                  <optgroup label={out ? 'Export · kontainer' : 'Import · kontainer'}>{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>
+                  <optgroup label={out ? 'Lokal / distribusi · truk' : 'Lokal / pabrik · truk'}>{MODA.filter(o => !o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup></select>
                   {isKont && <select aria-label="Cara muat" value={mu} onChange={e => set(i, { muatan: e.target.value as BarisProfil['muatan'] })} style={{ minWidth: 170, marginTop: 4 }}>
                     {MUATAN.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
                   {mu === 'unit' && <select aria-label="Satuan" value={r.satuanUnit ?? 'pcs'} onChange={e => set(i, { satuanUnit: e.target.value })} style={{ minWidth: 80, marginTop: 4 }}>{SATUAN_UNIT.map(u => <option key={u}>{u}</option>)}</select>}</td>
@@ -64,8 +66,10 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                   {mu === 'palet' && <span className="muted">—</span>}
                   {(mu === 'case' || mu === 'unit') && <>{n(r.casePerPalet, v => set(i, { casePerPalet: v }), 60, vp.cpp ? String(vp.cpp) : 'case')}<span className="muted">case/plt</span></>}
                   {mu === 'unit' && <>{n(r.unitPerCase, v => set(i, { unitPerCase: v }), 60, vp.upc ? String(vp.upc) : r.satuanUnit ?? 'pcs')}<span className="muted">/case</span></>}
-                </div><div className="small muted">{x.ket}</div></td>
-                <td className="num"><b>{angka(x.qtyHari, x.qtyHari < 10 ? 1 : 0)}</b><div className="small muted">{x.satuan}</div></td>
+                </div><div className="small muted">{x.ket}</div>
+                  {(mu === 'case' || mu === 'unit') && !(r.casePerPalet && r.casePerPalet > 0) && vp.cpp > 0 && <div className="small" style={{ color: 'var(--accent-ink, #0f766e)' }} title="Isi kolom case/plt untuk mengganti">otomatis {angka(vp.cpp)} case/plt · {vp.cppSumber}</div>}</td>
+                <td className="num"><b>{angka(x.qtyHari, x.qtyHari < 10 ? 1 : 0)}</b><div className="small muted">{x.satuan}</div>
+                  {m && <div className="small muted" title="Tonase & volume per hari">{angka(m.tonTrip * (m.bulat || 1), 1)} ton · {angka(m.cbmTrip * (m.bulat || 1), 1)} CBM</div>}</td>
                 <td>{isKont ? <><span className="small">{m?.kendaraan ?? 'kontainer'}</span>
                     <div className="row small" style={{ flexWrap: 'nowrap', gap: 4, marginTop: 4 }}>{n(r.tonPerKontainer ? r.tonPerKontainer * 1000 : undefined, v => set(i, { tonPerKontainer: v ? v / 1000 : undefined }), 70, m ? String(Math.round(m.kap.ton * 1000)) : 'kg')}<span className="muted">kg maks/kont</span></div></>
                   : <select aria-label="Kendaraan" value={kendaraan.some(x => x.nama === r.kendaraan) ? r.kendaraan : kendaraanAwal(kendaraan).nama} onChange={e => set(i, { kendaraan: e.target.value })} style={{ minWidth: 150 }}>
@@ -79,7 +83,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                   <div className="muted">pembatas: {m.pembatas === 'ton' ? 'berat' : m.pembatas}{mu === 'palet' && m.maksPaletCbm < m.kap.palet && ` · CBM hanya muat ${m.maksPaletCbm} palet`}</div>
                 </>}</td>
                 <td><button className="danger" onClick={() => onChange({ ...p, [arus]: rows.filter((_, j) => j !== i) })}>Hapus</button></td>
-              </tr>{m && (() => {
+              </tr>{m && !ringkas && (() => {
                 const trip = m.bulat || 1, cbm = m.cbmTrip * trip, kg = m.tonTrip * trip * 1000;
                 const cpp = r.casePerPalet || vp.cpp || 0, loose = mu !== 'palet';
                 const nP = loose ? 0 : (m.kap.palet > 0 ? x.paletHari / m.kap.palet : 0), nCbmEf = loose && m.casePerMobil > 0 && cpp > 0 ? x.paletHari * cpp / m.casePerMobil : m.cbmEfektif > 0 ? cbm / m.cbmEfektif : 0, nT = m.kap.ton > 0 ? kg / (m.kap.ton * 1000) : 0;
@@ -140,10 +144,12 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
 
   return (
     <div className="card" style={{ gap: 12 }}>
-      <h2><T>Profil order inbound & outbound (per hari)</T></h2>
-      <p className="small muted">Mengikuti volume di tabel Volume: volume per bulan ÷ hari operasional = palet per hari, lalu dipecah per moda sesuai porsi (%).
+      <h2>{ringkas ? <T>Moda transport inbound & outbound</T> : <T>Profil order inbound & outbound (per hari)</T>}</h2>
+      {ringkas ? <p className="small muted">Kendaraan yang dipakai saat <b>inbound</b> (import: kontainer 20ft / 40ft / 40HC dengan batas tonase; lokal / pabrik: truk dengan muatan palet, case atau pcs) dan
+        <b> outbound</b> (export: kontainer; lokal: truk). Jumlah kontainer / mobil per hari dihitung otomatis dari volume, dan menjadi dasar order line admin (Value Stream Mapping).</p>
+      : <p className="small muted">Mengikuti volume di tabel Volume: volume per bulan ÷ hari operasional = palet per hari, lalu dipecah per moda sesuai porsi (%).
         Berlaku untuk kontainer 20ft / 40ft / 40HC maupun land transport (truk), inbound & outbound — tidak hanya import/export. Cara muat: <b>palletize</b> (dibatasi jumlah palet, CBM, berat) atau <b>loose case/karton/pcs</b> (case = palet × case/palet; CBM & berat dari parameter per case).
-        Kontainer/mobil per hari = kebutuhan terbesar antara palet, CBM, dan berat dibanding kapasitas kontainer/kendaraan (dibulatkan ke atas per moda). Kapasitas kontainer bisa diubah di "Kapasitas kendaraan".</p>
+        Kontainer/mobil per hari = kebutuhan terbesar antara palet, CBM, dan berat dibanding kapasitas kontainer/kendaraan (dibulatkan ke atas per moda). Kapasitas kontainer bisa diubah di "Kapasitas kendaraan".</p>}
       <div className="row" style={{ alignItems: 'end' }}>
         <label className="f">Basis volume
           <select value={basis} onChange={e => onChange({ ...p, basis: e.target.value as BasisVolume })} style={{ minWidth: 170 }}>
@@ -158,7 +164,8 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
       </div>
       {bagian('inbound')}
       {bagian('outbound')}
-      {(() => {
+      {ringkas && <p className="small muted" style={{ margin: 0 }}>Data ini sama dengan <b>Profil order</b> di tab Volume (ubah di salah satu, keduanya ikut). Rincian rumus, order admin dan kapasitas kendaraan ada di tab Volume.</p>}
+      {!ringkas && (() => {
         const oa = orderAdmin(p, volumes, hariBulan);
         if (!oa.inbound.mobilHari && !oa.outbound.mobilHari) return null;
         return <div style={{ minWidth: 0 }}>
@@ -173,7 +180,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
           <p className="small muted">Order/bln otomatis menjadi volume aktivitas admin (role Admin, UoM order/line) di tab Value Stream Mapping bila kolom Volume/bln-nya kosong. Bila ada beberapa aktivitas admin di satu arus, order dibagi rata.</p>
         </div>;
       })()}
-      <details>
+      {!ringkas && <details>
         <summary className="small">Kapasitas kendaraan (bisa diubah / ditambah) · {kendaraan.length} jenis</summary>
         <p className="small muted">Kapasitas default adalah perkiraan umum di Indonesia (palet standar 1,2 × 1,0 m); sesuaikan dengan armada vendor. Nama kontainer (20ft / 40ft / 40HC) dipakai otomatis untuk moda kontainer.</p>
         <div className="tablewrap"><table>
@@ -194,6 +201,6 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
             ? <button className="ghost" onClick={() => onChange({ ...p, kendaraan: [...kendaraan, ...KENDARAAN_DEFAULT.filter(d => !kendaraan.some(x => x.nama === d.nama))] })}>Tambahkan jenis default yang belum ada</button> : null}
           {p.kendaraan?.length ? <button className="ghost" onClick={() => onChange({ ...p, kendaraan: undefined })}>Kembalikan kapasitas default</button> : null}
         </div>
-      </details>
+      </details>}
     </div>);
 }

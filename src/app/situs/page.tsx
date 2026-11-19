@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import LecaMark from '@/components/LecaMark';
-import { supabaseServer } from '@/lib/supabase/server';
+import LinkMasuk from './LinkMasuk';
 import Kontak from './Kontak';
 import MenuHp from './MenuHp';
 import Pamer3D from './Pamer3D';
@@ -21,9 +21,9 @@ export const metadata: Metadata = {
 };
 
 // Halaman awal niuleca.com untuk pengunjung (belum login). Menu: Beranda · Contact · Login.
-export default async function Situs() {
-  let masuk = false;
-  try { const { data } = await supabaseServer().auth.getUser(); masuk = !!data.user; } catch { /* abaikan */ }
+export const dynamic = 'force-static';
+
+export default function Situs() {
   return (
     <div className="ld">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" />
@@ -33,8 +33,8 @@ export default async function Situs() {
           <nav aria-label="Menu utama">
             <a href="#beranda" className="ld-link">Beranda</a>
             <a href="#kontak" className="ld-link">Contact</a>
-            <a href={masuk ? '/' : '/login'} className="ld-masuk">{masuk ? 'Buka Leca' : 'Login'}</a>
-            <MenuHp masuk={masuk} />
+            <LinkMasuk className="ld-masuk" />
+            <MenuHp />
           </nav>
         </div>
       </header>
@@ -48,7 +48,7 @@ export default async function Situs() {
               <h1>Hitung, rancang, dan menangkan tender gudang dalam satu platform.</h1>
               <p>Leca menyatukan volume customer, space planning, manpower, MHE, biaya, hingga rate card dan quotation. Angka di web sama persis dengan file Excel yang Anda kirim ke customer.</p>
               <div className="ld-cta">
-                <a href={masuk ? '/' : '/login'} className="ld-tombol utama">{masuk ? 'Buka Leca' : 'Masuk ke Leca'}</a>
+                <LinkMasuk className="ld-tombol utama" tamu="Masuk ke Leca" />
                 <a href="#kontak" className="ld-tombol garis">Hubungi kami</a>
               </div>
               <a href="#tiga-d" className="ld-baru"><span>Baru</span>Simulasi gudang 3D &amp; mode jelajah</a>
@@ -145,7 +145,7 @@ export default async function Situs() {
       {/* bilah aksi HP */}
       <div className="ld-bawah" role="navigation" aria-label="Aksi cepat">
         <a href="https://wa.me/6288291919234" target="_blank" rel="noopener noreferrer" className="ld-tombol garis gelap">WhatsApp</a>
-        <a href={masuk ? '/' : '/login'} className="ld-tombol utama">{masuk ? 'Buka Leca' : 'Login'}</a>
+        <LinkMasuk className="ld-tombol utama" />
       </div>
 
       <footer className="ld-kaki">

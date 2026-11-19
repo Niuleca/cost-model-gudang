@@ -1027,9 +1027,34 @@ tr.aktif td { background: #f5f3ff; }
   .sim2d-tata.mode-app.laci-kiri > .sim2d-kiri { display: grid; position: fixed; left: 0; top: 0; bottom: 0; height: auto; width: min(320px, 88vw); z-index: 5; box-shadow: 12px 0 30px rgba(15,23,42,.25); }
   .sim2d-tata.mode-app > .sim2d-tengah { padding: 6px; gap: 6px; }
 }
-.sim2d-tata.mode-app .sim2d-tengah .tabs { padding: 3px; }
-.sim2d-tata.mode-app .sim2d-tengah .tabs button { padding: 4px 9px; font-size: 12.5px; }
-.sim2d-tata.mode-app .sim2d-tengah > .row { row-gap: 6px; }
+
+/* ---------- Desain gudang: toolbar di dalam layar (gaya SketchUp / AutoCAD) */
+.sim2d-kanvas { grid-template-rows: auto minmax(0, 1fr); border: 1px solid var(--line); border-radius: var(--radius); background: #e2e8f0; padding: 0 6px 6px; gap: 6px; }
+.sim2d-kanvas.split { grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr); }
+.kb-atas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 2px; min-width: 0; }
+.kb-grup { display: inline-flex; align-items: center; gap: 2px; padding: 3px; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+.kb-grup button, .kb-menu > summary { border: 0; background: transparent; color: var(--ink); height: 34px; min-width: 40px; padding: 0 12px; border-radius: 7px; font-size: 13.5px; font-weight: 600; box-shadow: none; line-height: 1; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+.kb-grup button:hover, .kb-menu > summary:hover { background: #f1f5f9; }
+.kb-grup button.on { background: var(--ink, #0f172a); color: #fff; }
+.kb-label { font-size: 11.5px; color: var(--muted); padding: 0 6px 0 8px; font-weight: 600; }
+.kb-isi { flex: 1 1 0; }
+.kb-info { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.kb-teks { border: 0; background: none; color: var(--link-ink, #1e56a0); padding: 0 2px; height: auto; font-size: 12px; text-decoration: underline; box-shadow: none; }
+.kb-menu { position: relative; }
+.kb-menu > summary { list-style: none; cursor: pointer; }
+.kb-menu > summary::-webkit-details-marker { display: none; }
+.kb-menu-isi { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; display: grid; gap: 8px; min-width: 200px; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(15,23,42,.18); }
+.kb-palet { position: absolute; top: 10px; left: 10px; z-index: 3; display: flex; flex-direction: column; gap: 2px; padding: 4px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 4px 14px rgba(15,23,42,.14); max-height: calc(100% - 64px); overflow-y: auto; scrollbar-width: none; }
+.kb-palet button { width: 50px; height: 48px; padding: 3px 0 2px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); box-shadow: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.kb-palet button span { font-size: 10px; font-weight: 600; line-height: 1; }
+.kb-palet button:hover { background: #f1f5f9; }
+.kb-palet button.on { background: var(--ink, #0f172a); color: #fff; }
+.kb-sekat { display: block; height: 1px; margin: 3px 6px; background: var(--line); }
+.sim2d-kanvas.split .kb-palet button { height: 40px; }
+.sim2d-kanvas.split .kb-palet button span { display: none; }
+@media (pointer: coarse) { .kb-grup button, .kb-menu > summary { height: 40px; } .kb-palet button { width: 54px; height: 52px; } }
+@media (max-width: 860px) { .kb-label, .kb-info { display: none; } .kb-grup button { padding: 0 9px; } }
+.sim2d-tata.mode-app .sim2d-kanvas { border-radius: 10px; }
 
 /* ---------- Volume: ringkasan semua satuan */
 .vol-semua { display: grid; gap: 12px; margin-top: 14px; background: var(--g50, #f8fafc); }
@@ -1058,3 +1083,9 @@ td.td-isian { background: #fffaf0; }
 .contoh-isian { display: inline-block; width: 14px; height: 10px; border-radius: 3px; background: #fdecc8; border: 1px solid #f5d9a8; }
 @media (max-width: 640px) { .hasil-hero { padding: 12px; } .hasil-hero-kepala .hasil-aksi { width: 100%; } }
 @media (max-width: 480px) { .kpis-hasil .kpi b { font-size: 17px; white-space: normal; overflow-wrap: anywhere; } .kpis-hasil .kpi { padding: 10px 12px; } }
+.tombol-panduan { position: relative; display: inline-flex; }
+.tombol-panduan > .btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.tombol-panduan > button { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; padding-inline: 10px; }
+.tombol-panduan-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 220px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(15,23,42,.15); padding: 6px; display: grid; }
+.tombol-panduan-menu a { display: grid; gap: 1px; padding: 8px 10px; border-radius: 7px; color: var(--ink); text-decoration: none; }
+.tombol-panduan-menu a:hover, .tombol-panduan-menu a:focus { background: #f1f5f9; }
