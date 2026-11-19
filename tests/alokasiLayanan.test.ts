@@ -79,7 +79,7 @@ test('Handling in & out setara per palet (default): biaya handling dibagi menuru
   const rc = (b: string) => h.rateCard.find(r => r.bucket === b)!;
   assert.ok(h.alokasiLayanan.handlingSetara);
   const perPalet = (b: string) => rc(b).biayaBulan / (rc(b).volumeKomitmenArus || 1);
-  if (rc('handling_in').satuan === rc('handling_out').satuan) assert.ok(Math.abs(perPalet('handling_in') / perPalet('handling_out') - 1) < 0.02);
+  if (rc('handling_in').uomArus === rc('handling_out').uomArus) assert.ok(Math.abs(perPalet('handling_in') / perPalet('handling_out') - 1) < 0.02);
   const mati = hitungTender({ ...contohTender, handlingSetara: false, alokasiKategori: sama({ handling_in: 0.5, handling_out: 0.5 }) }, contohMaster);
   assert.equal(mati.alokasiLayanan.handlingSetara, null);
 });
