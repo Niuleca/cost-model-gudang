@@ -4,7 +4,7 @@ import type { Bucket, KategoriRisiko } from '@/lib/engine/types';
 import UmurKontrak from '@/components/UmurKontrak';
 import { SEKSI_BIAYA, biayaBulanBaris, hargaUntukMode, seksiDari, type ModeBiaya, type Seksi } from '@/lib/biayaLain';
 import { rp } from '@/lib/format';
-import { biayaLainDefault, kurangDefault, sinkronBiaya, tambahDefault, type BarisBiaya, type DriverBiaya } from '@/lib/biayaLainDefault';
+import { biayaLainDefault, buangGandaManpower, kurangDefault, sinkronBiaya, tambahDefault, type BarisBiaya, type DriverBiaya } from '@/lib/biayaLainDefault';
 
 interface Item { id: number; kategori: string; item: string; satuan: string; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; status_efektif: string }
 export type Baris = BarisBiaya;
@@ -104,7 +104,7 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
 }
 
 export interface StartupAuto { aktif: boolean; persenOpex: number; persenManpower: number }
-export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, onHitung, driver, defaultDiisi, onNilaiStok, fasilitas, dibuang = [] }: {
+export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, onHitung, driver, defaultDiisi, onNilaiStok, fasilitas, dibuang: dibuangAsli }: {
   /** kunci baris rekomendasi yang sengaja dihapus user — tidak ditambahkan otomatis lagi */
   dibuang?: string[];
   lines: Baris[]; items: Item[]; kontrakBulan: number; onChange: (l: Baris[], tandaiDefault?: boolean, dibuang?: string[]) => void;
@@ -130,17 +130,21 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
   const totalBulan = ringkas.reduce((t, r) => t + r.total, 0);
 
   // ---- Daftar default (rekomendasi) dari data tender: isi otomatis sekali, lalu baris default ikut data tender ----
+  const dibuang = dibuangAsli ?? [], dibuangDb = dibuang;
   const kunciDriver = JSON.stringify(driver);
   const def = useMemo(() => biayaLainDefault(driver, items), [kunciDriver, items]); // eslint-disable-line react-hooks/exhaustive-deps
   const siap = items.length > 0 && (driver.headcount > 0 || driver.luasM2 > 0);
   useEffect(() => {
     if (!siap || !def.length) return;
-    if (!lines.length && !defaultDiisi) { onChange(def.filter(d => !d.kunci || !dibuang.includes(d.kunci)), true); return; }
+    if (!lines.length && !defaultDiisi) { onChange(def.filter(d => !d.kunci || !dibuangDb.includes(d.kunci)), true, dibuangDb); return; }
     // otomatis penuh: baris rekomendasi ikut data tender + rekomendasi baru langsung masuk (kecuali yang pernah dihapus user)
-    const baru = sinkronBiaya(lines, def);
+    const s0 = sinkronBiaya(lines, def);
+    const baru = buangGandaManpower(s0 ?? lines, def) ?? s0;
+    // tender lama (sebelum ada daftar "dihapus"): rekomendasi yang belum ada dianggap sudah pernah dihapus — tidak dimunculkan lagi
+    if (dibuangAsli === undefined) { onChange(baru ?? lines, undefined, kurangDefault(baru ?? lines, def).map(d => d.kunci!).filter(Boolean)); return; }
     const tambah = kurangDefault(baru ?? lines, def).filter(d => d.kunci && !dibuang.includes(d.kunci));
     if (baru || tambah.length) onChange([...(baru ?? lines), ...tambah]);
-  }, [def, siap, lines, dibuang.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [def, siap, lines, dibuang.join('|'), dibuangAsli === undefined]); // eslint-disable-line react-hooks/exhaustive-deps
   const kurangSemua = kurangDefault(lines, def);
   const merahSemua = lines.filter(b => b.belumDiketahui).length;
   const ikut = lines.filter(b => b.kunci && b.qtyDefault != null && b.qty === b.qtyDefault).length;

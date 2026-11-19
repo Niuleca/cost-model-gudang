@@ -24,7 +24,13 @@ export interface DriverBiaya {
   skenarioAset: string;     // Rental / Own Asset / Built-to-Suit
   tipeGudang: string;
   nilaiStokRp: number;      // nilai stok rata-rata untuk asuransi (0 = belum diisi)
+  /** Security / cleaning yang sudah ada di manpower (peran tetap / role VSM) → jasa outsourcing tidak direkomendasikan (tidak dobel) */
+  securityInhouse?: number; cleaningInhouse?: number;
 }
+export const RE_SECURITY = /security|satpam|guard|keamanan/i;
+export const RE_CLEANING = /clean|kebersihan|office ?boy|janitor|\bOB\b/i;
+/** Baris jasa yang hilang dari rekomendasi karena sudah ditangani manpower → dibuang otomatis selama belum diubah manual. */
+export const KUNCI_GANDA_MANPOWER = ['svc.satpam', 'svc.danru', 'svc.cleaning'];
 
 export type BarisBiaya = CostLineInput & {
   priceItemId?: number; seksi?: string;
@@ -173,11 +179,12 @@ export function aturanBiaya(d: DriverBiaya): Aturan[] {
   if (KAT_RAYAP.includes(kat)) sv('rayap', /^Termite/i, ['Pest Control'], 1, `kategori ${kat}: kayu / kertas rawan rayap`);
   const pos = 1 + (d.luasM2 > 10000 ? 1 : 0) + (KAT_NILAI_TINGGI.includes(kat) ? 1 : 0);
   const satpam = pos * 3;   // pola 12 jam: 2 shift + 1 libur per pos (historis Mondelez 2 pos = 6 orang)
-  sv('satpam', /^Security Guard/i, ['Security'], satpam,
+  const adaSecurity = (d.securityInhouse ?? 0) > 0, adaCleaning = (d.cleaningInhouse ?? 0) > 0;
+  if (!adaSecurity) sv('satpam', /^Security Guard/i, ['Security'], satpam,
     `${pos} pos jaga 24 jam (gerbang${d.luasM2 > 10000 ? ' + patroli gudang > 10.000 m²' : ''}${KAT_NILAI_TINGGI.includes(kat) ? ` + pos barang bernilai tinggi (${kat})` : ''}) × 3 orang (shift 12 jam: 2 jaga + 1 libur; ubah ke 4 bila shift 8 jam)${ketOs}`, false, hargaOs);
-  if (satpam >= 8) sv('danru', /^Komandan Regu/i, ['Security'], 1, `komandan regu untuk ${satpam} satpam${d.umk > 0 ? ' · UMK × 1,1 × 1,38' : ''}`, false, d.umk > 0 ? Math.round(d.umk * 1.1 * FAKTOR_OUTSOURCING / 1000) * 1000 : undefined);
+  if (!adaSecurity && satpam >= 8) sv('danru', /^Komandan Regu/i, ['Security'], 1, `komandan regu untuk ${satpam} satpam${d.umk > 0 ? ' · UMK × 1,1 × 1,38' : ''}`, false, d.umk > 0 ? Math.round(d.umk * 1.1 * FAKTOR_OUTSOURCING / 1000) * 1000 : undefined);
   const cleaner = Math.max(1, ceil(gudangM2 / 4000) + ceil(Math.max(d.officeM2, uk > 0 ? 30 : 0) / 300));   // historis 14.820 m² → 4 orang
-  sv('cleaning', /^Cleaning Service/i, ['Cleaning'], cleaner, noLuas ? ketLuas : `gudang ${rb(gudangM2)} m² ÷ 4.000 m² + office & toilet ÷ 300 m²${ketOs}`, noLuas, hargaOs);
+  if (!adaCleaning) sv('cleaning', /^Cleaning Service/i, ['Cleaning'], cleaner, noLuas ? ketLuas : `gudang ${rb(gudangM2)} m² ÷ 4.000 m² + office & toilet ÷ 300 m²${ketOs}`, noLuas, hargaOs);
   sv('chemical', /^Chemical & perlengkapan kebersihan/i, ['Cleaning'], Math.max(1, ceil(d.luasM2 / 1000)), noLuas ? ketLuas : 'paket per 1.000 m² per bulan', noLuas);
   sv('sampah', /^Pengangkutan sampah/i, ['Cleaning'], 1, 'sampah non-B3, 1 kontrak per site');
 
@@ -250,4 +257,10 @@ export function sinkronBiaya(lines: BarisBiaya[], def: BarisBiaya[]): BarisBiaya
     return { ...b, ...patch };
   });
   return ubah ? out : null;
+}
+
+/** Baris jasa outsourcing yang kini ditangani manpower sendiri (security / cleaning) dan belum diubah manual → dihapus. null bila tidak ada. */
+export function buangGandaManpower(lines: BarisBiaya[], def: BarisBiaya[]): BarisBiaya[] | null {
+  const out = lines.filter(b => !(b.kunci && KUNCI_GANDA_MANPOWER.includes(b.kunci) && !def.some(d => d.kunci === b.kunci) && b.qtyDefault != null && b.qty === b.qtyDefault));
+  return out.length === lines.length ? null : out;
 }

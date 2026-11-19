@@ -79,3 +79,17 @@ test('IT: slab WMS dari volume order, access point & RF dari operator', () => {
   const turun = sinkronIt(rows, itDefault({ ...drv, orderBulan: 12000 }, kat))!;
   assert.equal(turun.find(r => r.kunci === 'wms')!.catalogId, 1);
 });
+
+test('Security / cleaning sudah di manpower → jasa outsourcing tidak direkomendasikan & baris lama dibuang', async () => {
+  const { buangGandaManpower } = await import('../src/lib/biayaLainDefault.ts');
+  const its = [...items, it(99, 'Cleaning', 'Cleaning Service outsourcing (8 jam/hari)', null, 8000000)];
+  const awal = biayaLainDefault(d, its);
+  assert.ok(awal.some(b => b.kunci === 'svc.satpam') && awal.some(b => b.kunci === 'svc.cleaning'));
+  const def = biayaLainDefault({ ...d, securityInhouse: 3, cleaningInhouse: 1 }, its);
+  assert.ok(!def.some(b => b.kunci === 'svc.satpam' || b.kunci === 'svc.cleaning' || b.kunci === 'svc.danru'));
+  const sisa = buangGandaManpower(awal, def)!;
+  assert.ok(!sisa.some(b => b.kunci === 'svc.satpam' || b.kunci === 'svc.cleaning'));
+  // qty diubah manual → tetap dipertahankan
+  const manual = awal.map(b => b.kunci === 'svc.satpam' ? { ...b, qty: (b.qty ?? 0) + 1 } : b);
+  assert.ok(buangGandaManpower(manual, def)!.some(b => b.kunci === 'svc.satpam'));
+});

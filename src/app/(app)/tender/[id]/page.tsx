@@ -12,6 +12,7 @@ import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, 
 import { Num, Pct, Txt, Sel, ubahArray, AngkaInput } from '@/components/fields';
 import { skemaVsmDefault, VSM_DEFAULT, tagDariDefault } from '@/lib/vsmDefault';
 import { alatRak, sesuaikanAlatRak, BATAS_ANGKAT_CBT_MM } from '@/lib/alatRak';
+import { RE_SECURITY, RE_CLEANING } from '@/lib/biayaLainDefault';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
 import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom } from '@/lib/engine/types';
@@ -398,12 +399,16 @@ export default function TenderPage() {
     transaksiBulan: volEf.filter(v => v.arus === 'inbound' || v.arus === 'outbound').reduce((x, v) => x + paletEkuivalen(v).palet, 0),
     orderBulan: orderIn + orderOut, userKantor: nRole(reKantor), manajer: nRole(reManajer), operatorScan: nRole(reScan),
     unitRf: unitMhe(/^(RF|RDT|HHT|scanner)/i), unitPc: unitMhe(/^(PC|komputer|desktop)/i), unitLaptop: unitMhe(/laptop/i) };
+  // manpower sendiri (peran tetap + role aktivitas aktif) untuk security / cleaning → jasa outsourcing tidak direkomendasikan dobel
+  const jumlahRole = (re: RegExp) => a.peranTetap.filter(p => re.test(p.roleName)).reduce((s2, p) => s2 + (Number(p.qty) || 0), 0)
+    + aktEfAktif.filter(x => re.test(x.roleName)).length;
   const driverBiaya = {
     headcount: headcountTotal, userKantor: driverIt.userKantor, manajer: driverIt.manajer, luasM2: luasDriver, officeM2: driverIt.officeM2,
     posisiPalet: Math.ceil((spaceH?.sd.ppReq ?? 0) + (spaceH?.dd.ppReq ?? 0) + (spaceH?.block.ppReq ?? 0) + (spaceH?.floor.ppReq ?? 0) - 1e-9),
     paletInBulan: paletEkuivalen(volArus('inbound')).palet, paletOutBulan: paletEkuivalen(volArus('outbound')).palet,
     orderInBulan: orderIn, orderOutBulan: orderOut, hariKerjaBulan: hariOps, kategori: kategoriDari(t.industri) ?? KATEGORI_UMUM,
-    umk: masterMp?.upahMinimum ?? 0, skenarioAset: t.skenario_aset, tipeGudang: t.tipe_gudang ?? '', nilaiStokRp: a.nilaiStokRp ?? 0 };
+    umk: masterMp?.upahMinimum ?? 0, skenarioAset: t.skenario_aset, tipeGudang: t.tipe_gudang ?? '', nilaiStokRp: a.nilaiStokRp ?? 0,
+    securityInhouse: jumlahRole(RE_SECURITY), cleaningInhouse: jumlahRole(RE_CLEANING) };
   const fasilitasGudang = lengkapiSpaceExcel(a.space.excel).fasilitas.map(f => ({ nama: f.nama, m2: Number(f.m2) || 0 })).filter(f => f.m2 > 0);
 
   /** Data lengkap untuk tab Export: hitung ulang dengan master terbaru. */
@@ -837,7 +842,7 @@ export default function TenderPage() {
           <p className="small muted">Dipisah per klasifikasi sesuai Price Inquiry; pilihan item di tiap bagian hanya dari kategorinya. Bulanan/sewa = qty × harga per bulan. Beli = depresiasi selama min(umur, kontrak) + bunga modal. Sekali = diamortisasi selama kontrak + bunga modal.</p>
           <BiayaLainPanel lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan}
             onChange={(costLines, tandai, dibuang) => setA({ costLines, ...(tandai ? { biayaDefaultDiisi: true } : {}), ...(dibuang ? { biayaDefaultDibuang: dibuang } : {}) })}
-            dibuang={a.biayaDefaultDibuang ?? []}
+            dibuang={a.biayaDefaultDibuang}
             startup={a.startupAuto ?? STARTUP_DEFAULT} onStartup={startupAuto => setA({ startupAuto })}
             hasilBaris={hasilInterest?.biaya ?? hasil?.biaya} onHitung={() => hitung(false)}
             driver={driverBiaya} defaultDiisi={!!a.biayaDefaultDiisi} onNilaiStok={nilaiStokRp => setA({ nilaiStokRp })} fasilitas={fasilitasGudang} />
