@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { BASIS_TARIF_DEFAULT, type BasisTarif } from '@/lib/engine/types';
 import type { HasilTender, Bucket } from '@/lib/engine/index.ts';
-import { rp, angka, persen, BUCKET_LABEL } from '@/lib/format';
+import { rp, angka, persen, BUCKET_LABEL, labelKelompok } from '@/lib/format';
 import type { TarifTambahanInput } from '@/lib/engine/index.ts';
 import { LayananDijual, BarisTambahan } from './TarifTambahan';
 
@@ -205,8 +205,8 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       <div className="tablewrap"><table>
         <thead><tr><th>Kategori</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th><th style={{ width: '35%' }}></th></tr></thead>
         <tbody>
-          {kelompok.map(([k, v]) => <tr key={k} className="kat-link" title={`Buka rincian ${k} di tab baru`} onClick={() => window.open(`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`, '_blank', 'noopener')}>
-            <td><a href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" onClick={e => e.stopPropagation()}>{k} ↗</a></td><td className="num">{rp(v)}</td><td className="num">{rp(v * 12)}</td><td className="num"><b>{persen(v / totK)}</b></td>
+          {kelompok.map(([k, v]) => <tr key={k} className="kat-link" title={`Buka rincian ${labelKelompok(k)} di tab baru`} onClick={() => window.open(`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`, '_blank', 'noopener')}>
+            <td><a href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" onClick={e => e.stopPropagation()}>{labelKelompok(k)} ↗</a></td><td className="num">{rp(v)}</td><td className="num">{rp(v * 12)}</td><td className="num"><b>{persen(v / totK)}</b></td>
             <td><div className="bar-kat"><i style={{ width: `${(v / kelompok[0][1]) * 100}%` }} /></div></td></tr>)}
           <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{rp(totK)}</b></td><td className="num"><b>{rp(totK * 12)}</b></td><td className="num"><b>100%</b></td><td></td></tr>
         </tbody>

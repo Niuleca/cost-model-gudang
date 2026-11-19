@@ -12,9 +12,10 @@ import { hitungTender, type HasilTender, type Arus, type Bucket, type Kelompok, 
 import { Num, Pct, Txt, Sel, ubahArray, AngkaInput, AngkaVolume } from '@/components/fields';
 import { skemaVsmDefault, VSM_DEFAULT, tagDariDefault } from '@/lib/vsmDefault';
 import { alatRak, sesuaikanAlatRak, BATAS_ANGKAT_CBT_MM } from '@/lib/alatRak';
+import { sesuaikanMhe } from '@/lib/mheOtomatis';
 import { RE_SECURITY, RE_CLEANING } from '@/lib/biayaLainDefault';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
-import { rp, angka, persen, BUCKET_LABEL, INDUSTRI } from '@/lib/format';
+import { rp, angka, persen, BUCKET_LABEL, INDUSTRI, labelKelompok } from '@/lib/format';
 import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, type BasisTarif } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
@@ -56,7 +57,7 @@ import { labelStatus, STATUS_DRAFT } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
 
 interface Prod { id: number; aktivitas: string; tahap: string; tool: string; role_name: string; uom: string; kelas_berat: string; industri: string; prod_per_jam: number; status: string; benchmark: Record<string, string> | null }
-interface Item { id: number; kategori: string; item: string; satuan: string; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; daya_watt: number | null; status_efektif: string; mhe_tipe: string | null; kapasitas_ton: number | null; sumber_tenaga: string | null }
+interface Item { id: number; kategori: string; item: string; satuan: string; vendor?: string | null; tinggi_angkat_m?: number | null; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; daya_watt: number | null; status_efektif: string; mhe_tipe: string | null; kapasitas_ton: number | null; sumber_tenaga: string | null }
 interface Tarif { golongan: string; tarif_kwh: number }
 interface Jab { role_name: string }
 
@@ -130,7 +131,7 @@ export default function TenderPage() {
     const [tr, p, it, tf, jb] = await Promise.all([
       sb.from('tenders').select('*').eq('id', id).single(),
       sb.from('productivity').select('id, aktivitas, tahap, tool, role_name, uom, kelas_berat, industri, prod_per_jam, status, benchmark').order('tahap').order('aktivitas'),
-      sb.from('price_items_status').select('id, kategori, item, satuan, harga_beli, harga_sewa_bulan, umur_ekonomis_bulan, daya_watt, status_efektif, mhe_tipe, kapasitas_ton, sumber_tenaga').order('kategori').order('item'),
+      sb.from('price_items_status').select('id, kategori, item, satuan, harga_beli, harga_sewa_bulan, umur_ekonomis_bulan, daya_watt, status_efektif, mhe_tipe, kapasitas_ton, sumber_tenaga, vendor, tinggi_angkat_m').order('kategori').order('item'),
       sb.from('electricity_tariffs').select('golongan, tarif_kwh').order('golongan'),
       sb.from('job_levels').select('role_name').order('role_name'),
     ]);
@@ -350,6 +351,15 @@ export default function TenderPage() {
     t.asumsi.faktorProduktivitas, t.asumsi.efisiensi, t.jumlah_shift,
     { spanOfControl: t.asumsi.spanOfControl, roleSupervisor: t.asumsi.roleSupervisor, alatSupervisor: t.asumsi.alatSupervisor, peranTetap: t.asumsi.peranTetap }) : null, [t]);
   const pdMhe = pdFull?.mhe ?? [];
+  // MHE: item harga otomatis = termurah yang memenuhi kapasitas (berat palet) & tinggi angkat (beam teratas), kecuali dipilih manual
+  const opsiPilihMhe = t ? { tonPerPalet: { ...PARAM_DEFAULT, ...(t.asumsi.profilVolume?.param ?? {}) }.tonPerPalet,
+    tinggiBeamM: alatRak(t.asumsi.space?.excel, t.asumsi.batasAngkatCbtMm ?? BATAS_ANGKAT_CBT_MM).tinggiBeamMm / 1000 || undefined } : {};
+  const kunciMheOto = JSON.stringify([pdMhe.map(r => r.nama), opsiPilihMhe, items.length, t?.asumsi.mhe]);
+  useEffect(() => {
+    if (!t || !bisaEdit || !items.length || !pdMhe.length) return;
+    const baru = sesuaikanMhe(t.asumsi.mhe, pdMhe.map(r => r.nama), items, opsiPilihMhe);
+    if (baru) { setT(x => x && ({ ...x, asumsi: { ...x.asumsi, mhe: baru } })); setKotor(true); }
+  }, [kunciMheOto, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
   // headcount total untuk konsumsi (galon): hasil Hitung bila ada, kalau tidak dari process design (direct + indirect/tetap)
   const headcountTotal = (hasil?.manpower?.reduce((s, m) => s + m.headcount, 0)) || ((pdFull?.totalMp ?? 0) + (pdFull?.indirect.total ?? 0));
 
@@ -837,12 +847,16 @@ export default function TenderPage() {
       {tab === 'Technology & Equipment' && <>
         <ProcessDesignPanel bagian="mhe" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
           jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />
-        <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })} kontrakBulan={t.durasi_kontrak_bulan}
+        <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })} kontrakBulan={t.durasi_kontrak_bulan} opsiPilih={opsiPilihMhe}
           alatRak={{ ...alatRak(a.space.excel, a.batasAngkatCbtMm ?? BATAS_ANGKAT_CBT_MM), batasMm: a.batasAngkatCbtMm ?? BATAS_ANGKAT_CBT_MM, onBatas: mm => setA({ batasAngkatCbtMm: mm }),
             manual: a.aktivitas.filter(x => x.alatManual && x.porsiMuat?.muat === 'palet').length }}
           kebutuhan={true
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
             : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />
+        <BiayaSpacePanel hanyaRak space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+          posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
+          posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
+          skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan} onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />
         <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={driverIt} />
 
         <div className="card">
@@ -1065,7 +1079,7 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
             const urut = Object.entries(h.perKelompok).sort((a, b) => b[1] - a[1]).map(([k]) => k);
             return urut.map(k => { const rows = h.biaya.filter(b => b.kelompok === k); if (!rows.length) return null; const sub = rows.reduce((s2, b) => s2 + b.biayaBulan, 0);
               return [
-                <tr key={`h-${k}`} className="kat-head"><td colSpan={3}><b>{k}</b> <span className="small muted">· {rows.length} baris · {persen(sub / (h.totalBiayaBulan || 1))}</span>
+                <tr key={`h-${k}`} className="kat-head"><td colSpan={3}><b>{labelKelompok(k)}</b> <span className="small muted">· {rows.length} baris · {persen(sub / (h.totalBiayaBulan || 1))}</span>
                   {' '}<a className="small" href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener">Rincian & revisi ↗</a></td><td className="num"><b>{rp(sub)}</b></td></tr>,
                 ...rows.map((b, i) => <tr key={`${k}-${i}`}><td style={{ paddingLeft: 22 }}>{b.deskripsi}{b.biayaSistem != null && <span className="pill warn small" style={{ marginLeft: 6 }}>direvisi</span>}</td><td>{b.kategoriRisiko}</td><td className="small muted">{b.dasar}</td><td className="num">{rp(b.biayaBulan)}</td></tr>),
               ]; });

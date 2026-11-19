@@ -245,6 +245,9 @@ export interface MheInput {
   umurBulan?: number;
   ketersediaan: number;           // 0.85 = 85% jam efektif bisa dipakai (charging, servis)
   sparePersen: number;
+  /** true = item harga dipilih otomatis (termurah yang memenuhi kapasitas) dan ikut berubah bila data berubah */
+  otomatis?: boolean;
+  vendor?: string | null;
 }
 
 export interface CostLineInput {

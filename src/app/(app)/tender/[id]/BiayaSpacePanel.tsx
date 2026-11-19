@@ -15,7 +15,9 @@ const tarifGudang = (g: { harga_sewa_m2_bulan: number | null; harga_per_bulan: n
 const cocok = (jenis: 'spr' | 'ddr', x: Item) => jenis === 'spr' ? /selective|\bspr\b/i.test(x.item) : /double deep|\bddr\b/i.test(x.item);
 
 /** Biaya space & racking, terhubung ke database (gudang terpilih, Price Inquiry Racking) dan sheet Space (Space Rent, posisi SPR/DDR). */
-export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, posSpr, posDdr, posBlock, posFloor, skenarioAset, kontrakBulan, onSpace, onGudang }: {
+export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, posSpr, posDdr, posBlock, posFloor, skenarioAset, kontrakBulan, onSpace, onGudang, hanyaRak = false }: {
+  /** Technology & Equipment: hanya tabel racking */
+  hanyaRak?: boolean;
   space: SpaceInput; gudang: GudangTerpilih | null | undefined; items: Item[];
   spaceRentM2: number; posSpr: number; posDdr: number; posBlock: number; posFloor: number;
   skenarioAset: string; kontrakBulan: number;
@@ -33,7 +35,9 @@ export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, pos
   // Rak belum diisi & tidak ada harga lama → isi otomatis dari Price Inquiry (Selective → SPR, Double Deep → DDR)
   useEffect(() => {
     if (space.rak || (space.hargaRakPerPosisi ?? 0) > 0 || !rakItems.length) return;
-    const isi = (j: 'spr' | 'ddr'): RakHarga | undefined => { const x = rakItems.find(y => cocok(j, y)); return x ? { priceItemId: x.id, nama: x.item, harga: Number(x.harga_beli ?? 0), umurBulan: x.umur_ekonomis_bulan ?? 120 } : undefined; };
+    // termurah per jenis rak (approved dulu, bila tidak ada pakai draft)
+    const isi = (j: 'spr' | 'ddr'): RakHarga | undefined => { const xs = rakItems.filter(y => cocok(j, y) && Number(y.harga_beli) > 0).sort((a, b) => Number(a.harga_beli) - Number(b.harga_beli));
+      const x = xs.find(y => y.status_efektif === 'approved') ?? xs[0]; return x ? { priceItemId: x.id, nama: x.item, harga: Number(x.harga_beli ?? 0), umurBulan: x.umur_ekonomis_bulan ?? 120 } : undefined; };
     onSpace({ ...space, rak: { spr: isi('spr'), ddr: isi('ddr') } });
   }, [rakItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -63,10 +67,11 @@ export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, pos
   const totalRak = baris.reduce((t, b) => t + b.bulan, 0), investasi = baris.reduce((t, b) => t + b.nilai, 0);
 
   return (
-    <div className="card" style={{ gap: 10, padding: 12 }}>
-      <h3>Biaya space & racking</h3>
+    <div className="card" style={{ gap: 10, padding: hanyaRak ? undefined : 12 }}>
+      {hanyaRak ? <><h2>Racking</h2><p className="small muted" style={{ margin: 0 }}>Jumlah posisi otomatis dari Warehouse Planning (porsi SPR / DDR × stok); harga default = item rak termurah di Price Inquiry. Perubahan di sini sama dengan di Warehouse Planning.</p></>
+        : <h3>Biaya space & racking</h3>}
 
-      <table className="sp-tabel sp-kecil"><tbody>
+      {!hanyaRak && <table className="sp-tabel sp-kecil"><tbody>
         <tr className="sp-judul"><td colSpan={3}>Sewa gudang {rental ? '' : `· tidak dipakai (skenario ${skenarioAset})`}</td></tr>
         <tr><td>Gudang (database)</td><td colSpan={2}>{gudang ? <><b>{gudang.nama}</b> <span className="small muted">· {gudang.kab_kota} · {angka(Number(gudang.luas_m2))} m²</span></> : <span className="small muted">Belum dipilih — pilih di daftar gudang di atas, atau isi tarif manual</span>}</td></tr>
         <tr><td>Luas sewa (Warehouse Planning)</td><td className="num"><b>{angka(spaceRentM2)}</b></td><td>m²</td></tr>
@@ -79,7 +84,7 @@ export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, pos
         {dbBerubah && <tr><td colSpan={3}><span className="pill warn">Harga gudang di database sudah berubah</span>{' '}
           <button className="ghost" style={{ padding: '0 6px' }} onClick={() => gudang && live && onGudang({ ...gudang, harga_sewa_m2_bulan: live.harga_sewa_m2_bulan, harga_per_bulan: live.harga_per_bulan, luas_m2: Number(live.luas_m2) })}>Perbarui</button></td></tr>}
         <tr className="sp-rent"><td>Sewa gudang per bulan</td><td className="num">{rp(sewaBulan)}</td><td>/bln</td></tr>
-      </tbody></table>
+      </tbody></table>}
 
       <table className="sp-tabel sp-kecil"><tbody>
         <tr className="sp-judul"><td>Racking (Price Inquiry · posisi dari sheet Space)</td><td className="num">Posisi</td><td>Biaya/bln</td></tr>

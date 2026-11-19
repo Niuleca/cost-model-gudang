@@ -79,6 +79,7 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
                 {!b.priceItemId && <input aria-label="Deskripsi" className="input-kecil" value={b.deskripsi} onChange={e => onUbah(i, { deskripsi: e.target.value })} placeholder="Nama item manual" />}
                 {(b.dasar || it) && <div className="dasar-def">{it ? (/^per\b/i.test(it.satuan) ? it.satuan : `per ${it.satuan}`) : ''}{it && b.dasar ? ' · ' : ''}{b.dasar}</div>}
                 {b.kunci && b.qtyDefault != null && b.qty !== b.qtyDefault && <div className="dasar-def">qty diubah manual · <button className="link-kecil" onClick={() => onUbah(i, { qty: b.qtyDefault! })}>kembali ke default {b.qtyDefault}</button></div>}
+                {b.kunci && b.qtyDefault != null && b.qty === b.qtyDefault && <div className="dasar-def" style={{ color: 'var(--accent-ink, #0f766e)' }}>⟳ otomatis — qty ikut volume / data tender</div>}
                 {hb != null && <div className="dasar-def" style={{ color: 'var(--warn, #b45309)' }}>Harga Price Inquiry sekarang {rp(hb)} · <button className="link-kecil" onClick={() => onUbah(i, { hargaSatuan: hb, hargaDb: hb, ...(b.hargaDefault != null ? { hargaDefault: hb } : {}) })}>pakai harga ini</button></div>}
                 {s.mode === 'beli' && b.mode === 'bulanan' && !b.kunci && <div className="dasar-def" style={{ color: 'var(--warn, #b45309)' }}>
                   Aset dengan mode Bulanan → harga dibebankan penuh tiap bulan.{' '}
@@ -121,8 +122,19 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
   const ubah = (i: number, patch: Partial<Baris>) => ubahBanyak([{ i, patch }]);
   const ringkas = perSeksi.map(({ s, rows }) => {
     const c = rows.map(r => biayaBulanBaris(r.b, kontrakBulan, 0));
-    return { s, n: rows.length, nilai: c.reduce((t, x) => t + x.nilai, 0), total: c.reduce((t, x) => t + x.total, 0) };
+    const oto = rows.filter(r => r.b.kunci && r.b.qtyDefault != null && r.b.qty === r.b.qtyDefault).length;
+    return { s, n: rows.length, oto, nilai: c.reduce((t, x) => t + x.nilai, 0), total: c.reduce((t, x) => t + x.total, 0) };
   });
+  // Analisa: penggerak utama tiap klasifikasi (semua turunan volume: volume → luas, manpower, user kantor, order)
+  const PENGGERAK: Record<string, string> = {
+    office: 'user kantor & SPV (dari manpower) + luas office',
+    atk: 'order in/out (dokumen, surat jalan, HVS) + user kantor',
+    consumable: 'palet in/out (stretch film, label, lakban) + manpower (air minum)',
+    palet: 'posisi palet simpan + cadangan staging',
+    hse: 'luas gudang (APAR, rambu, lampu darurat) + manpower (APD, seragam, P3K, training)',
+    services: 'luas gudang (pest control, cleaning) + pos jaga (security)',
+    asuransi: 'nilai stok rata-rata', startup: 'persen OPEX & manpower', lainnya: 'isian manual',
+  };
   // Startup & implementation otomatis (baris hasil mesin) ikut dihitung di ringkasan & kartu Startup
   const autoStartup = startup.aktif ? (hasilBaris ?? []).filter(b => / \(otomatis\) — amortisasi$/.test(b.deskripsi)) : [];
   const otoStartup = { n: autoStartup.length, total: autoStartup.reduce((t, b) => t + b.biayaBulan, 0) };
@@ -214,11 +226,17 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
     <div style={{ display: 'grid', gap: 14 }}>
       {kepala}
       <div className="tablewrap fit"><table className="tabel-fit">
-        <thead><tr><th>Ringkasan per klasifikasi</th><th className="num">Item</th><th className="num">Nilai (qty × harga)</th><th className="num">Biaya/bln</th></tr></thead>
+        <thead><tr><th>Ringkasan & analisa per klasifikasi</th><th className="num">Item</th><th className="num" title="Baris yang qty-nya ikut data tender (volume) otomatis">Otomatis</th><th>Penggerak qty (dari volume)</th><th className="num">Nilai (qty × harga)</th><th className="num">Biaya/bln</th><th className="num" title="Biaya/bln ÷ palet in + out per bulan">Per palet</th><th className="num" title="Biaya/bln ÷ manpower">Per orang</th></tr></thead>
         <tbody>
-          {ringkas.filter(r => r.n > 0).map(r => <tr key={r.s.id}><td>{r.s.label}</td><td className="num">{r.n}</td><td className="num">{rp(r.nilai)}</td><td className="num">{rp(r.total)}</td></tr>)}
-          {ringkas.every(r => r.n === 0) && <tr><td colSpan={4} className="muted">Belum ada biaya lain.</td></tr>}
-          <tr style={{ background: 'var(--link)' }}><td colSpan={3}><b>Total biaya lain per bulan</b> <span className="small muted">(beli & sekali = depresiasi/amortisasi selama kontrak {kontrakBulan} bln; tanpa bunga — pilih di tab Interest cost)</span></td><td className="num"><b>{rp(totalBulan)}</b></td></tr>
+          {ringkas.filter(r => r.n > 0).map(r => { const pal = d.paletInBulan + d.paletOutBulan;
+            return <tr key={r.s.id}><td>{r.s.label}</td><td className="num">{r.n}</td>
+              <td className="num">{r.oto === r.n ? <span className="pill ok">{r.oto}/{r.n}</span> : <span className="pill warn" title="Sebagian qty diubah manual">{r.oto}/{r.n}</span>}</td>
+              <td className="small muted">{PENGGERAK[r.s.id] ?? '—'}</td>
+              <td className="num">{rp(r.nilai)}</td><td className="num">{rp(r.total)}</td>
+              <td className="num">{pal > 0 ? rp(r.total / pal) : '—'}</td><td className="num">{d.headcount > 0 ? rp(r.total / d.headcount) : '—'}</td></tr>; })}
+          {ringkas.every(r => r.n === 0) && <tr><td colSpan={8} className="muted">Belum ada biaya lain.</td></tr>}
+          <tr style={{ background: 'var(--link)' }}><td colSpan={5}><b>Total biaya lain per bulan</b> <span className="small muted">(beli & sekali = depresiasi/amortisasi selama kontrak {kontrakBulan} bln; tanpa bunga — pilih di tab Interest cost)</span></td><td className="num"><b>{rp(totalBulan)}</b></td>
+            <td className="num"><b>{d.paletInBulan + d.paletOutBulan > 0 ? rp(totalBulan / (d.paletInBulan + d.paletOutBulan)) : '—'}</b></td><td className="num"><b>{d.headcount > 0 ? rp(totalBulan / d.headcount) : '—'}</b></td></tr>
         </tbody>
       </table></div>
       {perSeksi.map(({ s, rows }) => (

@@ -3,11 +3,13 @@ import UmurKontrak from '@/components/UmurKontrak';
 import type { MheInput } from '@/lib/engine/types';
 import { rp, angka } from '@/lib/format';
 
-interface Item { id: number; kategori: string; item: string; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; status_efektif: string; mhe_tipe: string | null; kapasitas_ton: number | null; sumber_tenaga: string | null }
+import { ALAT_IT, jenisMhe, pilihItemMhe } from '@/lib/mheOtomatis';
+interface Item { id: number; kategori: string; item: string; vendor?: string | null; tinggi_angkat_m?: number | null; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; status_efektif: string; mhe_tipe: string | null; kapasitas_ton: number | null; sumber_tenaga: string | null }
 type Mhe = MheInput & { priceItemId?: number };
 
 /** Kebutuhan MHE = equipment dari Value Stream Mapping (MHE Summary). User cukup memilih item harga per alat. */
-export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange, kontrakBulan, alatRak }: {
+export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange, kontrakBulan, alatRak, opsiPilih }: {
+  opsiPilih?: { tonPerPalet?: number; tinggiBeamM?: number };
   kontrakBulan: number;
   /** Pilihan otomatis CBT / RT untuk aktivitas rak + pengaturan tinggi angkat CBT */
   alatRak?: { tool: 'CBT' | 'RT'; alasan: string; batasMm: number; onBatas: (mm: number) => void; manual: number };
@@ -57,14 +59,20 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange,
                 <td className="num"><b>{b.unit ?? '–'}</b></td>
                 <td><select aria-label={`Item harga ${b.nama}`} value={m?.priceItemId ?? ''} style={{ minWidth: 240 }} onChange={e => {
                   const it = pilihan.find(x => x.id === Number(e.target.value));
-                  if (!it) { ubah(b.nama, { priceItemId: undefined, nama: '', harga: 0 }); return; }
-                  const mode = m?.mode ?? 'sewa';
-                  ubah(b.nama, { priceItemId: it.id, nama: it.item, harga: hargaDari(it, mode), umurBulan: it.umur_ekonomis_bulan ?? m?.umurBulan ?? 60 });
+                  if (!it) { ubah(b.nama, { priceItemId: undefined, nama: '', harga: 0, otomatis: false, vendor: null }); return; }
+                  const mode = m?.mode ?? (Number(it.harga_sewa_bulan) > 0 ? 'sewa' : 'beli');
+                  ubah(b.nama, { priceItemId: it.id, nama: it.item, harga: hargaDari(it, mode), mode, umurBulan: it.umur_ekonomis_bulan ?? m?.umurBulan ?? 60, otomatis: false, vendor: it.vendor ?? null });
                 }}>
                   <option value="">— tanpa biaya —</option>
                   {['MHE', 'IT'].map(kat => <optgroup key={kat} label={kat}>{pilihan.filter(x => x.kategori === kat).map(x => (
-                    <option key={x.id} value={x.id}>{x.mhe_tipe ? `${x.mhe_tipe} ${x.kapasitas_ton ?? ''}T${x.sumber_tenaga ? ' ' + x.sumber_tenaga : ''} · ` : ''}{x.item}{x.status_efektif !== 'approved' ? ` (${x.status_efektif})` : ''}</option>))}</optgroup>)}
-                </select></td>
+                    <option key={x.id} value={x.id}>{x.mhe_tipe ? `${x.mhe_tipe} ${x.kapasitas_ton ?? ''}T${x.sumber_tenaga ? ' ' + x.sumber_tenaga : ''} · ` : ''}{x.item}{x.vendor ? ` · ${x.vendor}` : ''}{x.status_efektif !== 'approved' ? ` (${x.status_efektif})` : ''}</option>))}</optgroup>)}
+                </select>
+                  {(() => { const p = pilihItemMhe(b.nama, items, opsiPilih);
+                    if (ALAT_IT.test(b.nama) && !jenisMhe(b.nama)) return <div className="small muted">biaya {b.nama} dihitung di Kebutuhan IT (di bawah) — biarkan tanpa biaya agar tidak dobel</div>;
+                    if (m?.otomatis) return <div className="small" style={{ color: 'var(--accent-ink, #0f766e)' }}>otomatis · {p?.alasan ?? 'termurah'}</div>;
+                    if (p && m) return <div className="small muted">manual · <button type="button" className="linkbtn" onClick={() => ubah(b.nama, { otomatis: true })}>pakai termurah ({p.item.item}{p.item.vendor ? ` · ${p.item.vendor}` : ''} {rp(p.harga)})</button></div>;
+                    if (!p && jenisMhe(b.nama)) return <div className="small muted">belum ada harga {jenisMhe(b.nama)} yang memenuhi kapasitas di Price Inquiry</div>;
+                    return null; })()}</td>
                 <td><select aria-label="Mode" style={{ minWidth: 86 }} value={m?.mode ?? 'sewa'} disabled={!m} onChange={e => {
                   const mode = e.target.value as 'sewa' | 'beli'; const it = pilihan.find(x => x.id === m?.priceItemId);
                   ubah(b.nama, { mode, harga: it ? hargaDari(it, mode) : m?.harga ?? 0 });

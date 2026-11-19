@@ -4,7 +4,7 @@
 // Total biaya & total GP tidak berubah — yang bergeser hanya porsi & tarif per layanan.
 import { useEffect, useState } from 'react';
 import type { HasilTender, Bucket, TenderInput } from '@/lib/engine/index.ts';
-import { rp, persen, BUCKET_LABEL } from '@/lib/format';
+import { rp, persen, BUCKET_LABEL, labelKelompok } from '@/lib/format';
 import { uraiUom } from '@/lib/engine/types';
 
 export type AlokasiKategori = NonNullable<TenderInput['alokasiKategori']>;
@@ -39,7 +39,7 @@ function InputPorsi({ nilai, set, label, lebar = 70 }: { nilai: number; set: (v:
 
 /** Contoh pola cepat untuk seluruh matriks. */
 const POLA: { label: string; buat: (kat: string[]) => AlokasiKategori }[] = [
-  { label: 'Fasilitas & rak → Storage 100%, lainnya Handling In/Out 50/50', buat: kat => Object.fromEntries(kat.map(k => [k, ['Fasilitas', 'Racking'].includes(k) ? { storage: 1 } : { handling_in: 0.5, handling_out: 0.5 }])) },
+  { label: 'Rental space & rak → Storage 100%, lainnya Handling In/Out 50/50', buat: kat => Object.fromEntries(kat.map(k => [k, ['Fasilitas', 'Racking'].includes(k) ? { storage: 1 } : { handling_in: 0.5, handling_out: 0.5 }])) },
   { label: 'Semua kategori 1/3 rata', buat: kat => Object.fromEntries(kat.map(k => [k, { storage: 1 / 3, handling_in: 1 / 3, handling_out: 1 / 3 }])) },
 ];
 
@@ -113,7 +113,7 @@ export function MatriksKategori({ h, nilai, onUbah, tenderId, setara, onSetara }
           const jml = kol.reduce((a, b) => a + nilaiSel(b), 0);
           const salah = Math.abs(jml - 1) > 0.0005;
           return <tr key={r.kelompok} className={r.override ? 'baris-ubah' : undefined}>
-            <td style={{ whiteSpace: 'nowrap' }}><a href={`/tender/${tenderId}/kategori/${encodeURIComponent(r.kelompok)}`} target="_blank" rel="noopener">{r.kelompok} ↗</a></td>
+            <td style={{ whiteSpace: 'nowrap' }}><a href={`/tender/${tenderId}/kategori/${encodeURIComponent(r.kelompok)}`} target="_blank" rel="noopener">{labelKelompok(r.kelompok)} ↗</a></td>
             <td className="num">{rp(r.biayaBulan)}</td>
             {kol.map(b => <td key={b} className="num"><InputPorsi lebar={64} label={`${r.kelompok} ${BUCKET_LABEL[b]}`} nilai={nilaiSel(b)} set={v => ubah(r.kelompok, b, v, r.porsi)} />
               {o && Math.abs((r.porsiDefault[b] ?? 0) - nilaiSel(b)) > 0.0005 && <div className="dasar-def">default {persen(r.porsiDefault[b] ?? 0)}</div>}</td>)}

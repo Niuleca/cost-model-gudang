@@ -22,6 +22,10 @@ export const ROLE_LABEL: Record<AppRole, string> = {
 
 export const TIM_TENDER: AppRole[] = ['admin', 'manager', 'solution_design', 'commercial', 'finance'];
 
+/** Nama tampilan kategori biaya (kunci data tetap sama). */
+export const LABEL_KELOMPOK: Record<string, string> = { Fasilitas: 'Rental Space' };
+export const labelKelompok = (k: string) => LABEL_KELOMPOK[k] ?? k;
+
 export const BUCKET_LABEL: Record<string, string> = {
   storage: 'Storage', handling_in: 'Handling In', handling_out: 'Handling Out', vas: 'VAS', manajemen: 'Manajemen',
 };

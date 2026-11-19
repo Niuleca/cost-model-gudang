@@ -9,7 +9,7 @@ import { ASUMSI_DEFAULT, keInput, muatMaster, type TenderRow } from '@/lib/tende
 import { hitungTender, type HasilTender } from '@/lib/engine/index.ts';
 import type { MasterData } from '@/lib/engine/types';
 import { IT_SHEET_DEFAULT } from '@/lib/it';
-import { rp, persen } from '@/lib/format';
+import { rp, persen, labelKelompok } from '@/lib/format';
 import { useProfile } from '@/lib/useProfile';
 import { STATUS_DRAFT } from '@/lib/status';
 
@@ -77,13 +77,13 @@ export default function KategoriBiayaPage() {
   return (<>
     <div>
       <p className="small muted" style={{ letterSpacing: '.06em', textTransform: 'uppercase' }}>{t.kode ?? ''} · v{t.versi} · Rincian kategori</p>
-      <h1 style={{ margin: '2px 0' }}>{kelompok} — {t.customer}</h1>
+      <h1 style={{ margin: '2px 0' }}>{labelKelompok(kelompok)} — {t.customer}</h1>
       <p className="small muted"><Link href={`/tender/${t.id}?tab=result`}>← Kembali ke tab Result</Link>
         {kategoriLain.length > 0 && <> · Kategori lain: {kategoriLain.map((k, i) => <span key={k}>{i ? ', ' : ''}<Link href={`/tender/${t.id}/kategori/${encodeURIComponent(k)}`}>{k}</Link></span>)}</>}</p>
     </div>
 
     <div className="kpis">
-      <div className="kpi"><span className="small muted">Biaya {kelompok}/bln</span><b>{rp(totKat)}</b><span className="small muted">{totKat !== totKatSistem ? `sistem ${rp(totKatSistem)}` : 'sesuai hitungan sistem'}</span></div>
+      <div className="kpi"><span className="small muted">Biaya {labelKelompok(kelompok)}/bln</span><b>{rp(totKat)}</b><span className="small muted">{totKat !== totKatSistem ? `sistem ${rp(totKatSistem)}` : 'sesuai hitungan sistem'}</span></div>
       <div className="kpi"><span className="small muted">Total cost/bln</span><b>{rp(h.totalBiayaBulan)}</b><span className="small muted">{awal && awal.totalBiayaBulan !== h.totalBiayaBulan ? `sebelumnya ${rp(awal.totalBiayaBulan)}` : ' '}</span></div>
       <div className="kpi"><span className="small muted">Selling/bln</span><b>{rp(s0?.pendapatanBulan)}</b><span className="small muted">{a0 && a0.pendapatanBulan !== s0?.pendapatanBulan ? `sebelumnya ${rp(a0.pendapatanBulan)}` : ' '}</span></div>
       <div className="kpi"><span className="small muted">Margin (GP%)</span><b>{persen(s0?.gpPersen)}</b><span className="small muted">{a0 && a0.gpPersen !== s0?.gpPersen ? `sebelumnya ${persen(a0.gpPersen)}` : ' '}</span></div>
@@ -91,7 +91,7 @@ export default function KategoriBiayaPage() {
 
     <div className="card">
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h2>Rincian {kelompok}</h2>
+        <h2>Rincian {labelKelompok(kelompok)}</h2>
         <div className="row">
           {pesan && <span className="small" role="status">{pesan}</span>}
           <button className="ghost" disabled={!Object.keys(revisi).some(k => baris.some(b => b.deskripsi === k))} onClick={() => setRevisi(r => Object.fromEntries(Object.entries(r).filter(([k]) => !baris.some(b => b.deskripsi === k))))}>Kembalikan ke sistem</button>
@@ -115,7 +115,7 @@ export default function KategoriBiayaPage() {
             </tr>;
           })}
           {!baris.length && <tr><td colSpan={7} className="muted">Tidak ada baris biaya di kategori ini.</td></tr>}
-          <tr className="pd-sub"><td colSpan={3}><b>Total {kelompok}</b></td><td className="num"><b>{rp(totKatSistem)}</b></td><td className="num out"><b>{rp(totKat)}</b></td><td className="num"><b>{totKat !== totKatSistem ? `${totKat - totKatSistem >= 0 ? '+' : ''}${rp(totKat - totKatSistem)}` : '—'}</b></td><td /></tr>
+          <tr className="pd-sub"><td colSpan={3}><b>Total {labelKelompok(kelompok)}</b></td><td className="num"><b>{rp(totKatSistem)}</b></td><td className="num out"><b>{rp(totKat)}</b></td><td className="num"><b>{totKat !== totKatSistem ? `${totKat - totKatSistem >= 0 ? '+' : ''}${rp(totKat - totKatSistem)}` : '—'}</b></td><td /></tr>
         </tbody>
       </table></div>
       <p className="small muted">Kosongkan kolom revisi = pakai hitungan sistem. Revisi disimpan per baris (berdasarkan nama baris); kalau nama baris berubah — misalnya jumlah orang/unit berubah — revisinya tidak dipakai lagi dan kembali ke hitungan sistem.
