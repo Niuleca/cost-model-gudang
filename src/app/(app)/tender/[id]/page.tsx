@@ -117,7 +117,7 @@ export default function TenderPage() {
   const simple = (usePathname() ?? '').startsWith('/simple/');
   const [pop, setPop] = useState<(typeof TABS)[number] | null>(null);
   const tabIsi: string = simple && pop ? pop : tab;
-  const lihat = (x: string) => tabIsi === x || (simple && !pop && tab === 'Key Assumption' && x === 'Volume');
+  const lihat = (x: string) => tabIsi === x || (simple && !pop && tab === 'Key Assumption' && (x === 'Volume' || x === 'Warehouse Planning'));
   const bukaRincian = (x: string) => { if (simple) { setPop(x as (typeof TABS)[number]); window.scrollTo({ top: 0 }); } else setTab(x as (typeof TABS)[number]); };
   useEffect(() => { if (simple && tab !== 'Key Assumption' && tab !== 'Result') setTab('Key Assumption'); }, [simple, tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prods, setProds] = useState<Prod[]>([]);
@@ -639,6 +639,23 @@ export default function TenderPage() {
       {lihat('Key Assumption') && <ProcessDesignPanel bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
           jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />}
 
+      {lihat('Warehouse Planning') && (<>
+        <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
+          setKol('warehouse_id', g?.id ?? null);
+          setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
+        }} />
+        <SpacePanel excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
+          inboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).palet} outboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).palet}
+          uomIn={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).ok ? 'palet' : volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).ok ? 'palet' : volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
+          jumlahShift={t.jumlah_shift} onChange={ubahSpaceExcel}
+          kekuatan={dasarKekuatan(a, t.customer)}
+          komersial={<BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+            posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
+            posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
+            skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
+            onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />} />
+      </>)}
+
       {lihat('Volume') && <ProfilVolumePanel judul={simple ? 'Moda transport inbound & outbound (profil order per hari)' : undefined} profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
         onChange={profilVolume => setA({ profilVolume })} />}
 
@@ -839,23 +856,6 @@ export default function TenderPage() {
                 </tr>); })}
             </tbody></table></div>
         </div>
-      </>)}
-
-      {lihat('Warehouse Planning') && (<>
-        <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
-          setKol('warehouse_id', g?.id ?? null);
-          setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
-        }} />
-        <SpacePanel excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
-          inboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).palet} outboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).palet}
-          uomIn={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).ok ? 'palet' : volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).ok ? 'palet' : volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
-          jumlahShift={t.jumlah_shift} onChange={ubahSpaceExcel}
-          kekuatan={dasarKekuatan(a, t.customer)}
-          komersial={<BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
-            posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
-            posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
-            skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
-            onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />} />
       </>)}
 
       {lihat('Loan & Interest Calculator') && <InterestPanel nilai={a.interestCost} onChange={interestCost => setA({ interestCost })} hasilLive={hasilInterest} kontrakBulan={t.durasi_kontrak_bulan} />}
