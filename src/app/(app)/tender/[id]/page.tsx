@@ -536,37 +536,6 @@ export default function TenderPage() {
           </div>
         </div>
       )}
-      {lihat('Key Assumption') && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel}
-        cbmPerPalet={{ ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}) }.cbmPerPalet}
-        onCbmPerPalet={cbm => setA({ profilVolume: { inbound: [], outbound: [], ...(a.profilVolume ?? {}), param: { ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}), cbmPerPalet: cbm } } })} />}
-      {lihat('Key Assumption') && <ProfilVolumePanel ringkas profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
-        onChange={profilVolume => setA({ profilVolume })} />}
-      {lihat('Key Assumption') && (() => {
-        const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };
-        const dipakai = (pr: string) => a.aktivitas.filter(x => x.porsiMuat?.proses === pr);
-        return <div className="card">
-          <h2><T>Workload palletize vs loose</T></h2>
-          <p className="small muted">Porsi volume yang ditangani <b>palletize</b> vs <b>loose</b> (curah / case) per proses. Aktivitas di tab Value Stream Mapping yang kolom % volume-nya "Ikut porsi" otomatis memakai angka ini.
-            Replenishment dihitung dari volume <b>case picking</b> (outbound × loose picking), lalu dibagi turun palet vs loose case.</p>
-          <div className="tablewrap"><table>
-            <thead><tr><th>Proses</th><th className="num">Palletize</th><th className="num">Loose</th><th>Keterangan</th><th>Aktivitas yang ikut</th></tr></thead>
-            <tbody>{PROSES_MUAT.map(p => {
-              const v = pm[p.v]; const xs = dipakai(p.v);
-              return <tr key={p.v}><td><b>{p.l}</b></td>
-                <td className="num"><div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}>
-                  <AngkaInput aria-label={`${p.l} palletize %`} min={0} max={100} step="any" value={Math.round(v * 1000) / 10} style={{ width: 70, minWidth: 70 }}
-                    onValue={n => setA({ porsiMuat: { ...pm, [p.v]: Math.min(100, Math.max(0, n)) / 100 } })} />%</div></td>
-                <td className="num"><b>{angka((1 - v) * 100, 1)}%</b></td>
-                <td className="small muted">{p.ket}{p.v === 'replenishment' && <> · basis {angka((1 - pm.picking) * 100, 1)}% outbound</>}</td>
-                <td className="small">{xs.length ? xs.map((x, k) => <div key={k}>{x.aktivitas} <span className="muted">({x.porsiMuat!.muat === 'palet' ? 'palletize' : x.porsiMuat!.muat} · {angka(persenDariPorsi(x.porsiMuat!, pm) * 100, 1)}%)</span></div>) : <span className="muted">belum ada aktivitas</span>}</td></tr>;
-            })}</tbody>
-          </table></div>
-          {a.porsiMuat && <div className="row"><button className="ghost" onClick={() => setA({ porsiMuat: undefined })}>Kembalikan ke default</button></div>}
-        </div>;
-      })()}
-      {lihat('Key Assumption') && <ProcessDesignPanel bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
-          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />}
-
       {lihat('Volume') && (
         <div className="card">
           <h2><T>Volume</T></h2>
@@ -638,7 +607,38 @@ export default function TenderPage() {
         </div>
       )}
 
-      {lihat('Volume') && <ProfilVolumePanel profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
+      {lihat('Key Assumption') && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel}
+        cbmPerPalet={{ ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}) }.cbmPerPalet}
+        onCbmPerPalet={cbm => setA({ profilVolume: { inbound: [], outbound: [], ...(a.profilVolume ?? {}), param: { ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}), cbmPerPalet: cbm } } })} />}
+      {lihat('Key Assumption') && !simple && <ProfilVolumePanel ringkas profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
+        onChange={profilVolume => setA({ profilVolume })} />}
+      {lihat('Key Assumption') && (() => {
+        const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };
+        const dipakai = (pr: string) => a.aktivitas.filter(x => x.porsiMuat?.proses === pr);
+        return <div className="card">
+          <h2><T>Workload palletize vs loose</T></h2>
+          <p className="small muted">Porsi volume yang ditangani <b>palletize</b> vs <b>loose</b> (curah / case) per proses. Aktivitas di tab Value Stream Mapping yang kolom % volume-nya "Ikut porsi" otomatis memakai angka ini.
+            Replenishment dihitung dari volume <b>case picking</b> (outbound × loose picking), lalu dibagi turun palet vs loose case.</p>
+          <div className="tablewrap"><table>
+            <thead><tr><th>Proses</th><th className="num">Palletize</th><th className="num">Loose</th><th>Keterangan</th><th>Aktivitas yang ikut</th></tr></thead>
+            <tbody>{PROSES_MUAT.map(p => {
+              const v = pm[p.v]; const xs = dipakai(p.v);
+              return <tr key={p.v}><td><b>{p.l}</b></td>
+                <td className="num"><div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}>
+                  <AngkaInput aria-label={`${p.l} palletize %`} min={0} max={100} step="any" value={Math.round(v * 1000) / 10} style={{ width: 70, minWidth: 70 }}
+                    onValue={n => setA({ porsiMuat: { ...pm, [p.v]: Math.min(100, Math.max(0, n)) / 100 } })} />%</div></td>
+                <td className="num"><b>{angka((1 - v) * 100, 1)}%</b></td>
+                <td className="small muted">{p.ket}{p.v === 'replenishment' && <> · basis {angka((1 - pm.picking) * 100, 1)}% outbound</>}</td>
+                <td className="small">{xs.length ? xs.map((x, k) => <div key={k}>{x.aktivitas} <span className="muted">({x.porsiMuat!.muat === 'palet' ? 'palletize' : x.porsiMuat!.muat} · {angka(persenDariPorsi(x.porsiMuat!, pm) * 100, 1)}%)</span></div>) : <span className="muted">belum ada aktivitas</span>}</td></tr>;
+            })}</tbody>
+          </table></div>
+          {a.porsiMuat && <div className="row"><button className="ghost" onClick={() => setA({ porsiMuat: undefined })}>Kembalikan ke default</button></div>}
+        </div>;
+      })()}
+      {lihat('Key Assumption') && <ProcessDesignPanel bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />}
+
+      {lihat('Volume') && <ProfilVolumePanel judul={simple ? 'Moda transport inbound & outbound (profil order per hari)' : undefined} profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
         onChange={profilVolume => setA({ profilVolume })} />}
 
       {lihat('Produk') && <ProdukPanel produk={a.produk} aturan={a.aturanBerat} volumes={volEf} profil={a.profilVolume} spaceExcel={a.space.excel} spaceH={spaceH}
