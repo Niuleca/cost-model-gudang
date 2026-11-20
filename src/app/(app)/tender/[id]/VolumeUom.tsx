@@ -142,7 +142,8 @@ export const SATUAN_UTAMA: { v: SatuanUtama; l: string }[] = [
 const SAT_LABEL: Record<Exclude<SatuanUtama, 'input'>, string> = { palet: 'palet', case: 'case', pcs: 'pcs', cbm: 'CBM', ton: 'ton' };
 
 /** Ringkasan order per hari / bulan / tahun dalam satuan utama + konversi ke palet, case, pcs, CBM, ton (kosong bila tidak bisa dikonversi). */
-export function RingkasanOrder({ volumes, basis, hariOps, utama, onUtama, labelArus, ekstra, muatan }: {
+export function RingkasanOrder({ volumes, basis, hariOps, utama, onUtama, labelArus, ekstra, muatan, gabung = false }: {
+  /** Simple CM: digabung dengan ringkasan volume (kartu stok + cara hitung) */ gabung?: boolean;
   ekstra?: React.ReactNode; volumes: VolumeInput[]; muatan?: Partial<Muatan>; basis: 'peakBulan' | 'rataRataBulan' | 'komitmenBulan'; hariOps: number;
   utama: SatuanUtama; onUtama: (u: SatuanUtama) => void; labelArus: (a: string) => string;
 }) {
@@ -176,19 +177,20 @@ export function RingkasanOrder({ volumes, basis, hariOps, utama, onUtama, labelA
   const caraHitung = (v: VolumeInput) => { const u = uraiUom(v, Number(v[basis]) || 0, m); return [...u.dasar, ...u.kurang.map(x => `⚠ ${x}`)].join(' · '); };
   return <>
     <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
-      <div><h3 style={{ margin: 0 }}>Ringkasan volume & order</h3>
+      {gabung ? <div><h3 style={{ margin: 0 }}>Ringkasan volume & order</h3>
         <span className="small muted">{f(m.cbmPerPalet, 2)} CBM & {f(m.tonPerPalet * 1000)} kg per palet (Parameter muatan)</span></div>
+        : <h3 style={{ margin: 0 }}>Ringkasan order</h3>}
       <div className="row" style={{ alignItems: 'end' }}>{ekstra}<label className="f" htmlFor="satuan-utama">Satuan utama
         <select id="satuan-utama" value={utama} onChange={e => onUtama(e.target.value as SatuanUtama)} style={{ minWidth: 190 }}>
           {SATUAN_UTAMA.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}</select></label></div>
     </div>
-    {us && <div className="vol-kartu">{kartu.map(([l, n, sx]) => <div key={l}><span className="small muted">{l}</span><b>{n}</b><span className="small muted">{sx}</span></div>)}</div>}
+    {gabung && us && <div className="vol-kartu">{kartu.map(([l, n, sx]) => <div key={l}><span className="small muted">{l}</span><b>{n}</b><span className="small muted">{sx}</span></div>)}</div>}
     <div className="tablewrap"><table>
       <thead><tr><th>Arus</th><th className="num">Per hari</th><th className="num">Per bulan</th><th className="num">Per tahun</th></tr></thead>
       <tbody>{volumes.map((v, i) => {
         const bln = Number(v[basis]) || 0, stok = v.arus === 'storage';
-        const ch = caraHitung(v);
-        return <tr key={i}><td>{labelArus(v.arus)} <span className="small muted">· {v.uom}</span>{stok && <div className="small muted">stok tersimpan (posisi), bukan arus</div>}
+        const ch = gabung ? caraHitung(v) : '';
+        return <tr key={i}><td>{labelArus(v.arus)}{gabung && <span className="small muted"> · {v.uom}</span>}{stok && <div className="small muted">stok tersimpan (posisi), bukan arus</div>}
           {ch && <div className="small muted" style={{ maxWidth: 360 }}>{ch}</div>}</td>
           <td className="num">{stok ? <span className="muted">–</span> : sel(v, hariOps > 0 ? bln / hariOps : 0)}</td>
           <td className="num">{sel(v, bln)}</td>

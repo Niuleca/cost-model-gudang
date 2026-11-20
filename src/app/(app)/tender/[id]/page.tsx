@@ -51,7 +51,7 @@ import HistorisPanel from './HistorisPanel';
 import CostAllocation from './PembagianLayanan';
 import HasilKomersial, { type Kurs, type Pajak } from './HasilKomersial';
 import StatusControl from '@/components/StatusControl';
-import { PilihUom, SelKonversi, gantiUom, RingkasanOrder } from './VolumeUom';
+import { PilihUom, SelKonversi, gantiUom, RingkasanVolumeSemuaUom, RingkasanOrder } from './VolumeUom';
 import BagikanTender from '@/components/BagikanTender';
 import { labelStatus, STATUS_DRAFT } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
@@ -571,7 +571,8 @@ export default function TenderPage() {
                 <td><button className="danger" onClick={() => setA({ volumes: a.volumes.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}
             </tbody></table></div>
-          <RingkasanOrder volumes={volEfBaris} muatan={a.profilVolume?.param} basis={basisRingkas} hariOps={hariOps} utama={a.satuanUtamaOrder ?? 'input'} onUtama={u => setA({ satuanUtamaOrder: u })}
+          {!simple && <RingkasanVolumeSemuaUom volumes={volEfBaris} muatan={a.profilVolume?.param} basis={basisRingkas} hariOps={hariOps} />}
+          <RingkasanOrder gabung={simple} volumes={volEfBaris} muatan={a.profilVolume?.param} basis={basisRingkas} hariOps={hariOps} utama={a.satuanUtamaOrder ?? 'input'} onUtama={u => setA({ satuanUtamaOrder: u })}
             labelArus={x => ARUS.find(o => o.v === x)?.l ?? x}
             ekstra={<label className="f" htmlFor="basis-ringkas">Basis
               <select id="basis-ringkas" value={basisRingkas} onChange={e => setBasisRingkas(e.target.value as typeof basisRingkas)} style={{ minWidth: 150 }}>
@@ -902,7 +903,7 @@ export default function TenderPage() {
         </div>
       </>)}
 
-      {lihat('Result') && <HasilPanel onBukaTab={bukaRincian} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
+      {lihat('Result') && <HasilPanel drill={simple} onBukaTab={bukaRincian} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} hariTarif={a.hariTarifHarian} onHariTarif={hariTarifHarian => setA({ hariTarifHarian })} uomManual={a.uomManual ?? {}} onUomManual={uomManual => setA({ uomManual })} onBukaAlokasi={() => bukaRincian('Cost Allocation')}
@@ -939,7 +940,9 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, uomManual, onUomManual, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, onBukaTab, saran, basisTarif, onBasisTarif }: {
+function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, uomManual, onUomManual, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, onBukaTab, saran, basisTarif, onBasisTarif }: {
+  /** Simple CM: angka Result bisa diklik untuk membuka rinciannya */
+  drill?: boolean;
   basisTarif?: Partial<BasisTarif>; onBasisTarif: (b: BasisTarif) => void;
   onBukaAlokasi: () => void; hariTarif?: number; onHariTarif: (n: number | undefined) => void;
   onBukaTab: (tab: string) => void; saran: Saran[];
@@ -993,14 +996,16 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
               'Jumlah manpower': ['Value Stream Mapping (aktivitas, produktivitas, manpower)', () => onBukaTab('Value Stream Mapping')],
               'Luas gudang': ['Warehouse Planning (space & racking)', () => onBukaTab('Warehouse Planning')],
             };
-            const d = ke[l];
+            const d = drill ? ke[l] : undefined;
             const isi = <><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}{d && <span className="small kpi-buka">Buka rincian →</span>}</>;
             return d ? <button key={l} type="button" className="kpi kpi-klik" title={`Buka: ${d[0]}`} onClick={d[1]}>{isi}</button> : <div key={l} className="kpi">{isi}</div>;
           })}</div>
           {kom.length > 0 && <div className="komposisi">
             <div className="komposisi-bar" role="img" aria-label={`Komposisi biaya: ${kom.map(([k, v]) => `${k} ${Math.round((v / totKom) * 100)}%`).join(', ')}`}>
               {kom.map(([k, v], j) => <i key={k} style={{ width: `${(v / totKom) * 100}%`, background: WARNA[j % WARNA.length] }} title={`${k} · ${rp(v)}/bln · ${persen(v / totKom)}`} />)}</div>
-            <div className="komposisi-legenda">{kom.map(([k, v], j) => <a key={k} href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" title={`Buka & revisi harga ${labelKelompok(k)} (tab baru)`}><i style={{ background: WARNA[j % WARNA.length] }} />{labelKelompok(k)} <b>{persen(v / totKom, 0)}</b></a>)}</div>
+            <div className="komposisi-legenda">{kom.map(([k, v], j) => drill
+              ? <a key={k} href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" title={`Buka & revisi harga ${labelKelompok(k)} (tab baru)`}><i style={{ background: WARNA[j % WARNA.length] }} />{labelKelompok(k)} <b>{persen(v / totKom, 0)}</b></a>
+              : <span key={k}><i style={{ background: WARNA[j % WARNA.length] }} />{labelKelompok(k)} <b>{persen(v / totKom, 0)}</b></span>)}</div>
           </div>}
         </section>;
       })()}
@@ -1077,9 +1082,10 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
       </div>
 
       <div className="card">
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}><h2 style={{ margin: 0 }}><T>Kebutuhan manpower & MHE</T></h2>
+        {drill ? <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}><h2 style={{ margin: 0 }}><T>Kebutuhan manpower & MHE</T></h2>
           <div className="row" style={{ margin: 0 }}><button className="ghost" onClick={() => onBukaTab('Value Stream Mapping')}>Ubah manpower (VSM) →</button>
             <button className="ghost" onClick={() => onBukaTab('Technology & Equipment')}>Ubah MHE & IT →</button></div></div>
+          : <h2><T>Kebutuhan manpower & MHE</T></h2>}
         <p className="small muted">Bagian ini hanya menunjukkan <b>jumlah</b> (berapa orang / unit dan seberapa sibuk). Biayanya ada di <b>Rincian biaya per bulan</b> di bawah, kategori Manpower & MHE — supaya angka rupiah tidak tampil dua kali.</p>
         <div className="tablewrap"><table>
           <thead><tr><th>Role</th><th>Jenis</th><th className="num">Jam kerja/shift</th><th className="num">MP/shift</th><th className="num">Headcount</th><th className="num">Utilisasi</th><th>Skema</th></tr></thead>

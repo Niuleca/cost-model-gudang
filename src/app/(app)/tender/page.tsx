@@ -51,7 +51,7 @@ export default function DaftarTender() {
   }
 
   const tahunList = Array.from(new Set(rows.map(r => r.created_at.slice(0, 4)))).sort().reverse();
-  const tampil = rows.filter(r => (!simple || r.simpleCm) && (fil.bagi !== 'saya' || r.created_by === profile?.id) && (fil.bagi !== 'lain' || r.created_by !== profile?.id) && (!draftSaja || DRAFT.includes(r.status)) && (!fil.status || r.status === fil.status) && (!fil.industri || r.industri === fil.industri)
+  const tampil = rows.filter(r => (simple ? !!r.simpleCm : !r.simpleCm) && (fil.bagi !== 'saya' || r.created_by === profile?.id) && (fil.bagi !== 'lain' || r.created_by !== profile?.id) && (!draftSaja || DRAFT.includes(r.status)) && (!fil.status || r.status === fil.status) && (!fil.industri || r.industri === fil.industri)
     && (!fil.tahun || r.created_at.startsWith(fil.tahun))
     && (!fil.q || `${r.kode} ${r.customer} ${r.kab_kota} ${r.pic ?? ''}`.toLowerCase().includes(fil.q.toLowerCase())));
 
@@ -89,7 +89,7 @@ export default function DaftarTender() {
               const excel = !r.hasil && !!r.excel;
               return (
                 <tr key={r.id}>
-                  <td><Link href={urlTender(r)}>{r.kode ?? r.id.slice(0, 8)}</Link>{r.simpleCm && <span className="pill info" style={{ fontSize: 11, marginLeft: 4 }}>Simple CM</span>}{(() => { const b = labelBagi(r, profile?.id); return <div><span className={`pill ${b.kelas}`} style={{ fontSize: 11 }}>{b.l}</span></div>; })()}</td>
+                  <td><Link href={urlTender(r)}>{r.kode ?? r.id.slice(0, 8)}</Link>{(() => { const b = labelBagi(r, profile?.id); return <div><span className={`pill ${b.kelas}`} style={{ fontSize: 11 }}>{b.l}</span></div>; })()}</td>
                   <td>{r.customer}{r.pic ? <div className="small muted">{r.pic}</div> : null}</td><td className="small">{r.industri ?? '—'}</td><td>{r.kab_kota}</td>
                   <td><span className={`pill ${pillStatus(r.status)}`}>{labelStatus(r.status)}</span> <span className="small muted">v{r.versi}</span></td>
                   <td className="num">{rp(biayaOf(r))}</td>
