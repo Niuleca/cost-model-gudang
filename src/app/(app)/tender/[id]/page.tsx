@@ -4,7 +4,7 @@ import VsmMapPanel from './VsmMapPanel';
 import { InputPanjang, useSatuanPanjang } from '@/lib/satuanPanjang';
 import { T, useT } from '@/lib/i18n';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { useTabUrl } from '@/lib/useTabUrl';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, STARTUP_DEFAULT, PAJAK_DEFAULT, ESKALASI_DEFAULT, keInput, muatMaster, aktivitasAktif, bersihkanRoleTerhapus, type Asumsi, type TenderRow } from '@/lib/tender';
@@ -112,6 +112,14 @@ export default function TenderPage() {
   }, []);
   const [basisRingkas, setBasisRingkas] = useState<'peakBulan' | 'rataRataBulan' | 'komitmenBulan'>('peakBulan');
   const [tab, setTab] = useTabUrl<(typeof TABS)[number] | typeof TAB_EXCEL>([TAB_EXCEL, ...TABS], 'Key Assumption');
+  // Simple CM Warehouse (/simple/[id]): hanya 2 tab — Key Assumption (+ Volume) & Result. Angka di Result bisa dibuka (drill-down)
+  // ke tab lengkapnya (VSM, Warehouse Planning, Technology & Equipment, …) sebagai halaman rincian, lalu kembali ke Result.
+  const simple = (usePathname() ?? '').startsWith('/simple/');
+  const [pop, setPop] = useState<(typeof TABS)[number] | null>(null);
+  const tabIsi: string = simple && pop ? pop : tab;
+  const lihat = (x: string) => tabIsi === x || (simple && !pop && tab === 'Key Assumption' && x === 'Volume');
+  const bukaRincian = (x: string) => { if (simple) { setPop(x as (typeof TABS)[number]); window.scrollTo({ top: 0 }); } else setTab(x as (typeof TABS)[number]); };
+  useEffect(() => { if (simple && tab !== 'Key Assumption' && tab !== 'Result') setTab('Key Assumption'); }, [simple, tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prods, setProds] = useState<Prod[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [tarif, setTarif] = useState<Tarif[]>([]);
@@ -184,7 +192,7 @@ export default function TenderPage() {
   // Hitung langsung untuk sheet Interest cost (hasil bunga live) dan Technology & Equipment (startup & implementation otomatis live)
   const tLive = useDeferredValue(t);
   const hasilInterest = useMemo(() => {
-    if (!tLive || !masterMp || (tab !== 'Loan & Interest Calculator' && tab !== 'Technology & Equipment')) return null;
+    if (!tLive || !masterMp || (tabIsi !== 'Loan & Interest Calculator' && tabIsi !== 'Technology & Equipment')) return null;
     try { return hitungTender(keInput(tLive), masterMp); } catch { return null; }
   }, [tLive, masterMp, tab]);
 
@@ -278,7 +286,7 @@ export default function TenderPage() {
     const h = hitungTender(keInput(t), master);
     for (const c of catatan) h.redFlags.push({ level: 'peringatan', kode: 'MASTER_DATA', pesan: c });
     for (const pesan of cekProduk()) h.redFlags.push({ level: 'peringatan', kode: 'PRODUK', pesan });
-    setHasil(h); setCatatanMaster(catatan); if (pindahTab) setTab('Result'); setPesan(pindahTab ? null : 'Dihitung ulang — hasil terbaru ada di tab Result.'); if (!pindahTab) setTimeout(() => setPesan(null), 3000);
+    setHasil(h); setCatatanMaster(catatan); if (pindahTab) { setTab('Result'); setPop(null); } setPesan(pindahTab ? null : 'Dihitung ulang — hasil terbaru ada di tab Result.'); if (!pindahTab) setTimeout(() => setPesan(null), 3000);
   }
 
   /** Upload Excel: terapkan kolom tender & asumsi dari file, lalu hitung ulang dengan data master terbaru. */
@@ -319,14 +327,14 @@ export default function TenderPage() {
 
   // Buka tab Hasil → selalu hitung ulang dari input terbaru (mis. Interest cost, revisi), supaya angka tidak basi
   useEffect(() => {
-    if ((tab !== 'Result' && tab !== 'Cost Allocation') || !t) return;
+    if ((tabIsi !== 'Result' && tabIsi !== 'Cost Allocation') || !t) return;
     hitung(false);
   }, [tab, !!t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Margin diubah di tab Hasil → hitung ulang otomatis (tanpa pindah tab)
   const kunciMargin = JSON.stringify([t?.asumsi.marginManual ?? {}, t?.asumsi.pajak ?? null, t?.asumsi.uomRateCard ?? {}, t?.asumsi.uomManual ?? {}, t?.asumsi.hariTarifHarian ?? null, t?.asumsi.alokasiKategori ?? null, t?.asumsi.handlingSetara ?? null, t?.asumsi.basisTarif ?? null, t?.asumsi.layananJual ?? null, t?.asumsi.tarifTambahan ?? null]);
   useEffect(() => {
-    if (!hasil || (tab !== 'Result' && tab !== 'Cost Allocation')) return;
+    if (!hasil || (tabIsi !== 'Result' && tabIsi !== 'Cost Allocation')) return;
     const id = setTimeout(() => { hitung(false); }, 400);
     return () => clearTimeout(id);
   }, [kunciMargin]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -457,7 +465,7 @@ export default function TenderPage() {
     <>
       <div className="head">
         <div>
-          <div className="eyebrow">{t.kode} · v{t.versi} · {labelStatus(t.status)}</div>
+          <div className="eyebrow">{simple ? 'Simple CM Warehouse · ' : ''}{t.kode} · v{t.versi} · {labelStatus(t.status)}</div>
           <h1>{t.customer}</h1>
           <p className="muted">{t.kab_kota}, {t.provinsi} · {t.skenario_aset} · {t.jumlah_shift} shift · kontrak {t.durasi_kontrak_bulan} bln</p>
         </div>
@@ -473,14 +481,21 @@ export default function TenderPage() {
         </div>
       </div>
 
-      <div className="tabs tabs-beku" role="tablist">
+      {simple ? <>
+        <div className="tabs tabs-beku" role="tablist">
+          {([['Key Assumption', 'Key Assumption & Volume'], ['Result', 'Result']] as const).map(([x, l]) => <button key={x} role="tab" aria-selected={tab === x && !pop} className={tab === x && !pop ? 'on' : ''} onClick={() => { setPop(null); setTab(x); }}>{tr(l)}</button>)}
+          <span style={{ flex: 1 }} /><a className="small" href={`/tender/${t.id}${tab === 'Result' ? '?tab=result' : ''}`} title="Buka semua tab (versi lengkap Logistics Tender)">Versi lengkap ↗</a>
+        </div>
+        {pop && <div className="rincian-bar" role="note"><button type="button" onClick={() => { setPop(null); setTab('Result'); }}>← Kembali ke Result</button>
+          <span>Rincian: <b>{tr(pop)}</b> — ubah di sini, angka di Result ikut dihitung ulang.</span></div>}
+      </> : <div className="tabs tabs-beku" role="tablist">
         {([...(a.historis ? [TAB_EXCEL] : []), ...TABS.filter(x => x !== 'Export' || bolehExport(profile))] as ((typeof TABS)[number] | typeof TAB_EXCEL)[]).map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{tr(x)}</button>)}
-      </div>
+      </div>}
 
       {tab === TAB_EXCEL && a.historis && <HistorisPanel h={a.historis} nama={(t.kode ?? t.customer).replace(/[^\w]+/g, '_')} />}
 
       <fieldset className="ro-fieldset" disabled={!bisaEdit}>
-      {tab === 'Key Assumption' && (
+      {lihat('Key Assumption') && (
         <div className="card">
           <h2><T>Key Assumption</T></h2>
           <div className="grid3 ka-grid">
@@ -521,12 +536,12 @@ export default function TenderPage() {
           </div>
         </div>
       )}
-      {tab === 'Key Assumption' && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel}
+      {lihat('Key Assumption') && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel}
         cbmPerPalet={{ ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}) }.cbmPerPalet}
         onCbmPerPalet={cbm => setA({ profilVolume: { inbound: [], outbound: [], ...(a.profilVolume ?? {}), param: { ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}), cbmPerPalet: cbm } } })} />}
-      {tab === 'Key Assumption' && <ProfilVolumePanel ringkas profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
+      {lihat('Key Assumption') && <ProfilVolumePanel ringkas profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
         onChange={profilVolume => setA({ profilVolume })} />}
-      {tab === 'Key Assumption' && (() => {
+      {lihat('Key Assumption') && (() => {
         const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };
         const dipakai = (pr: string) => a.aktivitas.filter(x => x.porsiMuat?.proses === pr);
         return <div className="card">
@@ -549,10 +564,10 @@ export default function TenderPage() {
           {a.porsiMuat && <div className="row"><button className="ghost" onClick={() => setA({ porsiMuat: undefined })}>Kembalikan ke default</button></div>}
         </div>;
       })()}
-      {tab === 'Key Assumption' && <ProcessDesignPanel bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+      {lihat('Key Assumption') && <ProcessDesignPanel bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
           jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />}
 
-      {tab === 'Volume' && (
+      {lihat('Volume') && (
         <div className="card">
           <h2><T>Volume</T></h2>
           <p className="small muted">Sizing memakai <b>peak</b>. Tarif dihitung dari <b>volume komitmen</b> (MGV). Storage diisi jumlah stok (posisi), arus lain per bulan.</p>
@@ -623,17 +638,17 @@ export default function TenderPage() {
         </div>
       )}
 
-      {tab === 'Volume' && <ProfilVolumePanel profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
+      {lihat('Volume') && <ProfilVolumePanel profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
         onChange={profilVolume => setA({ profilVolume })} />}
 
-      {tab === 'Produk' && <ProdukPanel produk={a.produk} aturan={a.aturanBerat} volumes={volEf} profil={a.profilVolume} spaceExcel={a.space.excel} spaceH={spaceH}
+      {lihat('Produk') && <ProdukPanel produk={a.produk} aturan={a.aturanBerat} volumes={volEf} profil={a.profilVolume} spaceExcel={a.space.excel} spaceH={spaceH}
         namaCustomer={t.customer} sinkron={a.produkSinkron !== false} dampak={dampakProduk}
         onChange={produk => ubahProduk(produk)} onAturan={aturanBerat => ubahProduk(a.produk, aturanBerat)}
         onSinkron={v => { if (v) ubahProduk(a.produk, a.aturanBerat, true); else setA({ produkSinkron: false }); }} />}
 
-      {tab === 'Landmark VSM' && <VsmMapPanel tenderId={t.id} kode={t.kode ?? ''} customer={t.customer} aktivitas={a.aktivitas} pd={pdFull} vsm={a.vsm} bisaEdit={bisaEdit}
+      {lihat('Landmark VSM') && <VsmMapPanel tenderId={t.id} kode={t.kode ?? ''} customer={t.customer} aktivitas={a.aktivitas} pd={pdFull} vsm={a.vsm} bisaEdit={bisaEdit}
         onVsm={vsm => setA({ vsm })} onAktif={(idx, aktif) => setA({ aktivitas: a.aktivitas.map((x, i) => (idx.includes(i) ? { ...x, nonaktif: aktif ? undefined : true } : x)) })} />}
-      {tab === 'Value Stream Mapping' && (<>
+      {lihat('Value Stream Mapping') && (<>
         {<>
           <ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift}
@@ -825,7 +840,7 @@ export default function TenderPage() {
         </div>
       </>)}
 
-      {tab === 'Warehouse Planning' && (<>
+      {lihat('Warehouse Planning') && (<>
         <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
           setKol('warehouse_id', g?.id ?? null);
           setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
@@ -842,9 +857,9 @@ export default function TenderPage() {
             onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />} />
       </>)}
 
-      {tab === 'Loan & Interest Calculator' && <InterestPanel nilai={a.interestCost} onChange={interestCost => setA({ interestCost })} hasilLive={hasilInterest} kontrakBulan={t.durasi_kontrak_bulan} />}
+      {lihat('Loan & Interest Calculator') && <InterestPanel nilai={a.interestCost} onChange={interestCost => setA({ interestCost })} hasilLive={hasilInterest} kontrakBulan={t.durasi_kontrak_bulan} />}
 
-      {tab === 'Technology & Equipment' && <>
+      {lihat('Technology & Equipment') && <>
         <ProcessDesignPanel bagian="mhe" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
           jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />
         <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })} kontrakBulan={t.durasi_kontrak_bulan} opsiPilih={opsiPilihMhe}
@@ -873,7 +888,7 @@ export default function TenderPage() {
         </div>
       </>}
 
-      {tab === 'Utilities Management' && (<>
+      {lihat('Utilities Management') && (<>
         <div className="card">
           <h2>Electrical</h2>
           <p className="small muted">Daftar default dihitung dari Warehouse Planning (luas, office, tinggi), Value Stream Mapping (shift), dan Technology & Equipment (MHE, IT). Baris <span style={{ color: 'var(--bad)', fontWeight: 600 }}>merah</span> = datanya belum diketahui; qty 0 sampai datanya dilengkapi.</p>
@@ -887,21 +902,21 @@ export default function TenderPage() {
         </div>
       </>)}
 
-      {tab === 'Result' && <HasilPanel onBukaTab={x => setTab(x as (typeof TABS)[number])} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
+      {lihat('Result') && <HasilPanel onBukaTab={bukaRincian} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
-        uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} hariTarif={a.hariTarifHarian} onHariTarif={hariTarifHarian => setA({ hariTarifHarian })} uomManual={a.uomManual ?? {}} onUomManual={uomManual => setA({ uomManual })} onBukaAlokasi={() => setTab('Cost Allocation')}
+        uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} hariTarif={a.hariTarifHarian} onHariTarif={hariTarifHarian => setA({ hariTarifHarian })} uomManual={a.uomManual ?? {}} onUomManual={uomManual => setA({ uomManual })} onBukaAlokasi={() => bukaRincian('Cost Allocation')}
         layananJual={a.layananJual ?? {}} onLayananJual={layananJual => setA({ layananJual })} tambahan={a.tarifTambahan ?? []} onTambahan={tarifTambahan => setA({ tarifTambahan })}
         basisTarif={a.basisTarif} onBasisTarif={basisTarif => setA({ basisTarif })} />}
-      {tab === 'Cost Allocation' && <CostAllocation h={hasil} tenderId={t.id} onKeResult={() => setTab('Result')}
+      {lihat('Cost Allocation') && <CostAllocation h={hasil} tenderId={t.id} onKeResult={() => { setPop(null); setTab('Result'); }}
         alokasiKategori={a.alokasiKategori ?? {}} onAlokasiKategori={alokasiKategori => setA({ alokasiKategori })}
         handlingSetara={a.handlingSetara !== false} onHandlingSetara={v => setA({ handlingSetara: v })} />}
-      {tab === 'Quotation' && <QuotationPanel tender={t} profile={profile} />}
+      {lihat('Quotation') && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
-      {tab === 'Export' && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
-      {tab === 'Export' && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={namaFileExport(nomorQ, t.kode ?? t.customer)} />}
-      {tab === 'Export' && bolehExport(profile) && <UploadExcelPanel t={t} bisaEdit={bisaEdit} onTerapkan={terapkanExcel} />}
-      {tab !== 'Result' && tab !== 'Quotation' && tab !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
+      {lihat('Export') && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
+      {lihat('Export') && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={namaFileExport(nomorQ, t.kode ?? t.customer)} />}
+      {lihat('Export') && bolehExport(profile) && <UploadExcelPanel t={t} bisaEdit={bisaEdit} onTerapkan={terapkanExcel} />}
+      {tabIsi !== 'Result' && tabIsi !== 'Quotation' && tabIsi !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
     </>
   );
 }
@@ -968,11 +983,24 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
                 : <span className="small muted">Sesuai versi tersimpan</span>}</div>
             <div className="row hasil-aksi" style={{ margin: 0 }}><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
           </div>
-          <div className="kpis kpis-hasil">{kpi.map(([l, v, k]) => <div key={l} className="kpi"><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}</div>)}</div>
+          <div className="kpis kpis-hasil">{kpi.map(([l, v, k]) => {
+            // drill-down: klik angka → buka rinciannya (tab lengkap / bagian Result) untuk dilihat & diubah
+            const ke: Record<string, [string, () => void]> = {
+              'Cost per bulan': ['Rincian biaya per kategori', () => setBagian('biaya')],
+              'Selling per bulan': ['Harga, satuan tarif & GP%', () => setBagian('harga')],
+              'Profit per bulan': ['Harga, satuan tarif & GP%', () => setBagian('harga')],
+              'Margin (GP%)': ['Harga, satuan tarif & GP%', () => setBagian('harga')],
+              'Jumlah manpower': ['Value Stream Mapping (aktivitas, produktivitas, manpower)', () => onBukaTab('Value Stream Mapping')],
+              'Luas gudang': ['Warehouse Planning (space & racking)', () => onBukaTab('Warehouse Planning')],
+            };
+            const d = ke[l];
+            const isi = <><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}{d && <span className="small kpi-buka">Buka rincian →</span>}</>;
+            return d ? <button key={l} type="button" className="kpi kpi-klik" title={`Buka: ${d[0]}`} onClick={d[1]}>{isi}</button> : <div key={l} className="kpi">{isi}</div>;
+          })}</div>
           {kom.length > 0 && <div className="komposisi">
             <div className="komposisi-bar" role="img" aria-label={`Komposisi biaya: ${kom.map(([k, v]) => `${k} ${Math.round((v / totKom) * 100)}%`).join(', ')}`}>
               {kom.map(([k, v], j) => <i key={k} style={{ width: `${(v / totKom) * 100}%`, background: WARNA[j % WARNA.length] }} title={`${k} · ${rp(v)}/bln · ${persen(v / totKom)}`} />)}</div>
-            <div className="komposisi-legenda">{kom.map(([k, v], j) => <span key={k}><i style={{ background: WARNA[j % WARNA.length] }} />{k} <b>{persen(v / totKom, 0)}</b></span>)}</div>
+            <div className="komposisi-legenda">{kom.map(([k, v], j) => <a key={k} href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" title={`Buka & revisi harga ${labelKelompok(k)} (tab baru)`}><i style={{ background: WARNA[j % WARNA.length] }} />{labelKelompok(k)} <b>{persen(v / totKom, 0)}</b></a>)}</div>
           </div>}
         </section>;
       })()}
@@ -1049,7 +1077,9 @@ function HasilPanel({ belumDisimpan, hasil, catatan, onSimpan, onHitung, marginM
       </div>
 
       <div className="card">
-        <h2><T>Kebutuhan manpower & MHE</T></h2>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}><h2 style={{ margin: 0 }}><T>Kebutuhan manpower & MHE</T></h2>
+          <div className="row" style={{ margin: 0 }}><button className="ghost" onClick={() => onBukaTab('Value Stream Mapping')}>Ubah manpower (VSM) →</button>
+            <button className="ghost" onClick={() => onBukaTab('Technology & Equipment')}>Ubah MHE & IT →</button></div></div>
         <p className="small muted">Bagian ini hanya menunjukkan <b>jumlah</b> (berapa orang / unit dan seberapa sibuk). Biayanya ada di <b>Rincian biaya per bulan</b> di bawah, kategori Manpower & MHE — supaya angka rupiah tidak tampil dua kali.</p>
         <div className="tablewrap"><table>
           <thead><tr><th>Role</th><th>Jenis</th><th className="num">Jam kerja/shift</th><th className="num">MP/shift</th><th className="num">Headcount</th><th className="num">Utilisasi</th><th>Skema</th></tr></thead>

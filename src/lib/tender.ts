@@ -61,6 +61,7 @@ export interface Asumsi {
   marginManual?: TenderInput['marginManual'];
   alokasiKategori?: TenderInput['alokasiKategori'];
   handlingSetara?: boolean;            // tarif handling in & out setara per palet (default aktif)
+  simpleCm?: boolean;                  // dibuat dari menu Simple CM Warehouse (tampilan 2 tab)
   basisTarif?: TenderInput['basisTarif'];   // dasar volume tarif: MGV atau mid / min / max
   uomManual?: TenderInput['uomManual'];
   hariTarifHarian?: number;

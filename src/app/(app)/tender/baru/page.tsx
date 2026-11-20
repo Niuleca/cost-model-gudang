@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import TombolPanduan from '@/components/TombolPanduan';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT } from '@/lib/tender';
 import { rp, INDUSTRI } from '@/lib/format';
@@ -11,6 +11,7 @@ interface Upah { provinsi: string; kab_kota: string; upah_berlaku: number; statu
 export default function TenderBaru() {
   const sb = supabaseBrowser();
   const router = useRouter();
+  const simple = (usePathname() ?? '').startsWith('/simple');   // Simple CM Warehouse: tampilan 2 tab (Key Assumption & Result)
   const [upah, setUpah] = useState<Upah[]>([]);
   const [f, setF] = useState({ customer: '', industri: '', provinsi: '', kab_kota: '', tipe_gudang: 'Ambient', durasi_kontrak_bulan: 24,
     tanggal_go_live: '', jumlah_shift: 1, payment_term_hari: 30, skenario_aset: 'Rental' });
@@ -31,16 +32,17 @@ export default function TenderBaru() {
     e.preventDefault(); setSibuk(true); setErr(null);
     const kode = `TND-${new Date().toISOString().slice(2, 7).replace('-', '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const { data, error } = await sb.from('tenders').insert({
-      ...f, kode, tanggal_go_live: f.tanggal_go_live || null, asumsi: ASUMSI_DEFAULT,
+      ...f, kode, tanggal_go_live: f.tanggal_go_live || null, asumsi: simple ? { ...ASUMSI_DEFAULT, simpleCm: true } : ASUMSI_DEFAULT,
     }).select('id').single();
     setSibuk(false);
     if (error) { setErr(error.message); return; }
-    router.push(`/tender/${data!.id}`);
+    router.push(`/${simple ? 'simple' : 'tender'}/${data!.id}`);
   }
 
   return (
     <>
-      <div className="head"><div><div className="eyebrow">UC10 · Input customer & tender</div><h1>Tender baru</h1></div></div>
+      <div className="head"><div><div className="eyebrow">{simple ? 'Simple CM Warehouse' : 'UC10 · Input customer & tender'}</div><h1>Tender baru</h1>
+          {simple && <p className="muted" style={{ margin: 0 }}>Hanya 2 tab: Key Assumption (termasuk volume) & Result. Semua angka dihitung otomatis; rinciannya bisa dibuka dan diubah dari Result.</p>}</div></div>
       <form className="card" onSubmit={buat}>
         <div className="grid3">
           <label className="f" htmlFor="customer">Customer<input id="customer" required value={f.customer} onChange={e => set('customer', e.target.value)} /></label>

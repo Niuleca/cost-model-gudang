@@ -24,6 +24,11 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/analisis', label: 'Project Analysis', roles: TIM_TENDER },
     { href: '/heatmap', label: 'Opportunity Control Tower', roles: TIM_TENDER },
   ] },
+  { id: 'simple', label: 'Simple CM Warehouse', item: [
+    { href: '/simple/baru', label: 'New Tender', roles: TIM_PENGUJI },
+    { href: '/simple/draft', label: 'Draft Tender', roles: TIM_PENGUJI },
+    { href: '/simple/perbandingan', label: 'Tender Comparison', roles: TIM_TENDER },
+  ] },
   { id: 'tender', label: 'Logistics Tender', item: [
     { href: '/tender/baru', label: 'New Tender', roles: TIM_PENGUJI, grup: 'Warehouse Tender' },
     { href: '/tender?grup=draft', label: 'Draft Tender', roles: TIM_PENGUJI, grup: 'Warehouse Tender' },

@@ -1,6 +1,7 @@
 'use client';
 import ExportButton from '@/components/ExportButton';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { rp, tanggal, INDUSTRI } from '@/lib/format';
@@ -9,7 +10,7 @@ import { STATUS, labelStatus, pillStatus } from '@/lib/status';
 
 import { STATUS_DRAFT as DRAFT } from '@/lib/status';
 
-interface Baris {
+interface Baris { simpleCm?: boolean | null;
   id: string; kode: string | null; customer: string; kab_kota: string; provinsi: string; industri: string | null; status: string; versi: number; updated_at: string; created_at: string; pic: string | null;
   hasil: { totalBiayaBulan?: number; redFlags?: { level: string }[]; simulasi?: { gpPersen: number }[] } | null;
   excel: { biayaBulan: number; gpPersen: number } | null;
@@ -27,13 +28,16 @@ function labelBagi(r: Baris, saya: string | undefined): { l: string; kelas: stri
 /** Menu 5 & 9 · Daftar tender dan riwayat pekerjaan (semua versi tersimpan, filter status/industri/tahun). */
 export default function DaftarTender() {
   const { profile, loading } = useProfile();
+  // /simple/draft: daftar Simple CM Warehouse (draft) — dibuka di tampilan 2 tab
+  const simple = (usePathname() ?? '').startsWith('/simple');
+  const urlTender = (r: { id: string; simpleCm?: boolean | null }) => `/${r.simpleCm || simple ? 'simple' : 'tender'}/${r.id}`;
   const [rows, setRows] = useState<Baris[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [fil, setFil] = useState({ q: '', status: '', industri: '', tahun: '', bagi: '' });
   const [draftSaja, setDraftSaja] = useState(false);
-  useEffect(() => { setDraftSaja(new URLSearchParams(window.location.search).get('grup') === 'draft'); }, []);
+  useEffect(() => { setDraftSaja(simple || new URLSearchParams(window.location.search).get('grup') === 'draft'); }, [simple]);
   useEffect(() => {
-    supabaseBrowser().from('tenders').select('id, kode, customer, kab_kota, provinsi, industri, status, versi, updated_at, created_at, pic, hasil, created_by, contoh_publik, tender_akses(count), excel:asumsi->historis->ringkasan').eq('jenis_tender', 'warehouse').order('updated_at', { ascending: false })
+    supabaseBrowser().from('tenders').select('id, kode, customer, kab_kota, provinsi, industri, status, versi, updated_at, created_at, pic, hasil, created_by, contoh_publik, tender_akses(count), excel:asumsi->historis->ringkasan, simpleCm:asumsi->simpleCm').eq('jenis_tender', 'warehouse').order('updated_at', { ascending: false })
       .then(({ data, error }: { data: Baris[] | null; error: { message: string } | null }) => { if (error) setErr(error.message); else setRows(data ?? []); });
   }, []);
 
@@ -47,15 +51,15 @@ export default function DaftarTender() {
   }
 
   const tahunList = Array.from(new Set(rows.map(r => r.created_at.slice(0, 4)))).sort().reverse();
-  const tampil = rows.filter(r => (fil.bagi !== 'saya' || r.created_by === profile?.id) && (fil.bagi !== 'lain' || r.created_by !== profile?.id) && (!draftSaja || DRAFT.includes(r.status)) && (!fil.status || r.status === fil.status) && (!fil.industri || r.industri === fil.industri)
+  const tampil = rows.filter(r => (!simple || r.simpleCm) && (fil.bagi !== 'saya' || r.created_by === profile?.id) && (fil.bagi !== 'lain' || r.created_by !== profile?.id) && (!draftSaja || DRAFT.includes(r.status)) && (!fil.status || r.status === fil.status) && (!fil.industri || r.industri === fil.industri)
     && (!fil.tahun || r.created_at.startsWith(fil.tahun))
     && (!fil.q || `${r.kode} ${r.customer} ${r.kab_kota} ${r.pic ?? ''}`.toLowerCase().includes(fil.q.toLowerCase())));
 
   return (
     <>
       <div className="head">
-        <div><div className="eyebrow">Tender</div><h1>{draftSaja ? 'Draft tender' : 'Semua tender'}</h1></div>
-        <Link className="btn" href="/tender/baru">Tender baru</Link>
+        <div><div className="eyebrow">{simple ? 'Simple CM Warehouse' : 'Tender'}</div><h1>{draftSaja ? 'Draft tender' : 'Semua tender'}</h1></div>
+        <Link className="btn" href={simple ? '/simple/baru' : '/tender/baru'}>Tender baru</Link>
       </div>
       {err && <p className="error">{err}</p>}
       <div className="row" role="group" aria-label="Tampilan">
@@ -85,7 +89,7 @@ export default function DaftarTender() {
               const excel = !r.hasil && !!r.excel;
               return (
                 <tr key={r.id}>
-                  <td><Link href={`/tender/${r.id}`}>{r.kode ?? r.id.slice(0, 8)}</Link>{(() => { const b = labelBagi(r, profile?.id); return <div><span className={`pill ${b.kelas}`} style={{ fontSize: 11 }}>{b.l}</span></div>; })()}</td>
+                  <td><Link href={urlTender(r)}>{r.kode ?? r.id.slice(0, 8)}</Link>{r.simpleCm && <span className="pill info" style={{ fontSize: 11, marginLeft: 4 }}>Simple CM</span>}{(() => { const b = labelBagi(r, profile?.id); return <div><span className={`pill ${b.kelas}`} style={{ fontSize: 11 }}>{b.l}</span></div>; })()}</td>
                   <td>{r.customer}{r.pic ? <div className="small muted">{r.pic}</div> : null}</td><td className="small">{r.industri ?? '—'}</td><td>{r.kab_kota}</td>
                   <td><span className={`pill ${pillStatus(r.status)}`}>{labelStatus(r.status)}</span> <span className="small muted">v{r.versi}</span></td>
                   <td className="num">{rp(biayaOf(r))}</td>

@@ -1089,3 +1089,12 @@ td.td-isian { background: #fffaf0; }
 .tombol-panduan-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 220px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(15,23,42,.15); padding: 6px; display: grid; }
 .tombol-panduan-menu a { display: grid; gap: 1px; padding: 8px 10px; border-radius: 7px; color: var(--ink); text-decoration: none; }
 .tombol-panduan-menu a:hover, .tombol-panduan-menu a:focus { background: #f1f5f9; }
+
+/* ---------- Simple CM Warehouse: drill-down dari Result */
+.kpi.kpi-klik { text-align: left; font: inherit; color: var(--ink, #0f172a); cursor: pointer; height: auto; width: 100%; justify-items: start; transition: border-color .15s, box-shadow .15s; }
+.kpi.kpi-klik:hover, .kpi.kpi-klik:focus-visible { border-color: var(--accent, #1e56a0); box-shadow: 0 2px 10px rgba(30,86,160,.12); }
+.kpi-buka { color: var(--link-ink, #1e56a0); font-weight: 600; margin-top: 2px; }
+.komposisi-legenda a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.komposisi-legenda a:hover { text-decoration: underline; }
+.rincian-bar { position: sticky; top: 64px; z-index: 6; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 8px 0 12px; padding: 10px 14px; border-radius: 10px; background: #fff7ed; border: 1px solid #fdba74; }
+.rincian-bar button { white-space: nowrap; }
