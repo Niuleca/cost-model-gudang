@@ -7,6 +7,7 @@ import { AngkaBebas } from '@/components/fields';
 import { useSatuanPanjang } from '@/lib/satuanPanjang';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT, keInput, muatMaster, type TenderRow } from '@/lib/tender';
@@ -33,11 +34,10 @@ const angka = (v: number, d = 0) => v.toLocaleString('id-ID', { maximumFractionD
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 const PALET: { jenis: JenisKomp | 'pasSpr' | 'pasDdr' | 'areaAdaptif' | 'ramp' | 'gateIn' | 'gateOut'; label: string }[] = [
-  { jenis: 'areaRak', label: 'Area rak otomatis 1 · grid (tarik → baris & lorong terbentuk)' },
-  { jenis: 'areaAdaptif', label: 'Area rak otomatis 2 · adaptif (hindari kolom, dinding, office, ramp)' },
+  { jenis: 'areaAdaptif', label: 'Area rak otomatis (baris & lorong menyesuaikan, hindari kolom/dinding/office/ramp — mode grid di Properti)' },
   { jenis: 'spr', label: 'Rak SPR (1 baris)' }, { jenis: 'pasSpr', label: 'Rak SPR back-to-back' }, { jenis: 'ddr', label: 'Rak DDR (1 baris)' }, { jenis: 'pasDdr', label: 'Rak DDR back-to-back' },
   { jenis: 'block', label: 'Block stack' }, { jenis: 'stagingIn', label: 'Staging inbound' }, { jenis: 'stagingOut', label: 'Staging outbound' },
-  { jenis: 'dock', label: 'Dock' }, { jenis: 'gateIn', label: 'Gate IN (masuk)' }, { jenis: 'gateOut', label: 'Gate OUT (keluar)' }, { jenis: 'gate', label: 'Gate IN & OUT / pintu (depan, belakang, samping)' }, { jenis: 'platform', label: 'Loading dock (platform beton)' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'areaKolom', label: 'Area kolom / grid pilar (tarik → kolom menyesuaikan)' }, { jenis: 'kolom', label: 'Kolom satuan' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
+  { jenis: 'dock', label: 'Dock' }, { jenis: 'gate', label: 'Gate / pintu (fungsi IN, OUT, atau IN & OUT diatur di Properti)' }, { jenis: 'platform', label: 'Loading dock (platform beton)' }, { jenis: 'fasilitas', label: 'Office / fasilitas' }, { jenis: 'jalur', label: 'Jalur / gang' }, { jenis: 'ramp', label: 'Ramp / bangunan existing' }, { jenis: 'zona', label: 'Zona (charging, QC, dll.)' },
 ];
 
 const daftarBentang = (t: string) => t.split(/[;\s]+/).map(v => Number(v.replace(',', '.'))).filter(n => n > 0.3);
@@ -71,6 +71,7 @@ function Angka({ l, v, set, step = 0.1, min, u }: { l: string; v: number; set: (
 
 export default function DesainGudang() {
   const sb = supabaseBrowser();
+  const router = useRouter();
   const [daftar, setDaftar] = useState<T[]>([]);
   const [id, setId] = useState('');
   const [data, setData] = useState<{ t: TenderRow; h: HasilTender; p: ParamSim; auto: LayoutGudang } | null>(null);
@@ -230,6 +231,10 @@ export default function DesainGudang() {
       const [a] = komponenBaru('areaRak', data.p, { x: 0, z: 0 }, edit.tinggiPalet);
       baru = [{ ...a, label: 'Area rak adaptif', x: 0, z: 0, w: edit.gedung.L, d: edit.gedung.W,
         area: { ...a.area!, mode: 'adaptif', crossAwal: 0, crossAkhir: 0, kelonggaran: 0.1, bebasRintangan: 0.3, bebasDinding: 0.5, rak: { ...a.area!.rak, lebarLorong: Math.max(3.4, a.area!.rak.lebarLorong) } } }];
+    } else if (j === 'gate') {
+      const n = edit.komponen.filter(k => k.jenis === 'gate').length;
+      const [gt] = komponenBaru('gate', data.p, pos, edit.tinggiPalet);
+      baru = [aturSisiGate({ ...gt, label: `Gate${n ? ` ${n + 1}` : ''}`, arus: undefined, z: r2(Math.min(edit.gedung.W - gt.d, Math.max(0, pos.z + n * 6))) }, 'depan', edit.gedung)];
     } else if (j === 'gateIn' || j === 'gateOut') {
       const masuk = j === 'gateIn';
       const n = edit.komponen.filter(k => k.jenis === 'gate' && k.arus === (masuk ? 'inbound' : 'outbound')).length;
@@ -390,7 +395,7 @@ export default function DesainGudang() {
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- simpan versi
-  async function simpan(sebagaiBaru = false) {
+  async function simpan(sebagaiBaru = false): Promise<string | undefined> {
     if (!edit || !data) return;
     setSibuk(true); setErr(null);
     const isi = { tender_id: pribadi ? null : data.t.id, nama: nama.trim() || 'Layout', data: edit };
@@ -401,6 +406,7 @@ export default function DesainGudang() {
     if (error || !row) { setErr(error?.message ?? 'Gagal menyimpan'); return; }
     const v = row as Versi;
     setVersi(vs => [v, ...vs.filter(x => x.id !== v.id)]); setVersiId(v.id); setKotor(false); setPesan(`Tersimpan: ${v.nama}`);
+    return v.id;
   }
   async function hapusVersi() {
     if (!versiId || !window.confirm(`Hapus versi "${nama}"?`)) return;
@@ -507,9 +513,9 @@ export default function DesainGudang() {
       <div className="head">
         <div><div className="eyebrow">Simulasi Warehouse</div><h1>Desain gudang 2D ⇄ 3D</h1></div>
         <div className="row">
-          {data && !pribadi && (versiId && !kotor
-            ? <Link className="btn" href={`/simulasi/game?id=${data.t.id}&layout=${versiId}`}>▶ Main di Leca Game</Link>
-            : <button type="button" className="ghost" disabled={sibuk || !edit} title="Simpan dulu supaya layout ini bisa dipakai di Leca Game" onClick={() => simpan(false)}>Simpan untuk Leca Game</button>)}
+          {data && !pribadi && <button type="button" disabled={sibuk || !edit} title={versiId && !kotor ? 'Buka layout ini di Leca Game' : 'Simpan layout ini lalu buka di Leca Game'}
+            onClick={async () => { const vid = versiId && !kotor ? versiId : await simpan(false); if (vid) router.push(`/simulasi/game?id=${data.t.id}&layout=${vid}`); }}>
+            {versiId && !kotor ? '▶ Main di Leca Game' : '💾 Simpan & main di Leca Game'}</button>}
           {data && !pribadi && <Link className="btn ghost" href={`/tender/${data.t.id}`}>Buka tender</Link>}
           <button type="button" onClick={() => setFormBaru(formBaru ? null : { ...GEDUNG_BARU })}>＋ Desain baru tanpa project</button>
         </div>
@@ -630,8 +636,8 @@ export default function DesainGudang() {
             })()}
             <div className="eyebrow">Kolom / pilar ({denganKolom(edit.komponen, edit.gedung).filter(k => k.jenis === 'kolom').length})</div>
             <div className="sim2d-kolom">
-              <button type="button" className={mode === 'kolom' ? '' : 'ghost'} onClick={() => setMode(mode === 'kolom' ? 'pilih' : 'kolom')}>{mode === 'kolom' ? '✓ Selesai menaruh kolom' : '＋ Taruh kolom dengan klik'}</button>
-              <p className="small muted" style={{ margin: 0 }}>Klik di denah = 1 kolom, ukuran <b>{angka(acuanKolom?.w ?? gridPilar.ukuran, 2)} × {angka(acuanKolom?.d ?? gridPilar.ukuran, 2)} m</b>{acuanKolom ? ' (ikut kolom terakhir dipilih / dibuat)' : ''}{acuanKolom && <> · <button type="button" className="link-kecil" onClick={() => setAcuanKolom(null)}>pakai ukuran pilar {angka(gridPilar.ukuran, 2)} m</button></>}. Otomatis sejajar dengan kolom terdekat (garis biru) dan menampilkan jarak as ke as. Seret kolom = pindah tanpa mengubah ukuran (handle ukuran ada di luar sudut kolom); Ctrl+D = gandakan dengan ukuran sama. Atau buat grid sekaligus:</p>
+              {mode === 'kolom' && <button type="button" onClick={() => setMode('pilih')}>✓ Selesai menaruh kolom</button>}
+              <p className="small muted" style={{ margin: 0 }}>Pilih alat <b>Kolom</b> di palet kanvas, lalu klik di denah = 1 kolom, ukuran <b>{angka(acuanKolom?.w ?? gridPilar.ukuran, 2)} × {angka(acuanKolom?.d ?? gridPilar.ukuran, 2)} m</b>{acuanKolom ? ' (ikut kolom terakhir dipilih / dibuat)' : ''}{acuanKolom && <> · <button type="button" className="link-kecil" onClick={() => setAcuanKolom(null)}>pakai ukuran pilar {angka(gridPilar.ukuran, 2)} m</button></>}. Otomatis sejajar dengan kolom terdekat (garis biru) dan menampilkan jarak as ke as. Seret kolom = pindah tanpa mengubah ukuran (handle ukuran ada di luar sudut kolom); Ctrl+D = gandakan dengan ukuran sama. Atau buat grid sekaligus:</p>
               <div className="row" style={{ gap: 4 }}>
                 {[['6', '6'], ['8', '8'], ['10', '10'], ['12', '24']].map(([x, z]) => (
                   <button key={`${x}x${z}`} type="button" className="ghost" style={{ padding: '3px 8px' }} onClick={() => setGridPilar(g => ({ ...g, x, z }))} title={`Bentang ${x} m × ${z} m`}>{x}×{z}</button>))}
@@ -1020,7 +1026,7 @@ export default function DesainGudang() {
                       <button type="button" className="ghost" onClick={pecahKolom} title="Ubah area jadi kolom satuan yang bisa digeser / diubah satu per satu">Pecah jadi kolom satuan</button>
                     </div>
                   </>); })()}
-                {terpilih.jenis === 'kolom' && <div className="row"><button type="button" className="ghost" onClick={gabungKolom} title="Semua kolom satuan (atau yang dipilih) → 1 area kolom">▦ Gabung jadi area kolom</button></div>}
+                {terpilih.jenis === 'kolom' && <p className="small muted" style={{ margin: 0 }}>Gabung kolom jadi area kolom: tombol <b>▦ Gabung kolom satuan jadi area kolom</b> di bagian Grid pilar (panel kiri).</p>}
                 {['fasilitas', 'kolom', 'dock'].includes(terpilih.jenis) && <Angka l="Tinggi" u="m" step={0.1} v={terpilih.tinggi} set={x => ubahK(k => ({ ...k, tinggi: Math.max(0.1, x) }))} />}
                 {terpilih.jenis === 'zona' && <label className="f">Warna<input type="color" value={terpilih.warna ?? '#0ea5e9'} onChange={e => ubahK(k => ({ ...k, warna: e.target.value }))} /></label>}
                 <div className="row">
