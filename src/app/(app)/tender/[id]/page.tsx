@@ -51,7 +51,7 @@ import HistorisPanel from './HistorisPanel';
 import CostAllocation from './PembagianLayanan';
 import HasilKomersial, { type Kurs, type Pajak } from './HasilKomersial';
 import StatusControl from '@/components/StatusControl';
-import { PilihUom, SelKonversi, gantiUom, RingkasanVolumeSemuaUom, RingkasanOrder } from './VolumeUom';
+import { PilihUom, SelKonversi, gantiUom, RingkasanOrder } from './VolumeUom';
 import BagikanTender from '@/components/BagikanTender';
 import { labelStatus, STATUS_DRAFT } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
@@ -571,8 +571,7 @@ export default function TenderPage() {
                 <td><button className="danger" onClick={() => setA({ volumes: a.volumes.filter((_, j) => j !== i) })}>Hapus</button></td>
               </tr>))}
             </tbody></table></div>
-          <RingkasanVolumeSemuaUom volumes={volEfBaris} muatan={a.profilVolume?.param} basis={basisRingkas} hariOps={hariOps} />
-          <RingkasanOrder volumes={volEfBaris} basis={basisRingkas} hariOps={hariOps} utama={a.satuanUtamaOrder ?? 'input'} onUtama={u => setA({ satuanUtamaOrder: u })}
+          <RingkasanOrder volumes={volEfBaris} muatan={a.profilVolume?.param} basis={basisRingkas} hariOps={hariOps} utama={a.satuanUtamaOrder ?? 'input'} onUtama={u => setA({ satuanUtamaOrder: u })}
             labelArus={x => ARUS.find(o => o.v === x)?.l ?? x}
             ekstra={<label className="f" htmlFor="basis-ringkas">Basis
               <select id="basis-ringkas" value={basisRingkas} onChange={e => setBasisRingkas(e.target.value as typeof basisRingkas)} style={{ minWidth: 150 }}>
