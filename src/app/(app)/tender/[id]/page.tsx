@@ -602,12 +602,13 @@ export default function TenderPage() {
                 {sp.liter > 0 && <div><div className="small muted">Cair</div><b>{angka(sp.liter)} liter</b></div>}
                 <div className="small muted" style={{ flex: 1, minWidth: 200 }}>{sp.palet > 0 ? 'Dipakai untuk tarif storage per kg / CBM / liter di Hasil (rate card & storage alternatif).' : 'Storage belum bisa dihitung ke palet — lengkapi isi per palet / parameter muatan.'}</div>
               </div>
+              {simple && <PaletTender tertanam excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel} cbmPerPalet={pm.cbmPerPalet} onCbmPerPalet={cbm => setP({ cbmPerPalet: cbm })} />}
             </>;
           })()}
         </div>
       )}
 
-      {lihat('Key Assumption') && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel}
+      {lihat('Key Assumption') && !simple && <PaletTender excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel}
         cbmPerPalet={{ ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}) }.cbmPerPalet}
         onCbmPerPalet={cbm => setA({ profilVolume: { inbound: [], outbound: [], ...(a.profilVolume ?? {}), param: { ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}), cbmPerPalet: cbm } } })} />}
       {lihat('Key Assumption') && !simple && <ProfilVolumePanel ringkas profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
@@ -1132,7 +1133,7 @@ const PALET_PRESET: (Omit<PaletTipe, 'id' | 'porsi'> & { label: string })[] = [
 ];
 const fmtN = (x: number, d = 2) => x.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: d });
 /** Jenis palet (Key Assumption) — satu sumber untuk semua ukuran palet: Produk (susunan per palet), block stack / pallet floor (luas rata-rata), racking (tebal terbesar), simulasi 3D. */
-function PaletTender({ excel, onChange, cbmPerPalet, onCbmPerPalet }: { excel: SpaceExcel; onChange: (x: SpaceExcel) => void; cbmPerPalet?: number; onCbmPerPalet?: (v: number) => void }) {
+function PaletTender({ excel, onChange, cbmPerPalet, onCbmPerPalet, tertanam = false }: { excel: SpaceExcel; onChange: (x: SpaceExcel) => void; cbmPerPalet?: number; onCbmPerPalet?: (v: number) => void; tertanam?: boolean }) {
   const list = daftarPalet(excel), r = ringkasPalet(list);
   const simpan = (xs: PaletTipe[]) => onChange({ ...excel, paletTipe: xs });
   const ubah = (i: number, patch: Partial<PaletTipe>) => simpan(list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
@@ -1141,8 +1142,8 @@ function PaletTender({ excel, onChange, cbmPerPalet, onCbmPerPalet }: { excel: S
   const kecil = { width: 96, minWidth: 96, textAlign: 'right' as const };
   const { satuan: sp, fmt } = useSatuanPanjang();
   const totOk = Math.abs(r.totalPorsi - 1) < 0.0005;
-  return <div className="card">
-    <h2>Jenis palet</h2>
+  return <div className={tertanam ? undefined : 'card'} style={tertanam ? { display: 'grid', gap: 8, marginTop: 12 } : undefined}>
+    {tertanam ? <h3>Jenis palet</h3> : <h2>Jenis palet</h2>}
     <p className="small muted">Palet yang dipakai di gudang ini + porsi pemakaiannya. Otomatis dipakai di: <b>Produk</b> (isi per layer & tinggi muatan, sesuai jenis palet tiap produk),
       <b> Warehouse Planning</b> (luas block stack / pallet floor = luas rata-rata tertimbang; Pallet di racking = tebal terbesar), dan <b>simulasi 3D</b>.</p>
     <div className="tablewrap"><table className="palet-tabel" style={{ width: 'auto', minWidth: '100%' }}>
