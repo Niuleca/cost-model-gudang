@@ -105,7 +105,9 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
 }
 
 export interface StartupAuto { aktif: boolean; persenOpex: number; persenManpower: number }
-export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, onHitung, driver, defaultDiisi, onNilaiStok, fasilitas, dibuang: dibuangAsli }: {
+export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, startup, onStartup, hasilBaris, onHitung, driver, defaultDiisi, onNilaiStok, fasilitas, dibuang: dibuangAsli, hanyaSeksi }: {
+  /** Simple CM (Summary cost): tampilkan seksi tertentu saja, mis. ['hse'] */
+  hanyaSeksi?: string[];
   /** kunci baris rekomendasi yang sengaja dihapus user — tidak ditambahkan otomatis lagi */
   dibuang?: string[];
   lines: Baris[]; items: Item[]; kontrakBulan: number; onChange: (l: Baris[], tandaiDefault?: boolean, dibuang?: string[]) => void;
@@ -139,7 +141,7 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
   const autoStartup = startup.aktif ? (hasilBaris ?? []).filter(b => / \(otomatis\) — amortisasi$/.test(b.deskripsi)) : [];
   const otoStartup = { n: autoStartup.length, total: autoStartup.reduce((t, b) => t + b.biayaBulan, 0) };
   for (const r of ringkas) if (r.s.id === 'startup' && otoStartup.n) { r.n += otoStartup.n; r.total += otoStartup.total; r.nilai += otoStartup.total * Math.max(1, kontrakBulan); }
-  const totalBulan = ringkas.reduce((t, r) => t + r.total, 0);
+  const totalBulan = ringkas.filter(r => !hanyaSeksi || hanyaSeksi.includes(r.s.id)).reduce((t, r) => t + r.total, 0);
 
   // ---- Daftar default (rekomendasi) dari data tender: isi otomatis sekali, lalu baris default ikut data tender ----
   const dibuang = dibuangAsli ?? [], dibuangDb = dibuang;
@@ -228,18 +230,18 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
       <div className="tablewrap fit"><table className="tabel-fit">
         <thead><tr><th>Ringkasan & analisa per klasifikasi</th><th className="num">Item</th><th className="num" title="Baris yang qty-nya ikut data tender (volume) otomatis">Otomatis</th><th>Penggerak qty (dari volume)</th><th className="num">Nilai (qty × harga)</th><th className="num">Biaya/bln</th><th className="num" title="Biaya/bln ÷ palet in + out per bulan">Per palet</th><th className="num" title="Biaya/bln ÷ manpower">Per orang</th></tr></thead>
         <tbody>
-          {ringkas.filter(r => r.n > 0).map(r => { const pal = d.paletInBulan + d.paletOutBulan;
+          {ringkas.filter(r => r.n > 0 && (!hanyaSeksi || hanyaSeksi.includes(r.s.id))).map(r => { const pal = d.paletInBulan + d.paletOutBulan;
             return <tr key={r.s.id}><td>{r.s.label}</td><td className="num">{r.n}</td>
               <td className="num">{r.oto === r.n ? <span className="pill ok">{r.oto}/{r.n}</span> : <span className="pill warn" title="Sebagian qty diubah manual">{r.oto}/{r.n}</span>}</td>
               <td className="small muted">{PENGGERAK[r.s.id] ?? '—'}</td>
               <td className="num">{rp(r.nilai)}</td><td className="num">{rp(r.total)}</td>
               <td className="num">{pal > 0 ? rp(r.total / pal) : '—'}</td><td className="num">{d.headcount > 0 ? rp(r.total / d.headcount) : '—'}</td></tr>; })}
           {ringkas.every(r => r.n === 0) && <tr><td colSpan={8} className="muted">Belum ada biaya lain.</td></tr>}
-          <tr style={{ background: 'var(--link)' }}><td colSpan={5}><b>Total biaya lain per bulan</b> <span className="small muted">(beli & sekali = depresiasi/amortisasi selama kontrak {kontrakBulan} bln; tanpa bunga — pilih di tab Interest cost)</span></td><td className="num"><b>{rp(totalBulan)}</b></td>
+          <tr style={{ background: 'var(--link)' }}><td colSpan={5}><b>{hanyaSeksi ? 'Total per bulan' : 'Total biaya lain per bulan'}</b> <span className="small muted">(beli & sekali = depresiasi/amortisasi selama kontrak {kontrakBulan} bln; tanpa bunga — pilih di tab Interest cost)</span></td><td className="num"><b>{rp(totalBulan)}</b></td>
             <td className="num"><b>{d.paletInBulan + d.paletOutBulan > 0 ? rp(totalBulan / (d.paletInBulan + d.paletOutBulan)) : '—'}</b></td><td className="num"><b>{d.headcount > 0 ? rp(totalBulan / d.headcount) : '—'}</b></td></tr>
         </tbody>
       </table></div>
-      {perSeksi.map(({ s, rows }) => (
+      {perSeksi.filter(({ s }) => !hanyaSeksi || hanyaSeksi.includes(s.id)).map(({ s, rows }) => (
         <KartuSeksi key={s.id} s={s} rows={rows} items={items} kontrak={kontrakBulan} fasilitas={fasilitas}
           kurang={kurangDefault(lines, def, s.id).length} onTambahDefault={() => onChange(tambahDefault(lines, def, s.id), true, dibuang.filter(k => !def.some(d => d.seksi === s.id && d.kunci === k)))}
           extra={s.id === 'startup' ? extraStartup : s.id === 'asuransi' ? extraAsuransi : undefined} otomatis={s.id === 'startup' ? otoStartup : undefined}

@@ -641,7 +641,7 @@ tr.baris-merah td b { color: #991b1b; }
 table.tabel-fit td.td-lebar { min-width: 150px; }
 table.tabel-fit td.td-lebar label { white-space: nowrap; margin-top: 4px; }
 table.tabel-it td select[aria-label='Cost type'] { min-width: 104px; }
-button.link-kecil { background: none; border: 0; padding: 0; color: var(--ink, #111); text-decoration: underline; cursor: pointer; font-size: 12px; min-height: 0; }
+button.link-kecil, a.link-kecil { background: none; border: 0; padding: 0; color: var(--ink, #111); text-decoration: underline; cursor: pointer; font-size: 12px; min-height: 0; }
 table.tabel-it td:first-child { min-width: 180px; }
 table.tabel-bl td:first-child { min-width: 200px; }
 table.tabel-bl td select[aria-label='Mode'] { min-width: 96px; }
@@ -1133,6 +1133,10 @@ td.td-isian { background: #fffaf0; }
 .wiz-kepala { display: grid; gap: 4px; padding: 2px 2px 4px; }
 .wiz-judul { display: flex; align-items: center; gap: 10px; font: 600 22px/1.25 var(--display, inherit); }
 .wiz-judul i { font-style: normal; font-size: 13px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--ink); color: var(--surface); }
+.sc-rental { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; padding: 10px 12px; margin: 4px 0 4px 22px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+.sc-rental b { font-size: 15px; }
+.wiz-kurang { margin-top: 6px; padding: 8px 12px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 8px; font-size: 13px; color: #78350f; }
+.wiz-kurang ul { margin: 4px 0 0; padding-left: 18px; }
 .vol-grup { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
 .vol-grup:first-of-type { border-top: 0; }
 @media (max-width: 900px) {

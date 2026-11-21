@@ -32,6 +32,8 @@ export interface GudangTerpilih {
 
 // Bagian input yang disimpan di tenders.asumsi
 export interface Asumsi {
+  /** Overhead (% × subtotal biaya) khusus tender ini; kosong = master Finance */
+  overheadPersen?: number | null;
   air?: AirInput;                    // Utilities Management → Water
   nilaiStokRp?: number;              // nilai stok rata-rata (dasar premi asuransi)
   biayaDefaultDiisi?: boolean;       // daftar default biaya lain sudah pernah diisi otomatis
@@ -210,7 +212,7 @@ export async function muatMaster(sb: SupabaseClient, t: TenderRow): Promise<{ ma
         thr: p.thr ?? 1 / 12, pesangon: p.pesangon ?? 0.08, contingencyOs: p.contingency_os ?? 0.07, feeOs: p.fee_os ?? 0.05,
       },
       finance: {
-        bungaModalTahun: f.bunga_modal_tahun ?? 0.1, apHari: f.ap_hari ?? 30, overheadPersen: f.overhead_persen ?? 0.03,
+        bungaModalTahun: f.bunga_modal_tahun ?? 0.1, apHari: f.ap_hari ?? 30, overheadPersen: t.asumsi?.overheadPersen != null && t.asumsi.overheadPersen >= 0 ? t.asumsi.overheadPersen : f.overhead_persen ?? 0.03,
         pphGrossUp: f.pph_grossup ?? 0.02, gpMinimum: f.gp_minimum ?? 0.08,
       },
       margin: { Rendah: margin.Rendah ?? 0.08, Sedang: margin.Sedang ?? 0.12, Tinggi: margin.Tinggi ?? 0.18 },

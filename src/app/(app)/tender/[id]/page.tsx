@@ -64,6 +64,9 @@ interface Jab { role_name: string }
 
 const TAB_EXCEL = 'Data project (Excel)' as const;
 const TABS = ['Key Assumption', 'Volume', 'Warehouse Planning', 'Produk', 'Value Stream Mapping', 'Landmark VSM', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Export'] as const;
+/** Porsi rak masih nilai bawaan aplikasi (SPR 20% / DDR 80%), bukan isian pengguna. */
+const porsiBawaan = (x?: Partial<SpaceExcel> | null) => { const p = x?.porsi; if (!p) return true;
+  const z = (v?: number) => Number(v) || 0; return Math.abs(z(p.spr) - 0.2) < 1e-9 && Math.abs(z(p.ddr) - 0.8) < 1e-9 && !z(p.block) && !z(p.floor); };
 /** Simple CM Warehouse — wizard 5 menu & sub-langkah, mengikuti Spesifikasi Menu Tender Warehouse (versi rapi). */
 type MenuSimple = { no: number; nama: string; tab: (typeof TABS)[number]; langkah: { id: string; nama: string; ke: string }[] };
 const MENU_SIMPLE: MenuSimple[] = [
@@ -76,6 +79,7 @@ const MENU_SIMPLE: MenuSimple[] = [
     { id: '1.6', nama: 'Working day', ke: 'Hari operasional → volume per hari (Volume, transport, staging) · man-hour per bulan → manpower' },
     { id: '1.7', nama: 'Workload shift', ke: 'Beban inbound / outbound / VAS per shift → manpower per shift' },
     { id: '1.8', nama: 'Workload transportation', ke: 'Porsi per jalur (import / local / export / inland / sea / air / rail) → volume transport per hari (2.3) → gate & loading dock' },
+    { id: '1.9', nama: 'Capacity requirement', ke: 'Total posisi palet (dari Volume storage) dibagi porsi SPR / DDR / block stack → Block stack / racking space (3.2)' },
   ] },
   { no: 2, nama: 'Volume', tab: 'Volume', langkah: [
     { id: '2.1', nama: 'Volume storage', ke: 'Stok (posisi palet) → capacity requirement (3.2) · Volume 1 bulan = dasar tarif storage' },
@@ -84,20 +88,19 @@ const MENU_SIMPLE: MenuSimple[] = [
     { id: '2.4', nama: 'Summary volume', ke: 'Ringkasan per hari / bulan / tahun dalam palet, CBM, ton, case, pcs' },
   ] },
   { no: 3, nama: 'Warehouse Planning', tab: 'Warehouse Planning', langkah: [
-    { id: '3.1', nama: 'List gudang per area', ke: 'Harga sewa per m² / sewa utuh → Rental space (Result)' },
-    { id: '3.2', nama: 'Capacity requirement', ke: 'Total posisi palet dibagi SPR / DDR / block stack' },
-    { id: '3.3', nama: 'Block stack / racking space', ke: 'Footprint per tipe penyimpanan · jumlah bay & level → biaya racking' },
-    { id: '3.4', nama: 'Staging inbound & outbound', ke: 'Footprint staging → footprint total' },
-    { id: '3.5', nama: 'Footprint requirement (total)', ke: 'Luas acuan (kalkulasi atau CAD) → layout & biaya sewa' },
-    { id: '3.6', nama: 'Building dimension', ke: 'P × L × T, gate, loading dock, trapesium, kekuatan lantai → layout 2D / 3D' },
-    { id: '3.7', nama: 'Layout 2D & simulasi 3D', ke: 'Dibuat otomatis dari langkah 1.3–3.6; bisa digeser & diatur, lalu disimpan' },
-    { id: '3.8', nama: 'Summary layout', ke: 'Komposisi luas per area: m², posisi palet, CBM, ton, % space' },
+    { id: '3.1', nama: 'List gudang per area', ke: 'Harga sewa per m² / sewa utuh → Rental space (Summary cost 4.2)' },
+    { id: '3.2', nama: 'Block stack / racking space', ke: 'Porsi dari Capacity requirement (1.9) → footprint per tipe, jumlah bay & level → biaya racking' },
+    { id: '3.3', nama: 'Staging inbound & outbound', ke: 'Footprint staging → footprint total' },
+    { id: '3.4', nama: 'Footprint requirement (total)', ke: 'Luas acuan (kalkulasi atau CAD) → layout & Rental space' },
+    { id: '3.5', nama: 'Building dimension', ke: 'P × L × T, gate, loading dock, trapesium, kekuatan lantai → layout 2D / 3D' },
+    { id: '3.6', nama: 'Layout 2D & simulasi 3D', ke: 'Dibuat otomatis dari langkah 1.3–3.5; bisa digeser & diatur, lalu disimpan' },
+    { id: '3.7', nama: 'Summary layout', ke: 'Komposisi luas per area: m², posisi palet, CBM, ton, % space' },
   ] },
   { no: 4, nama: 'Result & Output', tab: 'Result', langkah: [
     { id: '4.1', nama: 'Tarif per layanan', ke: 'Storage, handling in / out (+ VAS): satuan, MGV, biaya per bulan, GP, tarif · ubah GP % & cost allocation' },
-    { id: '4.2', nama: 'Konversi mata uang', ke: 'Tarif & simulasi dalam mata uang lain' },
-    { id: '4.3', nama: 'Capex & Opex', ke: 'Pembagian biaya investasi vs operasional' },
-    { id: '4.4', nama: 'Summary cost', ke: 'Rental space, manpower, storage, MHE, IT, consumable & ATK, HSE, office, utility, overhead, loan & interest, lainnya' },
+    { id: '4.2', nama: 'Summary cost', ke: 'Rental space, manpower, storage, MHE, IT, consumable & ATK, HSE, office, utility, overhead, loan & interest, lainnya — tiap kategori bisa dibuka perhitungannya' },
+    { id: '4.3', nama: 'Konversi mata uang', ke: 'Tarif & simulasi dalam mata uang lain' },
+    { id: '4.4', nama: 'Capex & Opex', ke: 'Item apa saja di capex dan opex, persentase biaya' },
     { id: '4.5', nama: 'Summary manpower', ke: 'Manpower summary & rincian per task' },
     { id: '4.6', nama: 'Buat quotation', ke: 'Mengambil tarif, asumsi utama & volume dasar' },
     { id: '4.7', nama: 'Export Excel', ke: 'Seluruh hasil hitung dalam satu file Excel' },
@@ -107,7 +110,7 @@ const LANGKAH_SIMPLE = MENU_SIMPLE.flatMap(m => m.langkah.map(l => ({ ...l, menu
 const LANGKAH_ID = LANGKAH_SIMPLE.map(l => l.id);
 const cariLangkah = (id: string) => LANGKAH_SIMPLE.find(l => l.id === id) ?? LANGKAH_SIMPLE[0];
 /** Tab rincian yang dibuka dari Result → langkah wizard (sisanya tetap dibuka sebagai halaman rincian). */
-const LANGKAH_DARI_TAB: Partial<Record<string, string>> = { 'Key Assumption': '1.1', 'Volume': '2.1', 'Warehouse Planning': '3.5', 'Produk': '1.4', 'Result': '4.1', 'Quotation': '4.6', 'Export': '4.7' };
+const LANGKAH_DARI_TAB: Partial<Record<string, string>> = { 'Key Assumption': '1.1', 'Volume': '2.1', 'Warehouse Planning': '3.4', 'Produk': '1.4', 'Result': '4.1', 'Quotation': '4.6', 'Export': '4.7' };
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'drum', 'ibc', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
@@ -168,14 +171,16 @@ export default function TenderPage() {
   const lihat = (x: string) => tabIsi === x || (simple && !pop && tabAktif === 'Result' && (x === 'Quotation' || x === 'Export'));
   /** Simple CM: rincian kategori biaya (Summary cost) dibuka di dalam wizard */
   const [popKat, setPopKat] = useState<string | null>(null);
+  /** langkah asal ketika membuka tab rincian (mis. Manpower dari Summary cost 4.2) */
+  const [popDari, setPopDari] = useState<string | null>(null);
   /** Simple CM: sub-langkah wizard yang sedang tampil */
   const di = (id: string) => !simple || (!pop && langkah === id);
   const [kunciLayout, setKunciLayout] = useState(0);
-  useEffect(() => { if (simple && langkah === '3.7' && kunciLayout === 0) setKunciLayout(1); }, [simple, langkah, kunciLayout]);
+  useEffect(() => { if (simple && langkah === '3.6' && kunciLayout === 0) setKunciLayout(1); }, [simple, langkah, kunciLayout]);
   const keLangkah = (id: string) => {
     setPop(null); setPopKat(null); setLangkahS(id); window.scrollTo({ top: 0 });
     // layout 2D / 3D dibaca dari data tersimpan → simpan dulu input terbaru, lalu muat ulang iframe
-    if (id === '3.7') { if (bisaEdit && kotorAkhir.current) void simpan().then(() => setKunciLayout(k => k + 1)); else setKunciLayout(k => k + 1); }
+    if (id === '3.6') { if (bisaEdit && kotorAkhir.current) void simpan().then(() => setKunciLayout(k => k + 1)); else setKunciLayout(k => k + 1); }
   };
   const keTab = (x: string) => {
     if (!simple) { setTab(x as (typeof TABS)[number]); return; }
@@ -431,6 +436,27 @@ export default function TenderPage() {
     const baru = sesuaikanMhe(t.asumsi.mhe, pdMhe.map(r => r.nama), items, opsiPilihMhe);
     if (baru) { setT(x => x && ({ ...x, asumsi: { ...x.asumsi, mhe: baru } })); setKotor(true); }
   }, [kunciMheOto, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Simple CM: porsi SPR/DDR/block tidak diisi nilai bawaan — dikosongkan sampai pengguna mengisi sendiri (Capacity requirement 1.9)
+  useEffect(() => {
+    if (!simple || !t || !bisaEdit) return;
+    const x = t.asumsi.space?.excel;
+    if (!x?.porsiDiisi && porsiBawaan(x) && (x?.porsi?.spr || x?.porsi?.ddr || !x?.porsi)) {
+      setT(y => y && ({ ...y, asumsi: { ...y.asumsi, space: { ...y.asumsi.space, excel: { ...lengkapiSpaceExcel(y.asumsi.space.excel), porsi: { spr: 0, ddr: 0, block: 0, floor: 0 } } } } })); setKotor(true);
+    }
+  }, [simple, t?.id, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Simple CM: gudang belum dipilih & tarif sewa belum diisi → harga sewa per m² otomatis = median database harga pasar di kab/kota (atau provinsi)
+  useEffect(() => {
+    if (!simple || !t || !bisaEdit || t.skenario_aset !== 'Rental' || t.asumsi.gudang || t.asumsi.space.tarifManual || (t.asumsi.space.tarifSewaM2Bulan ?? 0) > 0) return;
+    sb.from('warehouses').select('kab_kota, provinsi, harga_sewa_m2_bulan, harga_per_bulan, luas_m2').eq('provinsi', t.provinsi)
+      .then(({ data }: { data: { kab_kota: string; harga_sewa_m2_bulan: number | null; harga_per_bulan: number | null; luas_m2: number }[] | null }) => {
+        const m2 = (w: { harga_sewa_m2_bulan: number | null; harga_per_bulan: number | null; luas_m2: number }) => Number(w.harga_sewa_m2_bulan ?? (Number(w.harga_per_bulan) || 0) / Math.max(1, Number(w.luas_m2))) || 0;
+        const kab = (data ?? []).filter(w => w.kab_kota === t.kab_kota && m2(w) > 0), prov = (data ?? []).filter(w => m2(w) > 0);
+        const pakai = kab.length ? kab : prov; if (!pakai.length) return;
+        const xs = pakai.map(m2).sort((p1, p2) => p1 - p2), med = xs.length % 2 ? xs[(xs.length - 1) / 2] : (xs[xs.length / 2 - 1] + xs[xs.length / 2]) / 2;
+        const sumber = `median ${pakai.length} gudang di ${kab.length ? t.kab_kota : t.provinsi} (database harga pasar)`;
+        setT(y => y && ({ ...y, asumsi: { ...y.asumsi, space: { ...y.asumsi.space, tarifSewaM2Bulan: Math.round(med), tarifSumber: sumber } } })); setKotor(true);
+      });
+  }, [simple, t?.id, t?.kab_kota, t?.asumsi.gudang?.id, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
   // headcount total untuk konsumsi (galon): hasil Hitung bila ada, kalau tidak dari process design (direct + indirect/tetap)
   const headcountTotal = (hasil?.manpower?.reduce((s, m) => s + m.headcount, 0)) || ((pdFull?.totalMp ?? 0) + (pdFull?.indirect.total ?? 0));
 
@@ -633,6 +659,8 @@ export default function TenderPage() {
     <p className="small muted" style={{ margin: 0 }}>Isi per palet & per kemasan terisi otomatis dari <b>Product input (1.4)</b>; berat & CBM per palet juga dihitung dari sana (lihat Summary volume 2.4).</p>
   </div>;
   const produkAda = adaProdukNyata(a.produk ?? []);
+  const porsiTotal = (['spr', 'ddr', 'block', 'floor'] as const).reduce((x, k) => x + (Number(a.space.excel?.porsi?.[k]) || 0), 0);
+  const porsiSudahDiisi = !!a.space.excel?.porsiDiisi || (!porsiBawaan(a.space.excel) && porsiTotal > 0);
   const panelMuatanProduk = <div className="card">
     <h2><T>Berat & volume per palet</T> <span className="small muted" style={{ fontWeight: 400 }}>· dihitung dari Product input</span></h2>
     <div className="umk-box">
@@ -687,28 +715,167 @@ export default function TenderPage() {
               }} />
     <ProcessDesignPanel bagian="rincian" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
               jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} /></>;
-  const statusLangkah = (id: string): 'ok' | 'kurang' | 'opsional' => {
-    const lengkap = (ar: 'inbound' | 'outbound') => !adaVolume(ar) || (pvSimple[ar].length > 0 && Math.abs(totalPorsi(ar) - 1) < 0.005);
-    const volOk = ['storage', 'inbound', 'outbound'].every(adaVolume);
-    const b = (x: unknown) => (x ? 'ok' : 'kurang');
-    switch (id) {
-      case '1.1': return b(t.customer && t.provinsi && t.kab_kota && t.durasi_kontrak_bulan > 0 && t.tanggal_go_live);
-      case '1.2': return b(t.jumlah_shift > 0 && Number(t.jam_kerja_per_shift) > 0 && Number(t.jam_efektif_per_shift) > 0);
-      case '1.3': return b(daftarPalet(a.space.excel).length > 0);
-      case '1.4': return b(produkAda);
-      case '1.5': case '1.7': return 'ok';
-      case '1.6': return b((a.processDesign?.hariKerjaBulan ?? 25) > 0);
-      case '1.8': case '2.3': return b(lengkap('inbound') && lengkap('outbound'));
-      case '2.1': return b(adaVolume('storage'));
-      case '2.2': return b(adaVolume('inbound') && adaVolume('outbound'));
-      case '2.4': return b(volOk);
-      case '3.1': return b(a.gudang || a.space.tarifManual);
-      case '3.2': case '3.3': case '3.4': case '3.5': return b((spaceH?.spaceRent ?? 0) > 0);
-      case '3.6': return b(Number(a.space.excel?.lebarGudangM) > 0);
-      case '4.1': case '4.4': case '4.5': return b(hasil);
-      default: return 'opsional';
+
+  // ---------- Simple CM 4.2 Summary cost — kategori persis Spesifikasi (Word)
+  const KAT_SC: { k: string; l: string; kel: Kelompok[]; isi: string; tab?: string; seksi?: string[] }[] = [
+    { k: 'rental', l: 'Rental Space', kel: ['Fasilitas'], isi: 'Space yang dibutuhkan, harga space per m², biaya per hari / bulan / tahun' },
+    { k: 'manpower', l: 'Manpower', kel: ['Manpower'], isi: 'Biaya manpower, Value Stream Mapping, skema biaya selama kontrak, matriks multi-skill, indirect & peran tetap, productivity & man-hour', tab: 'Value Stream Mapping' },
+    { k: 'storage', l: 'Storage', kel: ['Racking'], isi: 'Racking, pallet (plastik / kayu), CCTV', seksi: ['palet'] },
+    { k: 'mhe', l: 'MHE', kel: ['MHE'], isi: 'Rincian MHE (jenis, unit, sewa / beli)' },
+    { k: 'it', l: 'IT', kel: ['IT'], isi: 'Laptop, monitor, PC, RF, Wi-Fi, software, WMS' },
+    { k: 'consumable', l: 'Consumable & ATK', kel: ['Consumable'], isi: 'Air minum, kertas HVS, galon, seragam, ATK + item manual', seksi: ['atk', 'consumable'] },
+    { k: 'hse', l: 'HSE', kel: ['HSE'], isi: 'APAR, sprinkler, P3K, safety sign, emergency lamp, papan informasi & training K3, helm, safety shoes, vest, sarung tangan, pencuci mata', seksi: ['hse'] },
+    { k: 'office', l: 'Office', kel: ['Office'], isi: 'Printer, dot matrix, kursi, meja, TV, papan tulis, meja meeting, AC, kipas, lemari, loker, renovasi office + custom', seksi: ['office'] },
+    { k: 'utility', l: 'Utility', kel: ['Utilitas'], isi: 'Listrik, air (bisa tidak dibebankan)', tab: 'Utilities Management' },
+    { k: 'overhead', l: 'Overhead', kel: ['Overhead'], isi: '% × subtotal biaya' },
+    { k: 'loan', l: 'Loan & Interest cost', kel: ['Interest cost', 'Finance'], isi: 'Bunga pinjaman / modal kerja', tab: 'Loan & Interest Calculator' },
+    { k: 'lainnya', l: 'Lainnya', kel: ['Asuransi', 'Startup', 'Lainnya'], isi: 'Services (pest control, security, cleaning), asuransi, startup + item manual', seksi: ['services', 'asuransi', 'startup', 'lainnya'] },
+  ];
+  const katBaris = (b: { kelompok: Kelompok; deskripsi: string }) =>
+    /cctv/i.test(b.deskripsi) || (b.kelompok === 'Consumable' && /pal+et/i.test(b.deskripsi)) ? 'storage' : KAT_SC.find(x => x.kel.includes(b.kelompok))?.k ?? 'lainnya';
+  const luasSewa = hasil?.space.totalM2 ?? spaceH?.luasDipakai ?? 0;
+  const tarifSewaPakai = a.gudang && !a.space.tarifManual ? Math.round(Number(a.gudang.harga_sewa_m2_bulan ?? (a.gudang.harga_per_bulan ?? 0) / Math.max(1, Number(a.gudang.luas_m2)))) : (a.space.tarifSewaM2Bulan ?? 0);
+  const sewaUtuh = !!a.gudang?.sewaUtuh;
+  const sewaBulanLive = t.skenario_aset !== 'Rental' ? 0 : sewaUtuh ? Number(a.gudang?.harga_per_bulan ?? tarifSewaPakai * Number(a.gudang?.luas_m2 ?? 0)) : luasSewa * tarifSewaPakai;
+  const sumberTarif = a.gudang && !a.space.tarifManual ? `database gudang ${a.gudang.nama}` : a.space.tarifManual ? 'diisi manual' : a.space.tarifSumber ?? (tarifSewaPakai > 0 ? 'isian' : 'belum ada');
+  const panelRental = <div className="sc-rental">
+    <div><div className="small muted">Space yang dibutuhkan</div><b>{angka(luasSewa)} m²</b><div className="small muted">dari Footprint requirement (3.4)</div></div>
+    <div><div className="small muted">Harga space per m² / bulan</div>
+      {sewaUtuh ? <b>sewa utuh {rp(sewaBulanLive)}/bln</b>
+        : <AngkaInput aria-label="Harga sewa per m² per bulan" value={tarifSewaPakai} style={{ width: 130, minWidth: 130 }}
+          onValue={v => setA({ space: { ...a.space, tarifSewaM2Bulan: Math.max(0, Math.round(v)), tarifManual: true, tarifSumber: 'diisi manual' } })} />}
+      <div className="small muted">sumber: {sumberTarif}{a.space.tarifManual && (a.gudang || a.space.tarifSumber !== 'diisi manual') ? '' : ''}</div>
+      {a.space.tarifManual && <button type="button" className="link-kecil" onClick={() => setA({ space: { ...a.space, tarifManual: false, tarifSewaM2Bulan: a.gudang ? a.space.tarifSewaM2Bulan : 0, tarifSumber: undefined } })}>Kembalikan ke harga otomatis</button>}</div>
+    <div><div className="small muted">Biaya per hari</div><b>{rp(sewaBulanLive / 30)}</b><div className="small muted">per bulan ÷ 30</div></div>
+    <div><div className="small muted">Biaya per bulan</div><b>{rp(sewaBulanLive)}</b></div>
+    <div><div className="small muted">Biaya per tahun</div><b>{rp(sewaBulanLive * 12)}</b></div>
+  </div>;
+  const panelSummaryCost = (() => {
+    if (!hasil) return <div className="card"><p>Belum dihitung.</p><div className="row"><button onClick={() => hitung(false)}>Hitung sekarang</button></div></div>;
+    const rows = hasil.biaya.map(b => ({ ...b, kat: katBaris(b) }));
+    const tot = hasil.totalBiayaBulan || 1;
+    return <div className="card">
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <h2 style={{ margin: 0 }}>Summary cost · {rp(hasil.totalBiayaBulan)}/bln · {rp(hasil.totalBiayaBulan * 12)}/thn</h2>
+        <button className="ghost" onClick={() => hitung(false)}>Hitung ulang</button></div>
+      <p className="small muted">Semua baris otomatis dari input sebelumnya dan bisa diedit / ditambah lewat <b>Rincian perhitungan</b> tiap kategori. Setelah mengubah, klik Hitung ulang.</p>
+      <div className="tablewrap"><table className="sc-tabel">
+        <thead><tr><th>Kategori / item</th><th>Dasar hitung</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th></tr></thead>
+        <tbody>{KAT_SC.map(c => {
+          const xs = rows.filter(r => r.kat === c.k); const sub = xs.reduce((x, r) => x + r.biayaBulan, 0);
+          return [
+            <tr key={c.k} className="kat-head"><td colSpan={2}><b>{c.l}</b> <span className="small muted">· {c.isi}</span>{' '}
+              <a href={`#rincian-${c.k}`} className="link-kecil" onClick={e => { e.preventDefault(); bukaRincianBiaya(c.k); }}>Rincian perhitungan →</a></td>
+              <td className="num"><b>{rp(sub)}</b></td><td className="num"><b>{rp(sub * 12)}</b></td><td className="num">{angka(sub / tot * 100, 1)}%</td></tr>,
+            ...(c.k === 'rental' ? [<tr key="rental-isi"><td colSpan={5}>{panelRental}</td></tr>] : []),
+            ...xs.map((r, i) => <tr key={`${c.k}-${i}`}><td style={{ paddingLeft: 22 }}>{r.deskripsi}</td><td className="small muted">{r.dasar}</td>
+              <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaBulan * 12)}</td><td className="num muted">{angka(r.biayaBulan / tot * 100, 1)}%</td></tr>),
+            ...(xs.length === 0 && c.k !== 'rental' ? [<tr key={`${c.k}-0`}><td colSpan={5} className="small muted" style={{ paddingLeft: 22 }}>Belum ada biaya — buka Rincian perhitungan untuk mengisi.</td></tr>] : []),
+          ];
+        })}
+          <tr className="pd-sub"><td colSpan={2}><b>Total</b></td><td className="num out">{rp(hasil.totalBiayaBulan)}</td><td className="num out">{rp(hasil.totalBiayaBulan * 12)}</td><td className="num">100%</td></tr>
+        </tbody></table></div>
+    </div>;
+  })();
+  const bukaRincianBiaya = (k: string) => {
+    const c = KAT_SC.find(x => x.k === k); if (!c) return;
+    if (c.tab) { setPopDari('4.2'); setPop(c.tab as (typeof TABS)[number]); setPopKat(null); } else { setPopKat(k); }
+    window.scrollTo({ top: 0 });
+  };
+  const panelLain = (seksi: string[]) => <BiayaLainPanel hanyaSeksi={seksi} lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan}
+            onChange={(costLines, tandai, dibuang) => setA({ costLines, ...(tandai ? { biayaDefaultDiisi: true } : {}), ...(dibuang ? { biayaDefaultDibuang: dibuang } : {}) })}
+            dibuang={a.biayaDefaultDibuang}
+            startup={a.startupAuto ?? STARTUP_DEFAULT} onStartup={startupAuto => setA({ startupAuto })}
+            hasilBaris={hasilInterest?.biaya ?? hasil?.biaya} onHitung={() => hitung(false)}
+            driver={driverBiaya} defaultDiisi={!!a.biayaDefaultDiisi} onNilaiStok={nilaiStokRp => setA({ nilaiStokRp })} fasilitas={fasilitasGudang} />;
+  const rincianBiayaSimple = (k: string) => {
+    const c = KAT_SC.find(x => x.k === k);
+    switch (k) {
+      case 'rental': return <><div className="card"><h2>Rental Space</h2>{panelRental}</div>
+        <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
+          setKol('warehouse_id', g?.id ?? null);
+          setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
+        }} /></>;
+      case 'storage': return <><BiayaSpacePanel hanyaRak space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+      posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
+      posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
+      skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan} onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />
+        <div className="card">{panelLain(['palet'])}</div>
+        <div className="card"><h3>CCTV</h3><p className="small">CCTV dihitung dari luas gudang di sheet IT dan ikut masuk ke kategori Storage di Summary cost.</p><ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={driverIt} /></div></>;
+      case 'mhe': return <><ProcessDesignPanel bagian="mhe" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+          jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />
+        <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })} kontrakBulan={t.durasi_kontrak_bulan} opsiPilih={opsiPilihMhe}
+          alatRak={{ ...alatRak(a.space.excel, a.batasAngkatCbtMm ?? BATAS_ANGKAT_CBT_MM), batasMm: a.batasAngkatCbtMm ?? BATAS_ANGKAT_CBT_MM, onBatas: mm => setA({ batasAngkatCbtMm: mm }),
+            manual: a.aktivitas.filter(x => x.alatManual && x.porsiMuat?.muat === 'palet').length }}
+          kebutuhan={true
+            ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
+            : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} /></>;
+      case 'it': return <ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={driverIt} />;
+      case 'overhead': return <div className="card"><h2>Overhead</h2>
+        <div className="grid3"><Pct id="overhead" label="Overhead (× subtotal biaya)" value={a.overheadPersen ?? ((Number(hasil?.biaya.find(b => b.kelompok === 'Overhead')?.dasar.match(/^([0-9.]+)%/)?.[1]) || 3) / 100)}
+          onChange={v => setA({ overheadPersen: Math.max(0, v) })} /></div>
+        <p className="small muted">Overhead = persen × subtotal semua biaya lain. Default dari master Finance; isian di sini khusus tender ini. Klik Hitung ulang setelah mengubah.</p></div>;
+      default: return c?.seksi ? <div className="card"><h2>{c.l}</h2><p className="small muted">{c.isi} — qty otomatis dari volume, luas & manpower; bisa diedit dan ditambah.</p>{panelLain(c.seksi)}</div> : null;
     }
   };
+  const pctTxt = (x: number) => `${angka(x * 100, 1)}%`;
+  /** Simple CM: apa saja yang masih kurang per langkah (dasar tanda "!") */
+  const kurangLangkah = (id: string): string[] => {
+    const k: string[] = [];
+    const cekJalur = () => (['inbound', 'outbound'] as const).forEach(ar => {
+      if (!adaVolume(ar)) return;
+      if (!pvSimple[ar].length) k.push(`Porsi jalur ${ar} belum diisi (langkah 1.8)`);
+      else if (Math.abs(totalPorsi(ar) - 1) > 0.005) k.push(`Total porsi jalur ${ar} ${pctTxt(totalPorsi(ar))} — harus 100%`);
+    });
+    switch (id) {
+      case '1.1':
+        if (!t.customer?.trim()) k.push('Customer name'); if (!t.provinsi) k.push('Provinsi project'); if (!t.kab_kota) k.push('Area kota (menentukan UMK)');
+        if (!(t.durasi_kontrak_bulan > 0)) k.push('Durasi kontrak'); if (!t.tanggal_go_live) k.push('Tanggal go-live'); break;
+      case '1.2':
+        if (!(t.jumlah_shift > 0)) k.push('Jumlah shift'); if (!(Number(t.jam_kerja_per_shift) > 0)) k.push('Jam kerja per shift');
+        if (!(Number(t.jam_efektif_per_shift) > 0)) k.push('Jam efektif per shift');
+        else if (Number(t.jam_efektif_per_shift) > Number(t.jam_kerja_per_shift)) k.push('Jam efektif lebih besar dari jam kerja per shift'); break;
+      case '1.3': {
+        const r = ringkasPalet(daftarPalet(a.space.excel));
+        if (!r.list.length) k.push('Jenis pallet belum ada'); else if (Math.abs(r.totalPorsi - 1) > 0.0005) k.push(`Total pemakaian palet ${pctTxt(r.totalPorsi)} — harus 100%`); break;
+      }
+      case '1.4': {
+        if (!produkAda) { k.push('Belum ada produk / SKU — berat, CBM & tinggi per palet masih memakai nilai standar'); break; }
+        const tdk = (a.produk ?? []).filter(x => !x.otomatis && (!(x.p > 0 && x.l > 0 && x.t > 0) && !(Number(x.cbm) > 0) || !(x.beratKg > 0) || !(x.upp > 0)));
+        if (tdk.length) k.push(`${tdk.length} SKU belum lengkap (dimensi / berat per UoM / UPP): ${tdk.slice(0, 3).map(x => x.kode || x.nama).join(', ')}${tdk.length > 3 ? ', …' : ''}`); break;
+      }
+      case '1.6': if (!((a.processDesign?.hariKerjaBulan ?? 25) > 0)) k.push('Hari operasional gudang per bulan'); break;
+      case '1.7': {
+        const pd = a.processDesign as Record<string, unknown> | undefined;
+        for (const [kunci, l] of [['bebanShiftInbound', 'inbound'], ['bebanShiftOutbound', 'outbound'], ['bebanShift', 'storage / VAS']] as const) {
+          const arr = pd?.[kunci] as number[] | undefined; if (!arr?.length) continue;
+          const tot = arr.slice(0, t.jumlah_shift).reduce((x, y) => x + (Number(y) || 0), 0);
+          if (Math.abs(tot - 1) > 0.005) k.push(`Total workload ${l} per shift ${pctTxt(tot)} — harus 100%`);
+        } break;
+      }
+      case '1.8': case '2.3': cekJalur(); break;
+      case '1.9':
+        if (!porsiSudahDiisi) k.push('Porsi SPR / DDR / block stack belum diisi');
+        else if (Math.abs(porsiTotal - 1) > 0.0005) k.push(`Total porsi ${pctTxt(porsiTotal)} — harus 100%`);
+        if (!adaVolume('storage')) k.push('Volume storage belum diisi (langkah 2.1) — total posisi palet masih 0'); break;
+      case '2.1': if (!adaVolume('storage')) k.push('Volume storage 1 bulan'); break;
+      case '2.2': if (!adaVolume('inbound')) k.push('Throughput inbound 1 bulan'); if (!adaVolume('outbound')) k.push('Throughput outbound 1 bulan'); break;
+      case '2.4': if (!['storage', 'inbound', 'outbound'].every(adaVolume)) k.push('Volume belum lengkap — isi langkah 2.1 & 2.2'); break;
+      case '3.1':
+        if (t.skenario_aset === 'Rental' && !a.gudang && !((a.space.tarifSewaM2Bulan ?? 0) > 0)) k.push('Gudang belum dipilih dan harga sewa per m² belum ada (database harga pasar di area ini kosong)'); break;
+      case '3.2': if (!porsiSudahDiisi || Math.abs(porsiTotal - 1) > 0.0005) k.push('Porsi SPR / DDR / block stack belum lengkap (langkah 1.9)'); break;
+      case '3.3': if (!adaVolume('inbound') || !adaVolume('outbound')) k.push('Throughput inbound / outbound belum diisi (langkah 2.2)'); break;
+      case '3.4': if (!((spaceH?.spaceRent ?? 0) > 0)) k.push('Luas belum bisa dihitung — lengkapi langkah 1.9 & 2.1'); break;
+      case '3.5': if (!(Number(a.space.excel?.lebarGudangM) > 0)) k.push('Lebar gudang (L)'); break;
+      case '4.1': case '4.2': case '4.4': case '4.5':
+        if (!hasil) { k.push('Belum dihitung — klik Hitung'); break; }
+        if (id === '4.2' && t.skenario_aset === 'Rental' && !((hasil.perKelompok?.Fasilitas ?? 0) > 0)) k.push('Sewa gudang Rp0 — pilih gudang (3.1) atau isi harga sewa per m² di Rental Space');
+        break;
+    }
+    return k;
+  };
+  const OPSIONAL_SIMPLE = ['3.6', '3.7', '4.3', '4.6', '4.7'];
+  const statusLangkah = (id: string): 'ok' | 'kurang' | 'opsional' => (kurangLangkah(id).length ? 'kurang' : OPSIONAL_SIMPLE.includes(id) ? 'opsional' : 'ok');
   const navWizard = <nav className="wiz-nav" aria-label="Langkah Simple CM Warehouse">
     {MENU_SIMPLE.map(m => {
       const st = m.langkah.map(l => statusLangkah(l.id));
@@ -718,7 +885,7 @@ export default function TenderPage() {
           <i>{m.no}</i><span>{tr(m.nama)}</span>{wajib > 0 && <small className={ok === wajib ? 'ok' : undefined}>{ok}/{wajib}</small>}</button>
         <ol>{m.langkah.map((l, k) => <li key={l.id}>
           <button type="button" aria-current={!pop && langkah === l.id ? 'step' : undefined} className={!pop && langkah === l.id ? 'on' : undefined} onClick={() => keLangkah(l.id)}>
-            <span className={`wiz-st ${st[k]}`} title={st[k] === 'ok' ? 'Lengkap' : st[k] === 'kurang' ? 'Belum lengkap' : 'Opsional'}>{st[k] === 'ok' ? '✓' : st[k] === 'kurang' ? '!' : '○'}</span>
+            <span className={`wiz-st ${st[k]}`} title={st[k] === 'ok' ? 'Lengkap' : st[k] === 'kurang' ? `Kurang: ${kurangLangkah(l.id).join('; ')}` : 'Opsional'}>{st[k] === 'ok' ? '✓' : st[k] === 'kurang' ? '!' : '○'}</span>
             <span><b>{l.id}</b> {tr(l.nama)}</span></button></li>)}</ol>
       </div>;
     })}
@@ -759,12 +926,14 @@ export default function TenderPage() {
       {simple && navWizard}
       <div className={simple ? 'wiz-isi' : 'wiz-mati'}>
       {simple && (pop
-        ? <div className="rincian-bar" role="note"><button type="button" onClick={() => keTab('Result')}>← Kembali ke Result</button>
+        ? <div className="rincian-bar" role="note"><button type="button" onClick={() => { const d = popDari; setPopDari(null); if (d) keLangkah(d); else keTab('Result'); }}>← Kembali ke {popDari === '4.2' ? 'Summary cost' : 'Result'}</button>
           <span>Rincian: <b>{tr(pop)}</b> — ubah di sini, angka di Result ikut dihitung ulang.</span></div>
         : <div className="wiz-kepala">
           <div className="small muted">{cariLangkah(langkah).menu.no}. {tr(cariLangkah(langkah).menu.nama)}</div>
           <div className="wiz-judul"><i>{langkah}</i>{tr(cariLangkah(langkah).nama)}</div>
           <div className="small"><span className="muted">Terhubung ke:</span> {cariLangkah(langkah).ke}</div>
+          {kurangLangkah(langkah).length > 0 && <div className="wiz-kurang" role="status"><b>Yang masih kurang di langkah ini:</b>
+            <ul>{kurangLangkah(langkah).map(x => <li key={x}>{x}</li>)}</ul></div>}
         </div>)}
 
       {tab === TAB_EXCEL && a.historis && <HistorisPanel h={a.historis} nama={(t.kode ?? t.customer).replace(/[^\w]+/g, '_')} />}
@@ -912,25 +1081,26 @@ export default function TenderPage() {
       })()}
       {lihat('Key Assumption') && !simple && panelDesain}
 
-      {lihat('Warehouse Planning') && (<>
-        {di('3.1') && <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
+      {(lihat('Warehouse Planning') || (simple && di('1.9'))) && (<>
+        {(!simple || di('3.1')) && <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
           setKol('warehouse_id', g?.id ?? null);
           setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
         }} />}
         {simple && di('3.1') && panelBiayaSpace}
-        {(!simple || ['3.2', '3.3', '3.4', '3.5', '3.6'].includes(langkah)) && !pop && <SpacePanel bagian={simple ? ({ '3.2': 'a', '3.3': 'b', '3.4': 'c', '3.5': 'd', '3.6': 'e' } as const)[langkah as '3.2'] : undefined} excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
+        {(!simple || ['1.9', '3.2', '3.3', '3.4', '3.5'].includes(langkah)) && !pop && <SpacePanel bagian={simple ? ({ '1.9': 'a', '3.2': 'b', '3.3': 'c', '3.4': 'd', '3.5': 'e' } as const)[langkah as '3.2'] : undefined}
+          porsiKosong={simple && !porsiSudahDiisi} excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
           inboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).palet} outboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).palet}
           uomIn={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).ok ? 'palet' : volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).ok ? 'palet' : volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
           jumlahShift={t.jumlah_shift} onChange={ubahSpaceExcel}
           kekuatan={dasarKekuatan(a, t.customer)}
           komersial={panelBiayaSpace} />}
-        {simple && di('3.7') && <div className="wiz-layout">
-          <p className="small muted" style={{ margin: 0 }}>Layout dibuat dari input langkah 1.3–3.6 (palet, produk, volume, porsi rak, staging, footprint, gate, loading dock, trapesium) yang sudah disimpan.
+        {simple && di('3.6') && <div className="wiz-layout">
+          <p className="small muted" style={{ margin: 0 }}>Layout dibuat dari input langkah 1.3–3.5 (palet, produk, volume, porsi rak, staging, footprint, gate, loading dock, trapesium) yang sudah disimpan.
             Bila input diubah sesudah layout terakhir disimpan, layout dibuat ulang otomatis. Komponen bisa digeser & diatur di sini, lalu klik Simpan di dalam editor.</p>
           {kunciLayout > 0 ? <iframe key={kunciLayout} className="wiz-frame" title="Layout 2D & simulasi 3D" src={`/simulasi?id=${t.id}&embed=1&dari=simple`} />
             : <p className="small">Menyimpan input & menyiapkan layout…</p>}
         </div>}
-        {simple && di('3.8') && panelSummaryLayout}
+        {simple && di('3.7') && panelSummaryLayout}
       </>)}
 
       {lihat('Volume') && di('2.3') && <ProfilVolumePanel pakaiJalur={simple} judul={simple ? 'Moda & volume transport per hari' : undefined} profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
@@ -1177,12 +1347,12 @@ export default function TenderPage() {
         </div>
       </>)}
 
-      {simple && popKat && <div className="wiz-layout">
-        <div className="rincian-bar" role="note"><button type="button" onClick={() => setPopKat(null)}>← Kembali ke Summary cost</button>
-          <span>Rincian & revisi: <b>{labelKelompok(popKat as Kelompok)}</b> — simpan di bawah, lalu klik Hitung agar Summary cost ikut berubah.</span></div>
-        <iframe className="wiz-frame" title={`Rincian ${popKat}`} src={`/tender/${t.id}/kategori/${encodeURIComponent(popKat)}?embed=1`} />
-      </div>}
-      {lihat('Result') && (!simple || (!popKat && ['4.1', '4.2', '4.3', '4.4', '4.5'].includes(langkah))) && <HasilPanel langkah={simple && !pop ? langkah : undefined} onBukaKategori={simple ? k => { setPopKat(k); window.scrollTo({ top: 0 }); } : undefined}
+      {simple && !pop && langkah === '4.2' && (popKat
+        ? <><div className="rincian-bar" role="note"><a href="#summary-cost" className="btn ghost" onClick={e => { e.preventDefault(); setPopKat(null); }}>← Kembali ke Summary cost</a>
+            <span>Rincian perhitungan: <b>{KAT_SC.find(x => x.k === popKat)?.l ?? popKat}</b> — ubah di sini, lalu Hitung ulang agar Summary cost ikut berubah.</span></div>
+          {rincianBiayaSimple(popKat)}</>
+        : panelSummaryCost)}
+      {lihat('Result') && (!simple || (!popKat && ['4.1', '4.3', '4.4', '4.5'].includes(langkah))) && <HasilPanel langkah={simple && !pop ? langkah : undefined} onBukaKategori={simple ? k => { keLangkah('4.2'); setTimeout(() => bukaRincianBiaya(katBaris({ kelompok: k as Kelompok, deskripsi: '' })), 0); } : undefined}
         ekstraManpower={simple ? panelManpowerSimple : undefined} drill={simple} onBukaTab={bukaRincian} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
@@ -1300,8 +1470,8 @@ function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, be
         {h.alokasiLayanan && <div className="card row" style={{ justifyContent: 'space-between', gap: 8 }}>
           <span className="small"><b>Cost allocation (pembagian biaya ke layanan):</b> {h.rateCard.map(r => `${BUCKET_LABEL[r.bucket]} ${persen(r.biayaBulan / (h.marginTotal.biayaBulan || 1))}`).join(' · ')}</span>
           <button className="ghost" onClick={onBukaAlokasi}>Atur cost allocation →</button></div>}</>}
-      {langkah === '4.2' && <HasilKomersial bagian="kurs" {...komersialProps} />}
-      {langkah === '4.3' && <HasilKomersial bagian="capex" {...komersialProps} />}
+      {langkah === '4.3' && <HasilKomersial bagian="kurs" {...komersialProps} />}
+      {langkah === '4.4' && <HasilKomersial bagian="capex" {...komersialProps} />}
       {langkah === '4.5' && ekstraManpower}
       {!langkah && <div className="tabs hasil-tab" role="tablist" aria-label="Bagian hasil">
         {([['ringkasan', 'Ringkasan & red flag', 'hasil'], ['harga', 'Harga & margin', 'isian'], ['biaya', 'Rincian biaya', 'hasil'], ['operasional', 'Manpower, MHE & space', 'hasil']] as const).map(([k, l, j]) => (
@@ -1400,7 +1570,7 @@ function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, be
 
       </>}
 
-      {(bagianTampil === 'biaya' || langkah === '4.4') && <><div className="card">
+      {bagianTampil === 'biaya' && <><div className="card">
         <h2><T>Rincian biaya per bulan</T></h2>
         <p className="small muted">Dikelompokkan per kategori. Klik <b>Rincian & revisi</b> untuk membuka kategori{onBukaKategori ? '' : ' di tab baru'} dan merevisi / menambah barisnya.</p>
         <div className="tablewrap"><table>
@@ -1418,7 +1588,7 @@ function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, be
             <tr className="pd-sub"><td colSpan={3}><b>Total</b></td><td className="num out">{rp(h.totalBiayaBulan)}</td></tr></tbody>
         </table></div>
       </div>
-      <HasilKomersial bagian={langkah ? 'porsi' : 'biaya'} {...komersialProps} /></>}
+      <HasilKomersial bagian="biaya" {...komersialProps} /></>}
     </>
   );
 }

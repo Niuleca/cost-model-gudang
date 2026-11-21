@@ -234,6 +234,8 @@ export interface SpaceInput {
   /** Harga rak per jenis (dari Price Inquiry kategori Racking); posisi diambil dari sheet Space (SPR / DDR). */
   rak?: { spr?: RakHarga; ddr?: RakHarga };
   tarifManual?: boolean;          // true = tarif sewa diisi manual, tidak mengikuti database gudang
+  /** Asal tarif sewa per m² bila gudang belum dipilih, mis. "median 5 gudang di Kabupaten Bogor (database harga pasar)" */
+  tarifSumber?: string;
 }
 export interface RakHarga { priceItemId?: number; nama?: string; harga: number; umurBulan: number }
 

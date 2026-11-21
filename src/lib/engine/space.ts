@@ -84,6 +84,8 @@ export interface SpaceExcel {
   /** Building dimension (Spesifikasi 3.2e): jumlah gate inbound / outbound, loading dock (platform), bentuk trapesium
    *  (lebar belakang ≠ lebar depan). Dipakai layout 2D / 3D otomatis. */
   gateIn?: number; gateOut?: number; loadingDock?: boolean; lebarBelakangM?: number | null;
+  /** Simple CM: porsi SPR / DDR / block sudah diisi pengguna (bukan nilai bawaan) */
+  porsiDiisi?: boolean;
 }
 
 export const SPACE_EXCEL_DEFAULT: SpaceExcel = {

@@ -17,7 +17,9 @@ function Baris({ l, v, u, input, tebal }: { l: string; v?: React.ReactNode; u?: 
 const Judul = ({ t }: { t: string }) => <tr className="sp-judul"><td colSpan={3}>{t}</td></tr>;
 
 /** Kebutuhan space format Excel (A–E) + visual racking level dan komposisi luas. */
-export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan, uomIn, uomOut, jumlahShift, onChange, komersial, kekuatan, bagian }: {
+export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan, uomIn, uomOut, jumlahShift, onChange, komersial, kekuatan, bagian, porsiKosong = false }: {
+  /** Simple CM: porsi belum diisi pengguna → kolom porsi kosong (tidak diisi nilai bawaan) */
+  porsiKosong?: boolean;
   /** Simple CM: tampilkan satu bagian saja — a capacity · b racking/block stack · c staging · d footprint total · e building dimension */
   bagian?: 'a' | 'b' | 'c' | 'd' | 'e';
   excel?: Partial<SpaceExcel> | null; ppTotal: number; inboundBulan: number; outboundBulan: number; uomIn: string; uomOut: string; jumlahShift: number;
@@ -70,9 +72,9 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
     </>;
   };
   const p = x.porsi!;
-  const setP = (k: keyof Porsi, v: number | null) => set({ porsi: { ...p, [k]: Math.min(100, Math.max(0, v ?? 0)) / 100 } });
+  const setP = (k: keyof Porsi, v: number | null) => set({ porsi: { ...p, [k]: Math.min(100, Math.max(0, v ?? 0)) / 100 }, porsiDiisi: true });
   const PorsiRow = ({ k, l, pp }: { k: keyof Porsi; l: string; pp: number }) =>
-    <Baris l={l} input={<>{inp(Math.round(p[k] * 1000) / 10, v => setP(k, v), { w: 64 })}%</>} u={`${f0(pp)} PP`} />;
+    <Baris l={l} input={<>{inp(porsiKosong && !p[k] ? null : Math.round(p[k] * 1000) / 10, v => setP(k, v), { w: 64, kosong: true, ph: porsiKosong ? 'isi' : '0' })}%</>} u={`${f0(pp)} PP`} />;
 
   const StgRows = (k: 'inbound' | 'outbound', r: typeof h.inbound, uom: string) => {
     const d = x[k];
