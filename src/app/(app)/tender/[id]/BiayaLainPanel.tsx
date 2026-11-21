@@ -116,7 +116,8 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
   driver: DriverBiaya; defaultDiisi: boolean; onNilaiStok: (v: number) => void; fasilitas: { nama: string; m2: number }[];
 }) {
   const katItem = (b: Baris) => items.find(x => x.id === b.priceItemId)?.kategori;
-  const perSeksi = SEKSI_BIAYA.map(s => ({ s, rows: lines.map((b, i) => ({ b, i })).filter(r => seksiDari(r.b, katItem(r.b)) === s.id) }));
+  // baris sewa tambahan (kelompok Fasilitas) dikelola di Rental Space, bukan di sini
+  const perSeksi = SEKSI_BIAYA.map(s => ({ s, rows: lines.map((b, i) => ({ b, i })).filter(r => r.b.kelompok !== 'Fasilitas' && seksiDari(r.b, katItem(r.b)) === s.id) }));
   const ubahBanyak = (u: { i: number; patch: Partial<Baris> }[]) => onChange(lines.map((b, j) => {
     const p = u.filter(x => x.i === j).reduce((acc, x) => ({ ...acc, ...x.patch }), {} as Partial<Baris>);
     return u.some(x => x.i === j) ? { ...b, ...p, seksi: p.seksi ?? b.seksi ?? seksiDari(b, katItem(b)) } : b;

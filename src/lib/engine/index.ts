@@ -281,8 +281,11 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
   // Racking: posisi SPR & DDR dari sheet Space × harga per jenis (Price Inquiry Racking). Data lama: satu harga untuk semua posisi.
   const posSpr = Math.ceil(sx.sd.ppReq - 1e-9), posDdr = Math.ceil(sx.dd.ppReq - 1e-9);
   const rakLama = { harga: s.hargaRakPerPosisi ?? 0, umurBulan: s.umurRakBulan ?? 120 };
-  for (const [label, pos, h] of [['SPR', posSpr, s.rak?.spr ?? rakLama], ['DDR', posDdr, s.rak?.ddr ?? rakLama]] as const)
-    if (pos > 0 && h.harga > 0) investasi += capex(`Racking ${label} (${pos} posisi)`, 'Racking', pos * h.harga, h.umurBulan, alokStorage);
+  const sewaRak = s.rakSkema === 'sewa', tarifSewaRak = Math.max(0, Number(s.sewaRakPerPPBulan) || 0);
+  for (const [label, pos, h] of [['SPR', posSpr, s.rak?.spr ?? rakLama], ['DDR', posDdr, s.rak?.ddr ?? rakLama]] as const) {
+    if (sewaRak) { if (pos > 0 && tarifSewaRak > 0) tambah(`Sewa racking ${label} (${pos} posisi)`, 'Racking', pos * tarifSewaRak, alokStorage, `${pos} PP × Rp${tarifSewaRak.toLocaleString('id-ID')}/PP/bln`); }
+    else if (pos > 0 && h.harga > 0) investasi += capex(`Racking ${label} (${pos} posisi)`, 'Racking', pos * h.harga, h.umurBulan, alokStorage);
+  }
 
   // Listrik
   const alokListrik = normalisasi(undefined, { storage: 0.6, handling_in: 0.2, handling_out: 0.2 });

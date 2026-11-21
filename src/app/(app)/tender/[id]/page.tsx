@@ -176,6 +176,17 @@ export default function TenderPage() {
   const [popKat, setPopKat] = useState<string | null>(null);
   /** langkah asal ketika membuka tab rincian (mis. Manpower dari Summary cost 4.2) */
   const [popDari, setPopDari] = useState<string | null>(null);
+  // Summary cost (4.2) hanya tampilan; revisi tiap kategori dibuka sebagai pop-up
+  const modalBuka = simple && langkah === '4.2' && (!!popKat || (!!pop && popDari === '4.2'));
+  const tutupModalRef = useRef<() => void>(() => {});
+  const tutupModal = () => tutupModalRef.current();
+  useEffect(() => {
+    if (!modalBuka) return;
+    const lama = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') tutupModal(); };
+    window.addEventListener('keydown', esc);
+    return () => { document.body.style.overflow = lama; window.removeEventListener('keydown', esc); };
+  }, [modalBuka]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Simple CM: sub-langkah wizard yang sedang tampil */
   const di = (id: string) => !simple || (!pop && langkah === id);
   const [kunciLayout, setKunciLayout] = useState(0);
@@ -446,6 +457,11 @@ export default function TenderPage() {
     if (!x?.porsiDiisi && porsiBawaan(x) && (x?.porsi?.spr || x?.porsi?.ddr || !x?.porsi)) {
       setT(y => y && ({ ...y, asumsi: { ...y.asumsi, space: { ...y.asumsi.space, excel: { ...lengkapiSpaceExcel(y.asumsi.space.excel), porsi: { spr: 0, ddr: 0, block: 0, floor: 0 } } } } })); setKotor(true);
     }
+  }, [simple, t?.id, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Simple CM: racking memakai skema sewa per posisi palet (default Rp25.000/PP/bln) bila belum pernah dipilih
+  useEffect(() => {
+    if (!simple || !t || !bisaEdit || t.asumsi.space?.rakSkema) return;
+    setT(y => y && ({ ...y, asumsi: { ...y.asumsi, space: { ...y.asumsi.space, rakSkema: 'sewa', sewaRakPerPPBulan: y.asumsi.space.sewaRakPerPPBulan ?? 25000 } } })); setKotor(true);
   }, [simple, t?.id, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
   // Simple CM: gudang belum dipilih & tarif sewa belum diisi → harga sewa per m² otomatis = median database harga pasar di kab/kota (atau provinsi)
   useEffect(() => {
@@ -741,17 +757,40 @@ export default function TenderPage() {
   const sewaUtuh = !!a.gudang?.sewaUtuh;
   const sewaBulanLive = t.skenario_aset !== 'Rental' ? 0 : sewaUtuh ? Number(a.gudang?.harga_per_bulan ?? tarifSewaPakai * Number(a.gudang?.luas_m2 ?? 0)) : luasSewa * tarifSewaPakai;
   const sumberTarif = a.gudang && !a.space.tarifManual ? `database gudang ${a.gudang.nama}` : a.space.tarifManual ? 'diisi manual' : a.space.tarifSumber ?? (tarifSewaPakai > 0 ? 'isian' : 'belum ada');
+  const barisSewaLain = a.costLines.map((c, i) => ({ c, i })).filter(x => x.c.kelompok === 'Fasilitas');
   const panelRental = <div className="sc-rental">
-    <div><div className="small muted">Space yang dibutuhkan</div><b>{angka(luasSewa)} m²</b><div className="small muted">dari Footprint requirement (3.4)</div></div>
-    <div><div className="small muted">Harga space per m² / bulan</div>
-      {sewaUtuh ? <b>sewa utuh {rp(sewaBulanLive)}/bln</b>
-        : <AngkaInput aria-label="Harga sewa per m² per bulan" value={tarifSewaPakai} style={{ width: 130, minWidth: 130 }}
-          onValue={v => setA({ space: { ...a.space, tarifSewaM2Bulan: Math.max(0, Math.round(v)), tarifManual: true, tarifSumber: 'diisi manual' } })} />}
-      <div className="small muted">sumber: {sumberTarif}{a.space.tarifManual && (a.gudang || a.space.tarifSumber !== 'diisi manual') ? '' : ''}</div>
-      {a.space.tarifManual && <button type="button" className="link-kecil" onClick={() => setA({ space: { ...a.space, tarifManual: false, tarifSewaM2Bulan: a.gudang ? a.space.tarifSewaM2Bulan : 0, tarifSumber: undefined } })}>Kembalikan ke harga otomatis</button>}</div>
-    <div><div className="small muted">Biaya per hari</div><b>{rp(sewaBulanLive / 30)}</b><div className="small muted">per bulan ÷ 30</div></div>
+    <div><div className="small muted">Space yang dibutuhkan</div><b>{angka(luasSewa)} m²</b><div className="small muted">Footprint requirement (3.4)</div></div>
+    <div><div className="small muted">Harga space</div><b>{sewaUtuh ? `sewa utuh ${rp(sewaBulanLive)}/bln` : `${rp(tarifSewaPakai)} /m²/bln`}</b><div className="small muted">{sumberTarif}</div></div>
+    <div><div className="small muted">Biaya per hari</div><b>{rp(sewaBulanLive / 30)}</b></div>
     <div><div className="small muted">Biaya per bulan</div><b>{rp(sewaBulanLive)}</b></div>
     <div><div className="small muted">Biaya per tahun</div><b>{rp(sewaBulanLive * 12)}</b></div>
+  </div>;
+  const editRental = <div className="card" style={{ gap: 12 }}>
+    <div className="sc-rental" style={{ margin: 0 }}>
+      <div><div className="small muted">Space yang dibutuhkan (otomatis)</div><b>{angka(luasSewa)} m²</b><div className="small muted">dari Footprint requirement (3.4)</div></div>
+      <div><div className="small muted">Gudang</div><b>{a.gudang ? a.gudang.nama : 'belum dipilih'}</b><div className="small muted">{a.gudang ? `${a.gudang.kab_kota} · ${angka(Number(a.gudang.luas_m2))} m²` : 'pilih di Input 3.1 List gudang'}</div></div>
+      <div><div className="small muted">Harga space per m² / bulan</div>
+        {sewaUtuh ? <b>sewa utuh {rp(sewaBulanLive)}/bln</b>
+          : <AngkaInput aria-label="Harga sewa per m² per bulan" value={tarifSewaPakai} style={{ width: 140, minWidth: 140 }}
+            onValue={v => setA({ space: { ...a.space, tarifSewaM2Bulan: Math.max(0, Math.round(v)), tarifManual: true, tarifSumber: 'diisi manual' } })} />}
+        <div className="small muted">sumber: {sumberTarif}</div>
+        {a.space.tarifManual && <button type="button" className="link-kecil" onClick={() => setA({ space: { ...a.space, tarifManual: false, tarifSewaM2Bulan: 0, tarifSumber: undefined } })}>Kembalikan ke harga otomatis</button>}</div>
+    </div>
+    <div className="tablewrap"><table>
+      <thead><tr><th>Biaya sewa</th><th className="num">Per hari</th><th className="num">Per bulan</th><th className="num">Per tahun</th><th /></tr></thead>
+      <tbody>
+        <tr><td>Sewa gudang {sewaUtuh ? '(sewa utuh)' : `${angka(luasSewa)} m² × ${rp(tarifSewaPakai)}`}</td><td className="num">{rp(sewaBulanLive / 30)}</td><td className="num"><b>{rp(sewaBulanLive)}</b></td><td className="num">{rp(sewaBulanLive * 12)}</td><td /></tr>
+        {barisSewaLain.map(({ c, i }) => { const bln = (Number(c.qty) || 0) * (Number(c.hargaSatuan) || 0);
+          const ub = (patch: Partial<typeof c>) => setA({ costLines: a.costLines.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+          return <tr key={i}><td><div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+              <input aria-label="Nama sewa" value={c.deskripsi} placeholder="mis. sewa area office / parkir" onChange={e => ub({ deskripsi: e.target.value })} style={{ minWidth: 220 }} />
+              <AngkaInput aria-label="Qty" value={c.qty} onValue={v => ub({ qty: v })} style={{ width: 70, minWidth: 70 }} /> ×
+              <AngkaInput aria-label="Harga per bulan" value={c.hargaSatuan} onValue={v => ub({ hargaSatuan: v })} style={{ width: 130, minWidth: 130 }} /></div></td>
+            <td className="num">{rp(bln / 30)}</td><td className="num"><b>{rp(bln)}</b></td><td className="num">{rp(bln * 12)}</td>
+            <td><button className="danger" onClick={() => setA({ costLines: a.costLines.filter((_, j) => j !== i) })}>Hapus</button></td></tr>; })}
+      </tbody></table></div>
+    <div className="row"><button className="ghost" onClick={() => setA({ costLines: [...a.costLines, { deskripsi: '', kelompok: 'Fasilitas', mode: 'bulanan', qty: 1, hargaSatuan: 0, seksi: 'rental' } as (typeof a.costLines)[number]] })}>+ Tambah biaya sewa lain</button>
+      <span className="small muted">Per hari = per bulan ÷ 30.</span></div>
   </div>;
   const panelSummaryCost = (() => {
     if (!hasil) return <div className="card"><p>Belum dihitung.</p><div className="row"><button onClick={() => hitung(false)}>Hitung sekarang</button></div></div>;
@@ -761,19 +800,22 @@ export default function TenderPage() {
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
         <h2 style={{ margin: 0 }}>Summary cost · {rp(hasil.totalBiayaBulan)}/bln · {rp(hasil.totalBiayaBulan * 12)}/thn</h2>
         <button className="ghost" onClick={() => hitung(false)}>Hitung ulang</button></div>
-      <p className="small muted">Semua baris otomatis dari input sebelumnya dan bisa diedit / ditambah lewat <b>Rincian perhitungan</b> tiap kategori. Setelah mengubah, klik Hitung ulang.</p>
+      <p className="small muted">Ringkasan biaya per kategori (hanya tampilan). Untuk mengubah harga / qty / menambah baris, klik <b>Revisi</b> pada kategori — pop-up terbuka, dan Summary cost dihitung ulang saat pop-up ditutup.</p>
       <div className="tablewrap"><table className="sc-tabel">
+        <colgroup><col style={{ width: '44%' }} /><col style={{ width: '22%' }} /><col style={{ width: '13%' }} /><col style={{ width: '14%' }} /><col style={{ width: '7%' }} /></colgroup>
         <thead><tr><th>Kategori / item</th><th>Dasar hitung</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th></tr></thead>
         <tbody>{KAT_SC.map(c => {
           const xs = rows.filter(r => r.kat === c.k); const sub = xs.reduce((x, r) => x + r.biayaBulan, 0);
           return [
-            <tr key={c.k} className="kat-head"><td colSpan={2}><b>{c.l}</b> <span className="small muted">· {c.isi}</span>{' '}
-              <a href={`#rincian-${c.k}`} className="link-kecil" onClick={e => { e.preventDefault(); bukaRincianBiaya(c.k); }}>Rincian perhitungan →</a></td>
+            <tr key={c.k} className="kat-head"><td colSpan={2}><div className="row" style={{ gap: 8, flexWrap: 'nowrap', alignItems: 'center' }}>
+              <span style={{ flex: 1, whiteSpace: 'normal', minWidth: 0 }}><b>{c.l}</b> <span className="small muted">· {c.isi}</span></span>
+              <button type="button" className="ghost sc-revisi" onClick={() => bukaRincianBiaya(c.k)}>Revisi</button></div>
+              </td>
               <td className="num"><b>{rp(sub)}</b></td><td className="num"><b>{rp(sub * 12)}</b></td><td className="num">{angka(sub / tot * 100, 1)}%</td></tr>,
             ...(c.k === 'rental' ? [<tr key="rental-isi"><td colSpan={5}>{panelRental}</td></tr>] : []),
-            ...xs.map((r, i) => <tr key={`${c.k}-${i}`}><td style={{ paddingLeft: 22 }}>{r.deskripsi}</td><td className="small muted">{r.dasar}</td>
+            ...xs.map((r, i) => <tr key={`${c.k}-${i}`}><td style={{ paddingLeft: 22 }} title={r.deskripsi}>{r.deskripsi}</td><td className="small muted" title={r.dasar}>{r.dasar}</td>
               <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaBulan * 12)}</td><td className="num muted">{angka(r.biayaBulan / tot * 100, 1)}%</td></tr>),
-            ...(xs.length === 0 && c.k !== 'rental' ? [<tr key={`${c.k}-0`}><td colSpan={5} className="small muted" style={{ paddingLeft: 22 }}>Belum ada biaya — buka Rincian perhitungan untuk mengisi.</td></tr>] : []),
+            ...(xs.length === 0 && c.k !== 'rental' ? [<tr key={`${c.k}-0`}><td colSpan={5} className="small muted" style={{ paddingLeft: 22 }}>Belum ada biaya — klik Revisi untuk mengisi.</td></tr>] : []),
           ];
         })}
           <tr className="pd-sub"><td colSpan={2}><b>Total</b></td><td className="num out">{rp(hasil.totalBiayaBulan)}</td><td className="num out">{rp(hasil.totalBiayaBulan * 12)}</td><td className="num">100%</td></tr>
@@ -783,7 +825,6 @@ export default function TenderPage() {
   const bukaRincianBiaya = (k: string) => {
     const c = KAT_SC.find(x => x.k === k); if (!c) return;
     if (c.tab) { setPopDari('4.2'); setPop(c.tab as (typeof TABS)[number]); setPopKat(null); } else { setPopKat(k); }
-    window.scrollTo({ top: 0 });
   };
   const panelLain = (seksi: string[]) => <BiayaLainPanel hanyaSeksi={seksi} lines={a.costLines} items={items} kontrakBulan={t.durasi_kontrak_bulan}
             onChange={(costLines, tandai, dibuang) => setA({ costLines, ...(tandai ? { biayaDefaultDiisi: true } : {}), ...(dibuang ? { biayaDefaultDibuang: dibuang } : {}) })}
@@ -794,17 +835,41 @@ export default function TenderPage() {
   const rincianBiayaSimple = (k: string) => {
     const c = KAT_SC.find(x => x.k === k);
     switch (k) {
-      case 'rental': return <><div className="card"><h2>Rental Space</h2>{panelRental}</div>
-        <GudangPicker provinsi={t.provinsi} terpilih={a.gudang} kebutuhanM2={hasil?.space.totalM2} onPilih={(g, tarifM2) => {
-          setKol('warehouse_id', g?.id ?? null);
-          setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
-        }} /></>;
-      case 'storage': return <><BiayaSpacePanel hanyaRak space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
-      posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
-      posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
-      skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan} onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />
+      case 'rental': return editRental;
+      case 'storage': return <>
+        <div className="card" style={{ gap: 10 }}>
+          <h2>Racking</h2>
+          <div className="tabs" role="tablist" aria-label="Skema racking" style={{ display: 'inline-flex', width: 'fit-content' }}>
+            {([['sewa', 'Sewa per posisi palet'], ['beli', 'Beli (investasi, depresiasi)']] as const).map(([v, l]) =>
+              <button key={v} type="button" role="tab" aria-selected={(a.space.rakSkema ?? 'beli') === v} className={(a.space.rakSkema ?? 'beli') === v ? 'on' : ''}
+                onClick={() => setA({ space: { ...a.space, rakSkema: v, ...(v === 'sewa' && !(a.space.sewaRakPerPPBulan ?? 0) ? { sewaRakPerPPBulan: 25000 } : {}) } })}>{l}</button>)}
+          </div>
+          {a.space.rakSkema === 'sewa' ? (() => {
+            const tarif = a.space.sewaRakPerPPBulan ?? 25000;
+            const ps = [['SPR · Selective Pallet Rack', Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)], ['DDR · Double Deep Rack', Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)]] as const;
+            const totPos = ps.reduce((x, [, n]) => x + n, 0);
+            return <>
+              <label className="f" style={{ maxWidth: 260 }}>Sewa racking per posisi palet / bulan
+                <AngkaInput aria-label="Sewa racking per PP per bulan" value={tarif} onValue={v => setA({ space: { ...a.space, sewaRakPerPPBulan: Math.max(0, Math.round(v)) } })} /></label>
+              <div className="tablewrap"><table>
+                <thead><tr><th>Jenis rak</th><th className="num">Posisi palet</th><th className="num">Sewa/PP/bln</th><th className="num">Per bulan</th><th className="num">Per tahun</th></tr></thead>
+                <tbody>{ps.filter(([, n]) => n > 0).map(([l, n]) => <tr key={l}><td>{l}</td><td className="num">{angka(n)}</td><td className="num">{rp(tarif)}</td><td className="num"><b>{rp(n * tarif)}</b></td><td className="num">{rp(n * tarif * 12)}</td></tr>)}
+                  {totPos === 0 && <tr><td colSpan={5} className="muted">Belum ada posisi rak — isi porsi SPR / DDR di Capacity requirement (1.9).</td></tr>}
+                  <tr className="pd-sub"><td><b>Total sewa racking</b></td><td className="num"><b>{angka(totPos)}</b></td><td /><td className="num"><b>{rp(totPos * tarif)}</b></td><td className="num"><b>{rp(totPos * tarif * 12)}</b></td></tr></tbody>
+              </table></div>
+              <p className="small muted">Posisi palet dari Block stack / racking space (3.2). Block stack & pallet floor tidak memakai rak.</p></>;
+          })() : <BiayaSpacePanel hanyaRak space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+            posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
+            posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
+            skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan} onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />}
+        </div>
         <div className="card">{panelLain(['palet'])}</div>
-        <div className="card"><h3>CCTV</h3><p className="small">CCTV dihitung dari luas gudang di sheet IT dan ikut masuk ke kategori Storage di Summary cost.</p><ItPanel sheet={a.it} onChange={it => setA({ it })} kontrakBulan={t.durasi_kontrak_bulan} driver={driverIt} /></div></>;
+        <div className="card"><h2>CCTV</h2>
+          {(hasil?.biaya ?? []).filter(b => /cctv/i.test(b.deskripsi)).length
+            ? <div className="tablewrap"><table><tbody>{(hasil?.biaya ?? []).filter(b => /cctv/i.test(b.deskripsi)).map((b, i) => <tr key={i}><td>{b.deskripsi}</td><td className="small muted">{b.dasar}</td><td className="num">{rp(b.biayaBulan)}</td></tr>)}</tbody></table></div>
+            : <p className="small muted">Belum ada baris CCTV.</p>}
+          <p className="small muted">Jumlah kamera otomatis dari luas gudang (1 per 400 m², min. 8). Qty & harga CCTV diubah di <button type="button" className="link-kecil" onClick={() => setPopKat('it')}>Revisi IT</button>.</p></div>
+      </>;
       case 'mhe': return <><ProcessDesignPanel bagian="mhe" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
           jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />
         <MhePanel mhe={a.mhe} items={items} metodeExcel={true} onChange={mhe => setA({ mhe })} kontrakBulan={t.durasi_kontrak_bulan} opsiPilih={opsiPilihMhe}
@@ -821,6 +886,8 @@ export default function TenderPage() {
       default: return c?.seksi ? <div className="card"><h2>{c.l}</h2><p className="small muted">{c.isi} — qty otomatis dari volume, luas & manpower; bisa diedit dan ditambah.</p>{panelLain(c.seksi)}</div> : null;
     }
   };
+  const judulModal = popKat ? KAT_SC.find(x => x.k === popKat)?.l ?? popKat : KAT_SC.find(x => x.tab === pop)?.l ?? (pop ? tr(pop) : '');
+  tutupModalRef.current = () => { setPopKat(null); setPop(null); setPopDari(null); hitung(false); };
   const pctTxt = (x: number) => `${angka(x * 100, 1)}%`;
   /** Simple CM: apa saja yang masih kurang per langkah (dasar tanda "!") */
   const kurangLangkah = (id: string): string[] => {
@@ -936,7 +1003,7 @@ export default function TenderPage() {
       <div className={simple ? 'wiz' : 'wiz-mati'}>
       {simple && navWizard}
       <div className={simple ? 'wiz-isi' : 'wiz-mati'}>
-      {simple && (pop
+      {simple && (pop && popDari !== '4.2'
         ? <div className="rincian-bar" role="note"><button type="button" onClick={() => { const d = popDari; setPopDari(null); if (d) keLangkah(d); else keTab('Result'); }}>← Kembali ke {popDari === '4.2' ? 'Summary cost' : 'Result'}</button>
           <span>Rincian: <b>{tr(pop)}</b> — ubah di sini, angka di Result ikut dihitung ulang.</span></div>
         : <div className="wiz-kepala">
@@ -949,6 +1016,13 @@ export default function TenderPage() {
 
       {tab === TAB_EXCEL && a.historis && <HistorisPanel h={a.historis} nama={(t.kode ?? t.customer).replace(/[^\w]+/g, '_')} />}
 
+      {simple && langkah === '4.2' && panelSummaryCost}
+      <div className={modalBuka ? 'sc-lapis' : 'wiz-mati'} onMouseDown={e => { if (modalBuka && e.target === e.currentTarget) tutupModal(); }}>
+      <div className={modalBuka ? 'sc-modal' : 'wiz-mati'} role={modalBuka ? 'dialog' : undefined} aria-modal={modalBuka || undefined} aria-label={modalBuka ? `Revisi ${judulModal}` : undefined}>
+      {modalBuka && <div className="sc-modal-kepala">
+        <div><div className="small muted">Summary cost · Revisi</div><h2 style={{ margin: 0 }}>{judulModal}</h2></div>
+        <span style={{ flex: 1 }} /><button type="button" onClick={tutupModal}>Selesai & hitung ulang</button>
+        <button type="button" className="ghost" aria-label="Tutup" onClick={tutupModal}>✕</button></div>}
       <fieldset className="ro-fieldset" disabled={!bisaEdit}>
       {lihat('Key Assumption') && (di('1.1') || di('1.2')) && (
         <div className="card">
@@ -1097,7 +1171,6 @@ export default function TenderPage() {
           setKol('warehouse_id', g?.id ?? null);
           setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
         }} />}
-        {simple && di('3.1') && panelBiayaSpace}
         {(!simple || ['1.9', '3.2', '3.3', '3.4', '3.5'].includes(langkah)) && !pop && <SpacePanel bagian={simple ? ({ '1.9': 'a', '3.2': 'b', '3.3': 'c', '3.4': 'd', '3.5': 'e' } as const)[langkah as '3.2'] : undefined}
           porsiKosong={simple && !porsiSudahDiisi} excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
           inboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).palet} outboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).palet}
@@ -1358,11 +1431,7 @@ export default function TenderPage() {
         </div>
       </>)}
 
-      {simple && !pop && langkah === '4.2' && (popKat
-        ? <><div className="rincian-bar" role="note"><a href="#summary-cost" className="btn ghost" onClick={e => { e.preventDefault(); setPopKat(null); }}>← Kembali ke Summary cost</a>
-            <span>Rincian perhitungan: <b>{KAT_SC.find(x => x.k === popKat)?.l ?? popKat}</b> — ubah di sini, lalu Hitung ulang agar Summary cost ikut berubah.</span></div>
-          {rincianBiayaSimple(popKat)}</>
-        : panelSummaryCost)}
+      {simple && langkah === '4.2' && popKat && rincianBiayaSimple(popKat)}
       {lihat('Result') && (!simple || (!popKat && ['4.1', '4.3', '4.4', '4.5'].includes(langkah))) && <HasilPanel langkah={simple && !pop ? langkah : undefined} onBukaKategori={simple ? k => { keLangkah('4.2'); setTimeout(() => bukaRincianBiaya(katBaris({ kelompok: k as Kelompok, deskripsi: '' })), 0); } : undefined}
         ekstraManpower={simple ? panelManpowerSimple : undefined} drill={simple} onBukaTab={bukaRincian} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
@@ -1375,11 +1444,12 @@ export default function TenderPage() {
         handlingSetara={a.handlingSetara !== false} onHandlingSetara={v => setA({ handlingSetara: v })} />}
       {lihat('Quotation') && di('4.6') && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
+      </div></div>
       {lihat('Export') && di('4.7') && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
       {lihat('Export') && di('4.7') && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={namaFileExport(nomorQ, t.kode ?? t.customer)} />}
       {lihat('Export') && di('4.7') && bolehExport(profile) && <UploadExcelPanel t={t} bisaEdit={bisaEdit} onTerapkan={terapkanExcel} />}
       {!simple && tabIsi !== 'Result' && tabIsi !== 'Quotation' && tabIsi !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
-      {simple && pop && tabIsi !== 'Result' && <div className="aksi-bawah">{aksi(false)}</div>}
+      {simple && pop && !modalBuka && tabIsi !== 'Result' && <div className="aksi-bawah">{aksi(false)}</div>}
       {lanjutSimple}
       </div></div>
     </>

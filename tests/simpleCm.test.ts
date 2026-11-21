@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { terapkanPorsiJalur, porsiJalur, jalurBaris, type BarisProfil } from '../src/lib/profilVolume';
 import { ubahSpek, tampilSpek, cekSpek, volSpek } from '../src/lib/volumeSpek';
 import type { VolumeInput } from '../src/lib/engine/types';
+import { hitungTender } from '../src/lib/engine/index.ts';
+import { contohTender, contohMaster } from './fixtures/contoh.ts';
 
 test('jalur: data lama ditebak dari moda', () => {
   assert.equal(jalurBaris({ moda: 'cont40', persen: 0.5 }, 'inbound'), 'import');
@@ -43,4 +45,14 @@ test('volume spek: Max/Avg kosong ikut Volume 1 bulan', () => {
 test('volume spek: data lama tanpa komitmen memakai rata-rata', () => {
   assert.equal(volSpek(V({ rataRataBulan: 500, peakBulan: 700 })), 500);
   assert.equal(tampilSpek(V({ rataRataBulan: 500, peakBulan: 700 })).max, 700);
+});
+
+test('racking skema sewa: posisi × sewa per PP per bulan, tanpa investasi', () => {
+  const beli = hitungTender(contohTender, contohMaster);
+  const t = { ...contohTender, space: { ...contohTender.space, rakSkema: 'sewa' as const, sewaRakPerPPBulan: 25000 } };
+  const h = hitungTender(t, contohMaster);
+  const rak = h.biaya.filter(b => b.kelompok === 'Racking');
+  assert.ok(rak.length > 0 && rak.every(b => /^Sewa racking/.test(b.deskripsi)));
+  for (const b of rak) { const pos = Number(b.deskripsi.match(/\((\d+) posisi\)/)![1]); assert.equal(b.biayaBulan, pos * 25000); }
+  assert.ok(h.investasi <= beli.investasi);
 });

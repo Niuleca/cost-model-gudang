@@ -236,6 +236,10 @@ export interface SpaceInput {
   tarifManual?: boolean;          // true = tarif sewa diisi manual, tidak mengikuti database gudang
   /** Asal tarif sewa per m² bila gudang belum dipilih, mis. "median 5 gudang di Kabupaten Bogor (database harga pasar)" */
   tarifSumber?: string;
+  /** Skema racking: 'beli' = investasi × posisi didepresiasi (default lama) · 'sewa' = sewa per posisi palet per bulan */
+  rakSkema?: 'beli' | 'sewa';
+  /** Sewa racking per posisi palet (PP) per bulan, mis. 25.000 */
+  sewaRakPerPPBulan?: number;
 }
 export interface RakHarga { priceItemId?: number; nama?: string; harga: number; umurBulan: number }
 

@@ -1143,6 +1143,14 @@ td.td-isian { background: #fffaf0; }
 .wiz-judul i { font-style: normal; font-size: 13px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--ink); color: var(--surface); }
 .sc-rental { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; padding: 10px 12px; margin: 4px 0 4px 22px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
 .sc-rental b { font-size: 15px; }
+.sc-tabel { table-layout: fixed; width: 100%; }
+.sc-tabel td { overflow: hidden; text-overflow: ellipsis; }
+.sc-revisi { padding: 3px 12px; min-height: 0; font-size: 13px; }
+.sc-lapis { position: fixed; inset: 0; z-index: 80; background: rgba(15, 23, 42, .45); display: grid; place-items: start center; padding: 24px 16px; overflow: auto; }
+.sc-modal { width: min(1180px, 100%); background: var(--bg); border-radius: 14px; box-shadow: 0 24px 64px rgba(0,0,0,.25); padding: 0 16px 16px; display: grid; gap: 14px; }
+.sc-modal > .ro-fieldset { display: grid; gap: 14px; min-width: 0; }
+.sc-modal-kepala { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 4px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
+@media (max-width: 640px) { .sc-lapis { padding: 8px; } .sc-modal { padding: 0 8px 8px; } }
 .wiz-kurang { margin-top: 6px; padding: 8px 12px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 8px; font-size: 13px; color: #78350f; }
 .wiz-kurang ul { margin: 4px 0 0; padding-left: 18px; }
 .vol-grup { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
