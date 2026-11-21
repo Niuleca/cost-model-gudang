@@ -4,6 +4,7 @@ import { terapkanPorsiJalur, porsiJalur, jalurBaris, type BarisProfil } from '..
 import { ubahSpek, tampilSpek, cekSpek, volSpek } from '../src/lib/volumeSpek';
 import type { VolumeInput } from '../src/lib/engine/types';
 import { hitungTender } from '../src/lib/engine/index.ts';
+import { kebutuhanSecurityCleaning } from '../src/lib/biayaLainDefault.ts';
 import { contohTender, contohMaster } from './fixtures/contoh.ts';
 
 test('jalur: data lama ditebak dari moda', () => {
@@ -55,4 +56,10 @@ test('racking skema sewa: posisi × sewa per PP per bulan, tanpa investasi', () 
   assert.ok(rak.length > 0 && rak.every(b => /^Sewa racking/.test(b.deskripsi)));
   for (const b of rak) { const pos = Number(b.deskripsi.match(/\((\d+) posisi\)/)![1]); assert.equal(b.biayaBulan, pos * 25000); }
   assert.ok(h.investasi <= beli.investasi);
+});
+
+test('security & cleaning untuk VSM: pos jaga × 3, danru ≥ 8 satpam, cleaner dari luas', () => {
+  assert.deepEqual(kebutuhanSecurityCleaning({ luasM2: 1700, officeM2: 32, userKantor: 1, kategori: 'Automotive & Spare Parts' }), { pos: 1, satpam: 3, danru: 0, cleaner: 2 });
+  const besar = kebutuhanSecurityCleaning({ luasM2: 15000, officeM2: 100, userKantor: 3, kategori: 'Healthcare & Pharma' });
+  assert.equal(besar.pos, 3); assert.equal(besar.satpam, 9); assert.equal(besar.danru, 1); assert.equal(besar.cleaner, 4 + 1);
 });

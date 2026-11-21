@@ -37,6 +37,8 @@ export interface Asumsi {
   air?: AirInput;                    // Utilities Management → Water
   nilaiStokRp?: number;              // nilai stok rata-rata (dasar premi asuransi)
   biayaDefaultDiisi?: boolean;       // daftar default biaya lain sudah pernah diisi otomatis
+  /** Simple CM: security & cleaning sudah dipindah ke VSM (peran tetap) — jasa outsourcing di Lainnya dihapus */
+  securityCleaningVsm?: boolean;
   biayaDefaultDibuang?: string[];    // kunci rekomendasi yang dihapus user (tidak ditambahkan otomatis lagi)
   /** Satuan utama Ringkasan order (tab Volume) */
   satuanUtamaOrder?: 'input' | 'palet' | 'case' | 'pcs' | 'cbm' | 'ton';

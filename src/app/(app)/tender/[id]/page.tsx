@@ -13,7 +13,7 @@ import { Num, Pct, Txt, Sel, ubahArray, AngkaInput, AngkaVolume } from '@/compon
 import { skemaVsmDefault, VSM_DEFAULT, tagDariDefault } from '@/lib/vsmDefault';
 import { alatRak, sesuaikanAlatRak, BATAS_ANGKAT_CBT_MM } from '@/lib/alatRak';
 import { sesuaikanMhe } from '@/lib/mheOtomatis';
-import { RE_SECURITY, RE_CLEANING } from '@/lib/biayaLainDefault';
+import { RE_SECURITY, RE_CLEANING, KUNCI_GANDA_MANPOWER, kebutuhanSecurityCleaning } from '@/lib/biayaLainDefault';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI, labelKelompok } from '@/lib/format';
 import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, type BasisTarif } from '@/lib/engine/types';
@@ -458,6 +458,24 @@ export default function TenderPage() {
       setT(y => y && ({ ...y, asumsi: { ...y.asumsi, space: { ...y.asumsi.space, excel: { ...lengkapiSpaceExcel(y.asumsi.space.excel), porsi: { spr: 0, ddr: 0, block: 0, floor: 0 } } } } })); setKotor(true);
     }
   }, [simple, t?.id, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Simple CM: security & cleaning masuk VSM sebagai peran tetap (bukan jasa di Lainnya) — jumlah orang dari aturan pos jaga & luas
+  const luasScVsm = spaceH?.luasDipakai || spaceH?.spaceRent || 0;
+  useEffect(() => {
+    if (!simple || !t || !bisaEdit || t.asumsi.securityCleaningVsm || !(luasScVsm > 0)) return;
+    const a0 = t.asumsi;
+    const officeM2 = lengkapiSpaceExcel(a0.space.excel).fasilitas.filter(f => /office|meeting|control/i.test(f.nama)).reduce((x, f) => x + (Number(f.m2) || 0), 0);
+    const k = kebutuhanSecurityCleaning({ luasM2: luasScVsm, officeM2, userKantor: 1, kategori: kategoriDari(t.industri) ?? KATEGORI_UMUM });
+    const ada = (re: RegExp) => a0.peranTetap.some(p => re.test(p.roleName)) || aktivitasAktif(a0.aktivitas).some(x => re.test(x.roleName));
+    const tambah: typeof a0.peranTetap = [];
+    if (!ada(RE_SECURITY)) { tambah.push({ roleName: 'Security', qty: k.satpam }); if (k.danru) tambah.push({ roleName: 'Komandan Regu Security', qty: k.danru }); }
+    if (!ada(RE_CLEANING)) tambah.push({ roleName: 'Cleaning Service', qty: k.cleaner });
+    const jasaOrang = (c: (typeof a0.costLines)[number]) => {
+      const b = c as typeof c & { kunci?: string };
+      return (!!b.kunci && KUNCI_GANDA_MANPOWER.includes(b.kunci)) || /^(security guard|komandan regu|cleaning service|satpam)/i.test(c.deskripsi);
+    };
+    setT(y => y && ({ ...y, asumsi: { ...y.asumsi, securityCleaningVsm: true, peranTetap: [...y.asumsi.peranTetap, ...tambah],
+      costLines: y.asumsi.costLines.filter(c => !jasaOrang(c)) } })); setKotor(true);
+  }, [simple, t?.id, bisaEdit, luasScVsm > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   // Simple CM: racking memakai skema sewa per posisi palet (default Rp25.000/PP/bln) bila belum pernah dipilih
   useEffect(() => {
     if (!simple || !t || !bisaEdit || t.asumsi.space?.rakSkema) return;
@@ -748,7 +766,7 @@ export default function TenderPage() {
     { k: 'utility', l: 'Utility', kel: ['Utilitas'], isi: 'Listrik, air (bisa tidak dibebankan)', tab: 'Utilities Management' },
     { k: 'overhead', l: 'Overhead', kel: ['Overhead'], isi: '% × subtotal biaya' },
     { k: 'loan', l: 'Loan & Interest cost', kel: ['Interest cost', 'Finance'], isi: 'Bunga pinjaman / modal kerja', tab: 'Loan & Interest Calculator' },
-    { k: 'lainnya', l: 'Lainnya', kel: ['Asuransi', 'Startup', 'Lainnya'], isi: 'Services (pest control, security, cleaning), asuransi, startup + item manual', seksi: ['services', 'asuransi', 'startup', 'lainnya'] },
+    { k: 'lainnya', l: 'Lainnya', kel: ['Asuransi', 'Startup', 'Lainnya'], isi: 'Services (pest control, chemical & sampah), asuransi, startup + item manual — security & cleaning ada di Manpower (VSM)', seksi: ['services', 'asuransi', 'startup', 'lainnya'] },
   ];
   const katBaris = (b: { kelompok: Kelompok; deskripsi: string }) =>
     /cctv/i.test(b.deskripsi) || (b.kelompok === 'Consumable' && /pal+et/i.test(b.deskripsi)) ? 'storage' : KAT_SC.find(x => x.kel.includes(b.kelompok))?.k ?? 'lainnya';

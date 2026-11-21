@@ -32,6 +32,16 @@ export const RE_CLEANING = /clean|kebersihan|office ?boy|janitor|\bOB\b/i;
 /** Baris jasa yang hilang dari rekomendasi karena sudah ditangani manpower → dibuang otomatis selama belum diubah manual. */
 export const KUNCI_GANDA_MANPOWER = ['svc.satpam', 'svc.danru', 'svc.cleaning'];
 
+/** Kebutuhan orang security & cleaning (aturan sama dengan rekomendasi jasa): pos jaga 24 jam × 3 orang, danru bila ≥ 8 satpam,
+ *  cleaner = gudang ÷ 4.000 m² + office & toilet ÷ 300 m². Dipakai Simple CM untuk memasukkan keduanya ke VSM (peran tetap). */
+export function kebutuhanSecurityCleaning(d: Pick<DriverBiaya, 'luasM2' | 'officeM2' | 'userKantor' | 'kategori'>) {
+  const pos = 1 + (d.luasM2 > 10000 ? 1 : 0) + (KAT_NILAI_TINGGI.includes(d.kategori) ? 1 : 0);
+  const satpam = pos * 3;
+  const gudangM2 = Math.max(0, d.luasM2 - (d.officeM2 || 0));
+  const cleaner = Math.max(1, Math.ceil(gudangM2 / 4000 - 1e-9) + Math.ceil(Math.max(d.officeM2, Math.max(0, d.userKantor) > 0 ? 30 : 0) / 300 - 1e-9));
+  return { pos, satpam, danru: satpam >= 8 ? 1 : 0, cleaner };
+}
+
 export type BarisBiaya = CostLineInput & {
   priceItemId?: number; seksi?: string;
   kunci?: string; qtyDefault?: number; dasar?: string; belumDiketahui?: boolean;
