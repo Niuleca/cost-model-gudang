@@ -96,7 +96,7 @@ const MENU_SIMPLE: MenuSimple[] = [
     { id: '3.6', nama: 'Layout 2D & simulasi 3D', ke: 'Dibuat otomatis dari langkah 1.3–3.5; bisa digeser & diatur, lalu disimpan' },
     { id: '3.7', nama: 'Summary layout', ke: 'Komposisi luas per area: m², posisi palet, CBM, ton, % space' },
   ] },
-  { no: 4, nama: 'Result & Output', tab: 'Result', langkah: [
+  { no: 4, nama: 'Result', tab: 'Result', langkah: [
     { id: '4.1', nama: 'Tarif per layanan', ke: 'Storage, handling in / out (+ VAS): satuan, MGV, biaya per bulan, GP, tarif · ubah GP % & cost allocation' },
     { id: '4.2', nama: 'Summary cost', ke: 'Rental space, manpower, storage, MHE, IT, consumable & ATK, HSE, office, utility, overhead, loan & interest, lainnya — tiap kategori bisa dibuka perhitungannya' },
     { id: '4.3', nama: 'Konversi mata uang', ke: 'Tarif & simulasi dalam mata uang lain' },
@@ -106,6 +106,9 @@ const MENU_SIMPLE: MenuSimple[] = [
     { id: '4.7', nama: 'Export Excel', ke: 'Seluruh hasil hitung dalam satu file Excel' },
   ] },
 ];
+/** Dua menu utama Simple CM: Input (Key Assumption, Volume, Warehouse Planning) dan Result. */
+const INDUK_SIMPLE: { nama: 'Input' | 'Result'; menu: number[] }[] = [{ nama: 'Input', menu: [1, 2, 3] }, { nama: 'Result', menu: [4] }];
+const indukDari = (no: number) => INDUK_SIMPLE.find(x => x.menu.includes(no))?.nama ?? 'Input';
 const LANGKAH_SIMPLE = MENU_SIMPLE.flatMap(m => m.langkah.map(l => ({ ...l, menu: m })));
 const LANGKAH_ID = LANGKAH_SIMPLE.map(l => l.id);
 const cariLangkah = (id: string) => LANGKAH_SIMPLE.find(l => l.id === id) ?? LANGKAH_SIMPLE[0];
@@ -876,17 +879,25 @@ export default function TenderPage() {
   };
   const OPSIONAL_SIMPLE = ['3.6', '3.7', '4.3', '4.6', '4.7'];
   const statusLangkah = (id: string): 'ok' | 'kurang' | 'opsional' => (kurangLangkah(id).length ? 'kurang' : OPSIONAL_SIMPLE.includes(id) ? 'opsional' : 'ok');
+  const barisLangkah = (m: MenuSimple) => <ol>{m.langkah.map(l => { const st = statusLangkah(l.id); return <li key={l.id}>
+    <button type="button" aria-current={!pop && langkah === l.id ? 'step' : undefined} className={!pop && langkah === l.id ? 'on' : undefined} onClick={() => keLangkah(l.id)}>
+      <span className={`wiz-st ${st}`} title={st === 'ok' ? 'Lengkap' : st === 'kurang' ? `Kurang: ${kurangLangkah(l.id).join('; ')}` : 'Opsional'}>{st === 'ok' ? '✓' : st === 'kurang' ? '!' : '○'}</span>
+      <span><b>{l.id}</b> {tr(l.nama)}</span></button></li>; })}</ol>;
+  const hitungSt = (ms: MenuSimple[]) => { const st = ms.flatMap(m => m.langkah.map(l => statusLangkah(l.id))); return { wajib: st.filter(x => x !== 'opsional').length, ok: st.filter(x => x === 'ok').length }; };
+  const menuAktif = cariLangkah(langkah).menu.no;
   const navWizard = <nav className="wiz-nav" aria-label="Langkah Simple CM Warehouse">
-    {MENU_SIMPLE.map(m => {
-      const st = m.langkah.map(l => statusLangkah(l.id));
-      const wajib = st.filter(x => x !== 'opsional').length, ok = st.filter(x => x === 'ok').length;
-      return <div key={m.no} className={`wiz-menu${cariLangkah(langkah).menu.no === m.no && !pop ? ' on' : ''}`}>
-        <button type="button" className="wiz-menu-judul" onClick={() => keLangkah(m.langkah[0].id)}>
-          <i>{m.no}</i><span>{tr(m.nama)}</span>{wajib > 0 && <small className={ok === wajib ? 'ok' : undefined}>{ok}/{wajib}</small>}</button>
-        <ol>{m.langkah.map((l, k) => <li key={l.id}>
-          <button type="button" aria-current={!pop && langkah === l.id ? 'step' : undefined} className={!pop && langkah === l.id ? 'on' : undefined} onClick={() => keLangkah(l.id)}>
-            <span className={`wiz-st ${st[k]}`} title={st[k] === 'ok' ? 'Lengkap' : st[k] === 'kurang' ? `Kurang: ${kurangLangkah(l.id).join('; ')}` : 'Opsional'}>{st[k] === 'ok' ? '✓' : st[k] === 'kurang' ? '!' : '○'}</span>
-            <span><b>{l.id}</b> {tr(l.nama)}</span></button></li>)}</ol>
+    {INDUK_SIMPLE.map(g => {
+      const ms = MENU_SIMPLE.filter(m => g.menu.includes(m.no)), { wajib, ok } = hitungSt(ms), aktif = !pop && g.menu.includes(menuAktif);
+      return <div key={g.nama} className={`wiz-induk${aktif ? ' on' : ''}`}>
+        <button type="button" className="wiz-induk-judul" onClick={() => keLangkah(ms[0].langkah[0].id)}>
+          <span>{tr(g.nama)}</span>{wajib > 0 && <small className={ok === wajib ? 'ok' : undefined}>{ok}/{wajib}</small>}</button>
+        {ms.length === 1 ? <div className="wiz-menu on">{barisLangkah(ms[0])}</div>
+          : ms.map(m => { const h = hitungSt([m]);
+            return <div key={m.no} className={`wiz-menu${menuAktif === m.no && !pop ? ' on' : ''}`}>
+              <button type="button" className="wiz-menu-judul" onClick={() => keLangkah(m.langkah[0].id)}>
+                <i>{m.no}</i><span>{tr(m.nama)}</span>{h.wajib > 0 && <small className={h.ok === h.wajib ? 'ok' : undefined}>{h.ok}/{h.wajib}</small>}</button>
+              {barisLangkah(m)}
+            </div>; })}
       </div>;
     })}
     <a className="small wiz-lengkap" href={`/tender/${t.id}?tab=${tabAktif.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`} title="Buka semua tab (versi lengkap Logistics Tender)">Versi lengkap ↗</a>
@@ -929,7 +940,7 @@ export default function TenderPage() {
         ? <div className="rincian-bar" role="note"><button type="button" onClick={() => { const d = popDari; setPopDari(null); if (d) keLangkah(d); else keTab('Result'); }}>← Kembali ke {popDari === '4.2' ? 'Summary cost' : 'Result'}</button>
           <span>Rincian: <b>{tr(pop)}</b> — ubah di sini, angka di Result ikut dihitung ulang.</span></div>
         : <div className="wiz-kepala">
-          <div className="small muted">{cariLangkah(langkah).menu.no}. {tr(cariLangkah(langkah).menu.nama)}</div>
+          <div className="small muted">{tr(indukDari(cariLangkah(langkah).menu.no))}{cariLangkah(langkah).menu.no < 4 ? ` · ${cariLangkah(langkah).menu.no}. ${tr(cariLangkah(langkah).menu.nama)}` : ''}</div>
           <div className="wiz-judul"><i>{langkah}</i>{tr(cariLangkah(langkah).nama)}</div>
           <div className="small"><span className="muted">Terhubung ke:</span> {cariLangkah(langkah).ke}</div>
           {kurangLangkah(langkah).length > 0 && <div className="wiz-kurang" role="status"><b>Yang masih kurang di langkah ini:</b>

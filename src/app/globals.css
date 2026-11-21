@@ -1113,6 +1113,14 @@ td.td-isian { background: #fffaf0; }
 .wiz-isi > .ro-fieldset { display: grid; gap: 14px; min-width: 0; }
 .wiz-nav { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow: auto; display: grid; gap: 4px; padding: 8px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.wiz-induk { display: grid; gap: 2px; padding-bottom: 6px; }
+.wiz-induk + .wiz-induk { border-top: 1px solid var(--line); padding-top: 6px; }
+.wiz-induk-judul { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 8px 4px; font-weight: 700; font-size: 15px; letter-spacing: .01em; }
+.wiz-induk-judul span { flex: 1; }
+.wiz-induk-judul small { font-weight: 500; color: var(--muted); font-size: 12px; }
+.wiz-induk-judul small.ok { color: var(--ok, #15803d); }
+.wiz-induk-judul:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; border-radius: 6px; }
+.wiz-induk:not(.on) > .wiz-menu.on:only-of-type ol { display: none; }
 .wiz-menu { border-radius: 8px; }
 .wiz-menu.on { background: var(--surface-2); }
 .wiz-menu-judul { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 8px; font-weight: 600; }
