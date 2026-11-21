@@ -190,9 +190,13 @@ export default function DesainGudang() {
         const u = new URL(window.location.href); u.searchParams.set('id', id); window.history.replaceState(null, '', u);
         return;
       }
-      if (r.vs.length) { setVersiId(r.vs[0].id); setNama(r.vs[0].nama); setEditS(r.vs[0].data); }
-      else { setVersiId(null); setNama('Layout A'); setEditS(dariOtomatis(r.auto, r.p, Math.round(r.h.space.ppDesain ?? 0))); }
-      riwayat.current = { lalu: [], depan: [] }; setKotor(false); setPilih(null);
+      // Dibuka dari Simple CM (langkah 3.7): input tender yang lebih baru dari versi tersimpan → layout dibuat ulang dari input terbaru
+      const dariSimple = new URLSearchParams(window.location.search).get('dari') === 'simple';
+      const usang = dariSimple && r.vs.length > 0 && !!r.t?.updated_at && new Date(r.t.updated_at).getTime() > new Date(r.vs[0].updated_at).getTime();
+      if (r.vs.length && !usang) { setVersiId(r.vs[0].id); setNama(r.vs[0].nama); setEditS(r.vs[0].data); }
+      else { setVersiId(null); setNama(usang ? `Layout ${r.vs.length + 1}` : 'Layout A'); setEditS(dariOtomatis(r.auto, r.p, Math.round(r.h.space.ppDesain ?? 0))); }
+      riwayat.current = { lalu: [], depan: [] }; setKotor(!!usang); setPilih(null);
+      if (usang) setPesan(`Layout dibuat ulang dari input tender terbaru. Versi tersimpan "${r.vs[0].nama}" lebih lama dari input — masih bisa dibuka di daftar versi. Simpan untuk menyimpan layout baru.`);
       const u = new URL(window.location.href); u.searchParams.set('id', id); window.history.replaceState(null, '', u);
     }).catch(e => { if (!batal) setErr(e.message); }).finally(() => { if (!batal) setSibuk(false); });
     return () => { batal = true; };
@@ -508,9 +512,12 @@ export default function DesainGudang() {
   }
 
   const tersaring = daftar;
+  // Ditanam di Simple CM (langkah 3.7): tanpa judul halaman, pilihan project & tombol pindah halaman
+  const [tertanam, setTertanam] = useState(false);
+  useEffect(() => { setTertanam(new URLSearchParams(window.location.search).get('dari') === 'simple'); }, []);
   return (
     <>
-      <div className="head">
+      {!tertanam && <div className="head">
         <div><div className="eyebrow">Simulasi Warehouse</div><h1>Desain gudang 2D ⇄ 3D</h1></div>
         <div className="row">
           {data && !pribadi && <button type="button" disabled={sibuk || !edit} title={versiId && !kotor ? 'Buka layout ini di Leca Game' : 'Simpan layout ini lalu buka di Leca Game'}
@@ -519,17 +526,17 @@ export default function DesainGudang() {
           {data && !pribadi && <Link className="btn ghost" href={`/tender/${data.t.id}`}>Buka tender</Link>}
           <button type="button" onClick={() => setFormBaru(formBaru ? null : { ...GEDUNG_BARU })}>＋ Desain baru tanpa project</button>
         </div>
-      </div>
+      </div>}
 
       <div className="card">
         <div className="sim2d-atas">
-          <label className="f">Project
+          {!tertanam && <label className="f">Project
             <select value={id} onChange={e => { if (kotor && !window.confirm('Perubahan belum disimpan akan hilang. Lanjut?')) return; setId(e.target.value); }}>
               <option value="">— pilih project —</option>
               <option value={ID_PRIBADI}>★ Desain saya (tanpa project)</option>
               {tersaring.map(x => <option key={x.id} value={x.id}>{x.kode ? `${x.kode} · ` : ''}{x.customer} ({labelStatus(x.status)})</option>)}
             </select>
-          </label>
+          </label>}
           {data && (<>
             <label className="f">Versi layout
               <select value={versiId ?? 'baru'} onChange={e => bukaVersi(e.target.value)}>

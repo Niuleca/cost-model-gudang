@@ -21,7 +21,9 @@ export interface BiayaMpProps {
   mulai: string | null; mulaiDefault: string | null; onMulai: (m: string | null) => void;
 }
 
-export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift, biaya }: {
+export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volumes, pd: pdIn, faktorProduktivitas, efisiensi, jumlahShift, onPd, onFaktor, onShift, biaya, hanya }: {
+  /** Simple CM (bagian desain): 'kalender' = Working day saja · 'shift' = Workload shift saja (shift tidak aktif disembunyikan) */
+  hanya?: 'kalender' | 'shift';
   biaya?: BiayaMpProps;
   bagian: 'ringkasan' | 'rincian' | 'desain' | 'matriks' | 'mhe';
   indirect?: IndirectInput;
@@ -238,10 +240,14 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
 
   return (
     <div className="card" style={{ gap: 14 }}>
-      <h2><T>Process Design & Resource Calculation</T></h2>
-      <div className="pd-atas">
-        <div style={{ minWidth: 0 }}>
-          <h3><T>Working day</T></h3>
+      {!hanya && <h2><T>Process Design & Resource Calculation</T></h2>}
+      {hanya === 'kalender' && <div className="row" style={{ gap: 18, alignItems: 'end' }}>
+        <label className="f">Hari operasional gudang per bulan {inp(pd.hariKerjaBulan ?? 25, v => onPd({ ...pd, hariKerjaBulan: v }))}<span className="small muted">dasar volume per hari (Volume, transport, staging)</span></label>
+        <label className="f">Hari kerja karyawan per bulan {inp(pd.hariKerjaKaryawan ?? 25, v => onPd({ ...pd, hariKerjaKaryawan: v }))}<span className="small muted">dasar man-hour & headcount</span></label>
+      </div>}
+      <div className={hanya ? undefined : 'pd-atas'}>
+        {hanya !== 'shift' && <div style={{ minWidth: 0 }}>
+          {!hanya && <h3><T>Working day</T></h3>}
           <div className="tablewrap"><table>
             <thead><tr><th>Working day</th><th className="num">Man Power</th><th className="num">MHE</th><th></th></tr></thead>
             <tbody>{barisKal.map(b => (
@@ -252,21 +258,21 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
                 <td className="small muted">{b.satuan}</td>
               </tr>))}</tbody>
           </table></div>
-        </div>
-        <div style={{ display: 'grid', gap: 14, alignContent: 'start', minWidth: 0 }}>
+        </div>}
+        {hanya !== 'kalender' && <div style={{ display: 'grid', gap: 14, alignContent: 'start', minWidth: 0 }}>
           <div className="pd-ringkas">
             <div style={{ minWidth: 0 }}>
-              <h3><T>Workload shift</T></h3>
+              {!hanya && <><h3><T>Workload shift</T></h3>
               <table className="pd-shift"><tbody>
                 <tr><td>Number of working shift</td><td className="num">
                   <select aria-label="Jumlah shift" value={jumlahShift} onChange={e => onShift(Number(e.target.value))} style={{ width: 64, minWidth: 64 }}>{[1, 2, 3].map(n => <option key={n}>{n}</option>)}</select></td><td>Shift</td></tr>
                 <tr><td>Working Days</td><td className="num">{inp(pd.hariKerjaBulan ?? 25, v => onPd({ ...pd, hariKerjaBulan: v }))}</td><td></td></tr>
                 <tr><td>Working Days Employee</td><td className="num">{inp(pd.hariKerjaKaryawan ?? 25, v => onPd({ ...pd, hariKerjaKaryawan: v }))}</td><td></td></tr>
                 <tr><td>Group</td><td className="num">{inp(pd.group ?? 1, v => onPd({ ...pd, group: Math.max(1, v) }))}</td><td>Group</td></tr>
-              </tbody></table>
-              <h3 style={{ marginTop: 10 }}><T>Workload per shift</T></h3>
+              </tbody></table></>}
+              {!hanya && <h3 style={{ marginTop: 10 }}><T>Workload per shift</T></h3>}
               <table className="pd-shift"><thead><tr><th>Shift</th><th className="num">Inbound</th><th className="num">Outbound</th><th className="num" title="Storage (cycle count, replenishment) & VAS">Storage / VAS</th><th className="num" title="Gabungan tertimbang man hour per arus">Gabungan</th></tr></thead><tbody>
-                {[0, 1, 2].map(i => (
+                {[0, 1, 2].filter(i => !hanya || i < jumlahShift).map(i => (
                   <tr key={i} style={i >= jumlahShift ? { opacity: 0.5 } : undefined}>
                     <td>Shift {i + 1}</td>
                     {(['bebanShiftInbound', 'bebanShiftOutbound', 'bebanShift'] as KunciBeban[]).map(k => {
@@ -282,7 +288,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
               </tbody></table>
               <p className="small muted" style={{ marginTop: 4 }}>Inbound & outbound bisa berbeda per shift (mis. barang masuk pagi, pengiriman malam). Aktivitas per arus mengikuti porsinya; manpower per shift = Σ FTE arus × % shift. Total tiap kolom sebaiknya 100% (bila tidak, dinormalkan otomatis).</p>
             </div>
-            <div style={{ minWidth: 0 }}>
+            {!hanya && <div style={{ minWidth: 0 }}>
               <h3><T>Faktor</T></h3>
               <table className="pd-shift"><tbody>
                 <tr><td>Produktivitas faktor</td><td className="num">{inp(Math.round(faktorProduktivitas * 1000) / 10, v => onFaktor({ faktorProduktivitas: v / 100 }))}%</td></tr>
@@ -290,11 +296,11 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
                 <tr><td>Operating (alat dipakai bergantian)<div className="small muted">otomatis = jumlah shift aktif</div></td><td className="num"><b>{h.operating}</b></td></tr>
               </tbody></table>
               <p className="small muted" style={{ marginTop: 6 }}>Resources man power = FTE × workload shift per shift aktif, dibulatkan dengan multi-skill pooling sesuai matriks rangkap di tab Value Stream Mapping. Working days & group untuk dokumentasi (belum mengubah hitungan).</p>
-            </div>
+            </div>}
           </div>
-        </div>
+        </div>}
       </div>
-      <p className="small muted">Matriks multi-skill (siapa boleh merangkap siapa) ada di tab <b>Value Stream Mapping</b>.</p>
+      {!hanya && <p className="small muted">Matriks multi-skill (siapa boleh merangkap siapa) ada di tab <b>Value Stream Mapping</b>.</p>}
     </div>
   );
 }

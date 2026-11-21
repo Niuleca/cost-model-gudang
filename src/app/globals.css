@@ -1102,6 +1102,12 @@ td.td-isian { background: #fffaf0; }
 .wiz-bawah > .row { margin: 0; }
 /* Simple CM Warehouse — wizard */
 .wiz-mati { display: contents; }
+.shell-embed > .topbar, .shell-embed > .app-foot { display: none; }
+.shell-embed > .main { padding: 8px; max-width: none; }
+.wiz-layout { display: grid; gap: 10px; min-width: 0; }
+.sp-satu { width: 100%; max-width: 820px; }
+.sp-kartu { max-width: 820px; }
+.wiz-frame { width: 100%; height: calc(100vh - 150px); min-height: 640px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .wiz { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 8px; }
 .wiz-isi { min-width: 0; display: grid; gap: 14px; align-content: start; }
 .wiz-isi > .ro-fieldset { display: grid; gap: 14px; min-width: 0; }

@@ -19,10 +19,12 @@ const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { s
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
 export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, bagian = 'semua', basisTarif, onBasisTarif }: {
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, bagian = 'semua', basisTarif, onBasisTarif , onBukaKategori}: {
   basisTarif?: Partial<BasisTarif>; onBasisTarif?: (b: BasisTarif) => void;
   /** 'harga' = rate card, margin, simulasi & kurs · 'biaya' = porsi & rincian biaya · 'semua' = keduanya */
-  bagian?: 'harga' | 'biaya' | 'semua';
+  bagian?: 'harga' | 'biaya' | 'semua' | 'tarif' | 'kurs' | 'capex' | 'porsi';
+  /** Simple CM: buka rincian kategori di dalam wizard (bukan tab baru) */
+  onBukaKategori?: (k: string) => void;
   hariTarif?: number; onHariTarif?: (n: number | undefined) => void;
   layananJual?: Partial<Record<Bucket, 'jual' | 'termasuk'>>; onLayananJual?: (x: Partial<Record<Bucket, 'jual' | 'termasuk'>>) => void;
   tambahan?: TarifTambahanInput[]; onTambahan?: (x: TarifTambahanInput[]) => void;
@@ -58,7 +60,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
   const totK = kelompok.reduce((s, [, v]) => s + v, 0) || 1;
 
   return (<>
-    {bagian !== 'biaya' && <><div className="card">
+    {(bagian === 'harga' || bagian === 'semua' || bagian === 'tarif') && <div className="card">
       <h2>Rate card & margin</h2>
       <fieldset className="isian">
       <legend>Isian Anda · pajak & layanan yang dijual</legend>
@@ -166,9 +168,9 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
           <td className="num">{rp(s.pendapatanBulan * 12)}</td><td className="num">{rp(s.biayaBulan * 12)}</td><td className="num">{rp(s.gp * 12)}</td><td className="num">{rp(s.gp * kontrakBulan)}</td></tr>)}</tbody>
       </table></div>
       <p className="small muted">Pendapatan = tarif sebelum PPN × volume, dikurangi PPh 23 {(pphPersen * 100).toFixed(1)}% (PPh {pajak.pph === 'exclude' ? 'ditanggung customer, sudah di-gross-up di tarif' : 'ditanggung kita → GP turun'}). Per tahun = per bulan × 12.</p>
-    </div>
+    </div>}
 
-    <div className="card">
+    {(bagian === 'harga' || bagian === 'semua' || bagian === 'kurs') && <div className="card">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'end' }}>
         <h2>Konversi mata uang</h2>
         <div className="row" style={{ alignItems: 'end' }}>
@@ -196,24 +198,23 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
             .map(([l, v]) => <tr key={l}><td>{l}</td><td className="num">{rp(v)}</td><td className="num"><b>{fmtAsing(x(v), kurs.kode)}</b></td></tr>) : null; })()}</tbody>
         </table></div>
       </div>}
-    </div>
-
-    </>}
-    {bagian !== 'harga' && <><div className="card">
+    </div>}
+    {(bagian === 'biaya' || bagian === 'semua' || bagian === 'porsi') && <div className="card">
       <h2>Porsi biaya per kategori</h2>
-      <p className="small muted">Klik kategori untuk membuka rinciannya di tab baru — harga tiap baris bisa direvisi di sana.</p>
+      <p className="small muted">Klik kategori untuk membuka rinciannya{onBukaKategori ? '' : ' di tab baru'} — harga tiap baris bisa direvisi & ditambah di sana.</p>
       <div className="tablewrap"><table>
         <thead><tr><th>Kategori</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th><th style={{ width: '35%' }}></th></tr></thead>
         <tbody>
-          {kelompok.map(([k, v]) => <tr key={k} className="kat-link" title={`Buka rincian ${labelKelompok(k)} di tab baru`} onClick={() => window.open(`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`, '_blank', 'noopener')}>
-            <td><a href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" onClick={e => e.stopPropagation()}>{labelKelompok(k)} ↗</a></td><td className="num">{rp(v)}</td><td className="num">{rp(v * 12)}</td><td className="num"><b>{persen(v / totK)}</b></td>
+          {kelompok.map(([k, v]) => <tr key={k} className="kat-link" title={`Buka rincian ${labelKelompok(k)} di tab baru`} onClick={() => onBukaKategori ? onBukaKategori(k) : window.open(`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`, '_blank', 'noopener')}>
+            <td>{onBukaKategori ? <button type="button" className="link-kecil" onClick={e => { e.stopPropagation(); onBukaKategori(k); }}>{labelKelompok(k)} →</button>
+              : <a href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" onClick={e => e.stopPropagation()}>{labelKelompok(k)} ↗</a>}</td><td className="num">{rp(v)}</td><td className="num">{rp(v * 12)}</td><td className="num"><b>{persen(v / totK)}</b></td>
             <td><div className="bar-kat"><i style={{ width: `${(v / kelompok[0][1]) * 100}%` }} /></div></td></tr>)}
           <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{rp(totK)}</b></td><td className="num"><b>{rp(totK * 12)}</b></td><td className="num"><b>100%</b></td><td></td></tr>
         </tbody>
       </table></div>
-    </div>
+    </div>}
 
-    <RincianJenis h={h} /></>}
+    {(bagian === 'biaya' || bagian === 'semua' || bagian === 'capex') && <RincianJenis h={h} />}
   </>);
 }
 

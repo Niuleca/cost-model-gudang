@@ -57,13 +57,36 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
               const mu = muatanBaris(r);
               const m = x.mobil;
               return <Fragment key={i}><tr>
-                <td>{pakaiJalur && <div className="small" style={{ marginBottom: 4 }}><b>{labelJalur(jalurBaris(r, arus))}</b></div>}
+                {pakaiJalur ? (() => {
+                  const jl = jalurBaris(r, arus), hanyaKont = jalurKontainer(jl);
+                  const nilaiModa = isKont ? `cont:${r.moda}` : `trk:${kendaraan.some(k => k.nama === r.kendaraan) ? r.kendaraan : kendaraanAwal(kendaraan).nama}`;
+                  const truk = kendaraan.filter(k => !/kontainer/i.test(k.nama));
+                  return <td>
+                    <div className="small" style={{ marginBottom: 4 }}><b>{labelJalur(jl)}</b></div>
+                    <label className="f small">Jenis moda
+                      <select aria-label={`Jenis moda ${labelJalur(jl)}`} value={nilaiModa} style={{ minWidth: 190 }} onChange={e => {
+                        const [tipe, ...rest] = e.target.value.split(':'); const v = rest.join(':');
+                        set(i, tipe === 'cont' ? { jalur: jl, moda: v as BarisProfil['moda'], muatan: mu } : { jalur: jl, moda: mu, kendaraan: v });
+                      }}>
+                        <optgroup label="Kontainer">{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={`cont:${o.v}`}>{o.l}</option>)}</optgroup>
+                        {!hanyaKont && <optgroup label="Truk">{truk.map(k => <option key={k.nama} value={`trk:${k.nama}`}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('id-ID')} kg</option>)}</optgroup>}
+                      </select></label>
+                    <label className="f small" style={{ marginTop: 4 }}>Jenis muat
+                      <select aria-label={`Jenis muat ${labelJalur(jl)}`} value={mu} style={{ minWidth: 190 }} onChange={e => {
+                        const m = e.target.value as BarisProfil['muatan'] & BarisProfil['moda'];
+                        set(i, isKont ? { jalur: jl, muatan: m } : { jalur: jl, moda: m, kendaraan: kendaraan.some(k => k.nama === r.kendaraan) ? r.kendaraan : kendaraanAwal(kendaraan).nama });
+                      }}>
+                        <option value="palet">Palletize</option><option value="case">Carton / case (loose)</option><option value="unit">Pcs / unit / custom</option>
+                      </select></label>
+                    {mu === 'unit' && <label className="f small" style={{ marginTop: 4 }}>Satuan<select aria-label="Satuan" value={r.satuanUnit ?? 'pcs'} onChange={e => set(i, { satuanUnit: e.target.value })} style={{ minWidth: 100 }}>{SATUAN_UNIT.map(u => <option key={u}>{u}</option>)}</select></label>}
+                  </td>;
+                })() :                 <td>
                   <select aria-label="Moda" value={r.moda} onChange={e => set(i, { moda: e.target.value as BarisProfil['moda'], ...(pakaiJalur ? { jalur: jalurBaris(r, arus) } : {}) })} style={{ minWidth: 170 }}>
                   <optgroup label={pakaiJalur ? 'Kontainer' : out ? 'Export · kontainer' : 'Import · kontainer'}>{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>
                   {!(pakaiJalur && jalurKontainer(jalurBaris(r, arus))) && <optgroup label={pakaiJalur ? 'Truk' : out ? 'Lokal / distribusi · truk' : 'Lokal / pabrik · truk'}>{MODA.filter(o => !o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>}</select>
                   {isKont && <select aria-label="Cara muat" value={mu} onChange={e => set(i, { muatan: e.target.value as BarisProfil['muatan'] })} style={{ minWidth: 170, marginTop: 4 }}>
                     {MUATAN.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
-                  {mu === 'unit' && <select aria-label="Satuan" value={r.satuanUnit ?? 'pcs'} onChange={e => set(i, { satuanUnit: e.target.value })} style={{ minWidth: 80, marginTop: 4 }}>{SATUAN_UNIT.map(u => <option key={u}>{u}</option>)}</select>}</td>
+                  {mu === 'unit' && <select aria-label="Satuan" value={r.satuanUnit ?? 'pcs'} onChange={e => set(i, { satuanUnit: e.target.value })} style={{ minWidth: 80, marginTop: 4 }}>{SATUAN_UNIT.map(u => <option key={u}>{u}</option>)}</select>}</td>}
                 <td className="num"><div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}>
                   {n(r.persen ? Math.round(r.persen * 1000) / 10 : 0, v => set(i, { persen: v / 100 }), 64)}<span className="small">%</span></div></td>
                 <td className="num"><b>{angka(x.paletHari, 1)}</b></td>
@@ -78,6 +101,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                 <td>{isKont ? <><span className="small">{m?.kendaraan ?? MODA.find(o => o.v === r.moda)?.l ?? 'kontainer'}</span>
                     <div className="row small" style={{ flexWrap: 'nowrap', gap: 4, marginTop: 4 }}>{n(r.tonPerKontainer ? r.tonPerKontainer * 1000 : undefined, v => set(i, { tonPerKontainer: v ? v / 1000 : undefined }), 70, String(Math.round((m ? m.kap.ton : TON_KONTAINER[r.moda as 'cont20' | 'cont40' | 'cont40hc']) * 1000)))}<span className="muted">kg maks/kont</span></div>
                     {!r.tonPerKontainer && <div className="small" style={{ color: 'var(--accent-ink, #0f766e)' }}>otomatis {((m ? m.kap.ton : TON_KONTAINER[r.moda as 'cont20' | 'cont40' | 'cont40hc']) * 1000).toLocaleString('id-ID')} kg (data kendaraan)</div>}</>
+                  : pakaiJalur ? <span className="small">{kendaraan.some(x => x.nama === r.kendaraan) ? r.kendaraan : kendaraanAwal(kendaraan).nama}</span>
                   : <select aria-label="Kendaraan" value={kendaraan.some(x => x.nama === r.kendaraan) ? r.kendaraan : kendaraanAwal(kendaraan).nama} onChange={e => set(i, { kendaraan: e.target.value })} style={{ minWidth: 150 }}>
                     {kendaraan.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('id-ID')} kg</option>)}</select>}</td>
                 <td className="num">{m ? <><b>{m.bulat}</b>{isKont && <div className="small">kontainer</div>}<div className="small muted">({angka(m.perHari, 2)}) / hari</div><div className="small"><b>{angka(m.bulatBulan)}</b> / bln</div></> : '–'}</td>
@@ -166,12 +190,12 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
           <select value={basis} onChange={e => onChange({ ...p, basis: e.target.value as BasisVolume })} style={{ minWidth: 170 }}>
             {BASIS.map(b => <option key={b.v} value={b.v}>{b.l}</option>)}</select></label>
         <span className="small muted" style={{ alignSelf: 'center' }}>Muatan: <b>{(p.param.tonPerPalet * 1000).toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerPalet.toLocaleString('id-ID')} CBM</b> per palet ·
-          {' '}<b>{p.param.kgPerCase.toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerCase.toLocaleString('id-ID')} CBM</b> per case — diatur di <b>Parameter muatan</b>{pakaiJalur ? ' (langkah 2.1)' : ' di atas'}</span>
+          {' '}<b>{p.param.kgPerCase.toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerCase.toLocaleString('id-ID')} CBM</b> per case — {pakaiJalur ? <>dihitung dari <b>Product input (1.4)</b></> : <>diatur di <b>Parameter muatan</b> di atas</>}</span>
         <label className="f" title="Inbound: barang masuk + put away; outbound: picking + barang keluar">Input admin per mobil {n(p.param.inputAdminPerMobil ?? 2, v => setParam('inputAdminPerMobil', v), 90)}</label>
         <label className="f" title="CBM efektif = CBM kendaraan × pemakaian; sisanya toleransi (ruang tidak terpakai)">Pemakaian ruang muat (CBM)
           <span className="row" style={{ flexWrap: 'nowrap', gap: 2 }}>{n(Math.round((p.param.utilCbm ?? 0.9) * 1000) / 10, v => setParam('utilCbm', Math.min(100, Math.max(1, v)) / 100), 70)}%
             <span className="small muted"> · toleransi {Math.round((1 - (p.param.utilCbm ?? 0.9)) * 1000) / 10}%</span></span></label>
-        <span className="small muted">Hari operasional {hariBulan}/bln (Working Days di Process Design)</span>
+        <span className="small muted">Hari operasional {hariBulan}/bln ({pakaiJalur ? 'Working day, langkah 1.6' : 'Working Days di Process Design'})</span>
       </div>
       {bagian('inbound')}
       {bagian('outbound')}

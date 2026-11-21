@@ -356,7 +356,11 @@ export function dariOtomatis(L: LayoutGudang, p: ParamSim, stokDesain: number): 
   }
   for (const f of L.fasilitas) k.push({ id: uid(), jenis: 'fasilitas', label: f.nama, x: r2(f.x0), z: r2(f.z0), w: r2(f.x1 - f.x0), d: r2(f.z1 - f.z0), tinggi: 3 });
   for (const d of L.dock) k.push({ id: uid(), jenis: 'dock', label: d.arus === 'inbound' ? 'Dock IN' : 'Dock OUT', x: 0, z: r2(Math.min(Math.max(0, d.z - 1.6), L.W - 3.2)), w: 0.3, d: 3.2, tinggi: 4.2, arus: d.arus });
-  return { versi: 1, gedung: { L: r2(L.L), W: r2(L.W), sideMm: p.sideMm, centerMm: p.centerMm }, komponen: k, ukur: [], latar: null, okupansi: null, stokDesain, tinggiPalet: L.tinggiPalet };
+  // Building dimension dari Warehouse Planning: platform loading dock di depan dinding dock, gedung trapesium (lebar belakang ≠ depan)
+  if (p.loadingDock) k.push({ id: uid(), jenis: 'platform', label: 'Loading dock', x: -4, z: 0, w: 4, d: r2(L.W), tinggi: 1.2, palet: 0 });
+  const lb = Number(p.lebarBelakangM) || 0;
+  const trapesium = lb > 0 && Math.abs(lb - L.W) > 0.05 ? (lb < L.W ? { lebarDepan: r2(L.W), lebarBelakang: r2(lb), sisi: 'kanan' as const } : null) : null;
+  return { versi: 1, gedung: { L: r2(L.L), W: r2(L.W), sideMm: p.sideMm, centerMm: p.centerMm, ...(trapesium ? { trapesium } : {}) }, komponen: k, ukur: [], latar: null, okupansi: null, stokDesain, tinggiPalet: L.tinggiPalet };
 }
 
 /** Konteks area untuk mode adaptif: rintangan (komponen lain) & ukuran gedung. */

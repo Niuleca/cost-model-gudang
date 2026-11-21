@@ -69,36 +69,45 @@ type MenuSimple = { no: number; nama: string; tab: (typeof TABS)[number]; langka
 const MENU_SIMPLE: MenuSimple[] = [
   { no: 1, nama: 'Key Assumption', tab: 'Key Assumption', langkah: [
     { id: '1.1', nama: 'Data customer & proyek', ke: 'Area kota + go-live → UMK → biaya manpower · durasi kontrak → skema biaya & capex · customer → kode produk & quotation' },
-    { id: '1.2', nama: 'Pola kerja & produktivitas', ke: 'Shift, jam efektif, produktivitas & efisiensi → kapasitas kerja per orang → kebutuhan manpower & MHE' },
-    { id: '1.3', nama: 'Working day & workload shift', ke: 'Hari kerja per bulan → volume per hari (Volume) · man-hour per bulan & beban per shift → manpower per shift' },
-    { id: '1.4', nama: 'Pallet', ke: 'Ukuran, tinggi & berat palet → konversi UoM (Volume), level rak & space (Warehouse Planning), cek muatan kendaraan' },
-    { id: '1.5', nama: 'Produk / SKU', ke: 'Dimensi, UPP & berat → isi per palet, parameter muatan & stok (Volume) · tinggi produk → level rak' },
-    { id: '1.6', nama: 'Workload palletize vs loose', ke: 'Porsi proses palet vs manual → Value Stream Mapping, manpower & MHE' },
-    { id: '1.7', nama: 'Workload transportation', ke: 'Porsi per jalur (import / local / export / inland / sea / air / rail) → volume transport per hari (2.2) → gate & loading dock' },
+    { id: '1.2', nama: 'Pola kerja & produktivitas', ke: 'Shift, group, jam efektif, produktivitas & efisiensi → kapasitas kerja per orang → manpower & MHE · payment term → quotation' },
+    { id: '1.3', nama: 'Pallet', ke: 'Ukuran & tebal palet → susunan produk per palet (1.4), luas block stack & tinggi rak (Warehouse Planning), layout 2D / 3D' },
+    { id: '1.4', nama: 'Product input', ke: 'Sumber data: berat, CBM & tinggi per palet, isi per palet, stok storage, level rak, cek muatan kendaraan' },
+    { id: '1.5', nama: 'Workload palletize vs loose', ke: 'Porsi proses palet vs manual → Value Stream Mapping, manpower & MHE' },
+    { id: '1.6', nama: 'Working day', ke: 'Hari operasional → volume per hari (Volume, transport, staging) · man-hour per bulan → manpower' },
+    { id: '1.7', nama: 'Workload shift', ke: 'Beban inbound / outbound / VAS per shift → manpower per shift' },
+    { id: '1.8', nama: 'Workload transportation', ke: 'Porsi per jalur (import / local / export / inland / sea / air / rail) → volume transport per hari (2.3) → gate & loading dock' },
   ] },
   { no: 2, nama: 'Volume', tab: 'Volume', langkah: [
-    { id: '2.1', nama: 'Input volume', ke: 'Volume 1 bulan = dasar tarif (komitmen / MGV) · Max = sizing (peak) · dikonversi ke palet, CBM, ton memakai Pallet & Produk' },
-    { id: '2.2', nama: 'Volume transport per hari', ke: 'Unit kendaraan per hari → gate, loading dock & staging · order per hari → admin di Value Stream Mapping' },
-    { id: '2.3', nama: 'Summary volume', ke: 'Total posisi palet & staging → Warehouse Planning · throughput → manpower, MHE & volume dasar tarif' },
+    { id: '2.1', nama: 'Volume storage', ke: 'Stok (posisi palet) → capacity requirement (3.2) · Volume 1 bulan = dasar tarif storage' },
+    { id: '2.2', nama: 'Throughput inbound & outbound', ke: 'Volume 1 bulan = dasar tarif handling · Max = sizing manpower, MHE & staging' },
+    { id: '2.3', nama: 'Volume transport per hari', ke: 'Unit kendaraan per hari → gate, loading dock & staging · order per hari → admin' },
+    { id: '2.4', nama: 'Summary volume', ke: 'Ringkasan per hari / bulan / tahun dalam palet, CBM, ton, case, pcs' },
   ] },
   { no: 3, nama: 'Warehouse Planning', tab: 'Warehouse Planning', langkah: [
-    { id: '3.1', nama: 'Pilih gudang', ke: 'Harga sewa per m² / sewa utuh → Rental space (Result)' },
-    { id: '3.2', nama: 'Space', ke: 'Luas acuan → Rental space, utility & HSE · jumlah rak & posisi palet → biaya racking (Storage)' },
-    { id: '3.3', nama: 'Layout 2D & simulasi 3D', ke: 'Layout dari hasil Space; komposisi luas per area' },
+    { id: '3.1', nama: 'List gudang per area', ke: 'Harga sewa per m² / sewa utuh → Rental space (Result)' },
+    { id: '3.2', nama: 'Capacity requirement', ke: 'Total posisi palet dibagi SPR / DDR / block stack' },
+    { id: '3.3', nama: 'Block stack / racking space', ke: 'Footprint per tipe penyimpanan · jumlah bay & level → biaya racking' },
+    { id: '3.4', nama: 'Staging inbound & outbound', ke: 'Footprint staging → footprint total' },
+    { id: '3.5', nama: 'Footprint requirement (total)', ke: 'Luas acuan (kalkulasi atau CAD) → layout & biaya sewa' },
+    { id: '3.6', nama: 'Building dimension', ke: 'P × L × T, gate, loading dock, trapesium, kekuatan lantai → layout 2D / 3D' },
+    { id: '3.7', nama: 'Layout 2D & simulasi 3D', ke: 'Dibuat otomatis dari langkah 1.3–3.6; bisa digeser & diatur, lalu disimpan' },
+    { id: '3.8', nama: 'Summary layout', ke: 'Komposisi luas per area: m², posisi palet, CBM, ton, % space' },
   ] },
-  { no: 4, nama: 'Result', tab: 'Result', langkah: [
-    { id: '4.1', nama: 'Hasil & tarif per layanan', ke: 'Tarif per layanan → Quotation & Export · klik angka untuk membuka rinciannya' },
-  ] },
-  { no: 5, nama: 'Output', tab: 'Quotation', langkah: [
-    { id: '5.1', nama: 'Quotation', ke: 'Mengambil tarif, asumsi utama & volume dasar dari Result' },
-    { id: '5.2', nama: 'Export Excel', ke: 'Seluruh hasil hitung dalam satu file Excel' },
+  { no: 4, nama: 'Result & Output', tab: 'Result', langkah: [
+    { id: '4.1', nama: 'Tarif per layanan', ke: 'Storage, handling in / out (+ VAS): satuan, MGV, biaya per bulan, GP, tarif · ubah GP % & cost allocation' },
+    { id: '4.2', nama: 'Konversi mata uang', ke: 'Tarif & simulasi dalam mata uang lain' },
+    { id: '4.3', nama: 'Capex & Opex', ke: 'Pembagian biaya investasi vs operasional' },
+    { id: '4.4', nama: 'Summary cost', ke: 'Rental space, manpower, storage, MHE, IT, consumable & ATK, HSE, office, utility, overhead, loan & interest, lainnya' },
+    { id: '4.5', nama: 'Summary manpower', ke: 'Manpower summary & rincian per task' },
+    { id: '4.6', nama: 'Buat quotation', ke: 'Mengambil tarif, asumsi utama & volume dasar' },
+    { id: '4.7', nama: 'Export Excel', ke: 'Seluruh hasil hitung dalam satu file Excel' },
   ] },
 ];
 const LANGKAH_SIMPLE = MENU_SIMPLE.flatMap(m => m.langkah.map(l => ({ ...l, menu: m })));
 const LANGKAH_ID = LANGKAH_SIMPLE.map(l => l.id);
 const cariLangkah = (id: string) => LANGKAH_SIMPLE.find(l => l.id === id) ?? LANGKAH_SIMPLE[0];
 /** Tab rincian yang dibuka dari Result → langkah wizard (sisanya tetap dibuka sebagai halaman rincian). */
-const LANGKAH_DARI_TAB: Partial<Record<string, string>> = { 'Key Assumption': '1.1', 'Volume': '2.1', 'Warehouse Planning': '3.2', 'Produk': '1.5', 'Result': '4.1', 'Quotation': '5.1', 'Export': '5.2' };
+const LANGKAH_DARI_TAB: Partial<Record<string, string>> = { 'Key Assumption': '1.1', 'Volume': '2.1', 'Warehouse Planning': '3.5', 'Produk': '1.4', 'Result': '4.1', 'Quotation': '4.6', 'Export': '4.7' };
 const ARUS: { v: Arus; l: string }[] = [{ v: 'inbound', l: 'Inbound' }, { v: 'outbound', l: 'Outbound' }, { v: 'storage', l: 'Storage (stok)' }, { v: 'vas', l: 'VAS' }];
 const TOOLS = ['Manual', 'FL Counter Balance', 'FL Reach Truck SPR', 'FL Reach Truck DD', 'CBT', 'RT', 'Pallet Mover', 'Hand Pallet', 'Trolley', 'PC', 'Laptop', 'HT', 'Printer', 'Scanner RDT', 'RF', 'Wrapping Machine'];
 const UOM_ISI = ['case', 'karton', 'dus', 'inner', 'bag', 'sak', 'pack', 'pail', 'drum', 'ibc', 'pcs', 'botol', 'kaleng', 'sachet', 'unit', 'kg', 'liter'];
@@ -156,10 +165,18 @@ export default function TenderPage() {
   const [pop, setPop] = useState<(typeof TABS)[number] | null>(null);
   const tabAktif: string = simple ? cariLangkah(langkah).menu.tab : tab;
   const tabIsi: string = simple && pop ? pop : tabAktif;
-  const lihat = (x: string) => tabIsi === x || (simple && !pop && tabAktif === 'Quotation' && x === 'Export');
+  const lihat = (x: string) => tabIsi === x || (simple && !pop && tabAktif === 'Result' && (x === 'Quotation' || x === 'Export'));
+  /** Simple CM: rincian kategori biaya (Summary cost) dibuka di dalam wizard */
+  const [popKat, setPopKat] = useState<string | null>(null);
   /** Simple CM: sub-langkah wizard yang sedang tampil */
   const di = (id: string) => !simple || (!pop && langkah === id);
-  const keLangkah = (id: string) => { setPop(null); setLangkahS(id); window.scrollTo({ top: 0 }); };
+  const [kunciLayout, setKunciLayout] = useState(0);
+  useEffect(() => { if (simple && langkah === '3.7' && kunciLayout === 0) setKunciLayout(1); }, [simple, langkah, kunciLayout]);
+  const keLangkah = (id: string) => {
+    setPop(null); setPopKat(null); setLangkahS(id); window.scrollTo({ top: 0 });
+    // layout 2D / 3D dibaca dari data tersimpan → simpan dulu input terbaru, lalu muat ulang iframe
+    if (id === '3.7') { if (bisaEdit && kotorAkhir.current) void simpan().then(() => setKunciLayout(k => k + 1)); else setKunciLayout(k => k + 1); }
+  };
   const keTab = (x: string) => {
     if (!simple) { setTab(x as (typeof TABS)[number]); return; }
     const id = LANGKAH_DARI_TAB[x];
@@ -548,14 +565,6 @@ export default function TenderPage() {
   // ---------- Simple CM: blok baru sesuai spesifikasi
   const pvSimple: ProfilVolume = { inbound: [], outbound: [], ...(a.profilVolume ?? {}), param: { ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}) } };
   const setParamMuat = (patch: Partial<ProfilVolume['param']>) => setA({ profilVolume: { ...pvSimple, param: { ...pvSimple.param, ...patch } } });
-  const panelBeratPalet = <div className="card">
-    <h2><T>Berat & volume per palet</T></h2>
-    <div className="grid3">
-      <Num id="kgplt-ka" label="Berat per palet" suffix="kg" value={Math.round(pvSimple.param.tonPerPalet * 1000 * 100) / 100} onChange={v => setParamMuat({ tonPerPalet: v / 1000 })} />
-      <Num id="cbmplt-ka" label="Volume per palet" suffix="CBM" value={pvSimple.param.cbmPerPalet} onChange={v => setParamMuat({ cbmPerPalet: v })} />
-    </div>
-    <p className="small muted">Dipakai untuk konversi volume ke ton & CBM, kekuatan rak/lantai, dan cek muatan kendaraan. Bila Produk / SKU (1.5) diisi dan dijadikan sumber data, angka ini ikut diperbarui dari data produk.</p>
-  </div>;
   const totalPorsi = (ar: 'inbound' | 'outbound') => pvSimple[ar].reduce((x, r) => x + (Number(r.persen) || 0), 0);
   const adaVolume = (ar: string) => a.volumes.some(v => v.arus === ar && volSpek(v) > 0);
   const panelJalur = <div className="card">
@@ -587,15 +596,14 @@ export default function TenderPage() {
     { ar: 'outbound', l: 'Throughput outbound', ket: 'Barang keluar per bulan' },
     { ar: 'vas', l: 'VAS & lainnya', ket: 'Opsional' },
   ];
-  const panelVolumeSpek = <div className="card">
-    <h2><T>Input volume</T></h2>
+  const panelVolumeSpek = (grupDipakai: string[]) => <div className="card">
     <p className="small muted"><b>Volume 1 bulan</b> wajib — menjadi dasar tarif (komitmen / MGV). <b>Max</b> dipakai untuk sizing gudang, manpower & MHE; <b>Max / Avg</b> yang dikosongkan otomatis sama dengan Volume 1 bulan. Ketik ribuan dengan titik (10.673).</p>
     {(() => { const xs = volumeSalahRibuan(a.volumes); if (!xs.length) return null;
       const kali = (x: number) => (x > 0 && x < 1000 && !Number.isInteger(x) ? Math.round(x * 1000) : x);
       return <p className="notice small" role="alert" style={{ borderColor: 'var(--bad, #c0392b)' }}>
         Volume {xs.map(({ v }) => `${v.arus} ${v.uom}`).join(' · ')} tercatat <b>desimal</b> — kemungkinan maksudnya ribuan.{' '}
         <button className="ghost" onClick={() => setA({ volumes: a.volumes.map((v, i) => xs.some(x => x.i === i) ? { ...v, rataRataBulan: kali(v.rataRataBulan), peakBulan: kali(v.peakBulan), komitmenBulan: kali(v.komitmenBulan) } : v) })}>Perbaiki jadi ribuan (× 1.000)</button></p>; })()}
-    {GRUP_ARUS.map(g => {
+    {GRUP_ARUS.filter(g => grupDipakai.includes(g.ar)).map(g => {
       const idx = a.volumes.map((v, i) => ({ v, i })).filter(({ v }) => (g.ar === 'vas' ? !['storage', 'inbound', 'outbound'].includes(v.arus) : v.arus === g.ar));
       const kurang = g.ar !== 'vas' && !idx.some(({ v }) => volSpek(v) > 0);
       return <div key={g.ar} className="vol-grup">
@@ -622,8 +630,63 @@ export default function TenderPage() {
         <div className="row"><button className="ghost" onClick={() => setA({ volumes: [...a.volumes, { arus: (g.ar === 'vas' ? 'vas' : g.ar) as Arus, uom: g.ar === 'storage' || g.ar === 'inbound' ? 'palet' : 'karton', rataRataBulan: 0, peakBulan: 0, komitmenBulan: 0 }] })}>+ Tambah UoM {g.ar === 'vas' ? 'VAS' : g.l.toLowerCase()}</button></div>
       </div>;
     })}
-    {panelParamMuatan}
+    <p className="small muted" style={{ margin: 0 }}>Isi per palet & per kemasan terisi otomatis dari <b>Product input (1.4)</b>; berat & CBM per palet juga dihitung dari sana (lihat Summary volume 2.4).</p>
   </div>;
+  const produkAda = adaProdukNyata(a.produk ?? []);
+  const panelMuatanProduk = <div className="card">
+    <h2><T>Berat & volume per palet</T> <span className="small muted" style={{ fontWeight: 400 }}>· dihitung dari Product input</span></h2>
+    <div className="umk-box">
+      <div><div className="small muted">Berat per palet</div><b>{angka(pvSimple.param.tonPerPalet * 1000)} kg</b></div>
+      <div><div className="small muted">CBM per palet</div><b>{angka(pvSimple.param.cbmPerPalet, 2)} CBM</b></div>
+      <div><div className="small muted">Berat per case</div><b>{angka(pvSimple.param.kgPerCase, 2)} kg</b></div>
+      <div><div className="small muted">CBM per case</div><b>{angka(pvSimple.param.cbmPerCase, 3)} CBM</b></div>
+      <div className="small muted" style={{ flex: 1, minWidth: 220 }}>{produkAda
+        ? <>Rata-rata tertimbang dari {(a.produk ?? []).filter(x => !x.otomatis).length} SKU di <b>Product input</b> — ubah di sana, angka ini ikut berubah.</>
+        : <>Belum ada data produk — sementara memakai nilai standar. <button type="button" className="link-kecil" onClick={() => keLangkah('1.4')}>Isi Product input (1.4) →</button></>}</div>
+    </div>
+  </div>;
+  const panelPaletSimple = <PaletTender tinggiDariProduk excel={lengkapiSpaceExcel(a.space.excel)} onChange={ubahSpaceExcel} />;
+  const panelProdukSimple = <ProdukPanel wajibSinkron produk={a.produk} aturan={a.aturanBerat} volumes={volEf} profil={a.profilVolume} spaceExcel={a.space.excel} spaceH={spaceH}
+    namaCustomer={t.customer} sinkron dampak={dampakProduk}
+    onChange={produk => ubahProduk(produk, a.aturanBerat, true)} onAturan={aturanBerat => ubahProduk(a.produk, aturanBerat, true)} onSinkron={() => ubahProduk(a.produk, a.aturanBerat, true)} />;
+  const panelBiayaSpace = <BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+    posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
+    posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
+    skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
+    onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />;
+  const panelSummaryLayout = (() => {
+    if (!spaceH) return <div className="card"><p className="muted">Lengkapi langkah 3.2–3.6 terlebih dahulu.</p></div>;
+    const kg = pvSimple.param.tonPerPalet * 1000, cbm = pvSimple.param.cbmPerPalet, tot = Math.max(1, spaceH.spaceRent);
+    const baris: [string, number, number | null][] = [
+      ['Rak SPR', spaceH.sd.footprint, spaceH.sd.ppReq], ['Rak DDR', spaceH.dd.footprint, spaceH.dd.ppReq],
+      ['Block stack', spaceH.block.footprint, spaceH.block.ppReq], ['Pallet floor', spaceH.floor.footprint, spaceH.floor.ppReq],
+      ['Staging inbound', spaceH.inbound.footprint, spaceH.inbound.perSequence ?? null], ['Staging outbound', spaceH.outbound.footprint, spaceH.outbound.perSequence ?? null],
+      ['Fasilitas (office, MHE area, dll.)', spaceH.fasilitasM2, null], ['Pembulatan', spaceH.spaceRent - spaceH.subtotal, null],
+    ];
+    const isi = baris.filter(([, m2]) => m2 > 0.05);
+    const pp = isi.reduce((x, [, , n]) => x + (n ?? 0), 0);
+    return <div className="card">
+      <div className="tablewrap"><table>
+        <thead><tr><th>Area</th><th className="num">Luas (m²)</th><th className="num">Posisi palet</th><th className="num">CBM</th><th className="num">Ton</th><th className="num">% space</th></tr></thead>
+        <tbody>{isi.map(([l, m2, n]) => <tr key={l}><td>{l}</td><td className="num">{angka(m2)}</td>
+          <td className="num">{n != null ? angka(Math.ceil(n - 1e-9)) : '—'}</td><td className="num">{n != null ? angka(n * cbm, 1) : '—'}</td><td className="num">{n != null ? angka(n * kg / 1000, 1) : '—'}</td>
+          <td className="num">{angka(m2 / tot * 100, 1)}%</td></tr>)}
+          <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{angka(spaceH.spaceRent)}</b></td><td className="num"><b>{angka(Math.ceil(pp))}</b></td><td className="num"><b>{angka(pp * cbm, 1)}</b></td><td className="num"><b>{angka(pp * kg / 1000, 1)}</b></td><td className="num"><b>100%</b></td></tr>
+        </tbody></table></div>
+      <p className="small muted">CBM & ton = posisi palet × {angka(cbm, 2)} CBM & {angka(kg)} kg per palet (dari Product input). Posisi palet staging = kapasitas staging per sequence.</p>
+    </div>;
+  })();
+  const panelManpowerSimple = <><ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift}
+              biaya={{
+                perOrang: role => { const r = rincianMp.find(x => x.role === role); return (r?.total ?? 0) * (r?.porsi ?? 1) * (1 + paramMp.feePersen); },
+                persenTahun: (a.eskalasiManpower ?? ESKALASI_DEFAULT).persenTahun, onPersen: persenTahun => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), persenTahun } }),
+                mulai: a.eskalasiManpower?.mulai ?? null, mulaiDefault: t.tanggal_go_live?.slice(0, 7) ?? null,
+                onMulai: mulai => setA({ eskalasiManpower: { ...(a.eskalasiManpower ?? ESKALASI_DEFAULT), mulai } }),
+                kontrakBulan: t.durasi_kontrak_bulan,
+              }} />
+    <ProcessDesignPanel bagian="rincian" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+              jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} /></>;
   const statusLangkah = (id: string): 'ok' | 'kurang' | 'opsional' => {
     const lengkap = (ar: 'inbound' | 'outbound') => !adaVolume(ar) || (pvSimple[ar].length > 0 && Math.abs(totalPorsi(ar) - 1) < 0.005);
     const volOk = ['storage', 'inbound', 'outbound'].every(adaVolume);
@@ -631,15 +694,18 @@ export default function TenderPage() {
     switch (id) {
       case '1.1': return b(t.customer && t.provinsi && t.kab_kota && t.durasi_kontrak_bulan > 0 && t.tanggal_go_live);
       case '1.2': return b(t.jumlah_shift > 0 && Number(t.jam_kerja_per_shift) > 0 && Number(t.jam_efektif_per_shift) > 0);
-      case '1.3': return b((a.processDesign?.hariKerjaBulan ?? 25) > 0);
-      case '1.4': return b(pvSimple.param.tonPerPalet > 0 && pvSimple.param.cbmPerPalet > 0);
-      case '1.5': return adaProdukNyata(a.produk ?? []) ? 'ok' : 'opsional';
-      case '1.6': return 'ok';
-      case '1.7': case '2.2': return b(lengkap('inbound') && lengkap('outbound'));
-      case '2.1': case '2.3': return b(volOk);
+      case '1.3': return b(daftarPalet(a.space.excel).length > 0);
+      case '1.4': return b(produkAda);
+      case '1.5': case '1.7': return 'ok';
+      case '1.6': return b((a.processDesign?.hariKerjaBulan ?? 25) > 0);
+      case '1.8': case '2.3': return b(lengkap('inbound') && lengkap('outbound'));
+      case '2.1': return b(adaVolume('storage'));
+      case '2.2': return b(adaVolume('inbound') && adaVolume('outbound'));
+      case '2.4': return b(volOk);
       case '3.1': return b(a.gudang || a.space.tarifManual);
-      case '3.2': return b((hasil?.space.totalM2 ?? 0) > 0);
-      case '4.1': return b(hasil);
+      case '3.2': case '3.3': case '3.4': case '3.5': return b((spaceH?.spaceRent ?? 0) > 0);
+      case '3.6': return b(Number(a.space.excel?.lebarGudangM) > 0);
+      case '4.1': case '4.4': case '4.5': return b(hasil);
       default: return 'opsional';
     }
   };
@@ -751,18 +817,29 @@ export default function TenderPage() {
             <Pct id="ef" label="Efisiensi kerja" value={a.efisiensi} onChange={v => setA({ efisiensi: v })} />
             </>;
             return simple ? (langkah === '1.1'
-              ? <div className="grid3 ka-grid">{dataProyek}{termin}</div>
-              : <div className="grid3 ka-grid">{polaKerja}{faktor}</div>) : <div className="grid3 ka-grid">{dataProyek}{polaKerja}{termin}{faktor}</div>;
+              ? <div className="grid3 ka-grid">{dataProyek}</div>
+              : <div className="grid3 ka-grid">
+                {(polaKerja.props.children as React.ReactNode[])[0]}
+                <Num id="group" label="Jumlah group" value={a.processDesign?.group ?? 1} onChange={v => setA({ processDesign: { ...(a.processDesign ?? PD_DEFAULT), group: Math.max(1, Math.round(v)) } })} />
+                {(polaKerja.props.children as React.ReactNode[]).slice(1)}
+                {termin}
+                <Pct id="fp" label="Faktor produktivitas" value={a.faktorProduktivitas} onChange={v => setA({ faktorProduktivitas: v })} />
+                <Pct id="ef" label="Efisiensi kerja" value={a.efisiensi} onChange={v => setA({ efisiensi: v })} />
+              </div>) : <div className="grid3 ka-grid">{dataProyek}{polaKerja}{termin}{faktor}</div>;
           })()}
         </div>
       )}
-      {simple && di('1.3') && panelDesain}
-      {simple && di('1.4') && <>{panelBeratPalet}{panelPalet}</>}
-      {simple && di('1.5') && panelProduk}
-      {simple && di('1.7') && panelJalur}
-      {simple && di('2.1') && panelVolumeSpek}
-      {simple && di('2.3') && <div className="card">{panelRingkasOrder}
-        <p className="small muted">Per hari = per bulan ÷ {hariOps} hari operasional (Working day, langkah 1.3); per tahun = per bulan × 12. Satuan yang tidak bisa dikonversi (isi per palet / parameter muatan belum ada) dikosongkan.</p></div>}
+      {simple && di('1.3') && <>{panelPaletSimple}{panelMuatanProduk}</>}
+      {simple && di('1.4') && panelProdukSimple}
+      {simple && di('1.6') && <ProcessDesignPanel hanya="kalender" bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+        jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd, cutiTahunanHari: pd.mp?.cuti ?? a.cutiTahunanHari })} onFaktor={patch => setA(patch)} onShift={gantiShift} />}
+      {simple && di('1.7') && <ProcessDesignPanel hanya="shift" bagian="desain" aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
+        jumlahShift={t.jumlah_shift} onPd={pd => setA({ processDesign: pd })} onFaktor={patch => setA(patch)} onShift={gantiShift} />}
+      {simple && di('1.8') && panelJalur}
+      {simple && di('2.1') && panelVolumeSpek(['storage'])}
+      {simple && di('2.2') && panelVolumeSpek(['inbound', 'outbound', 'vas'])}
+      {simple && di('2.4') && <><div className="card">{panelRingkasOrder}
+        <p className="small muted">Per hari = per bulan ÷ {hariOps} hari operasional (Working day, langkah 1.6); per tahun = per bulan × 12.</p></div>{panelMuatanProduk}</>}
       {lihat('Volume') && !simple && (
         <div className="card">
           <h2><T>Volume</T></h2>
@@ -810,7 +887,7 @@ export default function TenderPage() {
       {lihat('Key Assumption') && !simple && panelPalet}
       {lihat('Key Assumption') && !simple && <ProfilVolumePanel ringkas profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
         onChange={profilVolume => setA({ profilVolume })} />}
-      {lihat('Key Assumption') && di('1.6') && (() => {
+      {lihat('Key Assumption') && di('1.5') && (() => {
         const pm = { ...PORSI_MUAT_DEFAULT, ...(a.porsiMuat ?? {}) };
         const dipakai = (pr: string) => a.aktivitas.filter(x => x.porsiMuat?.proses === pr);
         return <div className="card">
@@ -840,24 +917,23 @@ export default function TenderPage() {
           setKol('warehouse_id', g?.id ?? null);
           setA({ gudang: g, space: { ...a.space, tarifManual: g ? false : a.space.tarifManual, tarifSewaM2Bulan: g ? Math.round(tarifM2) : a.space.tarifSewaM2Bulan } });
         }} />}
-        {di('3.2') && <SpacePanel excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
+        {simple && di('3.1') && panelBiayaSpace}
+        {(!simple || ['3.2', '3.3', '3.4', '3.5', '3.6'].includes(langkah)) && !pop && <SpacePanel bagian={simple ? ({ '3.2': 'a', '3.3': 'b', '3.4': 'c', '3.5': 'd', '3.6': 'e' } as const)[langkah as '3.2'] : undefined} excel={a.space.excel} ppTotal={paletEkuivalen(volEf.find(v => v.arus === 'storage')).palet}
           inboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).palet} outboundBulan={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).palet}
           uomIn={paletEkuivalen(volEf.find(v => v.arus === 'inbound')).ok ? 'palet' : volEf.find(v => v.arus === 'inbound')?.uom ?? 'palet'} uomOut={paletEkuivalen(volEf.find(v => v.arus === 'outbound')).ok ? 'palet' : volEf.find(v => v.arus === 'outbound')?.uom ?? 'palet'}
           jumlahShift={t.jumlah_shift} onChange={ubahSpaceExcel}
           kekuatan={dasarKekuatan(a, t.customer)}
-          komersial={<BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
-            posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
-            posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
-            skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
-            onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />} />}
-        {simple && di('3.3') && <div className="card">
-          <h2><T>Layout 2D & simulasi 3D</T></h2>
-          <p className="small muted">Layout otomatis dibuat dari hasil Space di atas (rak, block stack, staging, gate, loading dock, office, kolom) dan bisa digeser, diubah, disimpan per tender; tersedia simulasi racking dan tampilan 3D.</p>
-          <div className="row"><a className="btn" href={`/simulasi?id=${t.id}`}>Buka layout & simulasi gudang →</a></div>
+          komersial={panelBiayaSpace} />}
+        {simple && di('3.7') && <div className="wiz-layout">
+          <p className="small muted" style={{ margin: 0 }}>Layout dibuat dari input langkah 1.3–3.6 (palet, produk, volume, porsi rak, staging, footprint, gate, loading dock, trapesium) yang sudah disimpan.
+            Bila input diubah sesudah layout terakhir disimpan, layout dibuat ulang otomatis. Komponen bisa digeser & diatur di sini, lalu klik Simpan di dalam editor.</p>
+          {kunciLayout > 0 ? <iframe key={kunciLayout} className="wiz-frame" title="Layout 2D & simulasi 3D" src={`/simulasi?id=${t.id}&embed=1&dari=simple`} />
+            : <p className="small">Menyimpan input & menyiapkan layout…</p>}
         </div>}
+        {simple && di('3.8') && panelSummaryLayout}
       </>)}
 
-      {lihat('Volume') && di('2.2') && <ProfilVolumePanel pakaiJalur={simple} judul={simple ? 'Moda & volume transport per hari' : undefined} profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
+      {lihat('Volume') && di('2.3') && <ProfilVolumePanel pakaiJalur={simple} judul={simple ? 'Moda & volume transport per hari' : undefined} profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}
         onChange={profilVolume => setA({ profilVolume })} />}
 
       {lihat('Produk') && panelProduk}
@@ -1101,7 +1177,13 @@ export default function TenderPage() {
         </div>
       </>)}
 
-      {lihat('Result') && <HasilPanel drill={simple} onBukaTab={bukaRincian} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
+      {simple && popKat && <div className="wiz-layout">
+        <div className="rincian-bar" role="note"><button type="button" onClick={() => setPopKat(null)}>← Kembali ke Summary cost</button>
+          <span>Rincian & revisi: <b>{labelKelompok(popKat as Kelompok)}</b> — simpan di bawah, lalu klik Hitung agar Summary cost ikut berubah.</span></div>
+        <iframe className="wiz-frame" title={`Rincian ${popKat}`} src={`/tender/${t.id}/kategori/${encodeURIComponent(popKat)}?embed=1`} />
+      </div>}
+      {lihat('Result') && (!simple || (!popKat && ['4.1', '4.2', '4.3', '4.4', '4.5'].includes(langkah))) && <HasilPanel langkah={simple && !pop ? langkah : undefined} onBukaKategori={simple ? k => { setPopKat(k); window.scrollTo({ top: 0 }); } : undefined}
+        ekstraManpower={simple ? panelManpowerSimple : undefined} drill={simple} onBukaTab={bukaRincian} saran={hasil ? saranGudang(hasil, a, Number(t.jam_efektif_per_shift) || 7) : []} belumDisimpan={!!hasil && JSON.stringify(hasil.totalBiayaBulan) !== JSON.stringify((t.hasil as HasilTender | null)?.totalBiayaBulan) || JSON.stringify(hasil?.rateCard?.map(r => r.tarifPerUnit)) !== JSON.stringify((t.hasil as HasilTender | null)?.rateCard?.map(r => r.tarifPerUnit))} hasil={hasil} catatan={catatanMaster} onSimpan={simpanHasil} onHitung={() => hitung()}
         marginManual={a.marginManual ?? {}} onMargin={marginManual => setA({ marginManual })} kurs={a.kurs} onKurs={kurs => setA({ kurs })} kontrakBulan={t.durasi_kontrak_bulan}
         pajak={a.pajak ?? PAJAK_DEFAULT} onPajak={pajak => setA({ pajak })} gudang={a.gudang}
         uomRateCard={a.uomRateCard ?? {}} onUomRateCard={uomRateCard => setA({ uomRateCard })} hariTarif={a.hariTarifHarian} onHariTarif={hariTarifHarian => setA({ hariTarifHarian })} uomManual={a.uomManual ?? {}} onUomManual={uomManual => setA({ uomManual })} onBukaAlokasi={() => bukaRincian('Cost Allocation')}
@@ -1110,11 +1192,11 @@ export default function TenderPage() {
       {lihat('Cost Allocation') && <CostAllocation h={hasil} tenderId={t.id} onKeResult={() => keTab('Result')}
         alokasiKategori={a.alokasiKategori ?? {}} onAlokasiKategori={alokasiKategori => setA({ alokasiKategori })}
         handlingSetara={a.handlingSetara !== false} onHandlingSetara={v => setA({ handlingSetara: v })} />}
-      {lihat('Quotation') && di('5.1') && <QuotationPanel tender={t} profile={profile} />}
+      {lihat('Quotation') && di('4.6') && <QuotationPanel tender={t} profile={profile} />}
       </fieldset>
-      {lihat('Export') && di('5.2') && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
-      {lihat('Export') && di('5.2') && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={namaFileExport(nomorQ, t.kode ?? t.customer)} />}
-      {lihat('Export') && di('5.2') && bolehExport(profile) && <UploadExcelPanel t={t} bisaEdit={bisaEdit} onTerapkan={terapkanExcel} />}
+      {lihat('Export') && di('4.7') && !bolehExport(profile) && <div className="card"><p>Export Excel hanya untuk <b>Super Admin</b> dan <b>manager</b>.</p></div>}
+      {lihat('Export') && di('4.7') && bolehExport(profile) && <ExportPanel siapkan={siapkanExport} namaFile={namaFileExport(nomorQ, t.kode ?? t.customer)} />}
+      {lihat('Export') && di('4.7') && bolehExport(profile) && <UploadExcelPanel t={t} bisaEdit={bisaEdit} onTerapkan={terapkanExcel} />}
       {!simple && tabIsi !== 'Result' && tabIsi !== 'Quotation' && tabIsi !== 'Export' && <div className="aksi-bawah">{aksi(false)}</div>}
       {simple && pop && tabIsi !== 'Result' && <div className="aksi-bawah">{aksi(false)}</div>}
       {lanjutSimple}
@@ -1141,9 +1223,11 @@ function TambahAktivitas({ prods, industri, onTambah }: { prods: Prod[]; industr
   );
 }
 
-function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, uomManual, onUomManual, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, onBukaTab, saran, basisTarif, onBasisTarif }: {
+function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, belumDisimpan, hasil, catatan, onSimpan, onHitung, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, gudang, uomRateCard, onUomRateCard, uomManual, onUomManual, onBukaAlokasi, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, onBukaTab, saran, basisTarif, onBasisTarif }: {
   /** Simple CM: angka Result bisa diklik untuk membuka rinciannya */
   drill?: boolean;
+  /** Simple CM: langkah wizard 4.1–4.5 — tampilkan satu bagian Result sesuai Spesifikasi */
+  langkah?: string; onBukaKategori?: (k: string) => void; ekstraManpower?: React.ReactNode;
   basisTarif?: Partial<BasisTarif>; onBasisTarif: (b: BasisTarif) => void;
   onBukaAlokasi: () => void; hariTarif?: number; onHariTarif: (n: number | undefined) => void;
   onBukaTab: (tab: string) => void; saran: Saran[];
@@ -1164,9 +1248,11 @@ function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, on
   if (!hasil) return <div className="card"><p>Belum dihitung.</p><div className="row"><button onClick={onHitung}>Hitung sekarang</button></div></div>;
   const h = hasil;
   const kritis = h.redFlags.filter(f => f.level === 'kritis').length;
+  const bagianTampil = langkah ? null : bagian;
+  const komersialProps = { hariTarif, onHariTarif, h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, basisTarif, onBasisTarif, onBukaKategori };
   return (
     <>
-      {(() => {
+      {(!langkah || langkah === '4.1') && (() => {
         const s0 = h.simulasi[0];
         const sell = s0?.pendapatanBulan ?? 0, cost = h.totalBiayaBulan, profit = s0?.gp ?? sell - cost;
         const kpi: [string, string, string?][] = [
@@ -1205,18 +1291,25 @@ function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, on
             <div className="komposisi-bar" role="img" aria-label={`Komposisi biaya: ${kom.map(([k, v]) => `${k} ${Math.round((v / totKom) * 100)}%`).join(', ')}`}>
               {kom.map(([k, v], j) => <i key={k} style={{ width: `${(v / totKom) * 100}%`, background: WARNA[j % WARNA.length] }} title={`${k} · ${rp(v)}/bln · ${persen(v / totKom)}`} />)}</div>
             <div className="komposisi-legenda">{kom.map(([k, v], j) => drill
-              ? <a key={k} href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" title={`Buka & revisi harga ${labelKelompok(k)} (tab baru)`}><i style={{ background: WARNA[j % WARNA.length] }} />{labelKelompok(k)} <b>{persen(v / totKom, 0)}</b></a>
+              ? (onBukaKategori ? <button type="button" key={k} className="link-kecil" onClick={() => onBukaKategori(k)}><i style={{ background: WARNA[j % WARNA.length] }} />{labelKelompok(k)} <b>{persen(v / totKom, 0)}</b></button> : <a key={k} href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener" title={`Buka & revisi harga ${labelKelompok(k)} (tab baru)`}><i style={{ background: WARNA[j % WARNA.length] }} />{labelKelompok(k)} <b>{persen(v / totKom, 0)}</b></a>)
               : <span key={k}><i style={{ background: WARNA[j % WARNA.length] }} />{labelKelompok(k)} <b>{persen(v / totKom, 0)}</b></span>)}</div>
           </div>}
         </section>;
       })()}
-      <div className="tabs hasil-tab" role="tablist" aria-label="Bagian hasil">
+      {langkah === '4.1' && <><HasilKomersial bagian="tarif" {...komersialProps} />
+        {h.alokasiLayanan && <div className="card row" style={{ justifyContent: 'space-between', gap: 8 }}>
+          <span className="small"><b>Cost allocation (pembagian biaya ke layanan):</b> {h.rateCard.map(r => `${BUCKET_LABEL[r.bucket]} ${persen(r.biayaBulan / (h.marginTotal.biayaBulan || 1))}`).join(' · ')}</span>
+          <button className="ghost" onClick={onBukaAlokasi}>Atur cost allocation →</button></div>}</>}
+      {langkah === '4.2' && <HasilKomersial bagian="kurs" {...komersialProps} />}
+      {langkah === '4.3' && <HasilKomersial bagian="capex" {...komersialProps} />}
+      {langkah === '4.5' && ekstraManpower}
+      {!langkah && <div className="tabs hasil-tab" role="tablist" aria-label="Bagian hasil">
         {([['ringkasan', 'Ringkasan & red flag', 'hasil'], ['harga', 'Harga & margin', 'isian'], ['biaya', 'Rincian biaya', 'hasil'], ['operasional', 'Manpower, MHE & space', 'hasil']] as const).map(([k, l, j]) => (
           <button key={k} role="tab" aria-selected={bagian === k} className={bagian === k ? 'on' : ''} onClick={() => setBagian(k)}>{l}{j === 'isian' && <span className="pill warn" style={{ marginLeft: 6, fontSize: 11 }}>ada isian</span>}</button>))}
-      </div>
+      </div>}
 
-      {bagian === 'ringkasan' && <>
-      <div className="card">
+      {(bagianTampil === 'ringkasan' || langkah === '4.1') && <>
+      {!langkah && <div className="card">
         <h2>Tarif per layanan</h2>
         <div className="tablewrap"><table>
           <thead><tr><th>Layanan</th><th>Satuan</th><th className="num">Volume komitmen/bln</th><th className="num">Biaya/bln</th><th className="num">GP%</th><th className="num">Tarif {pajak.ppn === 'include' ? 'incl.' : 'excl.'} PPN</th></tr></thead>
@@ -1224,7 +1317,7 @@ function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, on
             <td className="num">{persen(r.gpPersen)}</td><td className="num"><b>{rp(pajak.ppn === 'include' ? (r.tarifInclPpn ?? r.tarifPerUnit) : r.tarifPerUnit)}</b></td></tr>)}</tbody>
         </table></div>
         <div className="row"><button className="ghost" onClick={() => setBagian('harga')}>Atur satuan tarif & GP% →</button></div>
-      </div>
+      </div>}
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2>Red flag {kritis > 0 ? <span className="pill bad">{kritis} kritis</span> : <span className="pill ok">tidak ada yang kritis</span>}</h2>
@@ -1246,15 +1339,15 @@ function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, on
         <div className="saran-gudang">{saran.map((x, i) => <div key={i} className="saran"><i>{i + 1}</i><div><b>{x.judul}</b><div className="small">{x.isi}{x.tab && <> <button className="link-kecil" onClick={() => onBukaTab(x.tab!)}>Buka {x.tab} →</button></>}</div></div></div>)}</div>
       </div>}
 
-      {h.alokasiLayanan && <div className="card row" style={{ justifyContent: 'space-between', gap: 8 }}>
+      {!langkah && h.alokasiLayanan && <div className="card row" style={{ justifyContent: 'space-between', gap: 8 }}>
         <span className="small"><b>Pembagian biaya ke layanan:</b> {h.alokasiLayanan.matriks?.filter(r => r.override).length ? `${h.alokasiLayanan.matriks.filter(r => r.override).length} kategori diubah` : 'default simulasi (cost-to-serve)'}
           {' · '}{h.rateCard.map(r => `${BUCKET_LABEL[r.bucket]} ${persen(r.biayaBulan / (h.marginTotal.biayaBulan || 1))}`).join(' · ')}</span>
         <button className="ghost" onClick={onBukaAlokasi}>Atur di Cost Allocation →</button></div>}
       </>}
-      {bagian === 'harga' && <HasilKomersial bagian="harga" hariTarif={hariTarif} onHariTarif={onHariTarif} h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} uomRateCard={uomRateCard} onUomRateCard={onUomRateCard} uomManual={uomManual} onUomManual={onUomManual}
+      {bagianTampil === 'harga' && <HasilKomersial bagian="harga" hariTarif={hariTarif} onHariTarif={onHariTarif} h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} uomRateCard={uomRateCard} onUomRateCard={onUomRateCard} uomManual={uomManual} onUomManual={onUomManual}
         layananJual={layananJual} onLayananJual={onLayananJual} tambahan={tambahan} onTambahan={onTambahan} basisTarif={basisTarif} onBasisTarif={onBasisTarif} />}
 
-      {bagian === 'operasional' && <><div className="grid2">
+      {(bagianTampil === 'operasional' || langkah === '4.5') && <>{!langkah && <div className="grid2">
         <div className="card">
           <h2><T>Kalender & volume desain</T></h2>
           <table><tbody>
@@ -1280,7 +1373,7 @@ function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, on
             <tr><td><b>Total</b></td><td className="num out">{angka(h.space.totalM2)} m²</td></tr>
           </tbody></table>
         </div>
-      </div>
+      </div>}
 
       <div className="card">
         {drill ? <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}><h2 style={{ margin: 0 }}><T>Kebutuhan manpower & MHE</T></h2>
@@ -1307,9 +1400,9 @@ function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, on
 
       </>}
 
-      {bagian === 'biaya' && <><div className="card">
+      {(bagianTampil === 'biaya' || langkah === '4.4') && <><div className="card">
         <h2><T>Rincian biaya per bulan</T></h2>
-        <p className="small muted">Dikelompokkan per kategori. Klik <b>Rincian & revisi ↗</b> untuk membuka kategori di tab baru dan merevisi harganya.</p>
+        <p className="small muted">Dikelompokkan per kategori. Klik <b>Rincian & revisi</b> untuk membuka kategori{onBukaKategori ? '' : ' di tab baru'} dan merevisi / menambah barisnya.</p>
         <div className="tablewrap"><table>
           <thead><tr><th>Baris</th><th>Risiko</th><th>Dasar hitung</th><th className="num">Biaya/bln</th></tr></thead>
           <tbody>{(() => {
@@ -1317,14 +1410,15 @@ function HasilPanel({ drill = false, belumDisimpan, hasil, catatan, onSimpan, on
             return urut.map(k => { const rows = h.biaya.filter(b => b.kelompok === k); if (!rows.length) return null; const sub = rows.reduce((s2, b) => s2 + b.biayaBulan, 0);
               return [
                 <tr key={`h-${k}`} className="kat-head"><td colSpan={3}><b>{labelKelompok(k)}</b> <span className="small muted">· {rows.length} baris · {persen(sub / (h.totalBiayaBulan || 1))}</span>
-                  {' '}<a className="small" href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener">Rincian & revisi ↗</a></td><td className="num"><b>{rp(sub)}</b></td></tr>,
+                  {' '}{onBukaKategori ? <button type="button" className="link-kecil" onClick={() => onBukaKategori(k)}>Rincian & revisi →</button>
+                    : <a className="small" href={`/tender/${tenderId}/kategori/${encodeURIComponent(k)}`} target="_blank" rel="noopener">Rincian & revisi ↗</a>}</td><td className="num"><b>{rp(sub)}</b></td></tr>,
                 ...rows.map((b, i) => <tr key={`${k}-${i}`}><td style={{ paddingLeft: 22 }}>{b.deskripsi}{b.biayaSistem != null && <span className="pill warn small" style={{ marginLeft: 6 }}>direvisi</span>}</td><td>{b.kategoriRisiko}</td><td className="small muted">{b.dasar}</td><td className="num">{rp(b.biayaBulan)}</td></tr>),
               ]; });
           })()}
             <tr className="pd-sub"><td colSpan={3}><b>Total</b></td><td className="num out">{rp(h.totalBiayaBulan)}</td></tr></tbody>
         </table></div>
       </div>
-      <HasilKomersial bagian="biaya" h={h} marginManual={marginManual} onMargin={onMargin} kurs={kurs} onKurs={onKurs} kontrakBulan={kontrakBulan} pajak={pajak} onPajak={onPajak} /></>}
+      <HasilKomersial bagian={langkah ? 'porsi' : 'biaya'} {...komersialProps} /></>}
     </>
   );
 }
@@ -1339,7 +1433,7 @@ const PALET_PRESET: (Omit<PaletTipe, 'id' | 'porsi'> & { label: string })[] = [
 ];
 const fmtN = (x: number, d = 2) => x.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: d });
 /** Jenis palet (Key Assumption) — satu sumber untuk semua ukuran palet: Produk (susunan per palet), block stack / pallet floor (luas rata-rata), racking (tebal terbesar), simulasi 3D. */
-function PaletTender({ excel, onChange, cbmPerPalet, onCbmPerPalet, tertanam = false }: { excel: SpaceExcel; onChange: (x: SpaceExcel) => void; cbmPerPalet?: number; onCbmPerPalet?: (v: number) => void; tertanam?: boolean }) {
+function PaletTender({ excel, onChange, cbmPerPalet, onCbmPerPalet, tertanam = false, tinggiDariProduk = false }: { tinggiDariProduk?: boolean; excel: SpaceExcel; onChange: (x: SpaceExcel) => void; cbmPerPalet?: number; onCbmPerPalet?: (v: number) => void; tertanam?: boolean }) {
   const list = daftarPalet(excel), r = ringkasPalet(list);
   const simpan = (xs: PaletTipe[]) => onChange({ ...excel, paletTipe: xs });
   const ubah = (i: number, patch: Partial<PaletTipe>) => simpan(list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
@@ -1359,8 +1453,8 @@ function PaletTender({ excel, onChange, cbmPerPalet, onCbmPerPalet, tertanam = f
         <td className="num"><InputPanjang aria-label={`Panjang palet ${i + 1}`} min={0} nilai={p.panjang} basis="m" style={kecil} onNilai={v => ubah(i, { panjang: v ?? 0 })} /></td>
         <td className="num"><InputPanjang aria-label={`Lebar palet ${i + 1}`} min={0} nilai={p.lebar} basis="m" style={kecil} onNilai={v => ubah(i, { lebar: v ?? 0 })} /></td>
         <td className="num"><InputPanjang aria-label={`Tebal palet ${i + 1}`} min={0} nilai={p.tebalMm} basis="mm" style={kecil} onNilai={v => ubah(i, { tebalMm: v ?? 0 })} /></td>
-        <td className="num"><InputPanjang aria-label={`Tinggi produk palet ${i + 1}`} min={0} nilai={p.tinggiProdukMm ?? null} basis="mm" style={kecil} kosong placeholderDasar={excel.rak.productMm}
-          onNilai={v => ubah(i, { tinggiProdukMm: v && v > 0 ? v : null })} /></td>
+        <td className="num">{tinggiDariProduk ? <span title="Dihitung dari Product input (tinggi produk × layer)">{fmt(Number(p.tinggiProdukMm) > 0 ? Number(p.tinggiProdukMm) : excel.rak.productMm, 'mm')}</span> : <InputPanjang aria-label={`Tinggi produk palet ${i + 1}`} min={0} nilai={p.tinggiProdukMm ?? null} basis="mm" style={kecil} kosong placeholderDasar={excel.rak.productMm}
+          onNilai={v => ubah(i, { tinggiProdukMm: v && v > 0 ? v : null })} />}</td>
         <td className="num">{Number(p.tinggiProdukMm) > 0 ? fmt((Number(p.tebalMm) || 0) + Number(p.tinggiProdukMm), 'mm') : <span className="muted">—</span>}</td>
         <td className="num">{Number(p.tinggiProdukMm) > 0 ? fmtN(r.cbmMuatan(p), 2) : <span className="muted">—</span>}</td>
         <td className="num"><AngkaInput aria-label={`Pemakaian palet ${i + 1}`} step="any" min={0} max={100} value={Math.round((p.porsi || 0) * 1000) / 10} style={kecil} onValue={v => ubah(i, { porsi: Math.max(0, v) / 100 })} /></td>

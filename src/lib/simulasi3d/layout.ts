@@ -32,6 +32,8 @@ export interface ParamSim {
   blockTumpuk: number;
   dockIn: number; dockOut: number;
   okupansi: number | null;
+  /** Warehouse Planning → Building dimension: platform loading dock & lebar belakang (trapesium) */
+  loadingDock?: boolean; lebarBelakangM?: number | null;
 }
 
 export interface LayoutGudang {
@@ -86,6 +88,7 @@ export function paramAwal(t: TenderRow, h: HasilTender): ParamSim {
   const luas = num(h.space.totalM2);
   const lebarIsi = num(t.asumsi.space?.excel?.lebarGudangM, 0);
   const gd = t.asumsi.gudang; const tot = num(gd?.jumlah_dock, 0);
+  const gIn = num(x.gateIn, 0), gOut = num(x.gateOut, 0);
   return {
     lebarM: lebarIsi || Math.max(15, Math.round(Math.sqrt(Math.max(luas, 150) / 1.6))),
     sideMm: num(x.rak.sideMm, 10000), centerMm: num(x.rak.centerMm, 13000), beamMm: num(x.rak.beamMm, 100), palletMm: num(x.rak.palletMm, 150),
@@ -94,8 +97,10 @@ export function paramAwal(t: TenderRow, h: HasilTender): ParamSim {
     spr: { koridor: num(x.sd.koridor, 1.7), depth: num(x.sd.depth, 1.15), width: num(x.sd.width, 2.7), ppl: num(x.sd.paletPerLevel, 2) },
     ddr: { koridor: num(x.dd.koridor, 1.85), depth: num(x.dd.depth, 2.4), width: num(x.dd.width, 2.7), ppl: num(x.dd.paletPerLevel, 2), deep: num(x.dd.deep, 2) },
     blockTumpuk: Math.max(1, num(x.block.tumpuk, 2)),
-    dockIn: tot > 0 ? Math.max(1, Math.floor(tot / 2)) : 2, dockOut: tot > 0 ? Math.max(1, tot - Math.max(1, Math.floor(tot / 2))) : 2,
+    dockIn: gIn > 0 ? gIn : tot > 0 ? Math.max(1, Math.floor(tot / 2)) : 2,
+    dockOut: gOut > 0 ? gOut : tot > 0 ? Math.max(1, tot - Math.max(1, Math.floor(tot / 2))) : 2,
     okupansi: null,
+    loadingDock: !!x.loadingDock, lebarBelakangM: num(x.lebarBelakangM, 0) > 0 ? num(x.lebarBelakangM, 0) : null,
   };
 }
 
@@ -254,7 +259,7 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
   const L = Math.max(x, 10);
 
   // ---------- 5. Dock
-  if (!num(t.asumsi.gudang?.jumlah_dock, 0) && o.param?.dockIn == null && o.param?.dockOut == null) asumsi.push('Jumlah dock belum ada di data gudang → dipakai 2 inbound + 2 outbound (bisa diubah).');
+  if (!num(t.asumsi.gudang?.jumlah_dock, 0) && !num(t.asumsi.space?.excel?.gateIn, 0) && o.param?.dockIn == null && o.param?.dockOut == null) asumsi.push('Jumlah dock belum ada di data gudang → dipakai 2 inbound + 2 outbound (bisa diubah).');
   const maxDock = Math.max(1, Math.floor((W / 2 - 1) / 4));
   const dIn = Math.min(Math.max(1, Math.round(p.dockIn)), maxDock), dOut = Math.min(Math.max(1, Math.round(p.dockOut)), maxDock);
   const dock: Dock[] = [];

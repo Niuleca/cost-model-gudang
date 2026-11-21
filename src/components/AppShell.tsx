@@ -70,6 +70,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { profile } = useProfile();
   const { bahasa, setBahasa, t } = useBahasa();
   const [buka, setBuka] = useState<string | null>(null);
+  // ?embed=1 → tampil di dalam iframe Simple CM (tanpa menu atas & footer)
+  const [embed, setEmbed] = useState(false);
+  useEffect(() => { setEmbed(new URLSearchParams(window.location.search).get('embed') === '1'); }, []);
   // Hover: buka langsung, tutup dengan jeda agar kursor sempat pindah ke menu
   const tutupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hover = () => typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
@@ -177,7 +180,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="shell">
+    <div className={`shell${embed ? ' shell-embed' : ''}`}>
       <header className="topbar">
         <Link href="/beranda" className="brand" aria-label="Leca — beranda"><LecaMark /><span className="brand-nama">Leca</span><span className="brand-oleh">by esapanghegar</span></Link>
         <nav aria-label="Menu utama" ref={navRef} className="topnav">

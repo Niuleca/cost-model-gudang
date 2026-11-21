@@ -81,6 +81,9 @@ export interface SpaceExcel {
    *  gangwayM = lebar jalur utama / cross aisle MHE (dipakai layout simulasi); lebarGudangM = L (kiri-kanan); panjangGudangM = P. */
   dasarLuas?: 'spaceRent' | 'cad';
   gangwayM?: number; lebarGudangM?: number; panjangGudangM?: number;
+  /** Building dimension (Spesifikasi 3.2e): jumlah gate inbound / outbound, loading dock (platform), bentuk trapesium
+   *  (lebar belakang ≠ lebar depan). Dipakai layout 2D / 3D otomatis. */
+  gateIn?: number; gateOut?: number; loadingDock?: boolean; lebarBelakangM?: number | null;
 }
 
 export const SPACE_EXCEL_DEFAULT: SpaceExcel = {

@@ -32,7 +32,9 @@ function Angka({ value, onValue, bulat, ...rest }: { value: number | null | unde
   }} />;
 }
 
-export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExcel, spaceH, namaCustomer, sinkron, dampak, onChange, onAturan, onSinkron }: {
+export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExcel, spaceH, namaCustomer, sinkron, dampak, onChange, onAturan, onSinkron, wajibSinkron = false }: {
+  /** Simple CM: produk selalu menjadi sumber data (tanpa pilihan mematikan) */
+  wajibSinkron?: boolean;
   produk: ProdukTender[] | undefined; aturan: AturanBerat | undefined; volumes: VolumeInput[]; profil: ProfilVolume | undefined;
   spaceExcel: Partial<SpaceExcel> | undefined; spaceH: HasilSpaceExcel | null; namaCustomer?: string;
   sinkron: boolean; dampak: PerubahanTender[];
@@ -94,7 +96,10 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
           ['Level rak (Space)', `${levelRak} level`]] as [string, string][]).map(([l, v]) => <div key={l} className="kpi"><span className="small muted">{l}</span><b>{v}</b></div>)}
       </div>
 
-      <div className="umk-box" style={{ alignItems: 'center' }}>
+      {wajibSinkron ? <div className="umk-box" style={{ alignItems: 'center' }}>
+        <span className="small"><b>Produk / SKU = sumber data.</b> Berat, CBM & tinggi per palet, isi per palet, stok storage dan level rak dihitung dari data produk di bawah —
+          tidak ada isian berat / CBM palet terpisah. {!nyata && 'Isi atau tempel produk Anda; selama belum ada, dipakai baris otomatis dari volume.'}</span>
+      </div> : <div className="umk-box" style={{ alignItems: 'center' }}>
         <label className="row" style={{ gap: 8, alignItems: 'center', margin: 0 }}>
           <input type="checkbox" checked={sinkron} onChange={e => onSinkron(e.target.checked)} style={{ width: 18, height: 18 }} />
           <b>Produk jadi sumber data tender</b></label>
@@ -102,7 +107,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
           {!nyata ? 'Aktif setelah ada produk yang Anda isi / ubah sendiri (baris otomatis saja tidak mengubah tender).'
             : sinkron ? 'Volume, Parameter muatan & Space mengikuti data produk. Matikan bila ingin mengisi tab-tab itu manual.'
               : 'Mati — tab Volume & Space tidak diubah oleh data produk.'}</span>
-      </div>
+      </div>}
       {sinkron && nyata && dampak.length > 0 && <div className="card" style={{ background: 'var(--ok-bg, #f0fdf4)', borderColor: '#bbf7d0', padding: 10 }}>
         <b className="small">Diperbarui dari data produk</b>
         <div className="tablewrap"><table className="small" style={{ margin: '4px 0 0' }}>

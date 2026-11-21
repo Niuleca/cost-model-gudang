@@ -17,7 +17,9 @@ function Baris({ l, v, u, input, tebal }: { l: string; v?: React.ReactNode; u?: 
 const Judul = ({ t }: { t: string }) => <tr className="sp-judul"><td colSpan={3}>{t}</td></tr>;
 
 /** Kebutuhan space format Excel (A–E) + visual racking level dan komposisi luas. */
-export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan, uomIn, uomOut, jumlahShift, onChange, komersial, kekuatan }: {
+export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan, uomIn, uomOut, jumlahShift, onChange, komersial, kekuatan, bagian }: {
+  /** Simple CM: tampilkan satu bagian saja — a capacity · b racking/block stack · c staging · d footprint total · e building dimension */
+  bagian?: 'a' | 'b' | 'c' | 'd' | 'e';
   excel?: Partial<SpaceExcel> | null; ppTotal: number; inboundBulan: number; outboundBulan: number; uomIn: string; uomOut: string; jumlahShift: number;
   onChange: (x: SpaceExcel) => void; komersial: React.ReactNode;
   /** dasar cek kekuatan rak & lantai: berat palet default (+ sumbernya), daya dukung lantai gudang terpilih, kapasitas beam per posisi */
@@ -102,13 +104,28 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
     { l: 'Pembulatan', v: h.spaceRent - h.subtotal, c: '#f0f0f0' },
   ].filter(k => k.v > 0.05);
 
-  return (
-    <div className="card" style={{ gap: 14 }}>
-      <h2>Space</h2>
-      <div className="sp-grid">
-        <div style={{ minWidth: 0 }}>
-          <table className="sp-tabel"><tbody>
-            <Judul t="A  Capacity Requirement" />
+
+  // ---- Simple CM: satu bagian per langkah wizard
+  if (bagian) {
+    const tabel = (rows: React.ReactNode) => <table className="sp-tabel sp-satu"><tbody>{rows}</tbody></table>;
+    const kartuRak = <div className="card sp-kartu" style={{ gap: 8 }}>
+      <h3>{(x.porsi?.spr ?? 0) + (x.porsi?.ddr ?? 0) > 0 ? 'Tinggi rak & level' : 'Tinggi block stack'}</h3>
+      <VisualRak x={x} lv={h.level} />
+      <table className="sp-tabel sp-kecil"><tbody>
+        {([['Center height', 'centerMm'], ['Side height', 'sideMm'], ['Beam', 'beamMm'], ['Pallet', 'palletMm'], ['Product', 'productMm'], ['Clearance', 'clearanceMm']] as const).map(([l, k]) => {
+          const dariPalet = k === 'palletMm' || (k === 'productMm' && (x.paletTipe ?? []).some(pp => Number(pp.tinggiProdukMm) > 0));
+          return <tr key={k}><td>{l}</td><td className="num">{dariPalet ? sp.fmt(x.rak[k], 'mm', { tanpaSatuan: true })
+            : pjn(x.rak[k], 'mm', v => set({ rak: { ...x.rak, [k]: Math.round((v ?? 0) * 1000) / 1000 } }), { w: 90 })}</td><td className="small muted">{dariPalet ? `${U} · dari Pallet / Produk` : U}</td></tr>; })}
+        <tr><td>Level manual (opsional)</td><td className="num">{inp(x.rak.levelManual ?? null, v => set({ rak: { ...x.rak, levelManual: v } }), { w: 90, kosong: true, ph: String(h.level.auto) })}</td><td className="small muted">level</td></tr>
+        <tr className="sp-hitam"><td>Rack level</td><td className="num">{angka(h.level.level, 1)}</td><td>level · tinggi {sp.fmt(h.level.tinggi, 'mm')} <span className={`pill ${h.level.ok ? 'ok' : 'bad'}`}>{h.level.ok ? 'OK' : 'Melebihi'}</span></td></tr>
+      </tbody></table>
+    </div>;
+    const kartuKomposisi = <div className="card sp-kartu" style={{ gap: 8 }}>
+      <h3>Komposisi luas · {f0(h.spaceRent)} m²</h3>
+      <div className="sp-bar" role="img" aria-label="Komposisi luas gudang">{komp.map(k => <div key={k.l} title={`${k.l}: ${f0(k.v)} m²`} style={{ flexGrow: k.v, background: k.c }} />)}</div>
+      <div className="sp-legend">{komp.map(k => <span key={k.l}><i style={{ background: k.c }} />{k.l} <b>{f0(k.v)} m²</b> <span className="muted">({angka(k.v / Math.max(1, h.spaceRent) * 100, 0)}%)</span></span>)}</div>
+    </div>;
+    if (bagian === 'a') return <div className="card">{tabel(<>            <Judul t="A  Capacity Requirement" />
             <Baris l="Total posisi palet (dari Volume storage peak)" v={<b>{f0(ppTotal)}</b>} u="PP" />
             {PorsiRow({ k: 'spr', l: 'Porsi SPR (selective pallet rack)', pp: h.sd.ppReq })}
             {PorsiRow({ k: 'ddr', l: 'Porsi DDR (double deep rack)', pp: h.dd.ppReq })}
@@ -117,13 +134,17 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
             <tr className="sp-foot"><td>Total porsi</td><td className="num"><span className={`pill ${h.porsiOk ? 'ok' : 'bad'}`}>{angka(h.totalPorsi * 100, 1)}%</span></td>
               <td className="small muted">{h.porsiOk ? 'OK' : 'harus 100%'}{!h.porsiOk && <button className="ghost" style={{ marginLeft: 6, padding: '0 8px' }}
                 onClick={() => { const sisa = Math.max(0, 1 - p.spr - p.block - p.floor); set({ porsi: { ...p, ddr: sisa } }); }}>Sisa ke DDR</button>}</td></tr>
-            {p.spr > 0 && <><Judul t="B  Racking space (SPR · Selective Pallet Rack)" />{RakRows('sd', h.sd)}</>}
-            {p.ddr > 0 && <><Judul t="C  Racking space (DDR · Double Deep Rack)" />{RakRows('dd', h.dd)}</>}
-            {p.block > 0 && <><Judul t="C2  Block stack" />{LantaiRows('block', h.block)}</>}
-            {p.floor > 0 && <><Judul t="C3  Pallet floor" />{LantaiRows('floor', h.floor)}</>}
-            <Judul t="D  Receiving & Staging" />{StgRows('inbound', h.inbound, uomIn)}
-            <Judul t="D  Outbound & Staging" />{StgRows('outbound', h.outbound, uomOut)}
-            <Judul t="E  Foot Print Requirement (TOTAL)" />
+</>)}</div>;
+    if (bagian === 'b') return <><div className="card">{tabel(<>            {p.spr > 0 && <><Judul t="B  Racking space (SPR · Selective Pallet Rack)" />{RakRows('sd', h.sd)}</>}
+            {p.ddr > 0 && <><Judul t="B  Racking space (DDR · Double Deep Rack)" />{RakRows('dd', h.dd)}</>}
+            {p.block > 0 && <><Judul t="B  Block stack" />{LantaiRows('block', h.block)}</>}
+            {p.floor > 0 && <><Judul t="B  Pallet floor" />{LantaiRows('floor', h.floor)}</>}
+</>)}
+      {p.spr + p.ddr + p.block + p.floor <= 0 && <p className="muted">Isi porsi SPR / DDR / block stack di langkah Capacity requirement.</p>}</div>{kartuRak}</>;
+    if (bagian === 'c') return <div className="card">{tabel(<>            <Judul t="C  Staging inbound (receiving)" />{StgRows('inbound', h.inbound, uomIn)}
+            <Judul t="C  Staging outbound" />{StgRows('outbound', h.outbound, uomOut)}
+</>)}</div>;
+    if (bagian === 'd') return <><div className="card">{tabel(<>            <Judul t="D  Foot Print Requirement (TOTAL)" />
             <Baris l="Racking space (SPR)" v={f0(h.sd.footprint)} u="m²" />
             <Baris l="Racking space (DDR)" v={f0(h.dd.footprint)} u="m²" />
             {h.block.footprint > 0 && <Baris l="Block stack" v={f0(h.block.footprint)} u="m²" />}
@@ -148,7 +169,78 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
               </tr>))}
             <tr><td colSpan={3}><button className="ghost" onClick={() => set({ cad: [...x.cad, { nama: x.cad.length ? 'RM' : 'PM', m2: 0 }] })}>+ Luas CAD (pembanding)</button>
               {h.cadTotal > 0 && <span className={`pill ${Math.abs(h.spaceRent - h.cadTotal) / h.cadTotal > 0.05 ? 'warn' : 'ok'}`} style={{ marginLeft: 8 }}>CAD {f0(h.cadTotal)} m² · selisih {angka((h.spaceRent / h.cadTotal - 1) * 100, 1)}%</span>}</td></tr>
-            <Judul t="F  Building dimension (P × L × T)" />
+
+            <tr><td>Acuan luas (layout & biaya sewa)</td><td colSpan={2}>
+              <div className="tabs" role="tablist" aria-label="Dasar luas sewa" style={{ display: 'inline-flex' }}>
+                {([['spaceRent', 'Space Rent (kalkulasi)'], ['cad', 'Ukuran CAD']] as const).map(([v, l]) =>
+                  <button key={v} type="button" role="tab" aria-selected={(x.dasarLuas ?? 'spaceRent') === v} className={(x.dasarLuas ?? 'spaceRent') === v ? 'on' : ''} onClick={() => set({ dasarLuas: v })}>{l}</button>)}
+              </div></td></tr>
+      </>)}</div>{kartuKomposisi}</>;
+    return <><div className="card">{tabel(<>            {(x.dasarLuas ?? 'spaceRent') === 'cad'
+              ? <Baris l="Panjang (P) — dari CAD" input={pjn(x.panjangGudangM ?? null, 'm', v => set({ panjangGudangM: v ?? undefined }), { kosong: true })} u={U} />
+              : <Baris l="Panjang (P) = luas ÷ L" v={sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true, desimal: U === 'm' ? 1 : 0 })} u={`${U} (otomatis)`} />}
+            <Baris l="Lebar (L) — kiri-kanan" input={pjn(x.lebarGudangM ?? null, 'm', v => set({ lebarGudangM: v ?? undefined }), { kosong: true, ph: h.dimensi.lebarM })} u={U} />
+            <Baris l="Tinggi sisi (T)" input={pjn(x.rak.sideMm, 'mm', v => set({ rak: { ...x.rak, sideMm: Math.round(v ?? 0) } }), { w: 80 })} u={`${U} · sama dengan Side height`} />
+            <Baris l="Tinggi tengah / puncak" input={pjn(x.rak.centerMm, 'mm', v => set({ rak: { ...x.rak, centerMm: Math.round(v ?? 0) } }), { w: 80 })} u={`${U} · sama dengan Center height`} />
+            <Baris l="Gangway (lebar jalur utama MHE)" input={pjn(x.gangwayM != null && x.gangwayM <= 8 ? x.gangwayM : null, 'm', v => set({ gangwayM: v ?? undefined }), { kosong: true, ph: 3.5 })} u={`${U} · dipakai layout simulasi`} />
+            <tr className="sp-hitam"><td>Luas dipakai cost model</td><td className="num">{f0(h.luasDipakai)}</td><td>m² · {h.dimensi.dasar === 'cad' ? `CAD ${sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true })} × ${sp.fmt(h.dimensi.lebarM, 'm')}` : 'Space Rent'}
+              {h.dimensi.dasar === 'cad' && h.spaceRent > 0 && <span className={`pill ${Math.abs(h.luasDipakai / h.spaceRent - 1) > 0.05 ? 'warn' : 'ok'}`} style={{ marginLeft: 6 }}>vs kalkulasi {f0(h.spaceRent)} m² ({angka((h.luasDipakai / h.spaceRent - 1) * 100, 1)}%)</span>}</td></tr>
+            <Baris l="Jumlah gate inbound" input={inp(x.gateIn ?? null, v => set({ gateIn: v && v > 0 ? Math.round(v) : undefined }), { w: 80, kosong: true, ph: '2' })} u="pintu · dipakai layout 2D / 3D" />
+            <Baris l="Jumlah gate outbound" input={inp(x.gateOut ?? null, v => set({ gateOut: v && v > 0 ? Math.round(v) : undefined }), { w: 80, kosong: true, ph: '2' })} u="pintu · dipakai layout 2D / 3D" />
+            <tr><td>Loading dock</td><td colSpan={2}><div className="tabs" role="tablist" aria-label="Loading dock" style={{ display: 'inline-flex' }}>
+              {([[true, 'Ada'], [false, 'Tidak ada']] as const).map(([v, l]) => <button key={l} type="button" role="tab" aria-selected={!!x.loadingDock === v} className={!!x.loadingDock === v ? 'on' : ''} onClick={() => set({ loadingDock: v })}>{l}</button>)}
+              </div> <span className="small muted">platform beton digambar di layout</span></td></tr>
+            <Baris l="Lebar belakang (bentuk trapesium)" input={pjn(x.lebarBelakangM ?? null, 'm', v => set({ lebarBelakangM: v && v > 0 ? v : null }), { kosong: true })} u={`${U} · kosong = persegi panjang (lebar depan = belakang)`} />
+</>)}</div>{kekuatan && <KekuatanRak x={x} set={set} inp={inp} pjn={pjn} o={kekuatan} />}</>;
+  }
+
+  return (
+    <div className="card" style={{ gap: 14 }}>
+      <h2>Space</h2>
+      <div className="sp-grid">
+        <div style={{ minWidth: 0 }}>
+          <table className="sp-tabel"><tbody>
+            <Judul t="A  Capacity Requirement" />
+            <Baris l="Total posisi palet (dari Volume storage peak)" v={<b>{f0(ppTotal)}</b>} u="PP" />
+            {PorsiRow({ k: 'spr', l: 'Porsi SPR (selective pallet rack)', pp: h.sd.ppReq })}
+            {PorsiRow({ k: 'ddr', l: 'Porsi DDR (double deep rack)', pp: h.dd.ppReq })}
+            {PorsiRow({ k: 'block', l: 'Porsi block stack (palet ditumpuk)', pp: h.block.ppReq })}
+            {PorsiRow({ k: 'floor', l: 'Porsi pallet floor (palet di lantai)', pp: h.floor.ppReq })}
+            <tr className="sp-foot"><td>Total porsi</td><td className="num"><span className={`pill ${h.porsiOk ? 'ok' : 'bad'}`}>{angka(h.totalPorsi * 100, 1)}%</span></td>
+              <td className="small muted">{h.porsiOk ? 'OK' : 'harus 100%'}{!h.porsiOk && <button className="ghost" style={{ marginLeft: 6, padding: '0 8px' }}
+                onClick={() => { const sisa = Math.max(0, 1 - p.spr - p.block - p.floor); set({ porsi: { ...p, ddr: sisa } }); }}>Sisa ke DDR</button>}</td></tr>
+            {p.spr > 0 && <><Judul t="B  Racking space (SPR · Selective Pallet Rack)" />{RakRows('sd', h.sd)}</>}
+            {p.ddr > 0 && <><Judul t="B  Racking space (DDR · Double Deep Rack)" />{RakRows('dd', h.dd)}</>}
+            {p.block > 0 && <><Judul t="B  Block stack" />{LantaiRows('block', h.block)}</>}
+            {p.floor > 0 && <><Judul t="B  Pallet floor" />{LantaiRows('floor', h.floor)}</>}
+            <Judul t="C  Staging inbound (receiving)" />{StgRows('inbound', h.inbound, uomIn)}
+            <Judul t="C  Staging outbound" />{StgRows('outbound', h.outbound, uomOut)}
+            <Judul t="D  Foot Print Requirement (TOTAL)" />
+            <Baris l="Racking space (SPR)" v={f0(h.sd.footprint)} u="m²" />
+            <Baris l="Racking space (DDR)" v={f0(h.dd.footprint)} u="m²" />
+            {h.block.footprint > 0 && <Baris l="Block stack" v={f0(h.block.footprint)} u="m²" />}
+            {h.floor.footprint > 0 && <Baris l="Pallet floor" v={f0(h.floor.footprint)} u="m²" />}
+            <Baris l="Receiving & Staging" v={f0(h.inbound.footprint)} u="m²" />
+            <Baris l="Outbound & Staging" v={f0(h.outbound.footprint)} u="m²" />
+            {x.fasilitas.map((fa, i) => (
+              <tr key={i}>
+                <td><input aria-label="Nama fasilitas" value={fa.nama} onChange={e => set({ fasilitas: x.fasilitas.map((y, j) => j === i ? { ...y, nama: e.target.value } : y) })} style={{ minWidth: 200 }} /></td>
+                <td className="num">{inp(fa.m2, v => set({ fasilitas: x.fasilitas.map((y, j) => j === i ? { ...y, m2: v ?? 0 } : y) }))}</td>
+                <td><button className="ghost" aria-label="Hapus fasilitas" style={{ padding: '0 8px' }} onClick={() => set({ fasilitas: x.fasilitas.filter((_, j) => j !== i) })}>×</button></td>
+              </tr>))}
+            <tr><td colSpan={3}><button className="ghost" onClick={() => set({ fasilitas: [...x.fasilitas, { nama: 'Area baru', m2: 0 }] })}>+ Fasilitas</button></td></tr>
+            <tr className="sp-judul"><td>Total</td><td className="num">{f0(h.subtotal)}</td><td>m²</td></tr>
+            <Baris l="Dibulatkan ke atas kelipatan" input={inp(x.pembulatan, v => set({ pembulatan: v ?? 1 }), { w: 64 })} u="m²" />
+            <tr className="sp-rent"><td>Space Rent</td><td className="num">{angka(h.spaceRent, 2)}</td><td>m²</td></tr>
+            {x.cad.map((c, i) => (
+              <tr key={`cad${i}`} className="sp-rent">
+                <td>Based on CAD · <input aria-label="Area CAD" value={c.nama} onChange={e => set({ cad: x.cad.map((y, j) => j === i ? { ...y, nama: e.target.value } : y) })} style={{ width: 90, minWidth: 90 }} /></td>
+                <td className="num">{inp(c.m2, v => set({ cad: x.cad.map((y, j) => j === i ? { ...y, m2: v ?? 0 } : y) }))}</td>
+                <td><button className="ghost" aria-label="Hapus CAD" style={{ padding: '0 8px' }} onClick={() => set({ cad: x.cad.filter((_, j) => j !== i) })}>×</button></td>
+              </tr>))}
+            <tr><td colSpan={3}><button className="ghost" onClick={() => set({ cad: [...x.cad, { nama: x.cad.length ? 'RM' : 'PM', m2: 0 }] })}>+ Luas CAD (pembanding)</button>
+              {h.cadTotal > 0 && <span className={`pill ${Math.abs(h.spaceRent - h.cadTotal) / h.cadTotal > 0.05 ? 'warn' : 'ok'}`} style={{ marginLeft: 8 }}>CAD {f0(h.cadTotal)} m² · selisih {angka((h.spaceRent / h.cadTotal - 1) * 100, 1)}%</span>}</td></tr>
+            <Judul t="E  Building dimension (P × L × T)" />
             <tr><td>Dasar luas sewa</td><td colSpan={2}>
               <div className="tabs" role="tablist" aria-label="Dasar luas sewa" style={{ display: 'inline-flex' }}>
                 {([['spaceRent', 'Space Rent (kalkulasi)'], ['cad', 'Ukuran CAD']] as const).map(([v, l]) =>
@@ -163,6 +255,12 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
             <Baris l="Gangway (lebar jalur utama MHE)" input={pjn(x.gangwayM != null && x.gangwayM <= 8 ? x.gangwayM : null, 'm', v => set({ gangwayM: v ?? undefined }), { kosong: true, ph: 3.5 })} u={`${U} · dipakai layout simulasi`} />
             <tr className="sp-hitam"><td>Luas dipakai cost model</td><td className="num">{f0(h.luasDipakai)}</td><td>m² · {h.dimensi.dasar === 'cad' ? `CAD ${sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true })} × ${sp.fmt(h.dimensi.lebarM, 'm')}` : 'Space Rent'}
               {h.dimensi.dasar === 'cad' && h.spaceRent > 0 && <span className={`pill ${Math.abs(h.luasDipakai / h.spaceRent - 1) > 0.05 ? 'warn' : 'ok'}`} style={{ marginLeft: 6 }}>vs kalkulasi {f0(h.spaceRent)} m² ({angka((h.luasDipakai / h.spaceRent - 1) * 100, 1)}%)</span>}</td></tr>
+            <Baris l="Jumlah gate inbound" input={inp(x.gateIn ?? null, v => set({ gateIn: v && v > 0 ? Math.round(v) : undefined }), { w: 80, kosong: true, ph: '2' })} u="pintu · dipakai layout 2D / 3D" />
+            <Baris l="Jumlah gate outbound" input={inp(x.gateOut ?? null, v => set({ gateOut: v && v > 0 ? Math.round(v) : undefined }), { w: 80, kosong: true, ph: '2' })} u="pintu · dipakai layout 2D / 3D" />
+            <tr><td>Loading dock</td><td colSpan={2}><div className="tabs" role="tablist" aria-label="Loading dock" style={{ display: 'inline-flex' }}>
+              {([[true, 'Ada'], [false, 'Tidak ada']] as const).map(([v, l]) => <button key={l} type="button" role="tab" aria-selected={!!x.loadingDock === v} className={!!x.loadingDock === v ? 'on' : ''} onClick={() => set({ loadingDock: v })}>{l}</button>)}
+              </div> <span className="small muted">platform beton digambar di layout</span></td></tr>
+            <Baris l="Lebar belakang (bentuk trapesium)" input={pjn(x.lebarBelakangM ?? null, 'm', v => set({ lebarBelakangM: v && v > 0 ? v : null }), { kosong: true })} u={`${U} · kosong = persegi panjang (lebar depan = belakang)`} />
           </tbody></table>
         </div>
 
