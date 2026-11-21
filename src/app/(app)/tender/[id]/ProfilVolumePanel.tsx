@@ -5,6 +5,7 @@ import type { VolumeInput } from '@/lib/engine/types';
 import { angka } from '@/lib/format';
 import {
   hitungProfil, volumePalet, orderAdmin, KENDARAAN_DEFAULT, kendaraanAwal, MODA, MUATAN, muatanBaris, PARAM_DEFAULT, SATUAN_UNIT, TON_KONTAINER,
+  JALUR, jalurBaris, jalurKontainer, labelJalur, barisJalur,
   type BarisProfil, type BasisVolume, type Kendaraan, type ProfilVolume,
 } from '@/lib/profilVolume';
 
@@ -14,8 +15,10 @@ const BASIS: { v: BasisVolume; l: string }[] = [
 const pct = (x: number) => `${(x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
 
 /** Profil order inbound/outbound: volume/bln dari tabel Volume ÷ hari operasional → dipecah per moda (%) → mobil per hari. */
-export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onChange, ringkas = false, judul }: {
+export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onChange, ringkas = false, judul, pakaiJalur = false }: {
   judul?: string;
+  /** Simple CM: tiap baris milik satu jalur (import / local / export / inland / sea / air / rail); pilihan moda menyesuaikan jalur */
+  pakaiJalur?: boolean;
   profil?: ProfilVolume; volumes: VolumeInput[]; hariBulan: number; onChange: (p: ProfilVolume) => void;
   /** Key Assumption: hanya moda & kendaraan (tanpa rincian rumus, order admin, kapasitas kendaraan) — data sama dengan tab Volume */
   ringkas?: boolean;
@@ -39,12 +42,12 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
     return (
       <div style={{ minWidth: 0, display: 'grid', gap: 8 }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h3>{out ? 'Outbound (export kontainer / lokal truk)' : 'Inbound (import kontainer / lokal · pabrik truk)'}</h3>
+          <h3>{pakaiJalur ? (out ? 'Outbound' : 'Inbound') : out ? 'Outbound (export kontainer / lokal truk)' : 'Inbound (import kontainer / lokal · pabrik truk)'}</h3>
           <span className="pill info">{angka(vp.paletBulan)} palet/bln ÷ {hariBulan} hari = <b>{angka(paletHari, 1)} palet/hari</b></span>
         </div>
         {vp.ket && <p className="small" style={{ color: 'var(--warn, #b45309)' }}>{vp.ket}</p>}
         <div className="tablewrap"><table>
-          <thead><tr><th>Moda & cara muat</th><th className="num">Porsi</th><th className="num">Palet/hari</th><th>Konversi</th><th className="num">Qty/hari</th>
+          <thead><tr><th>{pakaiJalur ? 'Jalur, moda & cara muat' : 'Moda & cara muat'}</th><th className="num">Porsi</th><th className="num">Palet/hari</th><th>Konversi</th><th className="num">Qty/hari</th>
             <th>Kendaraan</th><th className="num">Mobil/hari</th><th>Cek muatan per mobil</th><th></th></tr></thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={9} className="muted">Belum ada. Tambah moda di bawah lalu isi porsinya (%).</td></tr>}
@@ -54,9 +57,10 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
               const mu = muatanBaris(r);
               const m = x.mobil;
               return <Fragment key={i}><tr>
-                <td><select aria-label="Moda" value={r.moda} onChange={e => set(i, { moda: e.target.value as BarisProfil['moda'] })} style={{ minWidth: 170 }}>
-                  <optgroup label={out ? 'Export · kontainer' : 'Import · kontainer'}>{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>
-                  <optgroup label={out ? 'Lokal / distribusi · truk' : 'Lokal / pabrik · truk'}>{MODA.filter(o => !o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup></select>
+                <td>{pakaiJalur && <div className="small" style={{ marginBottom: 4 }}><b>{labelJalur(jalurBaris(r, arus))}</b></div>}
+                  <select aria-label="Moda" value={r.moda} onChange={e => set(i, { moda: e.target.value as BarisProfil['moda'], ...(pakaiJalur ? { jalur: jalurBaris(r, arus) } : {}) })} style={{ minWidth: 170 }}>
+                  <optgroup label={pakaiJalur ? 'Kontainer' : out ? 'Export · kontainer' : 'Import · kontainer'}>{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>
+                  {!(pakaiJalur && jalurKontainer(jalurBaris(r, arus))) && <optgroup label={pakaiJalur ? 'Truk' : out ? 'Lokal / distribusi · truk' : 'Lokal / pabrik · truk'}>{MODA.filter(o => !o.v.startsWith('cont')).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</optgroup>}</select>
                   {isKont && <select aria-label="Cara muat" value={mu} onChange={e => set(i, { muatan: e.target.value as BarisProfil['muatan'] })} style={{ minWidth: 170, marginTop: 4 }}>
                     {MUATAN.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
                   {mu === 'unit' && <select aria-label="Satuan" value={r.satuanUnit ?? 'pcs'} onChange={e => set(i, { satuanUnit: e.target.value })} style={{ minWidth: 80, marginTop: 4 }}>{SATUAN_UNIT.map(u => <option key={u}>{u}</option>)}</select>}</td>
@@ -139,7 +143,9 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
         {rows.length > 0 && Math.abs(sisa) > 0.001 && <p className="small" style={{ color: 'var(--bad, #b91c1c)' }}>
           Total porsi {pct(h.totalPersen)} — {sisa > 0 ? `masih kurang ${pct(sisa)}` : `lebih ${pct(-sisa)}`} agar 100%.</p>}
         <div className="row">
-          <button className="ghost" onClick={() => onChange({ ...p, [arus]: [...rows, { moda: rows.length ? 'case' : (out ? 'palet' : 'cont40hc'), persen: Math.max(0, Math.round(sisa * 1000) / 1000) }] })}>+ Tambah moda</button>
+          {pakaiJalur
+            ? JALUR[arus].map(j => <button key={j.v} className="ghost" onClick={() => onChange({ ...p, [arus]: [...rows, barisJalur(j.v, Math.max(0, Math.round(sisa * 1000) / 1000))] })}>+ {j.l}</button>)
+            : <button className="ghost" onClick={() => onChange({ ...p, [arus]: [...rows, { moda: rows.length ? 'case' : (out ? 'palet' : 'cont40hc'), persen: Math.max(0, Math.round(sisa * 1000) / 1000) }] })}>+ Tambah moda</button>}
         </div>
       </div>);
   };
@@ -149,6 +155,9 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
       <h2>{judul ? <T>{judul}</T> : ringkas ? <T>Moda transport inbound & outbound</T> : <T>Profil order inbound & outbound (per hari)</T>}</h2>
       {ringkas ? <p className="small muted">Kendaraan yang dipakai saat <b>inbound</b> (import: kontainer 20ft / 40ft / 40HC dengan batas tonase; lokal / pabrik: truk dengan muatan palet, case atau pcs) dan
         <b> outbound</b> (export: kontainer; lokal: truk). Jumlah kontainer / mobil per hari dihitung otomatis dari volume, dan menjadi dasar order line admin (Value Stream Mapping).</p>
+      : pakaiJalur ? <p className="small muted">Volume per bulan (langkah 2.1) ÷ hari operasional = palet per hari, dibagi per jalur sesuai porsi di <b>1.7 Workload transportation</b>.
+        Pilih moda & cara muat tiap jalur: jalur kontainer (import / export / sea / air / rail) memakai 20ft / 40ft / 40HC; local & inland boleh truk atau kontainer.
+        Jumlah kontainer / mobil per hari = kebutuhan terbesar antara palet, CBM dan berat dibanding kapasitasnya (dibulatkan ke atas).</p>
       : <p className="small muted">Mengikuti volume di tabel Volume: volume per bulan ÷ hari operasional = palet per hari, lalu dipecah per moda sesuai porsi (%).
         Berlaku untuk kontainer 20ft / 40ft / 40HC maupun land transport (truk), inbound & outbound — tidak hanya import/export. Cara muat: <b>palletize</b> (dibatasi jumlah palet, CBM, berat) atau <b>loose case/karton/pcs</b> (case = palet × case/palet; CBM & berat dari parameter per case).
         Kontainer/mobil per hari = kebutuhan terbesar antara palet, CBM, dan berat dibanding kapasitas kontainer/kendaraan (dibulatkan ke atas per moda). Kapasitas kontainer bisa diubah di "Kapasitas kendaraan".</p>}
@@ -157,7 +166,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
           <select value={basis} onChange={e => onChange({ ...p, basis: e.target.value as BasisVolume })} style={{ minWidth: 170 }}>
             {BASIS.map(b => <option key={b.v} value={b.v}>{b.l}</option>)}</select></label>
         <span className="small muted" style={{ alignSelf: 'center' }}>Muatan: <b>{(p.param.tonPerPalet * 1000).toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerPalet.toLocaleString('id-ID')} CBM</b> per palet ·
-          {' '}<b>{p.param.kgPerCase.toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerCase.toLocaleString('id-ID')} CBM</b> per case — diatur di <b>Parameter muatan</b> di atas</span>
+          {' '}<b>{p.param.kgPerCase.toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerCase.toLocaleString('id-ID')} CBM</b> per case — diatur di <b>Parameter muatan</b>{pakaiJalur ? ' (langkah 2.1)' : ' di atas'}</span>
         <label className="f" title="Inbound: barang masuk + put away; outbound: picking + barang keluar">Input admin per mobil {n(p.param.inputAdminPerMobil ?? 2, v => setParam('inputAdminPerMobil', v), 90)}</label>
         <label className="f" title="CBM efektif = CBM kendaraan × pemakaian; sisanya toleransi (ruang tidak terpakai)">Pemakaian ruang muat (CBM)
           <span className="row" style={{ flexWrap: 'nowrap', gap: 2 }}>{n(Math.round((p.param.utilCbm ?? 0.9) * 1000) / 10, v => setParam('utilCbm', Math.min(100, Math.max(1, v)) / 100), 70)}%

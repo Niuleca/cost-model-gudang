@@ -62,8 +62,54 @@ export interface BarisProfil {
   casePerPalet?: number;       // default dari konversi Volume
   unitPerCase?: number;        // default dari konversi Volume
   kendaraan?: string;          // palet / case / unit
+  /** Jalur transport (Workload transportation): inbound import / local; outbound export / inland / sea / air / rail.
+   *  Kosong = ditebak dari moda (kontainer → import / export, truk → local / inland). */
+  jalur?: Jalur;
   /** lama (versi qty/bln) — diabaikan */
   qty?: number;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Workload transportation (Spesifikasi Tender Warehouse 1.8) — porsi volume per jalur transport.
+export type Jalur = 'import' | 'local' | 'export' | 'inland' | 'sea' | 'air' | 'rail';
+export const JALUR: Record<'inbound' | 'outbound', { v: Jalur; l: string; kontainer: boolean }[]> = {
+  inbound: [{ v: 'import', l: 'Import', kontainer: true }, { v: 'local', l: 'Local', kontainer: false }],
+  outbound: [
+    { v: 'export', l: 'Export', kontainer: true }, { v: 'inland', l: 'Inland transport', kontainer: false },
+    { v: 'sea', l: 'Sea freight', kontainer: true }, { v: 'air', l: 'Air freight', kontainer: true }, { v: 'rail', l: 'Rail freight', kontainer: true },
+  ],
+};
+export const labelJalur = (j: Jalur) => [...JALUR.inbound, ...JALUR.outbound].find(x => x.v === j)?.l ?? j;
+/** Jalur yang hanya memakai kontainer (import / export / sea / air / rail); local & inland boleh truk maupun kontainer. */
+export const jalurKontainer = (j: Jalur) => [...JALUR.inbound, ...JALUR.outbound].find(x => x.v === j)?.kontainer ?? false;
+/** Jalur baris profil — tersimpan, atau ditebak dari moda untuk data lama. */
+export function jalurBaris(r: BarisProfil, arus: 'inbound' | 'outbound'): Jalur {
+  if (r.jalur && JALUR[arus].some(x => x.v === r.jalur)) return r.jalur;
+  return isKontainer(r.moda) ? (arus === 'inbound' ? 'import' : 'export') : (arus === 'inbound' ? 'local' : 'inland');
+}
+/** Total porsi (0..1) per jalur dari baris profil. */
+export function porsiJalur(rows: BarisProfil[], arus: 'inbound' | 'outbound'): Record<Jalur, number> {
+  const out = Object.fromEntries(JALUR[arus].map(x => [x.v, 0])) as Record<Jalur, number>;
+  for (const r of rows) { const j = jalurBaris(r, arus); out[j] = (out[j] ?? 0) + (Number(r.persen) || 0); }
+  return out;
+}
+/** Baris default untuk jalur baru: kontainer 40HC loose case untuk jalur kontainer; truk palletize untuk local / inland. */
+export function barisJalur(j: Jalur, persen: number): BarisProfil {
+  return jalurKontainer(j) ? { jalur: j, moda: 'cont40hc', muatan: 'case', persen } : { jalur: j, moda: 'palet', kendaraan: KENDARAAN_AWAL, persen };
+}
+/** Terapkan porsi per jalur ke baris profil: baris jalur yang sama diskalakan proporsional (atau dibagi rata bila semuanya 0),
+ *  jalur baru mendapat baris default, jalur 0% dihapus barisnya. Urutan mengikuti daftar jalur. */
+export function terapkanPorsiJalur(rows: BarisProfil[], arus: 'inbound' | 'outbound', porsi: Partial<Record<Jalur, number>>): BarisProfil[] {
+  const hasil: BarisProfil[] = [];
+  for (const { v } of JALUR[arus]) {
+    const target = Math.max(0, Number(porsi[v]) || 0);
+    if (target <= 0) continue;
+    const milik = rows.filter(r => jalurBaris(r, arus) === v).map(r => ({ ...r, jalur: v }));
+    if (!milik.length) { hasil.push(barisJalur(v, target)); continue; }
+    const tot = milik.reduce((s, r) => s + (Number(r.persen) || 0), 0);
+    for (const r of milik) hasil.push({ ...r, persen: tot > 0 ? (Number(r.persen) || 0) / tot * target : target / milik.length });
+  }
+  return hasil;
 }
 /** Parameter muatan (satu sumber untuk profil order & tarif storage alternatif). tonPerPalet disimpan dalam ton, ditampilkan sebagai kg. */
 export interface ParamProfil { tonPerPalet: number; cbmPerPalet: number; cbmPerCase: number; kgPerCase: number; literPerPalet?: number; inputAdminPerMobil?: number;

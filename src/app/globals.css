@@ -1098,8 +1098,39 @@ td.td-isian { background: #fffaf0; }
 .komposisi-legenda a:hover { text-decoration: underline; }
 .rincian-bar { position: sticky; top: 64px; z-index: 6; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 8px 0 12px; padding: 10px 14px; border-radius: 10px; background: #fff7ed; border: 1px solid #fdba74; }
 .rincian-bar button { white-space: nowrap; }
-.alur-simple { display: grid; gap: 6px; margin: 4px 0 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
-.alur-simple > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
-.alur-langkah { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
-.alur-langkah i { font-style: normal; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--surface); font-size: 11px; font-weight: 600; }
-.lanjut-simple { margin: 16px 0 8px; align-items: center; }
+.wiz-bawah { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wiz-bawah > .row { margin: 0; }
+/* Simple CM Warehouse — wizard */
+.wiz-mati { display: contents; }
+.wiz { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 8px; }
+.wiz-isi { min-width: 0; display: grid; gap: 14px; align-content: start; }
+.wiz-isi > .ro-fieldset { display: grid; gap: 14px; min-width: 0; }
+.wiz-nav { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow: auto; display: grid; gap: 4px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.wiz-menu { border-radius: 8px; }
+.wiz-menu.on { background: var(--surface-2); }
+.wiz-menu-judul { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 8px; font-weight: 600; }
+.wiz-menu-judul:focus-visible, .wiz-menu ol button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; border-radius: 6px; }
+.wiz-menu-judul i { font-style: normal; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--surface); font-size: 12px; }
+.wiz-menu-judul span { flex: 1; }
+.wiz-menu-judul small { font-weight: 500; color: var(--muted); font-size: 12px; }
+.wiz-menu-judul small.ok { color: var(--ok, #15803d); }
+.wiz-menu ol { list-style: none; margin: 0 0 6px; padding: 0 0 0 20px; display: grid; gap: 1px; }
+.wiz-menu:not(.on) ol { display: none; }
+.wiz-menu ol button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 6px; font-size: 13px; line-height: 1.35; color: var(--ink); }
+.wiz-menu ol button:hover { background: var(--line); }
+.wiz-menu ol button.on { background: var(--ink); color: var(--surface); }
+.wiz-st { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 700; border: 1px solid var(--line-strong); color: var(--muted); background: var(--surface); }
+.wiz-st.ok { background: var(--ok, #15803d); border-color: var(--ok, #15803d); color: #fff; }
+.wiz-st.kurang { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+.wiz-lengkap { padding: 8px; margin-top: 4px; border-top: 1px solid var(--line); }
+.wiz-kepala { display: grid; gap: 4px; padding: 2px 2px 4px; }
+.wiz-judul { display: flex; align-items: center; gap: 10px; font: 600 22px/1.25 var(--display, inherit); }
+.wiz-judul i { font-style: normal; font-size: 13px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--ink); color: var(--surface); }
+.vol-grup { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+.vol-grup:first-of-type { border-top: 0; }
+@media (max-width: 900px) {
+  .wiz { grid-template-columns: 1fr; }
+  .wiz-nav { position: static; max-height: none; }
+  .wiz-menu:not(.on) ol { display: none; }
+}
