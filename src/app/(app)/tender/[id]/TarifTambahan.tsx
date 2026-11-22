@@ -101,16 +101,16 @@ export function BarisTambahan({ h, nilai, onUbah, ppnInclude }: { h: HasilTender
           <td><PilihSatuan nilai={x.satuan} set={v => ubah(x.id, { satuan: v })} /></td>
           <td className="num"><input aria-label="Estimasi volume per bulan" type="number" value={x.volumeBulan ?? ''} placeholder="est. vol" onChange={e => ubah(x.id, { volumeBulan: num(e.target.value) })} {...inp(80)} /></td>
           <td className="num">{c && c.biayaBulan > 0 ? rp(c.biayaBulan) : '—'}</td>
-          <td className="num">{c ? rp(c.biayaPerUnit) : '…'}</td>
+          <td className="num k-unit">{c ? rp(c.biayaPerUnit) : '…'}</td>
           <td className="num">{c?.tarifDiubah ? <>{c.biayaPerUnit > 0 ? persen(c.gpDipakai) : '—'}<div className="dasar-def">dari tarif</div></> : <>
             <input aria-label="GP tarif tambahan" type="number" step="0.1" value={x.gp == null ? '' : Math.round(x.gp * 1000) / 10}
               placeholder={c ? String(Math.round(c.gpDipakai * 1000) / 10) : ''} onChange={e => ubah(x.id, { gp: e.target.value === '' ? null : Number(e.target.value) / 100 })} {...inp(64)} />%</>}</td>
-          <td className="num">{c && c.pendapatanBulan > 0 ? <>{rp(c.pendapatanBulan)}<div className="dasar-def">GP {rp(c.gpBulan)}</div></> : '—'}</td>
+          <td className="num k-harga">{c && c.pendapatanBulan > 0 ? <>{rp(c.pendapatanBulan)}<div className="dasar-def">GP {rp(c.gpBulan)}</div></> : '—'}</td>
           <td className={`num${ppnInclude ? '' : ' tier-kini'}`}>
             <input aria-label="Tarif tambahan excl PPN" type="number" value={tarifDiisi ? x.tarif : ''} placeholder={c ? String(c.tarifDefault || '') : ''}
               onChange={e => ubah(x.id, { tarif: num(e.target.value) })} {...inp(100)} style={{ width: 100, minWidth: 100, textAlign: 'right', fontWeight: 700 }} />
             <div className="dasar-def">{tarifDiisi ? <>diubah · <button className="link-kecil" onClick={() => ubah(x.id, { tarif: undefined })}>default {c ? rp(c.tarifDefault) : ''}</button></> : `default ${c ? rp(c.tarifPerUnit) : ''}`}</div></td>
-          <td className="num">{c ? rp(c.ppnPerUnit) : ''}</td>
+          <td className="num k-ppn">{c ? rp(c.ppnPerUnit) : ''}</td>
           <td className="num"><span className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>{c ? rp(c.tarifInclPpn) : ''}
             <button className="danger" aria-label="Hapus layanan tambahan" title="Hapus" onClick={() => onUbah(nilai.filter(y => y.id !== x.id))}>×</button></span></td>
         </tr>,

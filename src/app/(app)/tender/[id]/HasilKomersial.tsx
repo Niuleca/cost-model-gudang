@@ -7,6 +7,7 @@ import type { HasilTender, Bucket } from '@/lib/engine/index.ts';
 import { rp, angka, persen, BUCKET_LABEL, labelKelompok } from '@/lib/format';
 import type { TarifTambahanInput } from '@/lib/engine/index.ts';
 import { LayananDijual, BarisTambahan } from './TarifTambahan';
+import Grafik, { ringkasRp } from '@/components/Grafik';
 
 export interface Kurs { kode: string; rupiahPer: number; tanggal?: string }
 const MATA_UANG: { kode: string; nama: string }[] = [
@@ -19,7 +20,9 @@ const fmtAsing = (v: number, kode: string) => new Intl.NumberFormat('en-US', { s
 
 /** Rate card dengan margin input user, total margin, simulasi bulanan/tahunan, konversi mata uang, porsi biaya per kategori. */
 export interface Pajak { pph: 'include' | 'exclude'; ppn: 'include' | 'exclude'; ppnPersen: number }
-export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, bagian = 'semua', basisTarif, onBasisTarif , onBukaKategori}: {
+export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs, kontrakBulan, pajak, onPajak, uomRateCard, onUomRateCard, uomManual, onUomManual, layananJual, onLayananJual, tambahan, onTambahan, hariTarif, onHariTarif, bagian = 'semua', basisTarif, onBasisTarif , onBukaKategori, ringkas = false}: {
+  /** Simple CM: tampilan ringkas — pengaturan dilipat, kolom inti saja, grafik */
+  ringkas?: boolean;
   basisTarif?: Partial<BasisTarif>; onBasisTarif?: (b: BasisTarif) => void;
   /** 'harga' = rate card, margin, simulasi & kurs · 'biaya' = porsi & rincian biaya · 'semua' = keduanya */
   bagian?: 'harga' | 'biaya' | 'semua' | 'tarif' | 'kurs' | 'capex' | 'porsi';
@@ -59,9 +62,10 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
   const kelompok = Object.entries(h.perKelompok ?? {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const totK = kelompok.reduce((s, [, v]) => s + v, 0) || 1;
 
-  return (<>
-    {(bagian === 'harga' || bagian === 'semua' || bagian === 'tarif') && <div className="card">
-      <h2>Rate card & margin</h2>
+  const rk = ringkas && bagian === 'tarif';
+  const btR = { ...BASIS_TARIF_DEFAULT, ...(basisTarif ?? {}) };
+  const labelSkenario = (x: string) => x === 'Volume komitmen' ? 'Volume komitmen (MGV)' : x === 'Volume min' ? 'Volume min (terendah)' : x === 'Volume rata-rata' ? 'Volume mid (rata-rata)' : x === 'Volume peak' ? 'Volume max (peak)' : x;
+  const pengaturan = <>
       <fieldset className="isian">
       <legend>Isian Anda · pajak & layanan yang dijual</legend>
       <div className="pajak-bar">
@@ -99,8 +103,18 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
         </div>; })()}
       </fieldset>
       <p className="small muted legenda-isian"><span className="contoh-isian" /> kolom berwarna = isian Anda (satuan tarif & GP%); kolom lain = hasil hitung.</p>
-      <div className="tablewrap"><table>
-        <thead><tr><th>Layanan</th><th className="th-isian">Satuan tarif / UoM</th><th className="num">Volume {h.rateCard[0]?.basisVolume ?? 'komitmen'}</th><th className="num">Biaya/bln</th><th className="num">Biaya/unit</th><th className="num th-isian">GP% (isian)</th><th className="num">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
+  </>;
+  return (<>
+    {(bagian === 'harga' || bagian === 'semua' || bagian === 'tarif') && <div className="card">
+      {rk ? <>
+        <div className="sc-kepala"><h2 style={{ margin: 0 }}>Rate card & margin</h2>
+          {mt && <div className="rk-chip"><span>Total GP <b>{persen(mt.gpPersen ?? 0)}</b></span><span>Biaya <b>{rp(mt.biayaBulan)}</b>/bln</span><span>Harga <b>{rp(mt.hargaBulan)}</b>/bln</span></div>}</div>
+        <details className="rk-atur"><summary>Pengaturan pajak, layanan dijual & dasar volume
+          <span className="small muted"> · PPh {pajak.pph} · PPN {pajak.ppn} {Math.round(pajak.ppnPersen * 1000) / 10}% · basis {btR.pakaiMgv ? 'MGV' : btR.basis}</span></summary>
+          <div className="rk-atur-isi">{pengaturan}</div></details>
+      </> : <><h2>Rate card & margin</h2>{pengaturan}</>}
+      <div className="tablewrap"><table className={rk ? 'rk-tabel' : undefined}>
+        <thead><tr><th>Layanan</th><th className="th-isian">Satuan tarif / UoM</th><th className="num">Volume {h.rateCard[0]?.basisVolume ?? 'komitmen'}</th><th className="num">Biaya/bln</th><th className="num k-unit">Biaya/unit</th><th className="num th-isian">GP% (isian)</th><th className="num k-harga">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num k-ppn">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
         <tbody>
           {h.rateCard.map(r => {
             const b = r.bucket as Bucket, v = marginManual[b];
@@ -140,33 +154,48 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
                   {onHariTarif ? <input aria-label="Hari per bulan tarif harian" type="number" min={1} max={31} value={hariTarif ?? 30} style={{ width: 56, minWidth: 56, textAlign: 'right' }}
                     onChange={e => { const n = Number(e.target.value); onHariTarif(n > 0 ? n : undefined); }} /> : <b>{hariTarif ?? 30}</b>}<span className="muted">hari</span></div>}</td>
               <td className="num">{angka(r.volumeKomitmen)}</td>
-              <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaPerUnit)}</td>
+              <td className="num">{rp(r.biayaBulan)}</td><td className="num k-unit">{rp(r.biayaPerUnit)}</td>
               <td className="num td-isian"><input aria-label={`Margin ${BUCKET_LABEL[r.bucket]}`} type="number" step="0.1" value={v == null ? '' : Math.round(v * 1000) / 10}
                 placeholder={(Math.round((r.gpDefault ?? 0) * 1000) / 10).toString()} onChange={e => setM(b, e.target.value)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /> %
                 {v == null && <div className="small muted">default</div>}</td>
-              <td className="num">{rp(r.hargaBulan)}</td>
+              <td className="num k-harga">{rp(r.hargaBulan)}</td>
               <td className={`num${pajak.ppn === 'exclude' ? ' out' : ''}`}>{rp(r.tarifPerUnit)}</td>
-              <td className="num">{rp(r.ppnPerUnit ?? 0)}</td>
+              <td className="num k-ppn">{rp(r.ppnPerUnit ?? 0)}</td>
               <td className={`num${pajak.ppn === 'include' ? ' out' : ''}`}>{rp(r.tarifInclPpn ?? r.tarifPerUnit)}</td></tr>;
           })}
           {onTambahan && <BarisTambahan h={h} nilai={tambahan ?? []} onUbah={onTambahan} ppnInclude={pajak.ppn === 'include'} />}
-          {mt && <tr className="pd-sub"><td colSpan={3}><b>{tambahan?.length ? 'Total layanan utama' : 'Total (gabungan semua layanan)'}</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td><td></td>
+          {mt && rk && <tr className="pd-sub"><td colSpan={3}><b>{tambahan?.length ? 'Total layanan utama' : 'Total (gabungan semua layanan)'}</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td>
+            <td className="num"><b>{persen(mt.gpPersen ?? 0)}</b></td><td colSpan={2} className="small">harga {rp(mt.hargaBulan)}/bln · tarif tebal dipakai di quotation</td></tr>}
+          {mt && !rk && <tr className="pd-sub"><td colSpan={3}><b>{tambahan?.length ? 'Total layanan utama' : 'Total (gabungan semua layanan)'}</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td><td></td>
             <td className="num"><b>{persen(mt.gpPersen ?? 0)}</b></td><td className="num"><b>{rp(mt.hargaBulan)}</b></td><td colSpan={3} className="small muted">kolom tebal = tarif yang dipakai di quotation ({pajak.ppn === 'include' ? 'incl.' : 'excl.'} PPN)</td></tr>}
         </tbody>
       </table></div>
-      {mt && <p className="small">Total GP {persen(mt.gpPersen ?? 0)} = 1 − Σ biaya {rp(mt.biayaBulan)} ÷ Σ harga sebelum PPh {rp(mt.hargaSebelumPph)} (tertimbang). Setara markup {persen(mt.margin)} atas biaya.
+      {mt && <p className={rk ? 'small muted' : 'small'}>Total GP {persen(mt.gpPersen ?? 0)} = 1 − Σ biaya {rp(mt.biayaBulan)} ÷ Σ harga sebelum PPh {rp(mt.hargaSebelumPph)} (tertimbang). Setara markup {persen(mt.margin)} atas biaya.
         {' '}{pajak.pph === 'exclude' ? 'PPh exclude (ditanggung customer): tarif di-gross-up, jadi GP di simulasi ≈ GP input (sedikit lebih tinggi karena tarif dibulatkan ke atas).' : <b>PPh include (ditanggung kita): potongan PPh {(pphPersen * 100).toFixed(1)}% mengurangi pendapatan, jadi GP di simulasi lebih rendah dari GP input. Pilih PPh Exclude agar GP = input.</b>}</p>}
       {mt && h.simulasi[0] && h.simulasi[0].biayaBulan - mt.biayaBulan > 1000 && <p className="small notice">Ada biaya {rp(h.simulasi[0].biayaBulan - mt.biayaBulan)}/bln yang tidak masuk tarif mana pun (mis. biaya VAS tanpa volume) — GP% jadi lebih rendah dari margin.</p>}
       {h.storageAlternatif.length > 0 && <p className="small">Storage alternatif: {h.storageAlternatif.map(s => `${rp(s.tarif)}/${s.uom}`).join(' · ')}</p>}
 
+      {rk && <div className="grid2 rk-grafik">
+        <Grafik judul="Biaya vs harga per layanan" keterangan="per bulan" kategori={h.rateCard.map(r => BUCKET_LABEL[r.bucket])}
+          seri={[{ nama: 'Biaya/bln', nilai: h.rateCard.map(r => r.biayaBulan) }, { nama: 'Harga/bln', nilai: h.rateCard.map(r => r.hargaBulan) }]}
+          jenis="kolom" pilihan={['kolom', 'batang']} fmt={rp} fmtSumbu={ringkasRp} />
+        {(() => { const sm = [...h.simulasi].sort((p1, p2) => p1.pendapatanBulan - p2.pendapatanBulan);
+          return <Grafik judul="Simulasi volume" keterangan="pendapatan & biaya (kolom) · GP (garis), per bulan" kategori={sm.map(x => labelSkenario(x.skenario).replace(/^Volume /, '').replace(/ \(.*\)$/, ''))}
+            seri={[{ nama: 'Pendapatan', nilai: sm.map(x => x.pendapatanBulan) }, { nama: 'Biaya', nilai: sm.map(x => x.biayaBulan) }, { nama: 'GP', nilai: sm.map(x => x.gp), garis: true }]}
+            jenis="combo" pilihan={['combo', 'garis', 'kolom']} fmt={rp} fmtSumbu={ringkasRp} />; })()}
+      </div>}
       <h3>Simulasi</h3>
-      <div className="tablewrap"><table>
+      {rk ? <div className="tablewrap"><table>
+        <thead><tr><th>Skenario</th><th className="num">Pendapatan/bln</th><th className="num">Biaya/bln</th><th className="num">GP/bln</th><th className="num">GP%</th><th className="num">GP selama kontrak ({kontrakBulan} bln)</th></tr></thead>
+        <tbody>{h.simulasi.map(s2 => <tr key={s2.skenario}><td>{labelSkenario(s2.skenario)}</td><td className="num">{rp(s2.pendapatanBulan)}</td><td className="num">{rp(s2.biayaBulan)}</td>
+          <td className="num">{rp(s2.gp)}</td><td className="num"><b>{persen(s2.gpPersen)}</b></td><td className="num">{rp(s2.gp * kontrakBulan)}</td></tr>)}</tbody>
+      </table></div> : <div className="tablewrap"><table>
         <thead><tr><th>Skenario</th><th className="num">Pendapatan/bln</th><th className="num">Biaya/bln</th><th className="num">GP/bln</th><th className="num">GP%</th><th className="num">PPN/bln</th><th className="num">Invoice incl. PPN/bln</th>
           <th className="num">Pendapatan/thn</th><th className="num">Biaya/thn</th><th className="num">GP/thn</th><th className="num">GP selama kontrak ({kontrakBulan} bln)</th></tr></thead>
         <tbody>{h.simulasi.map(s => <tr key={s.skenario}><td>{s.skenario === 'Volume komitmen' ? 'Volume komitmen (MGV)' : s.skenario === 'Volume min' ? 'Volume min (terendah)' : s.skenario === 'Volume rata-rata' ? 'Volume mid (rata-rata)' : s.skenario === 'Volume peak' ? 'Volume max (peak)' : s.skenario}</td><td className="num">{rp(s.pendapatanBulan)}</td><td className="num">{rp(s.biayaBulan)}</td>
           <td className="num">{rp(s.gp)}</td><td className="num"><b>{persen(s.gpPersen)}</b></td><td className="num">{rp(s.ppnBulan ?? 0)}</td><td className="num">{rp(s.invoiceInclPpn ?? 0)}</td>
           <td className="num">{rp(s.pendapatanBulan * 12)}</td><td className="num">{rp(s.biayaBulan * 12)}</td><td className="num">{rp(s.gp * 12)}</td><td className="num">{rp(s.gp * kontrakBulan)}</td></tr>)}</tbody>
-      </table></div>
+      </table></div>}
       <p className="small muted">Pendapatan = tarif sebelum PPN × volume, dikurangi PPh 23 {(pphPersen * 100).toFixed(1)}% (PPh {pajak.pph === 'exclude' ? 'ditanggung customer, sudah di-gross-up di tarif' : 'ditanggung kita → GP turun'}). Per tahun = per bulan × 12.</p>
     </div>}
 
@@ -214,12 +243,12 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       </table></div>
     </div>}
 
-    {(bagian === 'biaya' || bagian === 'semua' || bagian === 'capex') && <RincianJenis h={h} />}
+    {(bagian === 'biaya' || bagian === 'semua' || bagian === 'capex') && <RincianJenis h={h} ringkas={ringkas} />}
   </>);
 }
 
 /** Opex vs capex vs interest cost, tiap jenis bisa dibuka: per kategori → per item (dasar hitung, nilai investasi capex). */
-function RincianJenis({ h }: { h: HasilTender }) {
+function RincianJenis({ h, ringkas = false }: { h: HasilTender; ringkas?: boolean }) {
   const [buka, setBuka] = useState<Record<string, boolean>>({});
   const pj = h.perJenis ?? { opex: 0, capex: 0, interest: 0 };
   const tot = pj.opex + pj.capex + pj.interest || 1;
@@ -233,9 +262,17 @@ function RincianJenis({ h }: { h: HasilTender }) {
   return <div className="card">
     <div className="row" style={{ justifyContent: 'space-between' }}>
       <h2 style={{ margin: 0 }}>Opex vs capex</h2>
-      <button className="ghost" onClick={() => setBuka(semua ? {} : { opex: true, capex: true, interest: true })}>{semua ? 'Tutup semua rincian' : 'Buka semua rincian'}</button>
+      <button className={ringkas ? 'ghost sc-revisi' : 'ghost'} onClick={() => setBuka(semua ? {} : { opex: true, capex: true, interest: true })}>{semua ? 'Tutup semua rincian' : 'Buka semua rincian'}</button>
     </div>
     <p className="small muted">Klik baris Opex / Capex / Interest cost untuk melihat isinya per kategori dan per item, lengkap dengan dasar hitung.</p>
+    {ringkas && <div className="sc-atas">
+      <div className="sc-total">
+        <div className="utama"><span>Total investasi (capex)</span><b>{rp(h.investasi)}</b></div>
+        {rows.map(r => <div key={r.k}><span>{r.l} / bln</span><b>{rp(r.v)} · {persen(r.v / tot)}</b></div>)}
+      </div>
+      <Grafik judul="Opex vs capex vs interest" keterangan="biaya per bulan" kategori={rows.filter(r => r.v > 0).map(r => r.l)} seri={[{ nama: 'Biaya/bln', nilai: rows.filter(r => r.v > 0).map(r => r.v) }]}
+        jenis="donut" pilihan={['donut', 'pie', 'batang', 'kolom']} fmt={rp} fmtSumbu={ringkasRp} warnaPerKategori tinggi={190} />
+    </div>}
     <div className="tablewrap fit"><table className="tabel-fit">
       <thead><tr><th>Jenis · kategori · item</th><th className="num">Nilai investasi</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th><th style={{ width: '22%' }}></th></tr></thead>
       <tbody>

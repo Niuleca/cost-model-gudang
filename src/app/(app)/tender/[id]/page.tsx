@@ -16,7 +16,7 @@ import { sesuaikanMhe } from '@/lib/mheOtomatis';
 import { RE_SECURITY, RE_CLEANING, KUNCI_GANDA_MANPOWER, kebutuhanSecurityCleaning } from '@/lib/biayaLainDefault';
 import { PROSES_MUAT, PORSI_MUAT_DEFAULT, OPSI_TAG, labelTag, persenDariPorsi, terapkanPorsiMuat } from '@/lib/porsiMuat';
 import { rp, angka, persen, BUCKET_LABEL, INDUSTRI, labelKelompok } from '@/lib/format';
-import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, type BasisTarif } from '@/lib/engine/types';
+import { faktorUom, pengaliEfektif, isRoleSupervisor, headcountTetap, volumeEfektif, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, MUATAN_DEFAULT, type BasisTarif } from '@/lib/engine/types';
 import ProfilVolumePanel from './ProfilVolumePanel';
 import BiayaManpowerPanel from './BiayaManpowerPanel';
 import ExportPanel from './ExportPanel';
@@ -51,6 +51,8 @@ import { hitungProcessDesign, PD_DEFAULT, ratakanBebanShift } from '@/lib/engine
 import HistorisPanel from './HistorisPanel';
 import CostAllocation from './PembagianLayanan';
 import HasilKomersial, { type Kurs, type Pajak } from './HasilKomersial';
+import Grafik, { warnaKe, ringkasRp } from '@/components/Grafik';
+import PerbesarTabel from '@/components/PerbesarTabel';
 import StatusControl from '@/components/StatusControl';
 import { PilihUom, SelKonversi, gantiUom, RingkasanVolumeSemuaUom, RingkasanOrder } from './VolumeUom';
 import BagikanTender from '@/components/BagikanTender';
@@ -174,6 +176,9 @@ export default function TenderPage() {
   const lihat = (x: string) => tabIsi === x || (simple && !pop && tabAktif === 'Result' && (x === 'Quotation' || x === 'Export'));
   /** Simple CM: rincian kategori biaya (Summary cost) dibuka di dalam wizard */
   const [popKat, setPopKat] = useState<string | null>(null);
+  /** Simple CM 4.2: kategori yang rinciannya sedang dibuka (tampil / sembunyi) */
+  const [bukaKat, setBukaKat] = useState<Record<string, boolean>>({});
+  const akarSimple = useRef<HTMLDivElement>(null);
   /** langkah asal ketika membuka tab rincian (mis. Manpower dari Summary cost 4.2) */
   const [popDari, setPopDari] = useState<string | null>(null);
   // Summary cost (4.2) hanya tampilan; revisi tiap kategori dibuka sebagai pop-up
@@ -730,10 +735,21 @@ export default function TenderPage() {
     ];
     const isi = baris.filter(([, m2]) => m2 > 0.05);
     const pp = isi.reduce((x, [, , n]) => x + (n ?? 0), 0);
+    // urut dari luas terbesar; pembulatan tetap paling bawah
+    const urut = [...isi].sort((x, y) => (x[0] === 'Pembulatan' ? 1 : 0) - (y[0] === 'Pembulatan' ? 1 : 0) || y[1] - x[1]);
     return <div className="card">
+      <div className="sc-atas">
+        <div className="sc-total">
+          <div className="utama"><span>Total space</span><b>{angka(spaceH.spaceRent)} m²</b></div>
+          <div><span>Posisi palet</span><b>{angka(Math.ceil(pp))}</b></div>
+          <div><span>Volume · berat</span><b>{angka(pp * cbm, 0)} CBM · {angka(pp * kg / 1000, 0)} ton</b></div>
+        </div>
+        <Grafik judul="Komposisi space" keterangan="luas per area (m²)" kategori={urut.map(([l]) => l)} seri={[{ nama: 'Luas (m²)', nilai: urut.map(([, m2]) => m2) }]}
+          jenis="donut" pilihan={['donut', 'pie', 'batang', 'kolom']} fmt={v => `${angka(v)} m²`} fmtSumbu={v => angka(v)} warnaPerKategori tinggi={200} tengah={`${angka(spaceH.spaceRent)} m²`} />
+      </div>
       <div className="tablewrap"><table>
         <thead><tr><th>Area</th><th className="num">Luas (m²)</th><th className="num">Posisi palet</th><th className="num">CBM</th><th className="num">Ton</th><th className="num">% space</th></tr></thead>
-        <tbody>{isi.map(([l, m2, n]) => <tr key={l}><td>{l}</td><td className="num">{angka(m2)}</td>
+        <tbody>{urut.map(([l, m2, n]) => <tr key={l}><td>{l}</td><td className="num">{angka(m2)}</td>
           <td className="num">{n != null ? angka(Math.ceil(n - 1e-9)) : '—'}</td><td className="num">{n != null ? angka(n * cbm, 1) : '—'}</td><td className="num">{n != null ? angka(n * kg / 1000, 1) : '—'}</td>
           <td className="num">{angka(m2 / tot * 100, 1)}%</td></tr>)}
           <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{angka(spaceH.spaceRent)}</b></td><td className="num"><b>{angka(Math.ceil(pp))}</b></td><td className="num"><b>{angka(pp * cbm, 1)}</b></td><td className="num"><b>{angka(pp * kg / 1000, 1)}</b></td><td className="num"><b>100%</b></td></tr>
@@ -813,30 +829,60 @@ export default function TenderPage() {
   const panelSummaryCost = (() => {
     if (!hasil) return <div className="card"><p>Belum dihitung.</p><div className="row"><button onClick={() => hitung(false)}>Hitung sekarang</button></div></div>;
     const rows = hasil.biaya.map(b => ({ ...b, kat: katBaris(b) }));
-    const tot = hasil.totalBiayaBulan || 1;
+    const total = hasil.totalBiayaBulan, tot = total || 1;
+    // kategori diurutkan dari biaya terbesar → terkecil; item di dalamnya juga
+    const kats = KAT_SC.map(c => { const xs = rows.filter(r => r.kat === c.k).sort((x, y) => y.biayaBulan - x.biayaBulan); return { c, xs, sub: xs.reduce((x, r) => x + r.biayaBulan, 0) }; })
+      .sort((x, y) => y.sub - x.sub);
+    const isi = kats.filter(k => k.sub > 0);
+    const maks = Math.max(...kats.map(k => k.sub), 1);
+    const semuaBuka = kats.every(k => bukaKat[k.c.k]);
+    const param = (k: (typeof kats)[number]) => k.c.k === 'rental' ? (sewaUtuh ? 'sewa utuh gudang' : `${angka(luasSewa)} m² × ${rp(tarifSewaPakai)}/m²/bln`)
+      : k.c.k === 'manpower' ? `${hasil.totalHeadcount} orang · ${k.xs.length} role`
+      : k.xs.length === 1 ? k.xs[0].dasar : k.xs.length ? `${k.xs.length} item` : '—';
+    const pct = (v: number) => `${angka(v / tot * 100, 1)}%`;
     return <div className="card">
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h2 style={{ margin: 0 }}>Summary cost · {rp(hasil.totalBiayaBulan)}/bln · {rp(hasil.totalBiayaBulan * 12)}/thn</h2>
-        <button className="ghost" onClick={() => hitung(false)}>Hitung ulang</button></div>
-      <p className="small muted">Ringkasan biaya per kategori (hanya tampilan). Untuk mengubah harga / qty / menambah baris, klik <b>Revisi</b> pada kategori — pop-up terbuka, dan Summary cost dihitung ulang saat pop-up ditutup.</p>
+      <div className="sc-kepala">
+        <div><h2 style={{ margin: 0 }}>Summary cost</h2>
+          <span className="small muted">Urut dari biaya terbesar · klik nama kategori untuk tampil / sembunyikan rincian · <b>Revisi</b> membuka pop-up ubah harga</span></div>
+        <div className="row" style={{ margin: 0 }}>
+          <button type="button" className="ghost sc-revisi" onClick={() => setBukaKat(semuaBuka ? {} : Object.fromEntries(kats.map(k => [k.c.k, true])))}>{semuaBuka ? '▴ Tutup semua rincian' : '▾ Buka semua rincian'}</button>
+          <button type="button" className="ghost sc-revisi" onClick={() => hitung(false)}>Hitung ulang</button></div>
+      </div>
+      <div className="sc-atas">
+        <div className="sc-total">
+          <div className="utama"><span>Total biaya / bulan</span><b>{rp(total)}</b></div>
+          <div><span>Total biaya / tahun</span><b>{rp(total * 12)}</b></div>
+          {isi[0] && <div><span>Biaya terbesar</span><b>{isi[0].c.l} · {pct(isi[0].sub)}</b></div>}
+          {isi[1] && <div><span>Terbesar ke-2</span><b>{isi[1].c.l} · {pct(isi[1].sub)}</b></div>}
+        </div>
+        <Grafik judul="Komposisi biaya per kategori" keterangan="per bulan" kategori={isi.map(k => k.c.l)} seri={[{ nama: 'Biaya/bln', nilai: isi.map(k => k.sub) }]}
+          jenis="donut" pilihan={['donut', 'pie', 'batang', 'kolom', 'combo']} fmt={rp} fmtSumbu={ringkasRp} warnaPerKategori tinggi={210} />
+      </div>
       <div className="tablewrap"><table className="sc-tabel">
-        <colgroup><col style={{ width: '44%' }} /><col style={{ width: '22%' }} /><col style={{ width: '13%' }} /><col style={{ width: '14%' }} /><col style={{ width: '7%' }} /></colgroup>
-        <thead><tr><th>Kategori / item</th><th>Dasar hitung</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th className="num">%</th></tr></thead>
-        <tbody>{KAT_SC.map(c => {
-          const xs = rows.filter(r => r.kat === c.k); const sub = xs.reduce((x, r) => x + r.biayaBulan, 0);
+        <colgroup><col style={{ width: '33%' }} /><col style={{ width: '25%' }} /><col style={{ width: '13%' }} /><col style={{ width: '13%' }} /><col style={{ width: '16%' }} /></colgroup>
+        <thead><tr><th>Kategori</th><th>Parameter (dasar hitung)</th><th className="num">Biaya/bln</th><th className="num">Biaya/thn</th><th>% dari total</th></tr></thead>
+        <tbody>{kats.map((k, ix) => {
+          const b = !!bukaKat[k.c.k], warna = k.sub > 0 ? warnaKe(ix) : undefined;
           return [
-            <tr key={c.k} className="kat-head"><td colSpan={2}><div className="row" style={{ gap: 8, flexWrap: 'nowrap', alignItems: 'center' }}>
-              <span style={{ flex: 1, whiteSpace: 'normal', minWidth: 0 }}><b>{c.l}</b> <span className="small muted">· {c.isi}</span></span>
-              <button type="button" className="ghost sc-revisi" onClick={() => bukaRincianBiaya(c.k)}>Revisi</button></div>
-              </td>
-              <td className="num"><b>{rp(sub)}</b></td><td className="num"><b>{rp(sub * 12)}</b></td><td className="num">{angka(sub / tot * 100, 1)}%</td></tr>,
-            ...(c.k === 'rental' ? [<tr key="rental-isi"><td colSpan={5}>{panelRental}</td></tr>] : []),
-            ...xs.map((r, i) => <tr key={`${c.k}-${i}`}><td style={{ paddingLeft: 22 }} title={r.deskripsi}>{r.deskripsi}</td><td className="small muted" title={r.dasar}>{r.dasar}</td>
-              <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaBulan * 12)}</td><td className="num muted">{angka(r.biayaBulan / tot * 100, 1)}%</td></tr>),
-            ...(xs.length === 0 && c.k !== 'rental' ? [<tr key={`${c.k}-0`}><td colSpan={5} className="small muted" style={{ paddingLeft: 22 }}>Belum ada biaya — klik Revisi untuk mengisi.</td></tr>] : []),
+            <tr key={k.c.k} className={`kat-head${k.sub > 0 ? '' : ' sc-nol'}`}>
+              <td><div className="sc-kat-sel">
+                <button type="button" className="sc-kat" aria-expanded={b} title={`${b ? 'Sembunyikan' : 'Tampilkan'} rincian · isi: ${k.c.isi}`} onClick={() => setBukaKat(x => ({ ...x, [k.c.k]: !b }))}>
+                  <span className="sc-panah">{b ? '▾' : '▸'}</span><i className="sc-sw" style={{ background: warna ?? 'transparent' }} /><span className="sc-nama">{k.c.l}</span>
+                  {k.xs.length > 0 && <span className="sc-jml">{k.xs.length}</span>}</button>
+                <button type="button" className="ghost sc-revisi" onClick={() => bukaRincianBiaya(k.c.k)}>Revisi</button></div></td>
+              <td className="small muted" title={param(k)}>{param(k)}</td>
+              <td className="num"><b>{rp(k.sub)}</b></td><td className="num">{rp(k.sub * 12)}</td>
+              <td><div className="sc-pct"><span>{pct(k.sub)}</span>{k.sub > 0 && <i style={{ width: `${k.sub / maks * 100}%`, background: warna }} />}</div></td></tr>,
+            ...(!b ? [] : [
+              ...(k.c.k === 'rental' ? [<tr key="rental-isi" className="sc-item"><td colSpan={5}>{panelRental}</td></tr>] : []),
+              ...k.xs.map((r, i) => <tr key={`${k.c.k}-${i}`} className="sc-item"><td style={{ paddingLeft: 36 }} title={r.deskripsi}>{r.deskripsi}</td><td className="small muted" title={r.dasar}>{r.dasar}</td>
+                <td className="num">{rp(r.biayaBulan)}</td><td className="num">{rp(r.biayaBulan * 12)}</td>
+                <td><div className="sc-pct kecil"><span>{pct(r.biayaBulan)}</span><i style={{ width: `${r.biayaBulan / maks * 100}%`, background: warna }} /></div></td></tr>),
+              ...(k.xs.length === 0 && k.c.k !== 'rental' ? [<tr key={`${k.c.k}-0`} className="sc-item"><td colSpan={5} className="small muted" style={{ paddingLeft: 36 }}>Belum ada biaya — klik Revisi untuk mengisi.</td></tr>] : []),
+            ]),
           ];
         })}
-          <tr className="pd-sub"><td colSpan={2}><b>Total</b></td><td className="num out">{rp(hasil.totalBiayaBulan)}</td><td className="num out">{rp(hasil.totalBiayaBulan * 12)}</td><td className="num">100%</td></tr>
+          <tr className="pd-sub"><td colSpan={2}><b>Total</b></td><td className="num out">{rp(total)}</td><td className="num out">{rp(total * 12)}</td><td><b>100%</b></td></tr>
         </tbody></table></div>
     </div>;
   })();
@@ -1018,7 +1064,8 @@ export default function TenderPage() {
       {!simple && <div className="tabs tabs-beku" role="tablist">
         {([...(a.historis ? [TAB_EXCEL] : []), ...TABS.filter(x => x !== 'Export' || bolehExport(profile))] as ((typeof TABS)[number] | typeof TAB_EXCEL)[]).map(x => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{tr(x)}</button>)}
       </div>}
-      <div className={simple ? 'wiz' : 'wiz-mati'}>
+      <div className={simple ? 'wiz simple-cm' : 'wiz-mati'} ref={simple ? akarSimple : undefined}>
+      {simple && <PerbesarTabel akar={akarSimple} />}
       {simple && navWizard}
       <div className={simple ? 'wiz-isi' : 'wiz-mati'}>
       {simple && (pop && popDari !== '4.2'
@@ -1027,7 +1074,7 @@ export default function TenderPage() {
         : <div className="wiz-kepala">
           <div className="small muted">{tr(indukDari(cariLangkah(langkah).menu.no))}{cariLangkah(langkah).menu.no < 4 ? ` · ${cariLangkah(langkah).menu.no}. ${tr(cariLangkah(langkah).menu.nama)}` : ''}</div>
           <div className="wiz-judul"><i>{langkah}</i>{tr(cariLangkah(langkah).nama)}</div>
-          <div className="small"><span className="muted">Terhubung ke:</span> {cariLangkah(langkah).ke}</div>
+          <div className="small klem" title="Klik untuk membaca selengkapnya"><span className="muted">Terhubung ke:</span> {cariLangkah(langkah).ke}</div>
           {kurangLangkah(langkah).length > 0 && <div className="wiz-kurang" role="status"><b>Yang masih kurang di langkah ini:</b>
             <ul>{kurangLangkah(langkah).map(x => <li key={x}>{x}</li>)}</ul></div>}
         </div>)}
@@ -1111,7 +1158,22 @@ export default function TenderPage() {
       {simple && di('2.1') && panelVolumeSpek(['storage'])}
       {simple && di('2.2') && panelVolumeSpek(['inbound', 'outbound', 'vas'])}
       {simple && di('2.4') && <><div className="card">{panelRingkasOrder}
-        <p className="small muted">Per hari = per bulan ÷ {hariOps} hari operasional (Working day, langkah 1.6); per tahun = per bulan × 12.</p></div>{panelMuatanProduk}</>}
+        <p className="small muted">Per hari = per bulan ÷ {hariOps} hari operasional (Working day, langkah 1.6); per tahun = per bulan × 12.</p></div>
+        {(() => {
+          const m = { ...MUATAN_DEFAULT, ...(a.profilVolume?.param ?? {}) };
+          const xs = volEf.filter(v => v.arus !== 'storage');
+          const pal = (v: (typeof xs)[number], q: number | undefined) => uraiUom(v, Number(q) || 0, m).palet ?? 0;
+          const adaMin = xs.some(v => Number(v.minBulan) > 0);
+          const seri = [
+            ...(adaMin ? [{ nama: 'Min', nilai: xs.map(v => pal(v, v.minBulan)) }] : []),
+            { nama: 'Mid (rata-rata)', nilai: xs.map(v => pal(v, v.rataRataBulan)) },
+            { nama: 'MGV (komitmen)', nilai: xs.map(v => pal(v, v.komitmenBulan)) },
+            { nama: 'Peak', nilai: xs.map(v => pal(v, v.peakBulan)) },
+          ];
+          return xs.length > 0 && <div className="card"><Grafik judul="Volume per arus" keterangan={`palet ekuivalen per bulan — ${seri.map(x => x.nama.split(' ')[0]).join(' / ')}`} kategori={xs.map(v => ARUS.find(o => o.v === v.arus)?.l ?? v.arus)}
+            seri={seri} jenis="kolom" pilihan={['kolom', 'batang']} fmt={v => `${angka(v, 0)} palet`} fmtSumbu={v => angka(v, 0)} tinggi={220} /></div>;
+        })()}
+        {panelMuatanProduk}</>}
       {lihat('Volume') && !simple && (
         <div className="card">
           <h2><T>Volume</T></h2>
@@ -1524,25 +1586,25 @@ function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, be
       {(!langkah || langkah === '4.1') && (() => {
         const s0 = h.simulasi[0];
         const sell = s0?.pendapatanBulan ?? 0, cost = h.totalBiayaBulan, profit = s0?.gp ?? sell - cost;
-        const kpi: [string, string, string?][] = [
+        const kpi: [string, string, string?, boolean?][] = [
           ['Cost per bulan', rp(cost), `per tahun ${rp(cost * 12)}`],
-          ['Selling per bulan', rp(sell), `per tahun ${rp(sell * 12)} · bersih setelah PPh`],
-          ['Profit per bulan', rp(profit), `per tahun ${rp(profit * 12)}`],
-          ['Margin (GP%)', persen(s0?.gpPersen), 'atas volume komitmen'],
+          ['Selling per bulan', rp(sell), `per tahun ${rp(sell * 12)} · bersih setelah PPh`, true],
+          ['Profit per bulan', rp(profit), `per tahun ${rp(profit * 12)}`, true],
+          ['Margin (GP%)', persen(s0?.gpPersen), 'atas volume komitmen', true],
           ['Jumlah manpower', `${h.totalHeadcount} orang`, 'headcount setelah rangkap'],
           ['Luas gudang', `${angka(h.space.totalM2)} m²`, gudang ? `${gudang.nama} · dari ${angka(Number(gudang.luas_m2))} m²` : 'gudang belum dipilih'],
         ];
         const kom = Object.entries(h.perKelompok ?? {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
         const totKom = kom.reduce((t2, [, v]) => t2 + v, 0) || 1;
         const WARNA = ['#1e56a0', '#f28c28', '#0f766e', '#7c3aed', '#be123c', '#ca8a04', '#0891b2', '#4d7c0f', '#9a3412', '#475569'];
-        return <section className="hasil-hero" aria-label="Ringkasan hasil">
+        return <section className={`hasil-hero${langkah ? ' ringkas' : ''}`} aria-label="Ringkasan hasil">
           <div className="hasil-hero-kepala">
             <div><h2 style={{ margin: 0 }}>Hasil hitung</h2>
               {belumDisimpan ? <span className="small" style={{ color: 'var(--warn, #b45309)' }}>Dihitung ulang dari input terbaru dan <b>belum disimpan</b> — simpan supaya quotation & export memakai angka ini.</span>
                 : <span className="small muted">Sesuai versi tersimpan</span>}</div>
             <div className="row hasil-aksi" style={{ margin: 0 }}><button className="ghost" onClick={onHitung}><T>Hitung ulang</T></button><button onClick={onSimpan}><T>Simpan hasil sebagai versi baru</T></button></div>
           </div>
-          <div className="kpis kpis-hasil">{kpi.map(([l, v, k]) => {
+          <div className="kpis kpis-hasil">{kpi.map(([l, v, k, utama]) => {
             // drill-down: klik angka → buka rinciannya (tab lengkap / bagian Result) untuk dilihat & diubah
             const ke: Record<string, [string, () => void]> = {
               'Cost per bulan': ['Rincian biaya per kategori', () => setBagian('biaya')],
@@ -1554,9 +1616,10 @@ function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, be
             };
             const d = drill ? ke[l] : undefined;
             const isi = <><span className="small muted"><T>{l}</T></span><b>{v}</b>{k && <span className="small muted">{k}</span>}{d && <span className="small kpi-buka">Buka rincian →</span>}</>;
-            return d ? <button key={l} type="button" className="kpi kpi-klik" title={`Buka: ${d[0]}`} onClick={d[1]}>{isi}</button> : <div key={l} className="kpi">{isi}</div>;
+            const kls = `kpi${utama && langkah ? ' kpi-utama' : ''}`;
+            return d ? <button key={l} type="button" className={`${kls} kpi-klik`} title={`Buka: ${d[0]}`} onClick={d[1]}>{isi}</button> : <div key={l} className={kls}>{isi}</div>;
           })}</div>
-          {kom.length > 0 && <div className="komposisi">
+          {kom.length > 0 && !langkah && <div className="komposisi">
             <div className="komposisi-bar" role="img" aria-label={`Komposisi biaya: ${kom.map(([k, v]) => `${k} ${Math.round((v / totKom) * 100)}%`).join(', ')}`}>
               {kom.map(([k, v], j) => <i key={k} style={{ width: `${(v / totKom) * 100}%`, background: WARNA[j % WARNA.length] }} title={`${k} · ${rp(v)}/bln · ${persen(v / totKom)}`} />)}</div>
             <div className="komposisi-legenda">{kom.map(([k, v], j) => drill
@@ -1565,12 +1628,37 @@ function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, be
           </div>}
         </section>;
       })()}
-      {langkah === '4.1' && <><HasilKomersial bagian="tarif" {...komersialProps} />
-        {h.alokasiLayanan && <div className="card row" style={{ justifyContent: 'space-between', gap: 8 }}>
-          <span className="small"><b>Cost allocation (pembagian biaya ke layanan):</b> {h.rateCard.map(r => `${BUCKET_LABEL[r.bucket]} ${persen(r.biayaBulan / (h.marginTotal.biayaBulan || 1))}`).join(' · ')}</span>
-          <button className="ghost" onClick={onBukaAlokasi}>Atur cost allocation →</button></div>}</>}
+      {langkah === '4.1' && h.rateCard.length > 0 && (() => {
+        const totA = h.rateCard.reduce((x, r) => x + r.biayaBulan, 0) || 1;
+        const ubah = h.alokasiLayanan?.matriks?.filter(r => r.override).length ?? 0;
+        return <div className="card ca-sorot">
+          <div className="sc-kepala">
+            <div><h2 style={{ margin: 0 }}>Cost allocation</h2>
+              <span className="small muted">Pembagian biaya ke tiap layanan — dasar tarif per layanan · {ubah ? `${ubah} kategori diubah manual` : 'default simulasi (cost-to-serve)'}</span></div>
+            {h.alokasiLayanan && <button type="button" onClick={onBukaAlokasi}>Atur cost allocation</button>}
+          </div>
+          <div className="ca-isi">
+            <div className="ca-angka">{h.rateCard.map((r, i) => <div key={r.bucket} className="ca-item">
+              <i style={{ background: warnaKe(i) }} /><span>{BUCKET_LABEL[r.bucket]}</span>
+              <b>{persen(r.biayaBulan / totA)}</b><span className="small muted">{rp(r.biayaBulan)}/bln</span></div>)}</div>
+            <Grafik judul="Porsi biaya per layanan" kategori={h.rateCard.map(r => BUCKET_LABEL[r.bucket])} seri={[{ nama: 'Biaya/bln', nilai: h.rateCard.map(r => r.biayaBulan) }]}
+              jenis="donut" pilihan={['donut', 'pie', 'batang', 'kolom']} fmt={rp} fmtSumbu={ringkasRp} warnaPerKategori tanpaLegenda tinggi={190} tengah={ringkasRp(totA)} />
+          </div>
+        </div>;
+      })()}
+      {langkah === '4.1' && <HasilKomersial bagian="tarif" ringkas {...komersialProps} />}
       {langkah === '4.3' && <HasilKomersial bagian="kurs" {...komersialProps} />}
-      {langkah === '4.4' && <HasilKomersial bagian="capex" {...komersialProps} />}
+      {langkah === '4.4' && <HasilKomersial bagian="capex" ringkas {...komersialProps} />}
+      {langkah === '4.5' && (() => {
+        const mp = h.manpower.filter(m => m.headcount > 0).sort((x, y) => y.headcount - x.headcount);
+        const al = h.mhe.filter(m => m.unit > 0).sort((x, y) => y.unit - x.unit);
+        return (mp.length > 0 || al.length > 0) && <div className="card"><div className="grid2">
+          {mp.length > 0 && <Grafik judul="Headcount per role" keterangan={`total ${h.totalHeadcount} orang`} kategori={mp.map(m => m.roleName)} seri={[{ nama: 'Headcount', nilai: mp.map(m => m.headcount) }]}
+            jenis="batang" pilihan={['batang', 'kolom', 'donut']} fmt={v => `${angka(v)} orang`} fmtSumbu={v => angka(v)} warnaPerKategori />}
+          {al.length > 0 && <Grafik judul="Unit MHE" keterangan="unit operasi (tanpa spare)" kategori={al.map(m => m.nama)} seri={[{ nama: 'Unit', nilai: al.map(m => m.unit) }]}
+            jenis="batang" pilihan={['batang', 'kolom', 'donut']} fmt={v => `${angka(v)} unit`} fmtSumbu={v => angka(v)} warnaPerKategori />}
+        </div></div>;
+      })()}
       {langkah === '4.5' && ekstraManpower}
       {!langkah && <div className="tabs hasil-tab" role="tablist" aria-label="Bagian hasil">
         {([['ringkasan', 'Ringkasan & red flag', 'hasil'], ['harga', 'Harga & margin', 'isian'], ['biaya', 'Rincian biaya', 'hasil'], ['operasional', 'Manpower, MHE & space', 'hasil']] as const).map(([k, l, j]) => (
