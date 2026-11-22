@@ -1292,3 +1292,20 @@ td.td-isian { background: #fffaf0; }
 .simple-cm .kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .simple-cm .kpi { padding: 7px 12px; gap: 0; box-shadow: none; }
 .simple-cm .kpi b { font-size: 18px; }
+
+/* Menu Database: Price Inquiry | Productivity berdampingan (2 kolom) */
+.ddmenu.ddmenu-2kolom { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; align-items: start; left: auto; right: 0; min-width: 0; width: min(620px, calc(100vw - 32px)); max-width: none; max-height: calc(100vh - 90px); overflow-y: auto; }
+.ddkolom { display: grid; gap: 1px; align-content: start; min-width: 0; }
+.ddkolom + .ddkolom { border-left: 1px solid var(--line); padding-left: 8px; }
+@media (max-width: 800px) { .ddmenu.ddmenu-2kolom { width: auto; grid-template-columns: 1fr; } .ddkolom + .ddkolom { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); } }
+/* header tetap satu baris dengan menu Cost Model Warehouse / Transportation / Database */
+@media (max-width: 1400px) { .brand-oleh { display: none; } .topbar { gap: 12px; } .ddbtn { padding-left: 8px; padding-right: 8px; font-size: 13.5px; } }
+@media (max-width: 1180px) { .ddlabel { max-width: 128px; } .bahasa-pilih > span[aria-hidden] { display: none; } }
+/* di bawah 1100px menu atas pindah ke laci (☰) supaya tidak terpotong */
+@media (max-width: 1100px) {
+  .topbar { flex-wrap: nowrap !important; min-height: 56px; padding-top: 0 !important; padding-bottom: 0 !important; gap: 10px !important; }
+  .topbar .topnav { display: none !important; }
+  .burger-app { display: grid; }
+  .laci-latar { display: block; position: fixed; inset: 0; z-index: 100; background: rgba(15, 23, 42, .45); animation: laci-pudar .18s ease-out; }
+  body.laci-buka { overflow: hidden; }
+}

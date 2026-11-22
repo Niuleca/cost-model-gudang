@@ -12,10 +12,10 @@ import { KATEGORI_BISNIS } from '@/lib/kategoriBisnis';
 import { BAHASA, useBahasa, type Bahasa } from '@/lib/i18n';
 import { useBrandingSaya } from './BrandingProfil';
 
-type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: boolean; grup?: string; segera?: boolean };
+type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: boolean; grup?: string; segera?: boolean; /** menu 2 kolom: kolom tempat item ini */ kolom?: string };
 /** Penguji boleh membuat & membuka project miliknya sendiri (dan yang dibagikan ke mereka). */
 const TIM_PENGUJI: AppRole[] = [...TIM_TENDER, 'penguji'];
-const MENU: { id: string; label: string; item: Item[] }[] = [
+const MENU: { id: string; label: string; item: Item[]; kolom?: boolean }[] = [
   { id: 'dashboard', label: 'Dashboard', item: [
     { href: '/beranda', label: 'Logistics Opportunity Radar', roles: 'semua' },
     { href: '/trend-bisnis', label: 'Business Trend Intelligence', roles: TIM_TENDER },
@@ -24,10 +24,15 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/analisis', label: 'Project Analysis', roles: TIM_TENDER },
     { href: '/heatmap', label: 'Opportunity Control Tower', roles: TIM_TENDER },
   ] },
-  { id: 'simple', label: 'Simple CM Warehouse', item: [
+  { id: 'simple', label: 'Cost Model Warehouse', item: [
     { href: '/simple/baru', label: 'New Tender', roles: TIM_PENGUJI },
     { href: '/simple/draft', label: 'Draft Tender', roles: TIM_PENGUJI },
     { href: '/simple/perbandingan', label: 'Tender Comparison', roles: TIM_TENDER },
+  ] },
+  // Halaman yang sama dengan Logistics Tender → Transport & Intermodal (di sana tetap ada)
+  { id: 'cm-transport', label: 'Cost Model Transportation', item: [
+    { href: '/transport', label: 'Transportation Tender', roles: TIM_TENDER },
+    { href: '/intermodal', label: 'Intermodal Tender', roles: TIM_TENDER },
   ] },
   { id: 'tender', label: 'Logistics Tender', item: [
     { href: '/tender/baru', label: 'New Tender', roles: TIM_PENGUJI, grup: 'Warehouse Tender' },
@@ -47,15 +52,18 @@ const MENU: { id: string; label: string; item: Item[] }[] = [
     { href: '/simulasi', label: 'Desain gudang 2D ⇄ 3D', roles: 'semua' },
     { href: '/simulasi/game', label: 'Leca Game (simulasi operasi)', roles: 'semua' },
   ] },
-  { id: 'price', label: 'Price Inquiry', item: [...PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua' })),
-    { href: '/price/perbandingan', label: 'Price Comparison (vendor)', roles: 'semua' as const, pisah: true }] },
-  { id: 'prod', label: 'Productivity', item: [
-    ...KATEGORI_BISNIS.map(k => ({ href: `/produktivitas?kategori=${encodeURIComponent(k.nama)}`, label: k.nama, roles: 'semua' as const, grup: 'Business category' })),
-    { href: '/produktivitas/referensi-uom', label: 'UoM & weight class reference', roles: 'semua', grup: 'Reference' },
-    { href: '/produktivitas/semua', label: 'All productivity data', roles: 'semua', grup: 'Reference' },
-    { href: '/produktivitas/kalender', label: 'Holiday calendar', roles: 'semua', grup: 'Reference' },
+  // Database = Price Inquiry + Productivity dalam satu menu (2 kolom)
+  { id: 'database', label: 'Database', kolom: true, item: [
+    ...PRICE_PAGES.map(p => ({ href: `/price/${p.slug}`, label: p.label, roles: 'semua' as const, pisah: p.slug === 'hr' || p.slug === 'semua', grup: 'Price Inquiry', kolom: 'price' })),
+    { href: '/price/perbandingan', label: 'Price Comparison (vendor)', roles: 'semua' as const, pisah: true, grup: 'Price Inquiry', kolom: 'price' },
+    ...KATEGORI_BISNIS.map(k => ({ href: `/produktivitas?kategori=${encodeURIComponent(k.nama)}`, label: k.nama, roles: 'semua' as const, grup: 'Productivity · Business category', kolom: 'prod' })),
+    { href: '/produktivitas/referensi-uom', label: 'UoM & weight class reference', roles: 'semua', grup: 'Productivity · Reference', kolom: 'prod' },
+    { href: '/produktivitas/semua', label: 'All productivity data', roles: 'semua', grup: 'Productivity · Reference', kolom: 'prod' },
+    { href: '/produktivitas/kalender', label: 'Holiday calendar', roles: 'semua', grup: 'Productivity · Reference', kolom: 'prod' },
   ] },
 ];
+/** Role Solution Design hanya melihat menu Cost Model & Database (menu lain disembunyikan; Admin / Super Admin tetap melihat semua). */
+const MENU_SOLUTION_DESIGN = ['simple', 'cm-transport', 'database'];
 const AKUN: Item[] = [
   { href: '/admin', label: 'Pengguna & role', roles: ['admin'] },
   { href: '/admin/approval', label: 'Approval akun', roles: ['admin'] },
@@ -99,6 +107,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   const boleh = (i: Item) => !profile || i.roles === 'semua' || profile.role === 'admin' || !!profile.is_master || i.roles.includes(profile.role);
+  const menuTampil = MENU.filter(m => !profile || profile.is_master || profile.role !== 'solution_design' || MENU_SOLUTION_DESIGN.includes(m.id));
   const aktif = (href: string) => {
     const dasar = href.split('?')[0];
     if (dasar === '/') return path === '/';
@@ -153,7 +162,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {i.href === '/admin/approval' && nPending > 0 && <span className="pill warn small" style={{ marginLeft: 6 }}>{nPending}</span>}</Link>}
     </Fragment>));
 
-  const Dropdown = ({ id, label, item, kanan }: { id: string; label: string; item: Item[]; kanan?: boolean }) => {
+  const daftarMenu = (isi: Item[]) => isi.map((i, k) => (
+    <Fragment key={i.href}>
+      {i.grup && i.grup !== isi[k - 1]?.grup && <div className={`ddgrup${k > 0 ? ' pisah' : ''}`} role="presentation">{t(i.grup)}</div>}
+      {i.segera ? <span role="menuitem" aria-disabled="true" className={`ddsegera${i.grup ? ' bergrup' : ''}`}>{t(i.label)} <span className="pill info small">segera</span></span> : <Link role="menuitem" href={i.href} className={`${aktif(i.href) ? 'on' : ''}${i.pisah && i.grup === isi[k - 1]?.grup ? ' pisah' : ''}${i.grup ? ' bergrup' : ''}`}>{t(i.label)}
+        {i.href === '/admin/approval' && nPending > 0 && <span className="pill warn small" style={{ marginLeft: 6 }}>{nPending}</span>}</Link>}
+    </Fragment>));
+  const Dropdown = ({ id, label, item, kanan, kolom }: { id: string; label: string; item: Item[]; kanan?: boolean; kolom?: boolean }) => {
     const isi = item.filter(boleh);
     if (!isi.length) return null;
     const on = isi.some(i => aktif(i.href));
@@ -167,13 +182,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <span className="ddlabel" title={t(label)}>{t(label)}</span> <span aria-hidden="true" className="caret">▾</span>
         </button>
         {buka === id && (
-          <div className={`ddmenu${kanan ? ' kanan' : ''}`} role="menu">
-            {isi.map((i, k) => (
-              <Fragment key={i.href}>
-                {i.grup && i.grup !== isi[k - 1]?.grup && <div className={`ddgrup${k > 0 ? ' pisah' : ''}`} role="presentation">{t(i.grup)}</div>}
-                {i.segera ? <span role="menuitem" aria-disabled="true" className={`ddsegera${i.grup ? ' bergrup' : ''}`}>{t(i.label)} <span className="pill info small">segera</span></span> : <Link role="menuitem" href={i.href} className={`${aktif(i.href) ? 'on' : ''}${i.pisah ? ' pisah' : ''}${i.grup ? ' bergrup' : ''}`}>{t(i.label)}
-                  {i.href === '/admin/approval' && nPending > 0 && <span className="pill warn small" style={{ marginLeft: 6 }}>{nPending}</span>}</Link>}
-              </Fragment>))}
+          <div className={`ddmenu${kanan ? ' kanan' : ''}${kolom ? ' ddmenu-2kolom' : ''}`} role="menu">
+            {kolom ? Array.from(new Set(isi.map(i => i.kolom ?? ''))).map(kk => <div key={kk} className="ddkolom">{daftarMenu(isi.filter(i => (i.kolom ?? '') === kk))}</div>) : daftarMenu(isi)}
             {kanan && <button role="menuitem" className="ddkeluar" onClick={keluar}>{t('Keluar')}</button>}
           </div>)}
       </div>);
@@ -184,7 +194,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <header className="topbar">
         <Link href="/beranda" className="brand" aria-label="Leca — beranda"><LecaMark /><span className="brand-nama">Leca</span><span className="brand-oleh">by esapanghegar</span></Link>
         <nav aria-label="Menu utama" ref={navRef} className="topnav">
-          {(!profile || profile.status === undefined || profile.status === 'aktif') && MENU.map(m => <Fragment key={m.id}>{Dropdown(m)}</Fragment>)}
+          {(!profile || profile.status === undefined || profile.status === 'aktif') && menuTampil.map(m => <Fragment key={m.id}>{Dropdown(m)}</Fragment>)}
           <div className="sela" />
           <label className="bahasa-pilih" title={t('Bahasa')}><span aria-hidden="true">🌐</span>
             <select aria-label={t('Bahasa')} value={bahasa} onChange={e => setBahasa(e.target.value as Bahasa)}>
@@ -205,7 +215,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <button type="button" className="laci-tutup" aria-label={t('Tutup menu')} onClick={() => setLaci(false)}>✕</button>
             </div>
             {menuAktif && <nav className="laci-menu" aria-label={t('Menu utama')}>
-              {MENU.map(m => {
+              {menuTampil.map(m => {
                 const isi = m.item.filter(boleh); if (!isi.length) return null;
                 const on = isi.some(i => aktif(i.href));
                 const terbuka = grupLaci === null ? on : grupLaci === m.id;

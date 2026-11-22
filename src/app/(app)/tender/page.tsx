@@ -58,7 +58,7 @@ export default function DaftarTender() {
   return (
     <>
       <div className="head">
-        <div><div className="eyebrow">{simple ? 'Simple CM Warehouse' : 'Tender'}</div><h1>{draftSaja ? 'Draft tender' : 'Semua tender'}</h1></div>
+        <div><div className="eyebrow">{simple ? 'Cost Model Warehouse' : 'Tender'}</div><h1>{draftSaja ? 'Draft tender' : 'Semua tender'}</h1></div>
         <Link className="btn" href={simple ? '/simple/baru' : '/tender/baru'}>Tender baru</Link>
       </div>
       {err && <p className="error">{err}</p>}

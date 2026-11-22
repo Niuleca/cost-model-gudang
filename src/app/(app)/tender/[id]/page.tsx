@@ -1016,7 +1016,7 @@ export default function TenderPage() {
       <span><b>{l.id}</b> {tr(l.nama)}</span></button></li>; })}</ol>;
   const hitungSt = (ms: MenuSimple[]) => { const st = ms.flatMap(m => m.langkah.map(l => statusLangkah(l.id))); return { wajib: st.filter(x => x !== 'opsional').length, ok: st.filter(x => x === 'ok').length }; };
   const menuAktif = cariLangkah(langkah).menu.no;
-  const navWizard = <nav className="wiz-nav" aria-label="Langkah Simple CM Warehouse">
+  const navWizard = <nav className="wiz-nav" aria-label="Langkah Cost Model Warehouse">
     {INDUK_SIMPLE.map(g => {
       const ms = MENU_SIMPLE.filter(m => g.menu.includes(m.no)), { wajib, ok } = hitungSt(ms), aktif = !pop && g.menu.includes(menuAktif);
       return <div key={g.nama} className={`wiz-induk${aktif ? ' on' : ''}`}>
@@ -1045,7 +1045,7 @@ export default function TenderPage() {
     <>
       <div className="head">
         <div>
-          <div className="eyebrow">{simple ? 'Simple CM Warehouse · ' : ''}{t.kode} · v{t.versi} · {labelStatus(t.status)}</div>
+          <div className="eyebrow">{simple ? 'Cost Model Warehouse · ' : ''}{t.kode} · v{t.versi} · {labelStatus(t.status)}</div>
           <h1>{t.customer}</h1>
           <p className="muted">{t.kab_kota}, {t.provinsi} · {t.skenario_aset} · {t.jumlah_shift} shift · kontrak {t.durasi_kontrak_bulan} bln</p>
         </div>

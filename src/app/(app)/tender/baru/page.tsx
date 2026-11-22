@@ -41,7 +41,7 @@ export default function TenderBaru() {
 
   return (
     <>
-      <div className="head"><div><div className="eyebrow">{simple ? 'Simple CM Warehouse' : 'UC10 · Input customer & tender'}</div><h1>Tender baru</h1>
+      <div className="head"><div><div className="eyebrow">{simple ? 'Cost Model Warehouse' : 'UC10 · Input customer & tender'}</div><h1>Tender baru</h1>
           {simple && <p className="muted" style={{ margin: 0 }}>Hanya 2 tab: Key Assumption (termasuk volume) & Result. Semua angka dihitung otomatis; rinciannya bisa dibuka dan diubah dari Result.</p>}</div></div>
       <form className="card" onSubmit={buat}>
         <div className="grid3">
