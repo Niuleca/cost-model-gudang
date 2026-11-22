@@ -1,152 +1,100 @@
 'use client';
-// Beranda: radar jadwal tender gudang / logistik perusahaan besar di Indonesia.
-// Diisi otomatis oleh Claude (scheduled task harian dari sumber publik) dan diperbarui manual oleh akun.
+// Beranda: grafik penyelesaian task project (checklist Implementation / Project Charter).
+// Logistics Opportunity Radar pindah ke /radar (menu Dashboard).
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { useProfile } from '@/lib/useProfile';
-import { tanggal, rp } from '@/lib/format';
+import Grafik from '@/components/Grafik';
+import { angka } from '@/lib/format';
 
-interface Radar {
-  id: string; perusahaan: string; judul: string; kategori: string; industri: string | null; lokasi: string | null; platform: string | null;
-  nomor_tender: string | null; tanggal_terbit: string | null; batas_daftar: string | null; batas_penawaran: string | null; nilai_estimasi: number | null;
-  status: string; link: string | null; pic_nama: string | null; pic_email: string | null; pic_telepon: string | null; catatan: string | null;
-  sumber: 'manual' | 'claude'; sumber_url: string | null; terverifikasi: boolean; dibuat_oleh: string | null; diubah_oleh: string | null; updated_at: string;
-}
-const KATEGORI = ['Warehousing', '3PL / Contract Logistics', 'Transport / Distribusi', 'Intermodal / Multimoda', 'Freight Forwarding', 'Cold Chain', 'Lainnya'];
-const PLATFORM = ['Coupa', 'SAP Ariba', 'SPSE / LPSE (pemerintah)', 'e-Proc BUMN', 'e-Proc swasta', 'Website perusahaan', 'LinkedIn', 'Berita / media', 'Undangan langsung / email', 'Lainnya'];
-const STATUS: Record<string, { l: string; c: string }> = {
-  rencana: { l: 'Rencana', c: 'info' }, dibuka: { l: 'Dibuka', c: 'ok' }, ditutup: { l: 'Ditutup', c: 'bad' }, dibatalkan: { l: 'Dibatalkan', c: 'bad' }, selesai: { l: 'Selesai', c: 'info' },
-};
-const kosong = (): Partial<Radar> => ({ perusahaan: '', judul: '', kategori: 'Warehousing', platform: 'Website perusahaan', status: 'dibuka' });
-// Tanggal lokal (WIB di browser pengguna), bukan UTC
+interface Tg { tender_id: string; status: string; target: string | null; selesai: string | null }
+interface T { id: string; kode: string | null; customer: string }
+
+/** Kelompok status task — warna status: hijau selesai, merah terlambat, kuning blocked. */
+const KEL = [
+  { k: 'selesai', l: 'Selesai', warna: '#1baf7a' },
+  { k: 'berjalan', l: 'Berjalan', warna: '#2a78d6' },
+  { k: 'belum', l: 'Belum mulai', warna: '#bdbdbd' },
+  { k: 'blocked', l: 'Blocked', warna: '#eda100' },
+  { k: 'telat', l: 'Terlambat', warna: '#e34948' },
+] as const;
+type Kel = (typeof KEL)[number]['k'];
 const hariIni = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const sisaHari = (d: string | null) => d ? Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(hariIni() + 'T00:00:00Z')) / 86400000) : null;
+/** Task yang lewat target dan belum selesai dihitung Terlambat. */
+const kelompok = (t: Tg, hari: string): Kel =>
+  t.status === 'Selesai' ? 'selesai'
+    : t.status === 'Terlambat' || (!!t.target && t.target < hari) ? 'telat'
+      : t.status === 'Blocked' ? 'blocked'
+        : t.status === 'Berjalan' ? 'berjalan' : 'belum';
 
 export default function Beranda() {
   const sb = supabaseBrowser();
-  const { profile } = useProfile();
-  const [rows, setRows] = useState<Radar[]>([]);
-  const [nama, setNama] = useState<Record<string, string>>({});
+  const [tugas, setTugas] = useState<Tg[]>([]);
+  const [tender, setTender] = useState<T[]>([]);
+  const [siap, setSiap] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [belumAda, setBelumAda] = useState(false);
-  const [q, setQ] = useState('');
-  const [filter, setFilter] = useState<'aktif' | 'semua' | 'lewat'>('aktif');
-  const [kat, setKat] = useState('');
-  const [edit, setEdit] = useState<Partial<Radar> | null>(null);
-  const [sibuk, setSibuk] = useState(false);
 
-  async function muat() {
-    const { data, error } = await sb.from('tender_radar').select('*').order('batas_penawaran', { ascending: true, nullsFirst: false }).limit(500);
-    if (error) { if (/tender_radar/.test(error.message)) setBelumAda(true); else setErr(error.message); return; }
-    const r = (data ?? []) as Radar[]; setRows(r);
-    const ids = Array.from(new Set(r.flatMap(x => [x.dibuat_oleh, x.diubah_oleh]).filter(Boolean))) as string[];
-    if (ids.length) {
-      const { data: ps } = await sb.from('profiles').select('id, full_name, email').in('id', ids);
-      setNama(Object.fromEntries(((ps ?? []) as { id: string; full_name: string; email: string }[]).map(p => [p.id, p.full_name || p.email])));
-    }
-  }
-  useEffect(() => { muat(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const tampil = useMemo(() => {
-    const t = hariIni();
-    return rows.filter(r => {
-      const lewat = (r.batas_penawaran && r.batas_penawaran < t) || ['ditutup', 'dibatalkan', 'selesai'].includes(r.status);
-      if (filter === 'aktif' && lewat) return false;
-      if (filter === 'lewat' && !lewat) return false;
-      if (kat && r.kategori !== kat) return false;
-      if (q && !`${r.perusahaan} ${r.judul} ${r.lokasi ?? ''} ${r.platform ?? ''} ${r.industri ?? ''}`.toLowerCase().includes(q.toLowerCase())) return false;
-      return true;
+  useEffect(() => {
+    Promise.all([
+      sb.from('implementation_tasks').select('tender_id, status, target, selesai'),
+      sb.from('tenders').select('id, kode, customer'),
+    ]).then(([a, b]) => {
+      if (a.error) setErr(a.error.message);
+      setTugas((a.data ?? []) as Tg[]); setTender((b.data ?? []) as T[]); setSiap(true);
     });
-  }, [rows, q, filter, kat]);
-  const ringkas = useMemo(() => {
-    const t = hariIni(), aktif = rows.filter(r => !(r.batas_penawaran && r.batas_penawaran < t) && !['ditutup', 'dibatalkan', 'selesai'].includes(r.status));
-    return { aktif: aktif.length, minggu: aktif.filter(r => { const s = sisaHari(r.batas_penawaran); return s != null && s <= 7; }).length,
-      claude: rows.filter(r => r.sumber === 'claude').length, terakhir: rows.reduce((m, r) => r.updated_at > m ? r.updated_at : m, '') };
-  }, [rows]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function simpan() {
-    if (!edit?.perusahaan?.trim() || !edit.judul?.trim()) { setErr('Perusahaan dan judul tender wajib diisi.'); return; }
-    setSibuk(true); setErr(null);
-    const { id, dibuat_oleh, diubah_oleh, updated_at, ...isi } = edit as Radar; void dibuat_oleh; void diubah_oleh; void updated_at;
-    const bersih = Object.fromEntries(Object.entries(isi).map(([k, v]) => [k, v === '' ? null : v]));
-    const res = id ? await sb.from('tender_radar').update(bersih).eq('id', id) : await sb.from('tender_radar').insert({ ...bersih, sumber: 'manual' });
-    setSibuk(false);
-    if (res.error) { setErr(/duplicate|unik/i.test(res.error.message) ? 'Tender dengan perusahaan & judul yang sama sudah ada.' : res.error.message); return; }
-    setEdit(null); muat();
-  }
-  async function hapus(r: Radar) {
-    const { error } = await sb.from('tender_radar').delete().eq('id', r.id);
-    if (error) setErr(error.message); else muat();
-  }
-  const bolehHapus = (r: Radar) => !!profile && (profile.is_master || profile.role === 'admin' || profile.role === 'manager' || r.dibuat_oleh === profile.id);
-  const f = (k: keyof Radar, label: string, type = 'text', opts?: string[]) => (
-    <label className="f" htmlFor={`rd-${k}`}>{label}
-      {opts ? <select id={`rd-${k}`} value={String(edit?.[k] ?? '')} onChange={e => setEdit({ ...edit, [k]: e.target.value })}>{opts.map(o => <option key={o} value={o}>{STATUS[o]?.l ?? o}</option>)}</select>
-        : type === 'textarea' ? <textarea id={`rd-${k}`} value={String(edit?.[k] ?? '')} onChange={e => setEdit({ ...edit, [k]: e.target.value })} />
-        : <input id={`rd-${k}`} type={type} value={String(edit?.[k] ?? '')} onChange={e => setEdit({ ...edit, [k]: type === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value })} />}
-    </label>);
+  const hari = hariIni();
+  // per project: jumlah task per kelompok, diurut dari % selesai tertinggi
+  const proj = useMemo(() => {
+    const ids = Array.from(new Set(tugas.map(t => t.tender_id)));
+    return ids.map(id => {
+      const xs = tugas.filter(t => t.tender_id === id);
+      const n = Object.fromEntries(KEL.map(k => [k.k, 0])) as Record<Kel, number>;
+      for (const t of xs) n[kelompok(t, hari)]++;
+      const tn = tender.find(x => x.id === id);
+      return { id, nama: tn ? `${tn.kode ? `${tn.kode} · ` : ''}${tn.customer}` : 'Project', n, total: xs.length, pct: xs.length ? n.selesai / xs.length : 0 };
+    }).sort((x, y) => y.pct - x.pct || y.total - x.total);
+  }, [tugas, tender, hari]);
 
-  return (<>
-    <div className="head"><div><div className="eyebrow">Dashboard</div><h1>Logistics Opportunity Radar</h1>
-      <p className="muted small">Warehouse · Transportation (land) · Intermodal</p></div>
-      <button onClick={() => setEdit(kosong())}>+ Tambah jadwal tender</button></div>
+  // task selesai per bulan (12 bulan terakhir) dari tanggal selesai
+  const bulan = useMemo(() => {
+    const now = new Date(); const xs: string[] = [];
+    for (let i = 11; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); xs.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
+    return xs;
+  }, []);
+  const perBulan = bulan.map(b => tugas.filter(t => t.status === 'Selesai' && t.selesai?.slice(0, 7) === b).length);
+  const adaTanggalSelesai = perBulan.some(v => v > 0);
 
-    {belumAda && <div className="card"><p className="notice small">Tabel radar belum dibuat di database. Jalankan SQL <b>0021_tender_radar</b> di Supabase SQL Editor, lalu muat ulang halaman ini.</p></div>}
-    {err && <p className="error small" role="alert">{err}</p>}
+  const total = tugas.length;
+  const jml = (k: Kel) => proj.reduce((a, p) => a + p.n[k], 0);
+  const pctSelesai = total ? Math.round((jml('selesai') / total) * 100) : 0;
 
-    <div className="grid3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
-      {[['Tender aktif', ringkas.aktif], ['Tutup ≤ 7 hari', ringkas.minggu], ['Ditemukan Claude', ringkas.claude], ['Update terakhir', ringkas.terakhir ? tanggal(ringkas.terakhir) : '—']].map(([l, v]) =>
-        <div key={String(l)} className="card" style={{ gap: 2 }}><span className="small muted">{l}</span><b style={{ fontSize: 22 }}>{v}</b></div>)}
-    </div>
-
-    <div className="card">
-      <div className="row">
-        <input aria-label="Cari" placeholder="Cari perusahaan, judul, lokasi…" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 300 }} />
-        <select aria-label="Kategori" value={kat} onChange={e => setKat(e.target.value)} style={{ maxWidth: 220 }}><option value="">Semua kategori</option>{KATEGORI.map(k => <option key={k}>{k}</option>)}</select>
-        <div className="tabs" role="tablist">{([['aktif', 'Aktif'], ['lewat', 'Lewat / ditutup'], ['semua', 'Semua']] as const).map(([v, l]) =>
-          <button key={v} role="tab" aria-selected={filter === v} className={filter === v ? 'on' : ''} onClick={() => setFilter(v)}>{l}</button>)}</div>
-        <span className="small muted">{tampil.length} tender</span>
+  return (
+    <>
+      <div className="head">
+        <div><div className="eyebrow">Beranda</div><h1>Penyelesaian task project</h1>
+          <p className="small muted">Dari checklist Implementation / Project Charter · task lewat target yang belum selesai dihitung terlambat</p></div>
+        <Link className="btn ghost" href="/implementasi">Buka checklist project</Link>
       </div>
-      <div className="tablewrap"><table>
-        <thead><tr><th>Batas penawaran</th><th>Perusahaan</th><th>Tender</th><th>Platform</th><th>PIC / kontak</th><th>Status</th><th>Sumber</th><th /></tr></thead>
-        <tbody>
-          {tampil.map(r => { const s = sisaHari(r.batas_penawaran); const st = STATUS[r.status] ?? { l: r.status, c: 'info' };
-            return <tr key={r.id}>
-              <td className="small" style={{ whiteSpace: 'nowrap' }}>{r.batas_penawaran ? <><b>{tanggal(r.batas_penawaran)}</b><div className={s != null && s <= 7 && s >= 0 ? 'bad' : 'muted'}>{s == null ? '' : s < 0 ? 'lewat' : s === 0 ? 'hari ini' : s === 1 ? 'besok' : `${s} hari lagi`}</div></> : <span className="muted">belum diumumkan</span>}
-                {r.batas_daftar && <div className="muted">daftar s.d. {tanggal(r.batas_daftar)}</div>}</td>
-              <td><b>{r.perusahaan}</b>{r.industri && <div className="small muted">{r.industri}</div>}</td>
-              <td>{r.link ? <a href={r.link} target="_blank" rel="noreferrer">{r.judul}</a> : r.judul}
-                <div className="small muted">{[r.kategori, r.lokasi, r.nomor_tender, r.nilai_estimasi ? `est. ${rp(r.nilai_estimasi)}` : null].filter(Boolean).join(' · ')}</div>
-                {r.catatan && <div className="small">{r.catatan}</div>}</td>
-              <td className="small">{r.platform ?? '—'}{r.tanggal_terbit && <div className="muted">terbit {tanggal(r.tanggal_terbit)}</div>}</td>
-              <td className="small">{r.pic_nama && <div>{r.pic_nama}</div>}{r.pic_email && <div><a href={`mailto:${r.pic_email}`}>{r.pic_email}</a></div>}{r.pic_telepon && <div><a href={`tel:${r.pic_telepon}`}>{r.pic_telepon}</a></div>}{!r.pic_nama && !r.pic_email && !r.pic_telepon && <span className="muted">—</span>}</td>
-              <td><span className={`pill ${st.c}`}>{st.l}</span>{r.terverifikasi && <div className="small ok">terverifikasi</div>}</td>
-              <td className="small">{r.sumber === 'claude' ? <span className="pill info">Claude</span> : 'Manual'}{r.sumber_url && <div><a href={r.sumber_url} target="_blank" rel="noreferrer">sumber</a></div>}
-                <div className="muted">{r.diubah_oleh ? `diubah ${nama[r.diubah_oleh] ?? ''}` : ''} {tanggal(r.updated_at)}</div></td>
-              <td><div className="row" style={{ flexWrap: 'nowrap' }}><button className="ghost" onClick={() => setEdit(r)}>Edit</button>{bolehHapus(r) && <button className="danger" onClick={() => hapus(r)}>Hapus</button>}</div></td>
-            </tr>; })}
-          {!tampil.length && !belumAda && <tr><td colSpan={8} className="muted">Belum ada jadwal tender untuk filter ini.</td></tr>}
-        </tbody>
-      </table></div>
-    </div>
+      {err && <p className="error small" role="alert">{err}</p>}
 
-    {edit && <div className="pv-latar" role="dialog" aria-modal="true" aria-label="Edit jadwal tender" onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
-      <div className="pv-kotak" style={{ maxWidth: 860, height: 'auto', maxHeight: '90vh' }}>
-        <div className="pv-bar"><b>{edit.id ? 'Edit jadwal tender' : 'Tambah jadwal tender'}</b><span style={{ flex: 1 }} /><button className="ghost" onClick={() => setEdit(null)}>Tutup</button></div>
-        <div className="pv-isi" style={{ padding: 16, display: 'grid', gap: 10, overflow: 'auto' }}>
-          <div className="grid3">
-            {f('perusahaan', 'Perusahaan *')}{f('judul', 'Judul tender *')}{f('kategori', 'Kategori', 'text', KATEGORI)}
-            {f('industri', 'Industri')}{f('lokasi', 'Lokasi')}{f('platform', 'Platform', 'text', PLATFORM)}
-            {f('nomor_tender', 'Nomor tender / event ID')}{f('tanggal_terbit', 'Tanggal terbit', 'date')}{f('batas_daftar', 'Batas pendaftaran', 'date')}
-            {f('batas_penawaran', 'Batas penawaran', 'date')}{f('nilai_estimasi', 'Nilai estimasi (Rp)', 'number')}{f('status', 'Status', 'text', Object.keys(STATUS))}
-            {f('link', 'Link pengumuman / portal')}{f('pic_nama', 'PIC pengadaan')}{f('pic_email', 'Email PIC', 'email')}
-            {f('pic_telepon', 'Telepon PIC')}{f('sumber_url', 'URL sumber')}
-            <label className="row small" style={{ gap: 6, alignSelf: 'end' }}><input type="checkbox" style={{ width: 'auto' }} checked={!!edit.terverifikasi} onChange={e => setEdit({ ...edit, terverifikasi: e.target.checked })} /> Terverifikasi</label>
-          </div>
-          {f('catatan', 'Catatan (lingkup, kebutuhan m², syarat, dll.)', 'textarea')}
-          <div className="row"><button onClick={simpan} disabled={sibuk}>{sibuk ? 'Menyimpan…' : 'Simpan'}</button><button className="ghost" onClick={() => setEdit(null)}>Batal</button></div>
-        </div>
-      </div>
-    </div>}
-  </>);
+      {!siap ? <div className="card"><p className="muted">Memuat…</p></div>
+        : !total ? <div className="card"><p className="muted">Belum ada task project. Checklist dibuat di menu Logistics Tender → Implementation / Project Charter.</p></div>
+          : <>
+            <div className="card">
+              <Grafik judul="Status task per project" keterangan={`${angka(jml('selesai'))} dari ${angka(total)} task selesai (${pctSelesai}%) · ${angka(jml('telat'))} terlambat · ${proj.length} project`}
+                kategori={proj.map(p => p.nama)} seri={KEL.map(k => ({ nama: k.l, nilai: proj.map(p => p.n[k.k]), warna: k.warna }))}
+                jenis="tumpuk" pilihan={['tumpuk', 'batang']} persen100 labelUjung={i => `${Math.round(proj[i].pct * 100)}% · ${proj[i].n.selesai}/${proj[i].total}`}
+                fmt={v => `${angka(v)} task`} fmtSumbu={v => angka(v)} />
+            </div>
+            {adaTanggalSelesai && <div className="card">
+              <Grafik judul="Task selesai per bulan" keterangan="12 bulan terakhir · kolom = selesai di bulan itu, garis = kumulatif"
+                kategori={bulan.map(b => new Date(`${b}-01`).toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }))}
+                seri={[{ nama: 'Task selesai', nilai: perBulan, warna: '#1baf7a' }]} jenis="combo" pilihan={['combo', 'kolom', 'garis']}
+                fmt={v => `${angka(v)} task`} fmtSumbu={v => angka(v)} tinggi={220} />
+            </div>}
+          </>}
+    </>
+  );
 }

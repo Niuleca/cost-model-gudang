@@ -17,7 +17,7 @@ type Item = { href: string; label: string; roles: AppRole[] | 'semua'; pisah?: b
 const TIM_PENGUJI: AppRole[] = [...TIM_TENDER, 'penguji'];
 const MENU: { id: string; label: string; item: Item[]; kolom?: boolean }[] = [
   { id: 'dashboard', label: 'Dashboard', item: [
-    { href: '/beranda', label: 'Logistics Opportunity Radar', roles: 'semua' },
+    { href: '/radar', label: 'Logistics Opportunity Radar', roles: 'semua' },
     { href: '/trend-bisnis', label: 'Business Trend Intelligence', roles: TIM_TENDER },
     { href: '/', label: 'Summary', roles: TIM_TENDER, pisah: true },
     { href: '/status', label: 'Project Status', roles: TIM_TENDER },

@@ -11,9 +11,9 @@ const TINTA = '#1f1f1f', TINTA2 = '#6b6b6b', GARIS_GRID = '#ececec', GARIS_SUMBU
 /** Warna kategori ke-i: 7 pertama berwarna, sisanya abu (dilipat ke "Lainnya" di pie). */
 export const warnaKe = (i: number) => (i < 7 ? PALET_GRAFIK[i] : ABU);
 
-export type JenisGrafik = 'pie' | 'donut' | 'kolom' | 'batang' | 'garis' | 'combo';
-export const NAMA_JENIS: Record<JenisGrafik, string> = { pie: 'Pie', donut: 'Donut', kolom: 'Column', batang: 'Bar', garis: 'Line', combo: 'Combo' };
-export interface SeriGrafik { nama: string; nilai: number[]; /** combo: digambar sebagai garis */ garis?: boolean }
+export type JenisGrafik = 'pie' | 'donut' | 'kolom' | 'batang' | 'garis' | 'combo' | 'tumpuk';
+export const NAMA_JENIS: Record<JenisGrafik, string> = { pie: 'Pie', donut: 'Donut', kolom: 'Column', batang: 'Bar', garis: 'Line', combo: 'Combo', tumpuk: 'Stacked' };
+export interface SeriGrafik { nama: string; nilai: number[]; /** combo: digambar sebagai garis */ garis?: boolean; /** warna tetap (mis. warna status) */ warna?: string }
 
 /** Angka ringkas untuk sumbu: 1,2 M · 350 jt · 12 rb */
 export function ringkas(v: number, awalan = '') {
@@ -80,6 +80,10 @@ interface Props {
   tanpaLegenda?: boolean;
   /** teks di tengah donut (default: total) */
   tengah?: string;
+  /** stacked: tiap batang = 100% (komposisi) */
+  persen100?: boolean;
+  /** stacked: teks di ujung batang (mis. "62% selesai") */
+  labelUjung?: (i: number) => string;
 }
 
 export default function Grafik(p: Props) {
@@ -135,7 +139,7 @@ function useLebar() {
   return [ref, w] as const;
 }
 
-function Kanvas({ kategori, seri, jenis, fmt = v => ringkas(v), fmtSumbu, tinggi = 220, warnaPerKategori, tanpaLegenda, tengah, judul, besar }: Props & { tinggi: number; besar?: boolean }) {
+function Kanvas({ kategori, seri, jenis, fmt = v => ringkas(v), fmtSumbu, tinggi = 220, warnaPerKategori, tanpaLegenda, tengah, judul, besar, persen100, labelUjung }: Props & { tinggi: number; besar?: boolean }) {
   const [ref, w] = useLebar();
   const [hover, setHover] = useState<number | null>(null);
   const fs = fmtSumbu ?? (v => ringkas(v));
@@ -176,10 +180,47 @@ function Kanvas({ kategori, seri, jenis, fmt = v => ringkas(v), fmtSumbu, tinggi
     </div>;
   }
 
-  // ---------- kartesius: kolom, batang, garis, combo
+  // ---------- kartesius: kolom, batang, garis, combo, tumpuk
   const lebar = Math.max(240, w || 560);
+  if (jenis === 'tumpuk') {
+    const ss = seri.map((s, i) => ({ ...s, warna: s.warna ?? PALET_GRAFIK[i % PALET_GRAFIK.length] }));
+    const totalK = kategori.map((_, i) => ss.reduce((a, s) => a + Math.max(0, s.nilai[i] || 0), 0));
+    const sk = persen100 ? { ticks: [0, 25, 50, 75, 100], hi: 100 } : skala(0, Math.max(1, ...totalK));
+    const fsT = persen100 ? (v: number) => `${v}%` : fs;
+    const tinggiBaris = besar ? 34 : 26, tb = tinggiBaris - 10;
+    const labW = Math.min(lebar * 0.38, Math.max(60, Math.max(...kategori.map(k => k.length)) * 6.2 + 10));
+    const atas = 4, bawah = 20, kanan = labelUjung ? 112 : 14;
+    const h = n * tinggiBaris + atas + bawah;
+    const sx = (v: number) => labW + (v / sk.hi) * (lebar - labW - kanan);
+    const nilaiK = (s: typeof ss[number], i: number) => { const v = Math.max(0, s.nilai[i] || 0); return persen100 ? (totalK[i] ? (v / totalK[i]) * 100 : 0) : v; };
+    const pctK = (v: number, i: number) => (totalK[i] ? Math.round((v / totalK[i]) * 1000) / 10 : 0);
+    return <div ref={ref} className="gf-kart">
+      {ss.length >= 2 && <div className="gf-legenda">{ss.map(s => <span key={s.nama}><i style={{ background: s.warna }} />{s.nama}</span>)}</div>}
+      <div className="gf-plot" onMouseLeave={() => setHover(null)}>
+        <svg width={lebar} height={h} role="img" aria-label={judul}>
+          {sk.ticks.map(t => <g key={t}><line x1={sx(t)} x2={sx(t)} y1={atas} y2={h - bawah} stroke={t === 0 ? GARIS_SUMBU : GARIS_GRID} />
+            <text x={sx(t)} y={h - 6} fontSize={10.5} textAnchor="middle" fill={TINTA2}>{fsT(t)}</text></g>)}
+          {kategori.map((k, i) => {
+            const y = atas + i * tinggiBaris, by = y + (tinggiBaris - tb) / 2;
+            let acc = 0;
+            const seg = ss.map(s => { const v = nilaiK(s, i); const a0 = acc; acc += v; return { s, x0: sx(a0), x1: sx(acc) }; }).filter(g => g.x1 - g.x0 > 0.5);
+            return <g key={k + i} onMouseEnter={() => setHover(i)}>
+              <rect x={0} y={y} width={lebar} height={tinggiBaris} fill={hover === i ? 'rgba(0,0,0,.04)' : 'transparent'} />
+              <text x={labW - 8} y={y + tinggiBaris / 2 + 4} fontSize={11.5} textAnchor="end" fill={TINTA}>{potong(k, labW - 12)}</text>
+              {seg.map((g, j) => j === seg.length - 1
+                ? <path key={g.s.nama} d={batangH(by, g.x0, g.x1, tb)} fill={g.s.warna} />
+                : <rect key={g.s.nama} x={g.x0} y={by} width={Math.max(0.5, g.x1 - g.x0 - 2)} height={tb} fill={g.s.warna} />)}
+              {labelUjung && <text x={sx(acc) + 6} y={y + tinggiBaris / 2 + 4} fontSize={11} fill={TINTA}>{labelUjung(i)}</text>}
+            </g>;
+          })}
+        </svg>
+        {hover != null && <div className="gf-tip" style={{ left: Math.min(lebar - 100, Math.max(100, labW + (lebar - labW - kanan) / 2)), top: atas + hover * tinggiBaris + tinggiBaris }}>
+          <b>{kategori[hover]}</b>{ss.map(s => { const v = Math.max(0, s.nilai[hover] || 0); return <div key={s.nama}><i style={{ background: s.warna }} />{s.nama}: <b>{fmt(v)}</b> · {pctK(v, hover).toLocaleString('id-ID')}%</div>; })}
+        </div>}
+      </div></div>;
+  }
   const combo = jenis === 'combo';
-  const dasarSeri = seri.map((s, i) => ({ ...s, warna: PALET_GRAFIK[i % PALET_GRAFIK.length] }));
+  const dasarSeri = seri.map((s, i) => ({ ...s, warna: s.warna ?? PALET_GRAFIK[i % PALET_GRAFIK.length] }));
   let kolom = jenis === 'garis' ? [] : dasarSeri.filter(s => !(combo && s.garis));
   let garis = jenis === 'garis' ? dasarSeri : combo ? dasarSeri.filter(s => s.garis) : [];
   if (combo && !garis.length && kolom.length === 1) {   // Pareto: kolom + garis kumulatif (satuan sama, satu sumbu)

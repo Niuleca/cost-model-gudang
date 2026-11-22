@@ -1309,3 +1309,11 @@ td.td-isian { background: #fffaf0; }
   .laci-latar { display: block; position: fixed; inset: 0; z-index: 100; background: rgba(15, 23, 42, .45); animation: laci-pudar .18s ease-out; }
   body.laci-buka { overflow: hidden; }
 }
+
+/* Tanda tangan online (Profil) */
+.ttd-pad { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-2); }
+.ttd-wadah { position: relative; height: 180px; border: 1px dashed var(--line-strong); border-radius: 10px; background: #fff; overflow: hidden; }
+.ttd-kanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; z-index: 1; }
+.ttd-garis { position: absolute; left: 18px; right: 18px; top: 72%; border-bottom: 1px solid var(--line-strong); color: var(--muted); font-size: 14px; line-height: 1; padding-bottom: 2px; pointer-events: none; }
+.ttd-petunjuk { position: absolute; left: 0; right: 0; top: 38%; text-align: center; color: var(--muted); font-size: 13px; pointer-events: none; }
+.ttd-tinta { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
