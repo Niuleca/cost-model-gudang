@@ -4,6 +4,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { useProfile } from '@/lib/useProfile';
 import { rp, angka } from '@/lib/format';
 import { hitungListrik, exportListrikExcel, type DataListrik } from '@/lib/listrik';
+import InputDesimal from '@/components/InputDesimal';
 
 interface Sim { id: string; nama: string; is_template: boolean; data: DataListrik; updated_at: string }
 interface Tarif { golongan: string; tarif_kwh: number }
@@ -57,7 +58,7 @@ export default function ListrikCalculator({ contoh }: { contoh?: DataListrik } =
   }
 
   const inp = (v: number, on: (x: number) => void, w = 80, step = 'any') =>
-    boleh ? <input type="number" step={step} value={Number.isFinite(v) ? v : 0} onChange={e => on(n(e.target.value))} style={{ width: w, minWidth: w, background: 'var(--input)' }} /> : (v ? v.toLocaleString('id-ID', { maximumFractionDigits: 2 }) : '–');
+    boleh ? <InputDesimal step={step} value={Number.isFinite(v) ? v : 0} onChange={e => on(n(e.target.value))} style={{ width: w, minWidth: w, background: 'var(--input)' }} /> : (v ? v.toLocaleString('id-ID', { maximumFractionDigits: 2 }) : '–');
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>

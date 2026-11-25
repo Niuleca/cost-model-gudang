@@ -6,6 +6,7 @@ import type { RakHarga, SpaceInput } from '@/lib/engine/types';
 import type { GudangTerpilih } from '@/lib/tender';
 import { useBungaModal } from '@/lib/useBungaModal';
 import { rp, angka } from '@/lib/format';
+import InputDesimal from '@/components/InputDesimal';
 
 interface Item { id: number; kategori: string; item: string; satuan: string; harga_beli: number | null; umur_ekonomis_bulan: number | null; status_efektif: string }
 interface WhLive { harga_sewa_m2_bulan: number | null; harga_per_bulan: number | null; luas_m2: number }
@@ -79,7 +80,7 @@ export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, pos
           ? <tr><td>Disewa utuh (harga database)</td><td className="num">{rp(sewaUtuhNilai)}</td><td>/bln</td></tr>
           : <tr><td>Tarif sewa {pakaiDb ? <span className="pill ok">database</span> : <span className="pill warn">manual</span>}</td>
             <td className="num">{pakaiDb ? rp(tarif)
-              : <input aria-label="Tarif sewa manual" type="number" value={space.tarifSewaM2Bulan} onChange={e => onSpace({ ...space, tarifSewaM2Bulan: Number(e.target.value) })} style={{ width: 110, minWidth: 110, textAlign: 'right', background: 'var(--input)' }} />}</td>
+              : <InputDesimal aria-label="Tarif sewa manual" value={space.tarifSewaM2Bulan} onChange={e => onSpace({ ...space, tarifSewaM2Bulan: Number(e.target.value) })} style={{ width: 110, minWidth: 110, textAlign: 'right', background: 'var(--input)' }} />}</td>
             <td className="small">/m²/bln {gudang && <button className="ghost" style={{ padding: '0 6px' }} onClick={() => onSpace({ ...space, tarifManual: !space.tarifManual, tarifSewaM2Bulan: space.tarifManual ? tarifDb ?? 0 : space.tarifSewaM2Bulan || tarifDb || 0 })}>{pakaiDb ? 'Ubah manual' : 'Pakai database'}</button>}</td></tr>}
         {dbBerubah && <tr><td colSpan={3}><span className="pill warn">Harga gudang di database sudah berubah</span>{' '}
           <button className="ghost" style={{ padding: '0 6px' }} onClick={() => gudang && live && onGudang({ ...gudang, harga_sewa_m2_bulan: live.harga_sewa_m2_bulan, harga_per_bulan: live.harga_per_bulan, luas_m2: Number(live.luas_m2) })}>Perbarui</button></td></tr>}
@@ -101,7 +102,7 @@ export default function BiayaSpacePanel({ space, gudang, items, spaceRentM2, pos
                   {rakItems.map(x => <option key={x.id} value={x.id}>{x.item} · {rp(x.harga_beli ?? 0)}/{x.satuan}{x.status_efektif !== 'approved' ? ` (${x.status_efektif})` : ''}</option>)}
                 </select>
                 <div className="row small">
-                  <label>Harga/posisi <input type="number" value={b.h.harga} onChange={e => setRak(b.j, { harga: Number(e.target.value) })} style={{ width: 110, minWidth: 110, textAlign: 'right', background: 'var(--input)' }} /></label>
+                  <label>Harga/posisi <InputDesimal value={b.h.harga} onChange={e => setRak(b.j, { harga: Number(e.target.value) })} style={{ width: 110, minWidth: 110, textAlign: 'right', background: 'var(--input)' }} /></label>
                   <label className="row" style={{ gap: 4, alignItems: 'flex-start' }}>Umur <UmurKontrak umur={b.h.umurBulan} kontrak={kontrakBulan} onChange={v => setRak(b.j, { umurBulan: v })} lebar={64} inputStyle={{ background: 'var(--input)' }} /> bln</label>
                   {b.beda && <button className="ghost" style={{ padding: '0 6px' }} onClick={() => setRak(b.j, { harga: Number(b.it!.harga_beli ?? 0), umurBulan: b.it!.umur_ekonomis_bulan ?? b.h.umurBulan })}>Samakan dengan database ({rp(b.it!.harga_beli ?? 0)})</button>}
                 </div>

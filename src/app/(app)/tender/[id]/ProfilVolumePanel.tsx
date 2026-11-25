@@ -8,6 +8,7 @@ import {
   JALUR, jalurBaris, jalurKontainer, labelJalur, barisJalur,
   type BarisProfil, type BasisVolume, type Kendaraan, type ProfilVolume,
 } from '@/lib/profilVolume';
+import InputDesimal from '@/components/InputDesimal';
 
 const PROFIL_KOSONG: ProfilVolume = { inbound: [], outbound: [], param: PARAM_DEFAULT };
 const BASIS: { v: BasisVolume; l: string }[] = [
@@ -27,7 +28,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
   const basis: BasisVolume = p.basis ?? 'peakBulan';
   const kendaraan: Kendaraan[] = p.kendaraan?.length ? p.kendaraan : KENDARAAN_DEFAULT;
   const n = (v: number | undefined, on: (x: number) => void, w = 80, ph?: string) => (
-    <input type="number" step="any" min={0} value={v ? v : ph ? '' : 0} placeholder={ph} onChange={e => on(Number(e.target.value))} style={{ width: w, minWidth: w }} />);
+    <InputDesimal step="any" min={0} value={v ? v : ph ? '' : 0} placeholder={ph} onChange={e => on(Number(e.target.value))} style={{ width: w, minWidth: w }} />);
   const setParam = (k: keyof ProfilVolume['param'], v: number) => onChange({ ...p, param: { ...p.param, [k]: v } });
 
   const bagian = (arus: 'inbound' | 'outbound') => {

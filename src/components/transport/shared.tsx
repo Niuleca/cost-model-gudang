@@ -9,6 +9,7 @@ import type { RateTransport } from '@/lib/transport';
 import { INDUSTRI, rp, tanggal } from '@/lib/format';
 import { labelStatus, pillStatus } from '@/lib/status';
 import { useProfile } from '@/lib/useProfile';
+import InputDesimal from '@/components/InputDesimal';
 
 export type JenisTenderTr = 'transportation' | 'intermodal';
 export interface TenderTr {
@@ -66,7 +67,7 @@ export function DatalistLokasi({ id, jenis }: { id: string; jenis: JenisLokasi[]
 
 /** Input persen (nilai disimpan desimal). */
 export function PersenInput({ nilai, onChange, placeholder, label }: { nilai: number | null | undefined; onChange: (v: number | null) => void; placeholder?: string; label: string }) {
-  return <input aria-label={label} type="number" step="0.1" value={nilai == null ? '' : Math.round(nilai * 10000) / 100} placeholder={placeholder}
+  return <InputDesimal aria-label={label} step="0.1" value={nilai == null ? '' : Math.round(nilai * 10000) / 100} placeholder={placeholder}
     onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value) / 100)} />;
 }
 
@@ -80,8 +81,8 @@ export function InfoTenderTr({ t, ubah, marginGlobal, onMargin, onMarginSemua, a
         <label className="f">Customer<input value={t.customer} onChange={e => ubah({ customer: e.target.value })} /></label>
         <label className="f">Business category<select value={t.industri ?? ''} onChange={e => ubah({ industri: e.target.value || null })}><option value="">—</option>{INDUSTRI.map(i => <option key={i}>{i}</option>)}</select></label>
         <label className="f">Lokasi customer (kota)<input list="dl-kota" value={t.kab_kota} onChange={e => ubah({ kab_kota: e.target.value })} /></label>
-        <label className="f">Durasi kontrak (bulan)<input type="number" min={1} value={t.durasi_kontrak_bulan} onChange={e => ubah({ durasi_kontrak_bulan: Number(e.target.value) || 1 })} /></label>
-        <label className="f">Payment term (hari)<input type="number" min={0} value={t.payment_term_hari} onChange={e => ubah({ payment_term_hari: Number(e.target.value) || 0 })} /></label>
+        <label className="f">Durasi kontrak (bulan)<InputDesimal min={1} value={t.durasi_kontrak_bulan} onChange={e => ubah({ durasi_kontrak_bulan: Number(e.target.value) || 1 })} /></label>
+        <label className="f">Payment term (hari)<InputDesimal min={0} value={t.payment_term_hari} onChange={e => ubah({ payment_term_hari: Number(e.target.value) || 0 })} /></label>
         <label className="f">Margin global (%)<PersenInput label="Margin global" nilai={marginGlobal} onChange={v => onMargin(v ?? 0)} /></label>
       </div>
       <div className="row small" style={{ marginTop: 8 }}>
@@ -142,7 +143,7 @@ export function DaftarTenderTr({ jenis, asumsiAwal, basePath }: { jenis: JenisTe
           <label className="f">Customer<input required value={baru.customer} onChange={e => setBaru({ ...baru, customer: e.target.value })} /></label>
           <label className="f">Business category<select value={baru.industri} onChange={e => setBaru({ ...baru, industri: e.target.value })}><option value="">—</option>{INDUSTRI.map(i => <option key={i}>{i}</option>)}</select></label>
           <label className="f">Lokasi customer (kota)<input list="dl-kota-baru" value={baru.kab_kota} onChange={e => setBaru({ ...baru, kab_kota: e.target.value })} placeholder="mis. Jakarta" /></label>
-          <label className="f">Durasi kontrak (bulan)<input type="number" min={1} value={baru.durasi_kontrak_bulan} onChange={e => setBaru({ ...baru, durasi_kontrak_bulan: Number(e.target.value) || 1 })} /></label>
+          <label className="f">Durasi kontrak (bulan)<InputDesimal min={1} value={baru.durasi_kontrak_bulan} onChange={e => setBaru({ ...baru, durasi_kontrak_bulan: Number(e.target.value) || 1 })} /></label>
           <div className="f"><button type="submit" disabled={sibuk}>{sibuk ? 'Membuat…' : 'Buat tender'}</button></div>
         </div>
         <DatalistLokasi id="dl-kota-baru" jenis={['kota']} />

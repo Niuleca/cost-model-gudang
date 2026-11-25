@@ -8,6 +8,7 @@ import { rp, angka, persen, BUCKET_LABEL, labelKelompok } from '@/lib/format';
 import type { TarifTambahanInput } from '@/lib/engine/index.ts';
 import { LayananDijual, BarisTambahan } from './TarifTambahan';
 import Grafik, { ringkasRp } from '@/components/Grafik';
+import InputDesimal from '@/components/InputDesimal';
 
 export interface Kurs { kode: string; rupiahPer: number; tanggal?: string }
 const MATA_UANG: { kode: string; nama: string }[] = [
@@ -80,7 +81,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
             <option value="include">Include PPN — tarif yang ditulis sudah termasuk PPN</option>
           </select></label>
         <label className="f" htmlFor="pj-ppnp">Tarif PPN efektif
-          <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input id="pj-ppnp" type="number" step="0.1" value={Math.round(pajak.ppnPersen * 1000) / 10}
+          <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><InputDesimal id="pj-ppnp" step="0.1" value={Math.round(pajak.ppnPersen * 1000) / 10}
             onChange={e => onPajak({ ...pajak, ppnPersen: Number(e.target.value) / 100 })} style={{ width: 80 }} />%</span></label>
       </div>
       {(() => { const p = pphPersen, n = 100000, gu = pajak.pph === 'exclude' ? n / (1 - p) : n; const pot = gu * p, ppnV = gu * pajak.ppnPersen;
@@ -143,7 +144,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
                   {manAktif && onUomManual && <div className="row small" style={{ gap: 4, marginTop: 4 }}>
                     <input aria-label={`Nama satuan manual ${BUCKET_LABEL[r.bucket]}`} value={man!.uom} placeholder="nama satuan, mis. container" style={{ width: 130, minWidth: 130 }}
                       onChange={e => { onUomManual({ ...(uomManual ?? {}), [b]: { uom: e.target.value, volume: man!.volume } }); onUomRateCard({ ...(uomRateCard ?? {}), [b]: e.target.value }); }} />
-                    <input aria-label={`Volume manual per bulan ${BUCKET_LABEL[r.bucket]}`} type="number" min={0} value={man!.volume || ''} placeholder="volume/bln" style={{ width: 90, minWidth: 90, textAlign: 'right' }}
+                    <InputDesimal aria-label={`Volume manual per bulan ${BUCKET_LABEL[r.bucket]}`} min={0} value={man!.volume || ''} placeholder="volume/bln" style={{ width: 90, minWidth: 90, textAlign: 'right' }}
                       onChange={e => onUomManual({ ...(uomManual ?? {}), [b]: { uom: man!.uom, volume: Number(e.target.value) || 0 } })} />
                     <span className="muted">/bln (komitmen)</span>
                     {!(man!.volume > 0) && <span style={{ color: 'var(--warn)' }}>isi volume — sementara tarif per {r.uom}</span>}</div>}</>
@@ -151,11 +152,11 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
                 {r.opsiUom?.find(o => o.uom === r.uom)?.dasar && <div className="small muted">{r.opsiUom.find(o => o.uom === r.uom)!.dasar}</div>}
                 {r.bucket === 'storage' && /\/hari$/i.test(r.uom) && <div className="row small" style={{ gap: 4, marginTop: 4, alignItems: 'center' }}>
                   <span className="muted">tarif harian · 1 bulan =</span>
-                  {onHariTarif ? <input aria-label="Hari per bulan tarif harian" type="number" min={1} max={31} value={hariTarif ?? 30} style={{ width: 56, minWidth: 56, textAlign: 'right' }}
+                  {onHariTarif ? <InputDesimal aria-label="Hari per bulan tarif harian" min={1} max={31} value={hariTarif ?? 30} style={{ width: 56, minWidth: 56, textAlign: 'right' }}
                     onChange={e => { const n = Number(e.target.value); onHariTarif(n > 0 ? n : undefined); }} /> : <b>{hariTarif ?? 30}</b>}<span className="muted">hari</span></div>}</td>
               <td className="num">{angka(r.volumeKomitmen)}</td>
               <td className="num">{rp(r.biayaBulan)}</td><td className="num k-unit">{rp(r.biayaPerUnit)}</td>
-              <td className="num td-isian"><input aria-label={`Margin ${BUCKET_LABEL[r.bucket]}`} type="number" step="0.1" value={v == null ? '' : Math.round(v * 1000) / 10}
+              <td className="num td-isian"><InputDesimal aria-label={`Margin ${BUCKET_LABEL[r.bucket]}`} step="0.1" value={v == null ? '' : Math.round(v * 1000) / 10}
                 placeholder={(Math.round((r.gpDefault ?? 0) * 1000) / 10).toString()} onChange={e => setM(b, e.target.value)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /> %
                 {v == null && <div className="small muted">default</div>}</td>
               <td className="num k-harga">{rp(r.hargaBulan)}</td>
@@ -208,7 +209,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
               <option value="">— pilih —</option>{MATA_UANG.map(m => <option key={m.kode} value={m.kode}>{m.kode} · {m.nama}</option>)}
             </select></label>
           {kurs && <label className="f" htmlFor="kurs-nilai">Kurs: 1 {kurs.kode} = Rp
-            <input id="kurs-nilai" type="number" step="any" value={kurs.rupiahPer || ''} onChange={e => onKurs({ ...kurs, rupiahPer: Number(e.target.value), tanggal: 'manual' })} style={{ width: 130 }} /></label>}
+            <InputDesimal id="kurs-nilai" step="any" value={kurs.rupiahPer || ''} onChange={e => onKurs({ ...kurs, rupiahPer: Number(e.target.value), tanggal: 'manual' })} style={{ width: 130 }} /></label>}
           {kurs && <button className="ghost" onClick={() => kursTerkini(kurs.kode)}>Kurs terkini</button>}
         </div>
       </div>

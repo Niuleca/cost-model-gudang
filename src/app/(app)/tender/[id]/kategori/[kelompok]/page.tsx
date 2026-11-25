@@ -12,6 +12,7 @@ import { IT_SHEET_DEFAULT } from '@/lib/it';
 import { rp, persen, labelKelompok } from '@/lib/format';
 import { useProfile } from '@/lib/useProfile';
 import { STATUS_DRAFT } from '@/lib/status';
+import InputDesimal from '@/components/InputDesimal';
 
 export default function KategoriBiayaPage() {
   const { id, kelompok: kRaw } = useParams<{ id: string; kelompok: string }>();
@@ -108,7 +109,7 @@ export default function KategoriBiayaPage() {
             return <tr key={b.deskripsi} style={rev != null ? { background: 'var(--res)' } : undefined}>
               <td>{b.deskripsi}</td><td>{b.kategoriRisiko}</td><td className="small muted">{dasar}</td>
               <td className="num">{rp(sistem)}</td>
-              <td className="num"><input type="number" min={0} step={1000} style={{ width: 150, textAlign: 'right' }} disabled={!bisaEdit} aria-label={`Revisi biaya ${b.deskripsi}`}
+              <td className="num"><InputDesimal min={0} step={1000} style={{ width: 150, textAlign: 'right' }} disabled={!bisaEdit} aria-label={`Revisi biaya ${b.deskripsi}`}
                 value={rev ?? ''} placeholder={String(Math.round(sistem))} onChange={e => setRev(b.deskripsi, e.target.value === '' ? null : Number(e.target.value))} /></td>
               <td className="num">{rev != null ? <b className={rev > sistem ? 'bad' : undefined}>{rev - sistem >= 0 ? '+' : ''}{rp(rev - sistem)}</b> : '—'}</td>
               <td>{rev != null && bisaEdit && <button className="linkbtn" onClick={() => setRev(b.deskripsi, null)}>reset</button>}</td>

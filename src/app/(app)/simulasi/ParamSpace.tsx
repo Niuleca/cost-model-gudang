@@ -3,6 +3,7 @@
 import type { ParamSim } from '@/lib/simulasi3d/layout';
 import { useSatuanPanjang, type SatuanPanjang } from '@/lib/satuanPanjang';
 import { pj } from '@/lib/satuanPanjangInti';
+import InputDesimal from '@/components/InputDesimal';
 
 const angka = (v: number, d = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d });
 
@@ -14,7 +15,7 @@ function Isian({ l, v, a, set, u, step = 0.01, pct, basis }: { l: string; v: num
   const beda = (v ?? null) !== (a ?? null) && !(v != null && a != null && Math.abs(v - a) < 1e-9);
   return (
     <label className={`f sim3d-isian${beda ? ' beda' : ''}`}>{l}{basis ? ` (${sp.satuan})` : u ? ` (${u})` : ''}
-      <input type="number" step={pct ? 1 : basis ? 'any' : step} value={tampil} placeholder={a == null ? 'otomatis' : undefined}
+      <InputDesimal step={pct ? 1 : basis ? 'any' : step} value={tampil} placeholder={a == null ? 'otomatis' : undefined}
         onChange={e => { const x = e.target.value === '' ? null : Number(e.target.value); set(x == null ? null : pct ? x / 100 : basis ? sp.simpan(x, basis) : x); }} />
       {beda && <span className="small muted">awal: {a == null ? 'otomatis' : pct ? `${angka(a * 100, 1)}%` : basis ? sp.fmt(a, basis) : angka(a, 2)}</span>}
     </label>

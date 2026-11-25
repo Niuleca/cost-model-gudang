@@ -18,6 +18,7 @@ import { jarakKm, bisaDarat } from '@/lib/lokasiIndonesia';
 import { rp } from '@/lib/format';
 import { labelStatus, pillStatus } from '@/lib/status';
 import { supabaseBrowser } from '@/lib/supabase/client';
+import InputDesimal from '@/components/InputDesimal';
 
 const Rute3D = dynamic(() => import('@/components/transport/Rute3D'), { ssr: false, loading: () => <div className="rute3d-wadah sim3d-muat">Menyiapkan peta 3D…</div> });
 
@@ -107,7 +108,7 @@ export default function TransportTender() {
                     <SelectBasis label="Buying basis" className="input-kecil" value={r.basis} pilihan={BASIS_DARAT} onChange={b => setRute(i, { basis: b })} />
                     {a && <div className="dasar-def">{(a.kapKg / 1000).toLocaleString('id-ID')} t · {a.kapCbm} CBM · {a.kapPalet} palet{kap && r.basis !== 'trip' && r.basis !== 'shipment' ? ` · ±${kap.toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${r.basis}/trip` : ''}</div>}
                   </td>
-                  <td className="num"><input aria-label="Volume per bulan" type="number" min={0} step="any" value={r.volumeBulan || ''} placeholder="0" onChange={e => setRute(i, { volumeBulan: Number(e.target.value) || 0 })} />
+                  <td className="num"><InputDesimal aria-label="Volume per bulan" min={0} step="any" value={r.volumeBulan || ''} placeholder="0" onChange={e => setRute(i, { volumeBulan: Number(e.target.value) || 0 })} />
                     <div className="dasar-def">{labelBasis(r.basis).replace('per ', '')}/bln</div></td>
                   <td>
                     {pilihan.length > 0 && <select aria-label="Pilih dari market price" value={r.rateId ?? ''} onChange={e => {
@@ -115,7 +116,7 @@ export default function TransportTender() {
                       if (x) setRute(i, { rateId: x.id, vendor: x.vendor, hargaBeli: x.harga, leadTimeHari: x.lead_time_hari, sumberHarga: 'market' });
                     }}><option value="">Market price: {pilihan.length} vendor…</option>{pilihan.map(p => <option key={p.id} value={p.id}>{p.vendor || '(tanpa nama)'} · {rp(p.harga)}{p.status !== 'approved' ? ' (draft)' : ''}</option>)}</select>}
                     <input aria-label="Vendor" className={pilihan.length ? 'input-kecil' : undefined} value={r.vendor} placeholder="Vendor" onChange={e => setRute(i, { vendor: e.target.value, rateId: null, sumberHarga: 'manual' })} />
-                    <input aria-label="Harga beli" className="input-kecil" type="number" min={0} value={r.hargaBeli || ''} placeholder={`Harga beli ${labelBasis(r.basis)}`} onChange={e => setRute(i, { hargaBeli: Number(e.target.value) || 0, rateId: null, sumberHarga: 'manual' })} />
+                    <InputDesimal aria-label="Harga beli" className="input-kecil" min={0} value={r.hargaBeli || ''} placeholder={`Harga beli ${labelBasis(r.basis)}`} onChange={e => setRute(i, { hargaBeli: Number(e.target.value) || 0, rateId: null, sumberHarga: 'manual' })} />
                     <div className="dasar-def">
                       {r.sumberHarga === 'market' ? 'dari Market Price' : r.sumberHarga === 'estimasi' ? 'estimasi tarif per km' : pilihan.length ? '' : 'belum ada di Market Price'}
                       {est && r.sumberHarga !== 'market' && <> · <button className="link-kecil" title={est.ket} onClick={() => setRute(i, { hargaBeli: est.harga, sumberHarga: 'estimasi', rateId: null })}>pakai estimasi {rp(est.harga)}</button></>}

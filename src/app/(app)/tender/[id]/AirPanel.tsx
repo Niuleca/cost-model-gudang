@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { AIR_DEFAULT, SUMBER_AIR, hitungAir, type AirInput, type SumberAir } from '@/lib/air';
 import { angka, rp } from '@/lib/format';
+import InputDesimal from '@/components/InputDesimal';
 
 /** Utilities Management → Water. Kebutuhan dari headcount & luas (tab lain), tarif per m³ bisa diubah. */
 export default function AirPanel({ air, headcount, luasM2, hariKerjaBulan, onChange }: {
@@ -22,10 +23,10 @@ export default function AirPanel({ air, headcount, luasM2, hariKerjaBulan, onCha
           <select value={a.sumber} onChange={e => set({ sumber: e.target.value as SumberAir })}>
             {(Object.keys(SUMBER_AIR) as SumberAir[]).map(k => <option key={k} value={k}>{SUMBER_AIR[k].l}{SUMBER_AIR[k].berbayar ? '' : ' (tidak dihitung)'}</option>)}
           </select></label>
-        <label className="f">Pemakaian per orang (L/hari)<input type="number" min={0} value={a.literOrangHari} onChange={e => set({ literOrangHari: Number(e.target.value) })} /></label>
-        <label className="f">Cleaning per m² (L/hari)<input type="number" min={0} step={0.05} value={a.literM2Hari} onChange={e => set({ literM2Hari: Number(e.target.value) })} /></label>
-        <label className="f">Tarif (Rp/m³)<input type="number" min={0} step={500} value={a.tarifM3} onChange={e => set({ tarifM3: Number(e.target.value) })} disabled={!sumber.berbayar} /></label>
-        <label className="f">Biaya beban / abonemen (Rp/bln)<input type="number" min={0} step={10000} value={a.abonemenBulan} onChange={e => set({ abonemenBulan: Number(e.target.value) })} disabled={!sumber.berbayar} /></label>
+        <label className="f">Pemakaian per orang (L/hari)<InputDesimal min={0} value={a.literOrangHari} onChange={e => set({ literOrangHari: Number(e.target.value) })} /></label>
+        <label className="f">Cleaning per m² (L/hari)<InputDesimal min={0} step={0.05} value={a.literM2Hari} onChange={e => set({ literM2Hari: Number(e.target.value) })} /></label>
+        <label className="f">Tarif (Rp/m³)<InputDesimal min={0} step={500} value={a.tarifM3} onChange={e => set({ tarifM3: Number(e.target.value) })} disabled={!sumber.berbayar} /></label>
+        <label className="f">Biaya beban / abonemen (Rp/bln)<InputDesimal min={0} step={10000} value={a.abonemenBulan} onChange={e => set({ abonemenBulan: Number(e.target.value) })} disabled={!sumber.berbayar} /></label>
       </div>
       <p className="small muted">{sumber.ket} Dasar 50 L/orang/hari mengikuti kebutuhan air pekerja industri/kantor (SNI 03-7065-2005); cleaning ±0,2 L/m²/hari untuk lantai, toilet & area umum. Tarif kawasan industri umumnya Rp10.000–25.000/m³ — sesuaikan dengan tarif pengelola/PDAM setempat.</p>
       <div className="tablewrap fit"><table className="tabel-fit"><tbody>

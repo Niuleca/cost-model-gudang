@@ -6,6 +6,7 @@ import { T } from '@/lib/i18n';
 import type { HasilTender } from '@/lib/engine/index.ts';
 import type { InterestCost, InterestItem } from '@/lib/engine/types';
 import { rp, persen } from '@/lib/format';
+import InputDesimal from '@/components/InputDesimal';
 
 export const INTEREST_DEFAULT: InterestCost = { bungaTahun: 0.09, metode: 'flat', items: [] };
 const idBaru = () => Math.random().toString(36).slice(2, 9);
@@ -35,7 +36,7 @@ export default function InterestPanel({ nilai, onChange, hasilLive, kontrakBulan
         lalu dibebankan rata selama kontrak <b>{kontrakBulan} bln</b> sebagai kategori biaya <b>Interest cost</b> — ikut ke total cost, rate card, quotation dan export.</p>
       <div className="grid3">
         <label className="f" htmlFor="ic-bunga">Bunga pinjaman (%/tahun)
-          <input id="ic-bunga" type="number" step="any" min={0} value={+(ic.bungaTahun * 100).toFixed(4)} onChange={e => set({ bungaTahun: e.target.value === '' ? 0 : Number(e.target.value) / 100 })} /></label>
+          <InputDesimal id="ic-bunga" step="any" min={0} value={+(ic.bungaTahun * 100).toFixed(4)} onChange={e => set({ bungaTahun: e.target.value === '' ? 0 : Number(e.target.value) / 100 })} /></label>
         <label className="f" htmlFor="ic-metode">Metode bunga
           <select id="ic-metode" value={ic.metode} onChange={e => set({ metode: e.target.value as InterestCost['metode'] })}>
             <option value="flat">Flat — bunga atas pokok penuh selama tenor</option>
@@ -81,9 +82,9 @@ export default function InterestPanel({ nilai, onChange, hasilLive, kontrakBulan
                 <td><input type="checkbox" aria-label="Aktif" checked={x.aktif} onChange={e => setItem(x.id, { aktif: e.target.checked })} /></td>
                 <td>{x.sumber ? <>{x.deskripsi}{def == null && <div className="small bad">baris sumber tidak ada lagi</div>}</>
                   : <input aria-label="Deskripsi pinjaman" value={x.deskripsi} onChange={e => setItem(x.id, { deskripsi: e.target.value })} />}</td>
-                <td className="num"><input type="number" min={0} step={1000000} style={{ width: 150, textAlign: 'right' }} aria-label="Pokok pinjaman"
+                <td className="num"><InputDesimal min={0} step={1000000} style={{ width: 150, textAlign: 'right' }} aria-label="Pokok pinjaman"
                   value={x.pokok ?? ''} placeholder={def != null ? String(def) : '0'} onChange={e => setItem(x.id, { pokok: e.target.value === '' ? null : Number(e.target.value) })} /></td>
-                <td className="num"><input type="number" min={1} step={1} style={{ width: 80, textAlign: 'right' }} aria-label="Tenor bulan"
+                <td className="num"><InputDesimal min={1} step={1} style={{ width: 80, textAlign: 'right' }} aria-label="Tenor bulan"
                   value={x.tenorBulan ?? ''} placeholder={String(kontrakBulan)} onChange={e => setItem(x.id, { tenorBulan: e.target.value === '' ? null : Number(e.target.value) })} /></td>
                 <td className="num">{h ? rp(h.bungaBulanAwal) : '—'}</td>
                 <td className="num">{h ? rp(h.totalBunga) : '—'}</td>

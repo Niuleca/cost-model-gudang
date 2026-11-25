@@ -4,6 +4,7 @@ import { hitungKekuatan, hitungSpaceExcel, lengkapiSpaceExcel, type HasilKekuata
 import { angka } from '@/lib/format';
 import { InputPanjang, useSatuanPanjang, type SatuanPanjang } from '@/lib/satuanPanjang';
 import { pj } from '@/lib/satuanPanjangInti';
+import InputDesimal from '@/components/InputDesimal';
 
 type Pj = (v: number | null | undefined, basis: SatuanPanjang, on: (n: number | null) => void, opt?: { w?: number; kosong?: boolean; ph?: number | null }) => React.ReactNode;
 
@@ -31,7 +32,7 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
   const h = useMemo(() => hitungSpaceExcel(x, ppTotal, inboundBulan, outboundBulan, jumlahShift), [JSON.stringify(x), ppTotal, inboundBulan, outboundBulan, jumlahShift]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<SpaceExcel>) => onChange({ ...x, ...patch });
   const inp = (v: number | null | undefined, on: (n: number | null) => void, opt: { w?: number; kosong?: boolean; ph?: string } = {}) => (
-    <input type="number" step="any" value={v == null ? '' : v} placeholder={opt.ph}
+    <InputDesimal step="any" value={v == null ? '' : v} placeholder={opt.ph}
       onChange={e => on(e.target.value === '' ? (opt.kosong ? null : 0) : Number(e.target.value))}
       style={{ width: opt.w ?? 80, minWidth: opt.w ?? 80, textAlign: 'right', background: 'var(--input)' }} />);
   // isian panjang dalam satuan global (m / cm / mm); disimpan dalam satuan dasar field

@@ -6,6 +6,7 @@ import type { AppRole } from '@/lib/format';
 import { exportExcel, importExcel, type KolomExcel } from '@/lib/excel';
 import GroupChips from '@/components/GroupChips';
 import PdfPreview from '@/app/(app)/tender/[id]/PdfPreview';
+import InputDesimal from '@/components/InputDesimal';
 
 export const BUCKET_QUOTATION_VENDOR = 'supplier-quotations';
 
@@ -252,7 +253,7 @@ export default function TableEditor(p: Props) {
       </select>);
     if (k.type === 'bool') return <input id={fid} aria-label={k.label} type="checkbox" checked={!!nilai} onChange={e => set(e.target.checked)} style={{ width: 'auto' }} />;
     if (k.type === 'percent') return (
-      <input id={fid} aria-label={k.label} type="number" step="any" value={nilai == null || nilai === '' ? '' : Number(nilai) * 100}
+      <InputDesimal id={fid} aria-label={k.label} step="any" value={nilai == null || nilai === '' ? '' : Number(nilai) * 100}
         onChange={e => set(e.target.value === '' ? '' : Number(e.target.value) / 100)} style={{ minWidth: 80 }} />);
     if (k.type === 'textarea') return <textarea id={fid} aria-label={k.label} value={String(nilai ?? '')} onChange={e => set(e.target.value)} />;
     return <input id={fid} aria-label={k.label} type={k.type === 'number' ? 'number' : k.type === 'date' ? 'date' : 'text'} step="any"

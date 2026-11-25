@@ -9,6 +9,7 @@ import type { HasilTender } from '@/lib/engine/index.ts';
 import type { LayoutGudang } from '@/lib/simulasi3d/layout';
 import { keLayoutGudang, ringkas, type LayoutEdit } from '@/lib/simulasi3d/editor';
 import Main3D from '../game/Main3D';
+import InputDesimal from '@/components/InputDesimal';
 
 const angka = (v: number) => v.toLocaleString('id-ID');
 
@@ -41,7 +42,7 @@ export default function SimulasiDesain({ edit, data, kotor }: { edit: LayoutEdit
           </p>
         </div>
         <label className="f">Hari simulasi<AngkaBebas min={1} max={60} bulat value={hari} onValue={setHari} /></label>
-        <label className="f">Seed<input type="number" value={seed} onChange={e => setSeed(Number(e.target.value) || 0)} /></label>
+        <label className="f">Seed<InputDesimal value={seed} onChange={e => setSeed(Number(e.target.value) || 0)} /></label>
         <button type="button" onClick={mulai}>{sim ? '↻ Ulang simulasi' : '▶ Mulai simulasi'}</button>
       </div>
       {sim && sim.kunci !== kunciEdit && <p className="small" style={{ color: 'var(--warn)' }}>Layout berubah sejak simulasi dimulai — tekan <b>Ulang simulasi</b> supaya memakai layout terbaru.</p>}

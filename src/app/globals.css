@@ -645,7 +645,7 @@ button.link-kecil, a.link-kecil { background: none; border: 0; padding: 0; color
 table.tabel-it td:first-child { min-width: 180px; }
 table.tabel-bl td:first-child { min-width: 200px; }
 table.tabel-bl td select[aria-label='Mode'] { min-width: 96px; }
-table.tabel-bl td input[type=number], table.tabel-it td input[type=number] { width: 100%; min-width: 64px; }
+table.tabel-bl td input[type=number], table.tabel-it td input[type=number], table.tabel-bl td input.input-angka, table.tabel-it td input.input-angka { width: 100%; min-width: 64px; }
 .dasar-def { font-size: 12px; color: var(--g600, #666); margin-top: 3px; line-height: 1.35; }
 tr.baris-merah .dasar-def { color: #991b1b; }
 .def-driver { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; }

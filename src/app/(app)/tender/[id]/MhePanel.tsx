@@ -4,6 +4,7 @@ import type { MheInput } from '@/lib/engine/types';
 import { rp, angka } from '@/lib/format';
 
 import { ALAT_IT, jenisMhe, pilihItemMhe } from '@/lib/mheOtomatis';
+import InputDesimal from '@/components/InputDesimal';
 interface Item { id: number; kategori: string; item: string; vendor?: string | null; tinggi_angkat_m?: number | null; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; status_efektif: string; mhe_tipe: string | null; kapasitas_ton: number | null; sumber_tenaga: string | null }
 type Mhe = MheInput & { priceItemId?: number };
 
@@ -37,7 +38,7 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange,
         <span>Alat rak (putaway, replenishment, picking palet) otomatis: <b>{alatRak.tool === 'RT' ? 'Reach Truck (RT)' : 'Forklift counterbalance (CBT)'}</b> — {alatRak.alasan}.
           {alatRak.manual > 0 && <> {alatRak.manual} aktivitas diubah manual di Value Stream Mapping (tidak ikut otomatis).</>}</span>
         <label className="row" style={{ gap: 6, margin: 0, flexWrap: 'nowrap' }}>Tinggi angkat maks CBT
-          <input type="number" step="any" min={1} aria-label="Tinggi angkat maksimal CBT (m)" value={alatRak.batasMm / 1000}
+          <InputDesimal step="any" min={1} aria-label="Tinggi angkat maksimal CBT (m)" value={alatRak.batasMm / 1000}
             onChange={e => { const v = Number(e.target.value); if (v > 0) alatRak.onBatas(Math.round(v * 1000)); }} style={{ width: 70, minWidth: 70, textAlign: 'right' }} /> m</label>
       </div>}
       <div className="tablewrap"><table>
@@ -77,10 +78,10 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange,
                   const mode = e.target.value as 'sewa' | 'beli'; const it = pilihan.find(x => x.id === m?.priceItemId);
                   ubah(b.nama, { mode, harga: it ? hargaDari(it, mode) : m?.harga ?? 0 });
                 }}><option value="sewa">Sewa</option><option value="beli">Beli</option></select></td>
-                <td className="num db"><input aria-label="Harga" type="number" value={m?.harga ?? ''} disabled={!m} onChange={e => ubah(b.nama, { harga: Number(e.target.value) })} style={{ width: 120, minWidth: 120 }} /></td>
+                <td className="num db"><InputDesimal aria-label="Harga" value={m?.harga ?? ''} disabled={!m} onChange={e => ubah(b.nama, { harga: Number(e.target.value) })} style={{ width: 120, minWidth: 120 }} /></td>
                 <td className="num"><UmurKontrak umur={m?.umurBulan} kontrak={kontrakBulan} disabled={!m || m.mode === 'sewa'} onChange={v => ubah(b.nama, { umurBulan: v })} /></td>
-                {!metodeExcel && <td className="num"><input aria-label="Ketersediaan" type="number" value={m ? +(m.ketersediaan * 100).toFixed(1) : ''} disabled={!m} onChange={e => ubah(b.nama, { ketersediaan: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>}
-                <td className="num"><input aria-label="Spare" type="number" value={m ? +(m.sparePersen * 100).toFixed(1) : ''} disabled={!m} onChange={e => ubah(b.nama, { sparePersen: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>
+                {!metodeExcel && <td className="num"><InputDesimal aria-label="Ketersediaan" value={m ? +(m.ketersediaan * 100).toFixed(1) : ''} disabled={!m} onChange={e => ubah(b.nama, { ketersediaan: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>}
+                <td className="num"><InputDesimal aria-label="Spare" value={m ? +(m.sparePersen * 100).toFixed(1) : ''} disabled={!m} onChange={e => ubah(b.nama, { sparePersen: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>
                 <td className="num"><b>{b.unit != null ? unitTot : '–'}</b></td>
                 <td className="num">{biaya ? rp(biaya) : <span className="small muted">tanpa biaya</span>}</td>
                 <td>{b.yatim && <button className="danger" onClick={() => onChange(mhe.filter(x => x.tool !== b.nama))}>Hapus</button>}</td>

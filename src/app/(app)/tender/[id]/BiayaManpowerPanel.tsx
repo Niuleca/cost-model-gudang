@@ -2,6 +2,7 @@
 import { T, useT } from '@/lib/i18n';
 import { rp, angka } from '@/lib/format';
 import { ringkasBiayaMp, LEVEL_JABATAN, LEVEL_GAJI_DEFAULT, levelDefault, type InputBiayaRole, type LevelJabatan, type ParamBiayaMp, type RincianBiayaRole } from '@/lib/engine/biayaMp';
+import InputDesimal from '@/components/InputDesimal';
 
 const r0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
 const pct = (x: number) => Math.round(x * 100000) / 1000;
@@ -22,12 +23,12 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
     onInput(x);
   };
   const num = (role: string, k: 'gajiPokok' | 'hariKerja' | 'hariAktual' | 'lisensi' | 'supervisi', nilai: number, ph: number, w = 104) => (
-    <input type="number" min={0} step="any" aria-label={`${k} ${role}`} value={input[role]?.[k] ?? ''} placeholder={ph ? String(Math.round(ph)) : '0'}
+    <InputDesimal min={0} step="any" aria-label={`${k} ${role}`} value={input[role]?.[k] ?? ''} placeholder={ph ? String(Math.round(ph)) : '0'}
       onChange={e => ubah(role, { [k]: e.target.value === '' ? undefined : Number(e.target.value) })} disabled={!bisaEdit}
       style={{ width: w, minWidth: w, textAlign: 'right' }} title={`dipakai: ${r0(nilai)}`} />);
   const pIn = (k: 'bpjsTk' | 'bpjsKs' | 'bpjsPensiun' | 'thr' | 'kompensasi' | 'feePersen', label: string) => (
     <label className="f" style={{ minWidth: 0 }}>{label}
-      <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input type="number" step="any" min={0} value={pct(param[k])} disabled={!bisaEdit}
+      <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><InputDesimal step="any" min={0} value={pct(param[k])} disabled={!bisaEdit}
         onChange={e => onParam({ [k]: Number(e.target.value) / 100 })} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /><span>%</span></div></label>);
 
   return (
@@ -47,7 +48,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
           {LEVEL_JABATAN.map(L => <tr key={L.v}>
             <td><b>{L.l}</b></td><td className="small muted">{L.contoh}</td>
             <td className="num"><div className="row" style={{ gap: 4, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
-              <input type="number" step="any" min={0} value={Math.round(lg[L.v] * 1000) / 10} disabled={!bisaEdit} aria-label={`Persen UMK ${L.l}`}
+              <InputDesimal step="any" min={0} value={Math.round(lg[L.v] * 1000) / 10} disabled={!bisaEdit} aria-label={`Persen UMK ${L.l}`}
                 onChange={e => onLevelGaji({ ...levelGaji, [L.v]: Number(e.target.value) / 100 })} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /><span>%</span></div></td>
             <td className="num"><b>{umk ? rp(umk * lg[L.v]) : '–'}</b></td>
             <td className="small">{rows.filter(r => r.level === L.v).map(r => r.role).join(', ') || <span className="muted">–</span>}</td>
@@ -98,7 +99,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
               <select aria-label={`Skema ${r.role}`} value={r.skema} disabled={!bisaEdit} style={{ minWidth: 104 }}
                 onChange={e => ubah(r.role, e.target.value === 'sharing' ? { skema: 'sharing', porsi: input[r.role]?.porsi ?? 0.5 } : { skema: undefined, porsi: undefined })}>
                 <option value="dedicated">Dedicated</option><option value="sharing">Sharing</option></select>
-              {r.skema === 'sharing' && <input type="number" step="any" min={0} max={1} aria-label={`Porsi sharing ${r.role}`} value={input[r.role]?.porsi ?? 0.5} disabled={!bisaEdit}
+              {r.skema === 'sharing' && <InputDesimal step="any" min={0} max={1} aria-label={`Porsi sharing ${r.role}`} value={input[r.role]?.porsi ?? 0.5} disabled={!bisaEdit}
                 onChange={e => ubah(r.role, { porsi: e.target.value === '' ? undefined : Number(e.target.value) })} style={{ width: 64, minWidth: 64, textAlign: 'right' }} />}
             </div>{r.skema === 'sharing' && <div className="small muted">{r.porsi > 0 ? `≈ 1/${angka(1 / r.porsi, 1)} project` : '0'} · {angka(r.qtyBiaya, 2)} org dibebankan</div>}</td>
             <td className="num"><b>{r0(r.totalQty)}</b></td>

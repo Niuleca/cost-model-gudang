@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { ASUMSI_DEFAULT } from '@/lib/tender';
 import { rp, INDUSTRI } from '@/lib/format';
+import InputDesimal from '@/components/InputDesimal';
 
 interface Upah { provinsi: string; kab_kota: string; upah_berlaku: number; status_verifikasi: string }
 
@@ -63,11 +64,11 @@ export default function TenderBaru() {
           <div className="f small">Upah minimum berlaku
             <div className="notice">{terpilih ? <>{rp(terpilih.upah_berlaku)} · <span className="muted">{terpilih.status_verifikasi}</span></> : '—'}</div>
           </div>
-          <label className="f" htmlFor="durasi">Durasi kontrak (bulan)<input id="durasi" type="number" min={1} value={f.durasi_kontrak_bulan} onChange={e => set('durasi_kontrak_bulan', Number(e.target.value))} /></label>
+          <label className="f" htmlFor="durasi">Durasi kontrak (bulan)<InputDesimal id="durasi" min={1} value={f.durasi_kontrak_bulan} onChange={e => set('durasi_kontrak_bulan', Number(e.target.value))} /></label>
           <label className="f" htmlFor="golive">Rencana go-live<input id="golive" type="date" value={f.tanggal_go_live} onChange={e => set('tanggal_go_live', e.target.value)} /></label>
           <label className="f" htmlFor="shift">Jumlah shift
             <select id="shift" value={f.jumlah_shift} onChange={e => set('jumlah_shift', Number(e.target.value))}>{[1, 2, 3].map(x => <option key={x} value={x}>{x}</option>)}</select></label>
-          <label className="f" htmlFor="top">Payment term (hari)<input id="top" type="number" min={0} value={f.payment_term_hari} onChange={e => set('payment_term_hari', Number(e.target.value))} /></label>
+          <label className="f" htmlFor="top">Payment term (hari)<InputDesimal id="top" min={0} value={f.payment_term_hari} onChange={e => set('payment_term_hari', Number(e.target.value))} /></label>
           <label className="f" htmlFor="aset">Skenario aset
             <select id="aset" value={f.skenario_aset} onChange={e => set('skenario_aset', e.target.value)}>{['Rental', 'Own Asset', 'Built-to-Suit'].map(x => <option key={x}>{x}</option>)}</select></label>
         </div>

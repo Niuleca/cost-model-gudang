@@ -17,6 +17,7 @@ import {
 import { jarakKm } from '@/lib/lokasiIndonesia';
 import { rp } from '@/lib/format';
 import { labelStatus, pillStatus } from '@/lib/status';
+import InputDesimal from '@/components/InputDesimal';
 
 const Rute3D = dynamic(() => import('@/components/transport/Rute3D'), { ssr: false, loading: () => <div className="rute3d-wadah sim3d-muat">Menyiapkan peta 3D…</div> });
 
@@ -45,7 +46,7 @@ function BarisStage({ s, idx, rates, q, onUbah }: { s: StageIntermodal; idx: num
         <select aria-label="Armada" value={s.armada} onChange={e => onUbah({ armada: e.target.value, rateId: null })}>{armadaModa(s.moda).map(a => <option key={a.nama}>{a.nama}</option>)}</select>
         <SelectBasis className="input-kecil" value={s.basis} onChange={b => onUbah({ basis: b, rateId: null })} />
       </td>
-      <td className="num"><input aria-label="Qty per shipment" type="number" min={0} step="any" value={q.auto ? q.qty : (s.qty || '')} className={q.auto ? 'input-auto' : undefined}
+      <td className="num"><InputDesimal aria-label="Qty per shipment" min={0} step="any" value={q.auto ? q.qty : (s.qty || '')} className={q.auto ? 'input-auto' : undefined}
         title={q.auto ? 'Otomatis dari profil muatan — ketik untuk isi manual' : undefined} onChange={e => onUbah({ qty: Number(e.target.value) || 0, qtyAuto: false })} />
         <div className="dasar-def">{labelBasis(s.basis).replace('per ', '')}/shipment
           {q.auto ? <span className="chip-auto" title={s.moda === 'udara' && s.basis === 'kg' ? 'chargeable weight = maks. berat aktual vs CBM × 166,67' : s.moda === 'laut' && s.basis === 'ton' && /lcl/i.test(s.armada) ? 'W/M LCL = maks. ton vs CBM' : 'dari profil muatan'}> auto</span>
@@ -59,8 +60,8 @@ function BarisStage({ s, idx, rates, q, onUbah }: { s: StageIntermodal; idx: num
         <div className="dasar-def">{s.sumberHarga === 'market' ? 'dari Market Price' : s.sumberHarga === 'estimasi' ? 'estimasi tarif per km' : pilihan.length ? '' : 'belum ada di Market Price'}
           {est && s.sumberHarga !== 'market' && <> · <button className="link-kecil" title={est.ket} onClick={() => onUbah({ harga: est.harga, sumberHarga: 'estimasi', rateId: null })}>estimasi {rp(est.harga)}</button></>}</div>
       </td>
-      <td className="num"><input aria-label="Harga beli" type="number" min={0} value={s.harga || ''} placeholder={labelBasis(s.basis)} onChange={e => onUbah({ harga: Number(e.target.value) || 0, rateId: null, sumberHarga: 'manual' })} /></td>
-      <td className="num"><input aria-label="Lead time" type="number" min={0} step="any" value={s.leadTimeHari ?? ''} placeholder="hari" onChange={e => onUbah({ leadTimeHari: e.target.value === '' ? null : Number(e.target.value) })} /></td>
+      <td className="num"><InputDesimal aria-label="Harga beli" min={0} value={s.harga || ''} placeholder={labelBasis(s.basis)} onChange={e => onUbah({ harga: Number(e.target.value) || 0, rateId: null, sumberHarga: 'manual' })} /></td>
+      <td className="num"><InputDesimal aria-label="Lead time" min={0} step="any" value={s.leadTimeHari ?? ''} placeholder="hari" onChange={e => onUbah({ leadTimeHari: e.target.value === '' ? null : Number(e.target.value) })} /></td>
       <td className="num"><b>{rp((s.harga || 0) * q.qty)}</b><div className="dasar-def">{rp(s.harga || 0)} × {fmtQ(q.qty)}</div></td>
     </tr>);
 }
@@ -142,15 +143,15 @@ export default function IntermodalTender() {
             <div className="grid-isi">
               <label className="f">Origin<input list="dl-im-darat" value={r.origin} onChange={e => setUjung(i, { origin: e.target.value })} /></label>
               <label className="f">Destination<input list="dl-im-darat" value={r.destination} onChange={e => setUjung(i, { destination: e.target.value })} /></label>
-              <label className="f">Shipment / bulan<input type="number" min={0} step="any" value={r.shipmentBulan || ''} onChange={e => setRute(i, { shipmentBulan: Number(e.target.value) || 0 })} /></label>
+              <label className="f">Shipment / bulan<InputDesimal min={0} step="any" value={r.shipmentBulan || ''} onChange={e => setRute(i, { shipmentBulan: Number(e.target.value) || 0 })} /></label>
               <label className="f">Harga jual dinyatakan
                 <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
                   <SelectBasis label="Satuan jual" value={r.satuanJual} onChange={b => setRute(i, { satuanJual: b })} />
-                  <input aria-label="Qty jual per shipment" type="number" min={0} step="any" value={qj.auto ? qj.qty : (r.qtyJual || '')} className={qj.auto ? 'input-auto' : undefined}
+                  <InputDesimal aria-label="Qty jual per shipment" min={0} step="any" value={qj.auto ? qj.qty : (r.qtyJual || '')} className={qj.auto ? 'input-auto' : undefined}
                     title={qj.auto ? 'Otomatis dari profil muatan — ketik untuk isi manual' : 'jumlah satuan jual per shipment'} onChange={e => setRute(i, { qtyJual: Number(e.target.value) || 1, qtyJualAuto: false })} style={{ width: 80 }} />
                 </span>
                 <span className="dasar-def">{qj.auto ? <span className="chip-auto">auto dari muatan</span> : <button className="link-kecil" onClick={() => setRute(i, { qtyJualAuto: true })}>hitung otomatis dari muatan</button>}</span></label>
-              <label className="f">Biaya lain / shipment (Rp)<input type="number" min={0} value={r.biayaLain || ''} placeholder="THC, dokumen, handling" onChange={e => setRute(i, { biayaLain: Number(e.target.value) || 0 })} /></label>
+              <label className="f">Biaya lain / shipment (Rp)<InputDesimal min={0} value={r.biayaLain || ''} placeholder="THC, dokumen, handling" onChange={e => setRute(i, { biayaLain: Number(e.target.value) || 0 })} /></label>
               <label className="f">Margin rute (%)<PersenInput label="Margin rute" nilai={r.marginPersen} placeholder={`${Math.round(im.marginGlobal * 1000) / 10} (global)`} onChange={v => setRute(i, { marginPersen: v })} /></label>
             </div>
             <div className="tablewrap fit"><table className="tabel-fit tabel-im">
@@ -182,7 +183,7 @@ export default function IntermodalTender() {
           <div className="tablewrap fit"><table className="tabel-fit">
             <thead><tr><th>Rute</th>{FIELD_MUATAN.map(f => <th key={f.k} className="num">{f.l}</th>)}</tr></thead>
             <tbody>{im.rute.map((r, i) => <tr key={r.id}><td>{r.origin || '…'} → {r.destination || '…'}</td>
-              {FIELD_MUATAN.map(f => <td key={f.k} className="num"><input aria-label={`${f.l} ${r.origin} → ${r.destination}`} type="number" min={0} step="any" style={{ width: 90 }} value={r.muatan?.[f.k] ?? ''} placeholder="—"
+              {FIELD_MUATAN.map(f => <td key={f.k} className="num"><InputDesimal aria-label={`${f.l} ${r.origin} → ${r.destination}`} min={0} step="any" style={{ width: 90 }} value={r.muatan?.[f.k] ?? ''} placeholder="—"
                 onChange={e => setRute(i, { muatan: { ...(r.muatan ?? {}), [f.k]: e.target.value === '' ? undefined : Number(e.target.value) } })} /></td>)}</tr>)}</tbody>
           </table></div>
         </details>

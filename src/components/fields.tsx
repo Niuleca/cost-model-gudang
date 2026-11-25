@@ -2,16 +2,16 @@
 // Komponen input kecil untuk form tender.
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { useT } from '@/lib/i18n';
+import InputDesimal from '@/components/InputDesimal';
 
 /** Input angka yang boleh dikosongkan sementara saat mengetik (tidak langsung jadi "0") */
-export function AngkaInput({ value, onValue, bulat, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
+export function AngkaInput({ value, onValue, bulat, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
   value: number | undefined; onValue: (v: number) => void; bulat?: boolean;
 }) {
-  const [teks, setTeks] = useState(value == null || Number.isNaN(value) ? '' : String(value));
-  useEffect(() => { if (Number(teks) !== value || (teks === '' && value)) setTeks(value == null || Number.isNaN(value) ? '' : String(value)); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
-  return <input {...rest} type="number" inputMode="decimal" value={teks}
-    onChange={e => { const x = e.target.value; setTeks(x); if (x === '' || x === '-') return; const n = Number(x.replace(',', '.')); if (Number.isFinite(n)) onValue(bulat ? Math.round(n) : n); }}
-    onBlur={e => { if (e.target.value === '') { setTeks('0'); onValue(0); } rest.onBlur?.(e); }} />;
+  // koma atau titik sebagai desimal (keyboard HP Indonesia hanya punya koma); kosong sementara saat mengetik, jadi 0 saat keluar kolom
+  return <InputDesimal {...rest} value={value == null || Number.isNaN(value) ? '' : value}
+    onChange={e => { const x = e.target.value; if (x === '') return; const n = Number(x); if (Number.isFinite(n)) onValue(bulat ? Math.round(n) : n); }}
+    onBlur={e => { if (e.target.value === '') onValue(0); rest.onBlur?.(e); }} />;
 }
 
 /** Baca angka gaya Indonesia: titik = pemisah ribuan ("10.673" → 10673, "1.250.000" → 1250000), koma = desimal ("2,5" → 2.5).
@@ -85,7 +85,7 @@ export function Pct({ id, label, value, onChange, hint }: { id: string; label: s
   const t = useT();
   return (
     <label className="f" htmlFor={id}>{t(label)} (%)
-      <input id={id} type="number" step="any" value={value == null ? '' : +(value * 100).toFixed(4)} onChange={e => onChange(e.target.value === '' ? 0 : Number(e.target.value) / 100)} />
+      <InputDesimal id={id} step="any" value={value == null ? '' : +(value * 100).toFixed(4)} onChange={e => onChange(e.target.value === '' ? 0 : Number(e.target.value) / 100)} />
       {hint && <span className="small muted">{hint}</span>}
     </label>
   );

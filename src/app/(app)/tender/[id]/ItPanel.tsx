@@ -6,6 +6,7 @@ import { COST_TYPES, KELOMPOK_IT, UMUR_IT_DEFAULT, basisDari, biayaBulanIt, perl
 import { ubahArray } from '@/components/fields';
 import { itDefault, sinkronIt, type DriverIt } from '@/lib/itDefault';
 import { rp } from '@/lib/format';
+import InputDesimal from '@/components/InputDesimal';
 
 interface Katalog { id: number; kelompok: string; item: string; deskripsi: string | null; cost_type: string; harga: number; slab_min: number | null; slab_max: number | null; status: string; berlaku_sampai: string | null }
 
@@ -56,7 +57,7 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
       <p className="small muted">Item ditarik dari katalog IT. Bulanan (PUPM, PDPM, Cost/Month, Monthly/Site) dan transaksi masuk biaya bulanan; Yearly ÷ 12; OTC berupa perangkat (hardware, CCTV, device) didepresiasi selama umur ekonomis (maks. masa kontrak); development, cabling & mandays diamortisasi selama kontrak; atau pilih ditagih terpisah di quotation. Bunga tidak dihitung otomatis — kalau OTC dibiayai pinjaman, pilih di tab Interest cost. Masa kontrak: {kontrakBulan} bln.</p>
       <div className="grid3">
         <label className="f" htmlFor="bap">Nomor BAP<input id="bap" value={sheet.nomorBap ?? ''} onChange={e => onChange({ ...sheet, nomorBap: e.target.value })} placeholder="BAP-…" /></label>
-        <label className="f" htmlFor="kurs">Kurs USD (Rp)<input id="kurs" type="number" value={sheet.kursUsd} onChange={e => onChange({ ...sheet, kursUsd: Number(e.target.value) })} /></label>
+        <label className="f" htmlFor="kurs">Kurs USD (Rp)<InputDesimal id="kurs" value={sheet.kursUsd} onChange={e => onChange({ ...sheet, kursUsd: Number(e.target.value) })} /></label>
       </div>
       {driver && (() => {
         const def = itDefault(driver, katalog);
@@ -106,12 +107,12 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
                 <input aria-label="Catatan" className="input-kecil" value={l.catatan ?? ''} placeholder="dasar qty / keterangan" onChange={e => set(ubahArray(sheet.lines, i, { catatan: e.target.value }))} />
               </td>
               <td><select aria-label="Cost type" value={l.costType} onChange={e => set(ubahArray(sheet.lines, i, { costType: e.target.value }))}>{COST_TYPES.map(c => <option key={c.v} value={c.v} title={c.ket}>{c.v}</option>)}</select></td>
-              <td className="num"><input aria-label="Qty" type="number" step="any" value={l.qty} onChange={e => set(ubahArray(sheet.lines, i, { qty: Number(e.target.value) }))} title={basisDari(l.costType) === 'Transaksi' ? 'Transaksi per bulan' : ''} />
+              <td className="num"><InputDesimal aria-label="Qty" step="any" value={l.qty} onChange={e => set(ubahArray(sheet.lines, i, { qty: Number(e.target.value) }))} title={basisDari(l.costType) === 'Transaksi' ? 'Transaksi per bulan' : ''} />
                 {l.kunci && l.qtyDefault != null && l.qty !== l.qtyDefault && <div className="small muted">manual · <button className="link-kecil" title="Kembalikan ke qty template (ikut data tender lagi)" onClick={() => set(ubahArray(sheet.lines, i, { qty: l.qtyDefault! }))}>default {l.qtyDefault}</button></div>}</td>
-              <td className="num db"><input aria-label="Harga budget" type="number" step="any" value={l.hargaBudget} onChange={e => set(ubahArray(sheet.lines, i, { hargaBudget: Number(e.target.value) }))} />
+              <td className="num db"><InputDesimal aria-label="Harga budget" step="any" value={l.hargaBudget} onChange={e => set(ubahArray(sheet.lines, i, { hargaBudget: Number(e.target.value) }))} />
                 <select aria-label="Mata uang" className="input-kecil" value={l.mataUang ?? 'IDR'} onChange={e => set(ubahArray(sheet.lines, i, { mataUang: e.target.value as 'IDR' | 'USD' }))}><option>IDR</option><option>USD</option></select></td>
               <td className="num">{rp(l.qty * l.hargaBudget * (l.mataUang === 'USD' ? sheet.kursUsd : 1))}</td>
-              <td className="num"><input aria-label="Harga aktual" type="number" step="any" value={l.hargaAktual ?? ''} onChange={e => set(ubahArray(sheet.lines, i, { hargaAktual: e.target.value === '' ? null : Number(e.target.value) }))} />
+              <td className="num"><InputDesimal aria-label="Harga aktual" step="any" value={l.hargaAktual ?? ''} onChange={e => set(ubahArray(sheet.lines, i, { hargaAktual: e.target.value === '' ? null : Number(e.target.value) }))} />
                 {l.hargaAktual != null && <div className="small muted">{rp(l.qty * l.hargaAktual * (l.mataUang === 'USD' ? sheet.kursUsd : 1))}</div>}</td>
               {(() => {
                 const sekali = basisDari(l.costType) === 'Sekali', p = perlakuanDari(l), c = biayaBulanIt(l, sheet.kursUsd, opsi);

@@ -5,6 +5,7 @@ import UmurKontrak from '@/components/UmurKontrak';
 import { SEKSI_BIAYA, biayaBulanBaris, hargaUntukMode, seksiDari, type ModeBiaya, type Seksi } from '@/lib/biayaLain';
 import { rp } from '@/lib/format';
 import { biayaLainDefault, buangGandaManpower, kurangDefault, sinkronBiaya, tambahDefault, type BarisBiaya, type DriverBiaya } from '@/lib/biayaLainDefault';
+import InputDesimal from '@/components/InputDesimal';
 
 interface Item { id: number; kategori: string; item: string; satuan: string; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; status_efektif: string }
 export type Baris = BarisBiaya;
@@ -90,8 +91,8 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
                 const h = it ? hargaUntukMode(it, mode) : undefined;
                 onUbah(i, { mode, ...(h != null ? { hargaSatuan: h, hargaDb: h, hargaDefault: undefined } : {}), ...(mode === 'beli' && !b.umurBulan ? { umurBulan: it?.umur_ekonomis_bulan ?? 60 } : {}) });
               }}>{MODE.map(m => <option key={m.v} value={m.v} title={m.t}>{m.l}</option>)}</select></td>
-              <td className="num"><input aria-label="Qty" type="number" step="any" value={b.qty} onChange={e => onUbah(i, { qty: Number(e.target.value) })} /></td>
-              <td className="num db"><input aria-label="Harga satuan" type="number" value={b.hargaSatuan} onChange={e => onUbah(i, { hargaSatuan: Number(e.target.value) })} /></td>
+              <td className="num"><InputDesimal aria-label="Qty" step="any" value={b.qty} onChange={e => onUbah(i, { qty: Number(e.target.value) })} /></td>
+              <td className="num db"><InputDesimal aria-label="Harga satuan" value={b.hargaSatuan} onChange={e => onUbah(i, { hargaSatuan: Number(e.target.value) })} /></td>
               <td className="num">{b.mode === 'beli' ? <UmurKontrak umur={b.umurBulan} kontrak={kontrak} onChange={v => onUbah(i, { umurBulan: v })} lebar={80} /> : <span className="small muted">{b.mode === 'sekali' ? kontrak : '–'}</span>}</td>
               <td className="num" title={`nilai ${rp(c.nilai)}${c.periode > 1 ? ` ÷ ${c.periode} bln` : ''}`}><b>{rp(c.total)}</b>{c.periode > 1 && <div className="small muted">nilai {rp(c.nilai)}</div>}</td>
               <td><select aria-label="Risiko" value={b.kategoriRisiko ?? ''} onChange={e => onUbah(i, { kategoriRisiko: (e.target.value || undefined) as KategoriRisiko | undefined })}><option value="">Default</option>{RISIKO.map(r => <option key={r}>{r}</option>)}</select>
@@ -190,14 +191,14 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
   // ---- Asuransi: nilai stok sebagai dasar premi ----
   const extraAsuransi = (
     <div className="grid-isi">
-      <label className="f">Nilai stok rata-rata (Rp)<input type="number" min={0} step={100000000} value={d.nilaiStokRp || ''} placeholder="mis. 25000000000" onChange={e => onNilaiStok(Number(e.target.value) || 0)} /></label>
+      <label className="f">Nilai stok rata-rata (Rp)<InputDesimal min={0} step={100000000} value={d.nilaiStokRp || ''} placeholder="mis. 25000000000" onChange={e => onNilaiStok(Number(e.target.value) || 0)} /></label>
       <p className="small muted" style={{ margin: 0 }}>Premi = nilai stok (miliar) × tarif per miliar. Tarif default = batas bawah asuransi kebakaran SEOJK 6/SEOJK.05/2017 (gudang umum / 3PL 2,255‰/tahun, kelas konstruksi 1). Ganti item untuk kelas konstruksi / okupasi lain.</p>
     </div>);
 
   // ---- Startup & implementation otomatis (dihitung mesin saat Hitung) ----
   const barisAuto = (nama: string) => hasilBaris?.find(b => b.deskripsi.startsWith(`${nama} (otomatis) — amortisasi`));
   const manualDobel = lines.map((b, i) => ({ b, i })).filter(r => startup.aktif && /implement|start ?up/i.test(r.b.deskripsi));
-  const persenInp = (v: number, on: (n: number) => void) => <input type="number" min={0} step="any" value={Math.round(v * 1000) / 10} disabled={!startup.aktif}
+  const persenInp = (v: number, on: (n: number) => void) => <InputDesimal min={0} step="any" value={Math.round(v * 1000) / 10} disabled={!startup.aktif}
     onChange={e => on(Number(e.target.value) / 100)} style={{ width: 70, minWidth: 70, textAlign: 'right' }} />;
   const [sibuk, setSibuk] = useState(false);
   const jalankan = async () => { setSibuk(true); try { await onHitung(); } finally { setSibuk(false); } };

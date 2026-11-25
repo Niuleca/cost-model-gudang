@@ -12,6 +12,7 @@ import { labelStatus } from '@/lib/status';
 import { buatDunia, jalankanHari, ringkasDunia, skenarioDariTender, type Dunia, type JenisTugas, type Skenario } from '@/lib/game';
 import { susunLayout, type LayoutGudang } from '@/lib/simulasi3d/layout';
 import { keLayoutGudang, type LayoutEdit } from '@/lib/simulasi3d/editor';
+import InputDesimal from '@/components/InputDesimal';
 
 const Main3D = dynamic(() => import('./Main3D'), { ssr: false, loading: () => <div className="card sim3d-wadah sim3d-muat">Menyiapkan gudang 3D…</div> });
 
@@ -167,10 +168,10 @@ export default function LecaGame() {
         {memuat && <p className="small muted">Menghitung tender…</p>}
         {sk && data && (
           <div className="game-isian">
-            <label className="f">Modal awal (Rp)<input type="number" step={1000000} value={modal ?? ''} onChange={e => setModal(e.target.value === '' ? null : Number(e.target.value))} />
+            <label className="f">Modal awal (Rp)<InputDesimal step={1000000} value={modal ?? ''} onChange={e => setModal(e.target.value === '' ? null : Number(e.target.value))} />
               <span className="small muted">default 3 × biaya bulanan ({jt(data.h.totalBiayaBulan * 3)})</span></label>
-            <label className="f">Batas hari main<input type="number" min={1} max={365} value={hari} onChange={e => setHari(Number(e.target.value))} /></label>
-            <label className="f">Seed<input type="number" value={seed} onChange={e => setSeed(Number(e.target.value) || 0)} /><span className="small muted">seed sama = hasil sama</span></label>
+            <label className="f">Batas hari main<InputDesimal min={1} max={365} value={hari} onChange={e => setHari(Number(e.target.value))} /></label>
+            <label className="f">Seed<InputDesimal value={seed} onChange={e => setSeed(Number(e.target.value) || 0)} /><span className="small muted">seed sama = hasil sama</span></label>
             <label className="f">Tanggal mulai<input type="date" value={mulai} onChange={e => setMulai(e.target.value)} /></label>
             <div className="game-tombol">
               {jalan ? <button type="button" className="ghost" onClick={() => { batalRef.current = true; }}>Hentikan ({jalan.selesai}/{jalan.total})</button>
@@ -210,7 +211,7 @@ export default function LecaGame() {
                 {(Object.keys(sk.prod) as JenisTugas[]).map(j => (
                   <tr key={j}>
                     <td>{LABEL_TUGAS[j]}</td>
-                    <td className="num"><input type="number" min={0} step={1} value={prodUbah[j] ?? sk.prod[j].prod} style={{ width: 72, background: prodUbah[j] != null ? 'var(--asumsi)' : undefined }}
+                    <td className="num"><InputDesimal min={0} step={1} value={prodUbah[j] ?? sk.prod[j].prod} style={{ width: 72, background: prodUbah[j] != null ? 'var(--asumsi)' : undefined }}
                       onChange={e => { const x = Number(e.target.value); setProdUbah(p => ({ ...p, [j]: Number.isFinite(x) ? x : 0 })); }} /> <span className="small muted">{sk.prod[j].satuan}/jam</span></td>
                     <td className="small muted">{sk.prod[j].luar ? 'pihak luar — tidak ada di tender' : sk.prod[j].sumber}</td>
                   </tr>

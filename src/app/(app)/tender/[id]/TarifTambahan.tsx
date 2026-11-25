@@ -3,6 +3,7 @@
 import type { HasilTender, Bucket, TarifTambahanInput } from '@/lib/engine/index.ts';
 import { useState } from 'react';
 import { rp, persen, BUCKET_LABEL } from '@/lib/format';
+import InputDesimal from '@/components/InputDesimal';
 
 type Jual = Partial<Record<Bucket, 'jual' | 'termasuk'>>;
 const OPS: Bucket[] = ['storage', 'handling_in', 'handling_out', 'vas'];
@@ -99,15 +100,15 @@ export function BarisTambahan({ h, nilai, onUbah, ppnInclude }: { h: HasilTender
             <div className="small"><button className="link-kecil" onClick={() => setBuka(b => ({ ...b, [x.id]: !detail }))}>{detail ? '▾' : '▸'} dasar biaya</button>
               {c?.dasarTeks && !detail && <span className="dasar-def"> {c.dasarTeks}</span>}</div></td>
           <td><PilihSatuan nilai={x.satuan} set={v => ubah(x.id, { satuan: v })} /></td>
-          <td className="num"><input aria-label="Estimasi volume per bulan" type="number" value={x.volumeBulan ?? ''} placeholder="est. vol" onChange={e => ubah(x.id, { volumeBulan: num(e.target.value) })} {...inp(80)} /></td>
+          <td className="num"><InputDesimal aria-label="Estimasi volume per bulan" value={x.volumeBulan ?? ''} placeholder="est. vol" onChange={e => ubah(x.id, { volumeBulan: num(e.target.value) })} {...inp(80)} /></td>
           <td className="num">{c && c.biayaBulan > 0 ? rp(c.biayaBulan) : '—'}</td>
           <td className="num k-unit">{c ? rp(c.biayaPerUnit) : '…'}</td>
           <td className="num">{c?.tarifDiubah ? <>{c.biayaPerUnit > 0 ? persen(c.gpDipakai) : '—'}<div className="dasar-def">dari tarif</div></> : <>
-            <input aria-label="GP tarif tambahan" type="number" step="0.1" value={x.gp == null ? '' : Math.round(x.gp * 1000) / 10}
+            <InputDesimal aria-label="GP tarif tambahan" step="0.1" value={x.gp == null ? '' : Math.round(x.gp * 1000) / 10}
               placeholder={c ? String(Math.round(c.gpDipakai * 1000) / 10) : ''} onChange={e => ubah(x.id, { gp: e.target.value === '' ? null : Number(e.target.value) / 100 })} {...inp(64)} />%</>}</td>
           <td className="num k-harga">{c && c.pendapatanBulan > 0 ? <>{rp(c.pendapatanBulan)}<div className="dasar-def">GP {rp(c.gpBulan)}</div></> : '—'}</td>
           <td className={`num${ppnInclude ? '' : ' tier-kini'}`}>
-            <input aria-label="Tarif tambahan excl PPN" type="number" value={tarifDiisi ? x.tarif : ''} placeholder={c ? String(c.tarifDefault || '') : ''}
+            <InputDesimal aria-label="Tarif tambahan excl PPN" value={tarifDiisi ? x.tarif : ''} placeholder={c ? String(c.tarifDefault || '') : ''}
               onChange={e => ubah(x.id, { tarif: num(e.target.value) })} {...inp(100)} style={{ width: 100, minWidth: 100, textAlign: 'right', fontWeight: 700 }} />
             <div className="dasar-def">{tarifDiisi ? <>diubah · <button className="link-kecil" onClick={() => ubah(x.id, { tarif: undefined })}>default {c ? rp(c.tarifDefault) : ''}</button></> : `default ${c ? rp(c.tarifPerUnit) : ''}`}</div></td>
           <td className="num k-ppn">{c ? rp(c.ppnPerUnit) : ''}</td>
@@ -124,12 +125,12 @@ export function BarisTambahan({ h, nilai, onUbah, ppnInclude }: { h: HasilTender
               <select aria-label="Satuan dasar" value={x.uom ?? ''} onChange={e => ubah(x.id, { uom: e.target.value })}>
                 {(h.rateCard.find(r => r.bucket === x.bucket)?.opsiUom ?? []).filter(o => o.volume > 0).map(o => <option key={o.uom} value={o.uom}>{o.uom}</option>)}</select></>}
             {x.dasar === 'aktivitas' && <>
-              <label>menit/unit <input aria-label="Menit per unit" type="number" step="0.05" value={x.menit ?? ''} onChange={e => ubah(x.id, { menit: num(e.target.value) })} {...inp(64)} /></label>
-              <label>orang <input aria-label="Orang" type="number" step="1" value={x.orang ?? ''} onChange={e => ubah(x.id, { orang: num(e.target.value) })} {...inp(52)} /></label>
-              <label title="Pengali upah, mis. 1,5 untuk lembur">pengali <input aria-label="Pengali" type="number" step="0.1" value={x.pengali ?? ''} placeholder="1" onChange={e => ubah(x.id, { pengali: num(e.target.value) })} {...inp(52)} /></label>
+              <label>menit/unit <InputDesimal aria-label="Menit per unit" step="0.05" value={x.menit ?? ''} onChange={e => ubah(x.id, { menit: num(e.target.value) })} {...inp(64)} /></label>
+              <label>orang <InputDesimal aria-label="Orang" step="1" value={x.orang ?? ''} onChange={e => ubah(x.id, { orang: num(e.target.value) })} {...inp(52)} /></label>
+              <label title="Pengali upah, mis. 1,5 untuk lembur">pengali <InputDesimal aria-label="Pengali" step="0.1" value={x.pengali ?? ''} placeholder="1" onChange={e => ubah(x.id, { pengali: num(e.target.value) })} {...inp(52)} /></label>
               <label className="row" style={{ gap: 2 }}><input type="checkbox" style={{ width: 'auto' }} checked={!!x.alat} onChange={e => ubah(x.id, { alat: e.target.checked })} />pakai alat (MHE)</label>
-              <label>material Rp <input aria-label="Material per unit" type="number" value={x.material ?? ''} onChange={e => ubah(x.id, { material: num(e.target.value) })} {...inp(90)} /></label></>}
-            {(x.dasar === 'manual' || x.dasar === 'tarif') && <label>biaya/unit Rp <input aria-label="Biaya per unit" type="number" value={x.biaya ?? ''} placeholder={x.dasar === 'tarif' ? 'opsional' : ''} onChange={e => ubah(x.id, { biaya: num(e.target.value) })} {...inp(100)} /></label>}
+              <label>material Rp <InputDesimal aria-label="Material per unit" value={x.material ?? ''} onChange={e => ubah(x.id, { material: num(e.target.value) })} {...inp(90)} /></label></>}
+            {(x.dasar === 'manual' || x.dasar === 'tarif') && <label>biaya/unit Rp <InputDesimal aria-label="Biaya per unit" value={x.biaya ?? ''} placeholder={x.dasar === 'tarif' ? 'opsional' : ''} onChange={e => ubah(x.id, { biaya: num(e.target.value) })} {...inp(100)} /></label>}
             {c?.dasarTeks && <span className="muted">{c.dasarTeks}</span>}
           </div></td></tr>,
       ];

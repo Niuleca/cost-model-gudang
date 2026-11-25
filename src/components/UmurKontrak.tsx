@@ -1,4 +1,5 @@
 'use client';
+import InputDesimal from '@/components/InputDesimal';
 // Isian umur depresiasi yang selalu konsisten dengan masa kontrak: aset beli disusutkan selama min(umur ekonomis, kontrak)
 // (sama dengan mesin hitung). Yang tampil = periode depresiasi efektif; bila umur ekonomis > kontrak, ditandai di bawahnya.
 
@@ -17,7 +18,7 @@ export default function UmurKontrak({ umur, kontrak, onChange, disabled, label =
   const efektif = periodeDepresiasi(umur, n);
   const dibatasi = !disabled && !!umur && umur > n;
   return <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-    <input aria-label={label} type="number" min={1} max={n} value={disabled ? (umur ?? '') : efektif} disabled={disabled}
+    <InputDesimal aria-label={label} min={1} max={n} value={disabled ? (umur ?? '') : efektif} disabled={disabled}
       title={`Periode depresiasi = min(umur ekonomis, kontrak ${n} bln)`}
       onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v) && v > 0) onChange(Math.min(v, n)); }}
       style={{ width: lebar, minWidth: lebar, textAlign: 'right', ...inputStyle }} />

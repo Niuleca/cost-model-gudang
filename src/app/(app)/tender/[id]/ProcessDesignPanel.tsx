@@ -5,6 +5,7 @@ import type { AktivitasInput, VolumeInput } from '@/lib/engine/types';
 import { hitungProcessDesign, bolehRangkap, isTkbm, PD_DEFAULT, type IndirectInput, type KalenderResource, type ProcessDesignInput } from '@/lib/engine/processDesign';
 import { angka, rp } from '@/lib/format';
 import { hitungEskalasi } from '@/lib/engine/index.ts';
+import InputDesimal from '@/components/InputDesimal';
 
 const f2 = (x: number) => (x ? x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
 const f0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
@@ -37,7 +38,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
 
   const setKal = (jenis: 'mp' | 'mhe', key: keyof KalenderResource, v: number) => onPd({ ...pd, [jenis]: { ...pd[jenis], [key]: v } });
   const inp = (v: number, on: (x: number) => void, w = 64) => (
-    <input type="number" step="any" value={Number.isFinite(v) ? v : 0} onChange={e => on(e.target.value === '' ? 0 : Number(e.target.value))}
+    <InputDesimal step="any" value={Number.isFinite(v) ? v : 0} onChange={e => on(e.target.value === '' ? 0 : Number(e.target.value))}
       style={{ width: w, minWidth: w, textAlign: 'right', background: 'var(--input)' }} />);
   const km = h.kalender.mp, kh = h.kalender.mhe;
   /** Waktu kerja di balik FTE: man hour per bulan & per hari kerja. */
@@ -164,7 +165,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
               <input id="esk-mulai" type="month" value={biaya.mulai || biaya.mulaiDefault || esk.mulai} onChange={e => biaya.onMulai(e.target.value || null)} style={{ minWidth: 150 }} />
               <span className="small muted">{biaya.mulai ? 'diisi manual' : biaya.mulaiDefault ? 'dari tanggal go-live' : 'go-live kosong → Januari tahun ini'}</span></label>
             <label className="f" htmlFor="esk-mp">Kenaikan upah tiap Januari
-              <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input id="esk-mp" type="number" step="any" min={0} value={Math.round(esk.persenTahun * 1000) / 10}
+              <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><InputDesimal id="esk-mp" step="any" min={0} value={Math.round(esk.persenTahun * 1000) / 10}
                 onChange={e => biaya.onPersen(Number(e.target.value) / 100)} style={{ width: 80, minWidth: 80, textAlign: 'right' }} /><span>%</span></div>
               <span className="small muted">kebijakan UMK, umumnya 5–7%</span></label>
             </div>

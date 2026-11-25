@@ -58,6 +58,7 @@ import { PilihUom, SelKonversi, gantiUom, RingkasanVolumeSemuaUom, RingkasanOrde
 import BagikanTender from '@/components/BagikanTender';
 import { labelStatus, STATUS_DRAFT } from '@/lib/status';
 import { IT_SHEET_DEFAULT, ringkasIt } from '@/lib/it';
+import InputDesimal from '@/components/InputDesimal';
 
 interface Prod { id: number; aktivitas: string; tahap: string; tool: string; role_name: string; uom: string; kelas_berat: string; industri: string; prod_per_jam: number; status: string; benchmark: Record<string, string> | null }
 interface Item { id: number; kategori: string; item: string; satuan: string; vendor?: string | null; tinggi_angkat_m?: number | null; harga_beli: number | null; harga_sewa_bulan: number | null; umur_ekonomis_bulan: number | null; daya_watt: number | null; status_efektif: string; mhe_tipe: string | null; kapasitas_ton: number | null; sumber_tenaga: string | null }
@@ -1451,23 +1452,23 @@ export default function TenderPage() {
                   <td><select aria-label="Role" value={x.roleName} onChange={e => ub({ roleName: e.target.value })} style={{ minWidth: 160 }}>
                     {(() => { const semua = Array.from(new Set([...jabatan, ...prods.map(q => q.role_name).filter(Boolean)])).sort(); return (semua.includes(x.roleName) ? semua : [x.roleName, ...semua]); })().map(j => <option key={j}>{j}</option>)}</select>
                     {x.roleName && jabatan.length > 0 && !jabatan.includes(x.roleName) && <div className="small" style={{ color: 'var(--warn, #b45309)' }} title="Tambahkan role ini di master Jabatan (job level) agar faktor UMK & tunjangan sesuai">belum ada di master Jabatan</div>}</td>
-                  <td className="num db"><input aria-label="Produktivitas" type="number" step="any" value={x.prodPerJam} onChange={e => ub({ prodPerJam: Number(e.target.value) })} style={{ width: 80, minWidth: 80 }} /></td>
+                  <td className="num db"><InputDesimal aria-label="Produktivitas" step="any" value={x.prodPerJam} onChange={e => ub({ prodPerJam: Number(e.target.value) })} style={{ width: 80, minWidth: 80 }} /></td>
                   <td><select aria-label="UoM" value={x.uom} style={{ minWidth: 100 }} onChange={e => ub({ uom: e.target.value })}>{(UOM.includes(x.uom) ? UOM : [x.uom, ...UOM]).map(u => <option key={u}>{u}</option>)}</select></td>
                   <td><select aria-label="Arus" value={x.arus} style={{ minWidth: 130 }} title="Alur barang: inbound (masuk), outbound (keluar), storage (penyimpanan), VAS" onChange={e => ub({ arus: e.target.value as Arus })}>{ARUS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select></td>
-                  <td className="num"><input aria-label="Volume per bulan" type="number" step="any" placeholder={Math.round(vAuto).toLocaleString('id-ID')} value={x.volumeManual ?? ''}
+                  <td className="num"><InputDesimal aria-label="Volume per bulan" step="any" placeholder={Math.round(vAuto).toLocaleString('id-ID')} value={x.volumeManual ?? ''}
                     onChange={e => ub({ volumeManual: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 96, minWidth: 96 }} />
                     {ef?.volumeDariProfil && <div className="small muted" title="Order admin dari Profil order (tab Volume): mobil/hari × input admin per mobil × hari operasional">auto dari profil order</div>}
                     {!ef?.volumeDariProfil && isAktivitasAdmin(x) && x.volumeManual == null && <div className="small muted" title="Isi Profil order di tab Volume agar volume admin terisi otomatis">isi profil order</div>}</td>
                   <td className="num"><div className="sel-persen">
                     {x.porsiMuat
                       ? <div className="nilai" title="Ikut porsi palletize/loose di Key Assumption">{angka(persenDariPorsi(x.porsiMuat, a.porsiMuat) * 100, 1)}%</div>
-                      : <div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}><input aria-label="Persen volume" type="number" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /><span className="small">%</span></div>}
+                      : <div className="row" style={{ flexWrap: 'nowrap', gap: 2, justifyContent: 'flex-end' }}><InputDesimal aria-label="Persen volume" step="any" value={+(x.persenVolume * 100).toFixed(2)} onChange={e => ub({ persenVolume: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /><span className="small">%</span></div>}
                     <select aria-label="Sumber % volume" title={x.porsiMuat ? `Ikut porsi: ${labelTag(x.porsiMuat)}` : '% diisi manual'} value={x.porsiMuat ? `${x.porsiMuat.proses}:${x.porsiMuat.muat}` : ''}
                       onChange={e => { const o = OPSI_TAG.find(q => q.k === e.target.value); ub(o ? { porsiMuat: o.t } : { porsiMuat: undefined, persenVolume: x.porsiMuat ? persenDariPorsi(x.porsiMuat, a.porsiMuat) : x.persenVolume }); }}>
                       <option value="">% manual</option>
                       {OPSI_TAG.map(o => <option key={o.k} value={o.k}>Porsi {labelTag(o.t)}</option>)}</select>
                   </div></td>
-                  <td className="num"><input aria-label="Pengali UoM" type="number" step="any" value={x.pengaliUom} onChange={e => ub({ pengaliUom: Number(e.target.value) })} title="Mis. 1 palet = 40 karton → 40. Biarkan 1 agar memakai konversi di tab Volume." style={{ width: 70, minWidth: 70 }} />
+                  <td className="num"><InputDesimal aria-label="Pengali UoM" step="any" value={x.pengaliUom} onChange={e => ub({ pengaliUom: Number(e.target.value) })} title="Mis. 1 palet = 40 karton → 40. Biarkan 1 agar memakai konversi di tab Volume." style={{ width: 70, minWidth: 70 }} />
                     {(x.pengaliUom || 1) === 1 && pEf !== 1 && <div className="small muted" title="dari konversi di tab Volume">{pEf > 0 && pEf < 1 ? `auto ÷${angka(1 / pEf, 1 / pEf % 1 ? 1 : 0)}` : `auto ×${angka(pEf)}`}</div>}
                     {vArus && faktorUom(vArus, x.uom) == null && (x.pengaliUom || 1) === 1 && <div className="small" style={{ color: 'var(--warn, #b45309)' }} title={`UoM ${x.uom} belum ada di konversi arus (${vArus.uom})`}>isi konversi</div>}</td>
                   <td className="row" style={{ flexWrap: 'nowrap', gap: 4 }}>

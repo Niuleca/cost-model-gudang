@@ -6,6 +6,7 @@ import { hitungListrik, type DataListrik } from '@/lib/listrik';
 import type { ListrikInput, TenderInput } from '@/lib/engine/types';
 import { rp, angka } from '@/lib/format';
 import { listrikDefault, type BarisListrik, type DriverListrik } from '@/lib/utilitas';
+import InputDesimal from '@/components/InputDesimal';
 
 interface Sim { id: string; nama: string; is_template: boolean; data: DataListrik }
 interface Tarif { golongan: string; tarif_kwh: number }
@@ -104,9 +105,9 @@ export default function ListrikTender({ simulasi, listrik, golongan, tarifKwh, t
                   <option value="">{l.item ? `${l.item} (tidak ada di daftar)` : '— pilih peralatan —'}</option>
                   {katalog.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {angka(k.watt)} W</option>)}
                 </select>}</td>
-                <td className="num"><input aria-label="Watt" type="number" min={0} value={l.watt} onChange={e => ubah({ watt: Number(e.target.value) })} style={{ width: 76, minWidth: 0 }} /></td>
-                <td className="num"><input aria-label="Qty" type="number" min={0} value={l.qty} onChange={e => ubah({ qty: Number(e.target.value) })} style={{ width: 64, minWidth: 0 }} /></td>
-                <td className="num"><input aria-label="Jam per hari" type="number" min={0} max={24} value={l.jamPerHari} onChange={e => ubah({ jamPerHari: Number(e.target.value) })} style={{ width: 56, minWidth: 0 }} /></td>
+                <td className="num"><InputDesimal aria-label="Watt" min={0} value={l.watt} onChange={e => ubah({ watt: Number(e.target.value) })} style={{ width: 76, minWidth: 0 }} /></td>
+                <td className="num"><InputDesimal aria-label="Qty" min={0} value={l.qty} onChange={e => ubah({ qty: Number(e.target.value) })} style={{ width: 64, minWidth: 0 }} /></td>
+                <td className="num"><InputDesimal aria-label="Jam per hari" min={0} max={24} value={l.jamPerHari} onChange={e => ubah({ jamPerHari: Number(e.target.value) })} style={{ width: 56, minWidth: 0 }} /></td>
                 <td className="num">{angka(l.watt * l.qty * l.jamPerHari * 30 / 1000, 0)}</td>
                 <td className="small">{b.dasar ?? <span className="muted">manual</span>}</td>
                 <td><button className="ghost" aria-label="Hapus" style={{ padding: '0 8px' }} onClick={() => onListrik(listrik.filter((_, j) => j !== i))}>×</button></td>

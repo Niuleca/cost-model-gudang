@@ -11,6 +11,7 @@ import { buatDocx, type BlokDocx } from '@/lib/docxSederhana';
 import { buatPdf } from '@/lib/pdfDariBlok';
 import { LEAD_KPI, adaBuffer, ikonAlat, leadKpi, leadTimeDefault, namaTool, sopEfektif, susunVsm, type FteAktivitas, type ProsesVsm, type SopInput, type VsmInput } from '@/lib/vsmSop';
 import IkonAlat from '@/components/IkonAlat';
+import InputDesimal from '@/components/InputDesimal';
 
 const BUCKET = 'tender-sop';
 const WARNA_LANE = ['#2563eb', '#7c3aed', '#0891b2', '#16a34a', '#ea580c', '#db2777', '#4b5563'];
@@ -254,7 +255,7 @@ export default function VsmMapPanel({ tenderId, kode, customer, aktivitas, pd, v
       <div className="lm-lead" aria-label="Lead time">
         {LEAD_KPI.map(z => <div key={z.k} className="lm-lead-seg" style={{ flexGrow: Math.max(1, leadKpi(vsm, z.k)) }}>
           <span>{z.label}</span>
-          <label className="small"><input type="number" min={0} step="any" aria-label={`${z.label} (jam)`} value={vsm?.leadKpi?.[z.k] ?? ''} placeholder={String(z.def)} disabled={!bisaEdit}
+          <label className="small"><InputDesimal min={0} step="any" aria-label={`${z.label} (jam)`} value={vsm?.leadKpi?.[z.k] ?? ''} placeholder={String(z.def)} disabled={!bisaEdit}
             onChange={e => onVsm({ ...(vsm ?? {}), leadKpi: { ...(vsm?.leadKpi ?? {}), [z.k]: e.target.value === '' ? undefined : Number(e.target.value) } })} /> jam</label>
         </div>)}
         <div className="lm-lead-tot">Total dock to dock <b>{angka(totalLead, 1)} jam</b> ({angka(totalLead / 24, 1)} hari)</div>

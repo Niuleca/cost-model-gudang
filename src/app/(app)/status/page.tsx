@@ -5,6 +5,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import StatusControl from '@/components/StatusControl';
 import { STATUS, labelStatus } from '@/lib/status';
 import { rp, tanggal } from '@/lib/format';
+import InputDesimal from '@/components/InputDesimal';
 
 interface T { id: string; kode: string | null; customer: string; kab_kota: string; status: string; alasan_hasil: string | null; tanggal_go_live: string | null; pic: string | null; updated_at: string; hasil: { simulasi?: { pendapatanBulan: number }[] } | null }
 interface Log { tender_id: string; ke: string; waktu: string }
@@ -54,7 +55,7 @@ export default function StatusProject() {
       <div className="head">
         <div><div className="eyebrow">Dashboard</div><h1>Project Status</h1></div>
         <label className="f" htmlFor="bh">Tandai macet jika lebih dari (hari) di status yang sama
-          <input id="bh" type="number" min={1} value={batasHari} onChange={e => setBatasHari(Number(e.target.value) || 14)} style={{ maxWidth: 120 }} /></label>
+          <InputDesimal id="bh" min={1} value={batasHari} onChange={e => setBatasHari(Number(e.target.value) || 14)} style={{ maxWidth: 120 }} /></label>
       </div>
       <div className="kpis">
         {STATUS.map(s => { const n = rows.filter(r => r.status === s.v).length; return n ? <div key={s.v} className="kpi"><span className="small muted">{s.l}</span><b>{n}</b></div> : null; })}

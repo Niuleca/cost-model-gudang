@@ -7,6 +7,7 @@ import { BUCKET_FOTO, adaHarga, fotoDiStorage, fotoUrl, gmapsLink, kedaluwarsa, 
 import { exportExcel, importExcel, type KolomExcel } from '@/lib/excel';
 import { angka, rp, tanggal } from '@/lib/format';
 import GroupChips from '@/components/GroupChips';
+import InputDesimal from '@/components/InputDesimal';
 
 type Form = Partial<Warehouse>;
 const KOSONG: Form = { tipe: 'Ambient', foto: [] };
@@ -161,16 +162,16 @@ export default function GudangManager() {
             <label className="f" htmlFor="g-kota">Kabupaten/kota<select id="g-kota" value={form.kab_kota ?? ''} onChange={e => set('kab_kota', e.target.value)}><option value="">Pilih…</option>{kotaList.map(k => <option key={k}>{k}</option>)}</select></label>
             <label className="f" htmlFor="g-alamat">Alamat<input id="g-alamat" value={form.alamat ?? ''} onChange={e => set('alamat', e.target.value)} /></label>
             <label className="f" htmlFor="g-gmaps">Link Google Maps<input id="g-gmaps" value={form.gmaps_url ?? ''} onChange={e => set('gmaps_url', e.target.value)} placeholder="https://maps.app.goo.gl/…" /></label>
-            <label className="f" htmlFor="g-lat">Latitude<input id="g-lat" type="number" step="any" value={form.latitude ?? ''} onChange={e => set('latitude', num(e.target.value))} /></label>
-            <label className="f" htmlFor="g-lng">Longitude<input id="g-lng" type="number" step="any" value={form.longitude ?? ''} onChange={e => set('longitude', num(e.target.value))} /></label>
-            <label className="f" htmlFor="g-luas">Luas (m²)<input id="g-luas" type="number" value={form.luas_m2 ?? ''} onChange={e => set('luas_m2', num(e.target.value))} /></label>
-            <label className="f" htmlFor="g-hm2">Harga sewa per m² per bulan<input id="g-hm2" type="number" value={form.harga_sewa_m2_bulan ?? ''} onChange={e => set('harga_sewa_m2_bulan', num(e.target.value))} /></label>
-            <label className="f" htmlFor="g-hbl">Harga sewa per bulan (utuh)<input id="g-hbl" type="number" value={form.harga_per_bulan ?? ''} onChange={e => set('harga_per_bulan', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-lat">Latitude<InputDesimal id="g-lat" step="any" value={form.latitude ?? ''} onChange={e => set('latitude', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-lng">Longitude<InputDesimal id="g-lng" step="any" value={form.longitude ?? ''} onChange={e => set('longitude', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-luas">Luas (m²)<InputDesimal id="g-luas" value={form.luas_m2 ?? ''} onChange={e => set('luas_m2', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-hm2">Harga sewa per m² per bulan<InputDesimal id="g-hm2" value={form.harga_sewa_m2_bulan ?? ''} onChange={e => set('harga_sewa_m2_bulan', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-hbl">Harga sewa per bulan (utuh)<InputDesimal id="g-hbl" value={form.harga_per_bulan ?? ''} onChange={e => set('harga_per_bulan', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-tinggi">Tinggi bersih ({sp.satuan})<InputPanjang id="g-tinggi" nilai={form.tinggi_bersih_m ?? null} basis="m" kosong onNilai={v => set('tinggi_bersih_m', v)} /></label>
-            <label className="f" htmlFor="g-lantai">Daya dukung lantai (ton/m²)<input id="g-lantai" type="number" step="any" value={form.daya_lantai_ton_m2 ?? ''} onChange={e => set('daya_lantai_ton_m2', num(e.target.value))} /></label>
-            <label className="f" htmlFor="g-dock">Jumlah dock<input id="g-dock" type="number" value={form.jumlah_dock ?? ''} onChange={e => set('jumlah_dock', num(e.target.value))} /></label>
-            <label className="f" htmlFor="g-gate">Jumlah gate<input id="g-gate" type="number" min={0} value={form.jumlah_gate ?? ''} onChange={e => set('jumlah_gate', num(e.target.value))} /></label>
-            <label className="f" htmlFor="g-kva">Daya listrik (kVA)<input id="g-kva" type="number" value={form.daya_listrik_kva ?? ''} onChange={e => set('daya_listrik_kva', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-lantai">Daya dukung lantai (ton/m²)<InputDesimal id="g-lantai" step="any" value={form.daya_lantai_ton_m2 ?? ''} onChange={e => set('daya_lantai_ton_m2', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-dock">Jumlah dock<InputDesimal id="g-dock" value={form.jumlah_dock ?? ''} onChange={e => set('jumlah_dock', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-gate">Jumlah gate<InputDesimal id="g-gate" min={0} value={form.jumlah_gate ?? ''} onChange={e => set('jumlah_gate', num(e.target.value))} /></label>
+            <label className="f" htmlFor="g-kva">Daya listrik (kVA)<InputDesimal id="g-kva" value={form.daya_listrik_kva ?? ''} onChange={e => set('daya_listrik_kva', num(e.target.value))} /></label>
             <label className="f" htmlFor="g-fas">Fasilitas<input id="g-fas" value={form.fasilitas ?? ''} onChange={e => set('fasilitas', e.target.value)} placeholder="office, toilet, mushola, parkir truk…" /></label>
             <label className="f" htmlFor="g-pic">Nama PIC<input id="g-pic" value={form.pic_nama ?? ''} onChange={e => set('pic_nama', e.target.value || null)} placeholder="mis. Bp. Andi (marketing landlord)" /></label>
             <label className="f" htmlFor="g-tel">No. telepon PIC<input id="g-tel" type="tel" value={form.pic_telepon ?? ''} onChange={e => set('pic_telepon', e.target.value || null)} placeholder="mis. 0812-3456-7890" /></label>

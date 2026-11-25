@@ -52,15 +52,18 @@ export function InputPanjang({ nilai, basis, onNilai, kosong, style, placeholder
     const n = Number(teks.replace(',', '.'));
     const dariTeks = teks === '' ? null : simpan(n, basis);
     const beda = nilai == null || (kosong && !Number(nilai)) ? teks !== '' : dariTeks == null || Math.abs(dariTeks - Number(nilai)) > 1e-9 * Math.max(1, Math.abs(Number(nilai)));
-    if (beda) setTeks(keTeks(nilai));
+    if (beda && !(teks.trim() === '' && Number(nilai) === 0)) setTeks(keTeks(nilai));
   }, [nilai, satuan]); // eslint-disable-line react-hooks/exhaustive-deps
-  return <input {...rest} type="number" step="any" inputMode="decimal" value={teks}
+  // teks + inputMode decimal (bukan type number): koma dari keyboard HP Indonesia diterima sebagai desimal ("1,1" = 1.1)
+  return <input {...rest} type="text" inputMode="decimal" autoComplete="off" className={rest.className ? `${rest.className} input-angka` : 'input-angka'} value={teks}
     placeholder={placeholderDasar != null && Number.isFinite(placeholderDasar) ? String(tampil(placeholderDasar, basis)) : rest.placeholder}
     style={style}
     onChange={e => {
-      const x = e.target.value; setTeks(x);
+      const x = e.target.value; if (!/^[-\d.,\s]*$/.test(x)) return; setTeks(x);
       if (x === '') { onNilai(kosong ? null : 0); return; }
-      const n = Number(x.replace(',', '.')); if (Number.isFinite(n)) onNilai(simpan(n, basis));
+      const t = x.replace(/\s/g, ''), d = t.includes(',') && t.includes('.') ? t.replace(/\./g, '') : t;
+      if (/^-?[.,]?$/.test(d)) return;
+      const n = Number(d.replace(',', '.')); if (Number.isFinite(n)) onNilai(simpan(n, basis));
     }} />;
 }
 
