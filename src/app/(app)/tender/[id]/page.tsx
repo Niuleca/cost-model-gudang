@@ -43,6 +43,7 @@ import SpacePanel from './SpacePanel';
 import ProdukPanel from './ProdukPanel';
 import { dasarKekuatan } from '@/lib/kekuatan';
 import { ATURAN_BERAT_DEFAULT, adaProdukNyata, hitungProduk, paletDariSpace, produkEfektif, terapkanProduk, type AturanBerat, type PerubahanTender, type ProdukTender } from '@/lib/produk';
+import { normalUom, kelasDariBerat, uomDari } from '@/lib/uom';
 import { hitungLevelRak } from '@/lib/engine/space';
 import MhePanel from './MhePanel';
 import BiayaSpacePanel from './BiayaSpacePanel';
@@ -209,6 +210,34 @@ export default function TenderPage() {
   };
   const bukaRincian = keTab;
   const [prods, setProds] = useState<Prod[]>([]);
+  /** Ganti UoM task → produktivitas ikut berubah: cari di database (tahap + role/equipment sama, UoM baru, kelas berat produk);
+   *  bila tidak ada, dikonversi dari produktivitas lama (palet → isi per palet, atau rasio berat per unit). */
+  const prodUntukUom = (x: { tahap: string; tool: string; roleName: string; uom: string; prodPerJam: number; aktivitas: string; productivityId?: number },
+    uomBaru: string, produk: ProdukTender[] | undefined, industri: string | null | undefined) => {
+    const norm = (u: string) => normalUom(u);
+    const pr = (produk ?? []).filter(q => !q.otomatis || (produk ?? []).length === 1);
+    const kgUom = (u: string) => {   // berat per 1 UoM dari produk tender (null = tidak tahu)
+      const q = pr.find(z => norm(z.uom) === norm(u)); if (q && Number(q.beratKg) > 0) return Number(q.beratKg);
+      if (norm(u) === 'palet') { const z = pr.find(y => Number(y.beratKg) > 0 && Number(y.upp) > 0); if (z) return Number(z.beratKg) * Number(z.upp); }
+      return null;
+    };
+    const kgBaru = kgUom(uomBaru);
+    const kelas = pr.find(z => norm(z.uom) === norm(uomBaru))?.kelasBerat || (kgBaru ? kelasDariBerat(norm(uomBaru), kgBaru)?.kode : undefined);
+    const nilai = (p: Prod) => (p.role_name === x.roleName ? 4 : 0) + (p.tool === x.tool ? 2 : 0) + (kelas && p.kelas_berat === kelas ? 8 : p.kelas_berat === 'semua' ? 1 : 0)
+      + (industri && p.industri === industri ? 3 : p.industri === 'General Cargo' ? 1 : 0);
+    const cocok = prods.filter(p => norm(p.uom) === norm(uomBaru) && p.tahap === x.tahap && (p.role_name === x.roleName || p.tool === x.tool))
+      .sort((a1, b1) => nilai(b1) - nilai(a1))[0];
+    if (cocok) return { uom: uomBaru, prodPerJam: Number(cocok.prod_per_jam), productivityId: cocok.id, aktivitas: cocok.aktivitas };
+    // tidak ada di database → konversi dari produktivitas lama
+    const lama = Number(x.prodPerJam) || 0, kgLama = kgUom(x.uom);
+    const upp = Number(pr.find(z => norm(z.uom) === norm(uomBaru))?.upp) || 0;
+    let baru: number | null = null;
+    if (norm(x.uom) === 'palet' && upp > 0 && /CBT|RT|forklift|reach|hand pallet|HPT|stacker/i.test(x.tool)) baru = lama * upp;        // alat memindah 1 palet = isi palet
+    else if (kgLama && kgBaru && norm(x.uom) !== 'palet') baru = lama * Math.min(3, Math.max(1 / 3, kgLama / kgBaru));                  // manual: lebih berat → lebih lambat
+    else if (!kgLama && kgBaru && norm(x.uom) !== 'palet') { const kl = uomDari(norm(x.uom))?.kelas ?? []; const t = kl.find(c => /std|medium/.test(c.kode))?.tipikalKg ?? kl[0]?.tipikalKg;
+      if (t) baru = lama * Math.min(3, Math.max(1 / 3, t / kgBaru)); }
+    return { uom: uomBaru, ...(baru != null && baru > 0 ? { prodPerJam: Math.round(baru * 10) / 10 } : {}), productivityId: undefined };
+  };
   const [items, setItems] = useState<Item[]>([]);
   const [tarif, setTarif] = useState<Tarif[]>([]);
   const [jabatan, setJabatan] = useState<string[]>([]);
@@ -1459,7 +1488,7 @@ export default function TenderPage() {
                     {(() => { const semua = Array.from(new Set([...jabatan, ...prods.map(q => q.role_name).filter(Boolean)])).sort(); return (semua.includes(x.roleName) ? semua : [x.roleName, ...semua]); })().map(j => <option key={j}>{j}</option>)}</select>
                     {x.roleName && jabatan.length > 0 && !jabatan.includes(x.roleName) && <div className="small" style={{ color: 'var(--warn, #b45309)' }} title="Tambahkan role ini di master Jabatan (job level) agar faktor UMK & tunjangan sesuai">belum ada di master Jabatan</div>}</td>
                   <td className="num db"><InputDesimal aria-label="Produktivitas" step="any" value={x.prodPerJam} onChange={e => ub({ prodPerJam: Number(e.target.value) })} style={{ width: 80, minWidth: 80 }} /></td>
-                  <td><select aria-label="UoM" value={x.uom} style={{ minWidth: 100 }} onChange={e => ub({ uom: e.target.value })}>{(UOM.includes(x.uom) ? UOM : [x.uom, ...UOM]).map(u => <option key={u}>{u}</option>)}</select></td>
+                  <td><select aria-label="UoM" value={x.uom} style={{ minWidth: 100 }} onChange={e => ub(prodUntukUom(x, e.target.value, a.produk, t.industri))}>{(UOM.includes(x.uom) ? UOM : [x.uom, ...UOM]).map(u => <option key={u}>{u}</option>)}</select></td>
                   <td><select aria-label="Arus" value={x.arus} style={{ minWidth: 130 }} title="Alur barang: inbound (masuk), outbound (keluar), storage (penyimpanan), VAS" onChange={e => ub({ arus: e.target.value as Arus })}>{ARUS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select></td>
                   <td className="num"><InputDesimal aria-label="Volume per bulan" step="any" placeholder={Math.round(vAuto).toLocaleString('en-US')} value={x.volumeManual ?? ''}
                     onChange={e => ub({ volumeManual: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 96, minWidth: 96 }} />
