@@ -6,6 +6,7 @@ import type { VolumeInput } from '../src/lib/engine/types';
 import { hitungTender } from '../src/lib/engine/index.ts';
 import { kebutuhanSecurityCleaning } from '../src/lib/biayaLainDefault.ts';
 import { contohTender, contohMaster } from './fixtures/contoh.ts';
+import { hitungProduk, adaProdukNyata, turunanProduk, terapkanProduk, ATURAN_BERAT_DEFAULT } from '../src/lib/produk.ts';
 
 test('jalur: data lama ditebak dari moda', () => {
   assert.equal(jalurBaris({ moda: 'cont40', persen: 0.5 }, 'inbound'), 'import');
@@ -62,4 +63,36 @@ test('security & cleaning untuk VSM: pos jaga × 3, danru ≥ 8 satpam, cleaner 
   assert.deepEqual(kebutuhanSecurityCleaning({ luasM2: 1700, officeM2: 32, userKantor: 1, kategori: 'Automotive & Spare Parts' }), { pos: 1, satpam: 3, danru: 0, cleaner: 2 });
   const besar = kebutuhanSecurityCleaning({ luasM2: 15000, officeM2: 100, userKantor: 3, kategori: 'Healthcare & Pharma' });
   assert.equal(besar.pos, 3); assert.equal(besar.satpam, 9); assert.equal(besar.danru, 1); assert.equal(besar.cleaner, 4 + 1);
+});
+
+// Produk berat di lantai (kasus gula rafinasi 50 kg/sak, 30 sak/palet, tanpa racking)
+const gula = { id: 'g', kode: 'GULA', nama: 'Gula rafinasi', uom: 'bag', p: 0.33, l: 0.33, t: 0.275, satuanDim: 'm' as const, beratKg: 50, upp: 30, qty: 0, perLayer: 6, layer: 5, simpan: 'floor' as const, otomatis: false };
+
+test('produk pallet floor: kapasitas beam tidak berlaku', () => {
+  const h = hitungProduk(gula, ATURAN_BERAT_DEFAULT);
+  assert.equal(h.beratPaletKg, 1525);
+  assert.equal(h.caraSimpan, 'floor');
+  assert.equal(h.hanyaLantai, false);
+  assert.equal(h.levelMaks, 1);
+  assert.ok(!h.peringatan.some(w => /beam/.test(w)), h.peringatan.join(' | '));
+  // produk yang sama dengan cara simpan otomatis tetap dicek beam (dipaksa ke lantai)
+  const oto = hitungProduk({ ...gula, simpan: 'otomatis' }, ATURAN_BERAT_DEFAULT);
+  assert.equal(oto.hanyaLantai, true);
+  assert.equal(oto.caraSimpan, 'floor');
+});
+
+test('produk tanpa qty tetap jadi sumber data per palet; stok storage dari Volume', () => {
+  assert.equal(adaProdukNyata([gula]), true);
+  const d = turunanProduk([gula]);
+  assert.ok(d && !d.adaQty);
+  assert.equal(Math.round(d!.kgPerPalet), 1525);
+  assert.equal(d!.porsiLantai, 1);
+  const a = { volumes: [{ arus: 'storage', uom: 'palet', peakBulan: 400, rataRataBulan: 400, komitmenBulan: 400 }] as never[], space: { excel: { porsi: { spr: 0, ddr: 0, block: 0, floor: 0 } } } };
+  const { patch } = terapkanProduk(a, [gula]);
+  const p = patch as { profilVolume?: { param: { tonPerPalet: number; kgPerCase: number } }; volumes?: { peakBulan: number }[]; space?: { excel: { porsi: { floor: number; spr: number } } } };
+  assert.equal(p.profilVolume?.param.tonPerPalet, 1.525);
+  assert.equal(p.profilVolume?.param.kgPerCase, 50);
+  assert.equal(p.volumes?.[0].peakBulan, 400);          // stok tidak ditimpa
+  assert.equal(p.space?.excel.porsi.floor, 1);           // 100% pallet floor
+  assert.equal(p.space?.excel.porsi.spr, 0);
 });

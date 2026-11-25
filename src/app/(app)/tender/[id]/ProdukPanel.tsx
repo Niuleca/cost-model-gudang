@@ -57,7 +57,8 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
   // ubah satu baris: baris otomatis yang diedit angkanya berhenti mengikuti key assumption
   const ubah = (i: number, patch: Partial<ProdukTender>, lepasOtomatis = true) => {
     const base = daftar.map(x => ({ ...x }));
-    base[i] = { ...base[i], ...patch, ...(lepasOtomatis && base[i].otomatis ? { otomatis: false, dimEstimasi: patch.p || patch.l || patch.t ? false : base[i].dimEstimasi } : {}) };
+    // catatan baris otomatis (selisih Parameter muatan) tidak berlaku lagi setelah baris diedit
+    base[i] = { ...base[i], ...patch, ...(lepasOtomatis && base[i].otomatis ? { otomatis: false, catatan: undefined, dimEstimasi: patch.p || patch.l || patch.t ? false : base[i].dimEstimasi } : {}) };
     if (patch.p || patch.l || patch.t) base[i].dimEstimasi = false;
     onChange(base);
   };
@@ -98,7 +99,8 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
 
       {wajibSinkron ? <div className="umk-box" style={{ alignItems: 'center' }}>
         <span className="small"><b>Produk / SKU = sumber data.</b> Berat, CBM & tinggi per palet, isi per palet, stok storage dan level rak dihitung dari data produk di bawah —
-          tidak ada isian berat / CBM palet terpisah. {!nyata && 'Isi atau tempel produk Anda; selama belum ada, dipakai baris otomatis dari volume.'}</span>
+          tidak ada isian berat / CBM palet terpisah. {!nyata && 'Isi atau tempel produk Anda; selama belum ada, dipakai baris otomatis dari volume.'}
+          {nyata && !(tot.qty > 0) && <> <b>Qty stok kosong</b> — berat, CBM, UPP & tinggi per palet tetap dari produk; jumlah stok diambil dari Volume (storage).</>}</span>
       </div> : <div className="umk-box" style={{ alignItems: 'center' }}>
         <label className="row" style={{ gap: 8, alignItems: 'center', margin: 0 }}>
           <input type="checkbox" checked={sinkron} onChange={e => onSinkron(e.target.checked)} style={{ width: 18, height: 18 }} />
@@ -175,12 +177,13 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
             {/^pal+et/i.test(x.uom) ? <label title="UOM palet: 1 UOM = 1 palet">{lab('UPP (unit/palet)')}<input readOnly value="1 (UOM palet)" aria-label={`UPP ${i + 1}`} style={{ ...kecil, background: 'transparent', border: '1px dashed var(--g200, #e2e8f0)' }} /></label>
               : <label title="Unit per palet">{lab('UPP (unit/palet)')}<Angka aria-label={`UPP ${i + 1}`} bulat value={x.upp} onValue={v => ubah(i, { upp: v, layer: null })} style={kecil} /></label>}
             <label>{lab(`Qty stok (${x.uom || 'unit'})`)}<Angka aria-label={`Qty ${i + 1}`} bulat value={x.qty} onValue={v => ubah(i, { qty: v })} style={kecil} /></label>
-            <div>{lab('Palet · berat/palet')}<b>{angka(h.palet)}</b> plt · <b style={{ color: h.hanyaLantai ? 'var(--bad, #c0392b)' : h.levelMaks < levelRak ? 'var(--warn, #b45309)' : undefined }}>{angka(h.beratPaletKg)} kg</b></div>
+            <div>{lab('Palet · berat/palet')}<b>{angka(h.palet)}</b> plt · <b style={{ color: h.hanyaLantai ? 'var(--bad, #c0392b)' : h.levelMaks < levelRak && (h.caraSimpan === 'spr' || h.caraSimpan === 'ddr') ? 'var(--warn, #b45309)' : undefined }}>{angka(h.beratPaletKg)} kg</b></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, alignItems: 'end', marginTop: 8 }}>
-            <label title="Level rak tertinggi yang boleh dipakai">{lab(`Level maks · ${h.sumberLevel}`)}<select aria-label={`Level maks ${i + 1}`} value={x.levelMaks ?? 0} onChange={e => ubah(i, { levelMaks: Number(e.target.value) || null }, false)} style={kecil}>
+            {x.simpan === 'floor' || x.simpan === 'block' ? <label title="Disimpan di lantai — kapasitas beam & level rak tidak berlaku">{lab('Level maks')}<input readOnly aria-label={`Level maks ${i + 1}`} value="Lantai (tanpa rak)" style={{ ...kecil, background: 'transparent', border: '1px dashed var(--g200, #e2e8f0)' }} /></label>
+            : <label title="Level rak tertinggi yang boleh dipakai">{lab(`Level maks · ${h.sumberLevel}`)}<select aria-label={`Level maks ${i + 1}`} value={x.levelMaks ?? 0} onChange={e => ubah(i, { levelMaks: Number(e.target.value) || null }, false)} style={kecil}>
               <option value={0}>Auto: {h.levelMaks >= levelRak ? `semua (L1–L${levelRak})` : `L1–L${h.levelMaks}`}</option>
-              {Array.from({ length: levelRak }, (_, k) => k + 1).map(l => <option key={l} value={l}>Manual: L1–L{l}</option>)}</select></label>
+              {Array.from({ length: levelRak }, (_, k) => k + 1).map(l => <option key={l} value={l}>Manual: L1–L{l}</option>)}</select></label>}
             <label>{lab('Cara simpan')}<select aria-label={`Cara simpan ${i + 1}`} value={x.simpan ?? 'otomatis'} onChange={e => ubah(i, { simpan: e.target.value as ProdukTender['simpan'] }, false)} style={kecil}>
               {SIMPAN.map(s => <option key={s.v} value={s.v}>{s.v === 'otomatis' ? `Otomatis → ${LABEL_SIMPAN[h.caraSimpan].split(' (')[0]}` : s.l}</option>)}</select></label>
             {!/^pal+et/i.test(x.uom) && <div title="Konfigurasi palet: isi per layer × jumlah layer. Kosong = otomatis dari dimensi produk & palet. Mengisi jumlah layer mengubah UPP = isi/layer × layer.">{lab('Isi/layer × layer')}

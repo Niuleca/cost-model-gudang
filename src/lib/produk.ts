@@ -172,14 +172,18 @@ export function hitungProduk(x: ProdukTender, aturan: AturanBerat = ATURAN_BERAT
   if (dimOk && !palUom && perLayerAuto === 0 && !perLayerManual) peringatan.push(`Unit ${pj2(d.p, d.l, 'cm')} lebih besar dari palet ${pj2(PALET_CM.p, PALET_CM.l, 'cm')} — cek dimensi / satuan, atau pakai UOM palet / simpan di lantai.`);
   if (dimOk && palUom && (Math.max(d.p, d.l) > Math.max(PALET_CM.p, PALET_CM.l) + 10 || Math.min(d.p, d.l) > Math.min(PALET_CM.p, PALET_CM.l) + 15)) peringatan.push(`Palet ${pj2(d.p, d.l, 'cm')} lebih besar dari palet ${pj2(PALET_CM.p, PALET_CM.l, 'cm')} — cek dimensi / satuan.`);
 
+  // Cara simpan dipilih lantai (pallet floor / block stack) atau shelving → tidak memakai rak palet:
+  // kapasitas beam & aturan berat → level rak tidak berlaku (palet berat boleh di lantai tanpa peringatan beam).
+  const tanpaRak = x.simpan === 'floor' || x.simpan === 'block' || x.simpan === 'shelving';
   let levelMaks = 99, sumberLevel = 'semua level';
-  if (x.levelMaks && x.levelMaks > 0) { levelMaks = x.levelMaks; sumberLevel = 'manual'; }
+  if (tanpaRak) { levelMaks = x.simpan === 'shelving' ? (x.levelMaks && x.levelMaks > 0 ? x.levelMaks : 99) : 1; sumberLevel = x.simpan === 'shelving' ? 'shelving (tanpa rak palet)' : 'di lantai (tanpa rak)'; }
+  else if (x.levelMaks && x.levelMaks > 0) { levelMaks = x.levelMaks; sumberLevel = 'manual'; }
   else if (beratPaletKg > 0) {
     const b = [...aturan.batas].sort((a, c) => a.kgMaks - c.kgMaks).find(r => beratPaletKg <= r.kgMaks);
     levelMaks = b ? b.levelMaks : 1;
     sumberLevel = b ? (b.levelMaks >= 99 ? `≤ ${b.kgMaks} kg/palet` : `≤ ${b.kgMaks} kg/palet → maks level ${b.levelMaks}`) : `> ${Math.max(0, ...aturan.batas.map(r => r.kgMaks))} kg/palet → level 1 / lantai`;
   }
-  const hanyaLantai = beratPaletKg > aturan.kapPosisiKg;
+  const hanyaLantai = !tanpaRak && beratPaletKg > aturan.kapPosisiKg;
   if (hanyaLantai) { levelMaks = 1; peringatan.push(`Berat ${Math.round(beratPaletKg)} kg/palet melebihi kapasitas beam ${aturan.kapPosisiKg} kg/posisi — simpan di lantai (block / floor).`); }
   levelMaks = Math.min(levelMaks, levelRak);
 
@@ -289,15 +293,23 @@ export function dariTempel(teks: string): ProdukTender[] {
 
 
 /** Produk manual (bukan baris otomatis) sudah ada → produk menjadi sumber data tender. */
-export const adaProdukNyata = (daftar: ProdukTender[] | undefined) => (daftar ?? []).some(x => !x.otomatis && uppEfektif(x) > 0 && Number(x.qty) > 0);
+/** Produk terpakai sebagai sumber data: UPP terisi dan qty stok ATAU berat per UOM terisi (qty boleh kosong — stok lalu diambil dari Volume). */
+const produkTerpakai = (x: ProdukTender) => uppEfektif(x) > 0 && (Number(x.qty) > 0 || Number(x.beratKg) > 0);
+export const adaProdukNyata = (daftar: ProdukTender[] | undefined) => (daftar ?? []).some(x => !x.otomatis && produkTerpakai(x));
 
 export interface TurunanProduk {
   palet: number; qty: number; kgPerUnit: number; cbmPerUnit: number; upp: number; isiPcs: number | null;
   kgPerPalet: number; cbmPerPalet: number; tinggiMaksMm: number; porsiLantai: number;
+  /** false = qty stok produk kosong: angka per palet dari produk (tiap SKU setara 1 palet), stok storage tidak diubah */
+  adaQty: boolean;
 }
 /** Rata-rata tertimbang dari daftar produk: berat & CBM per unit (tertimbang qty), per palet (tertimbang palet), UPP = qty ÷ palet. */
 export function turunanProduk(daftar: ProdukTender[], aturan: AturanBerat = ATURAN_BERAT_DEFAULT, levelRak = 99, dimPalet: PaletDim | PaletProduk = PALET_DEFAULT): TurunanProduk | null {
-  const xs = daftar.filter(x => uppEfektif(x) > 0 && Number(x.qty) > 0).map(x => ({ x, h: hitungProduk(x, aturan, levelRak, undefined, dimPalet) }));
+  const valid = daftar.filter(produkTerpakai);
+  const adaQty = valid.some(x => Number(x.qty) > 0);
+  // qty kosong semua → tiap produk dihitung setara 1 palet (qty = UPP) supaya berat / CBM / UPP per palet tetap dari produk
+  const pakai = adaQty ? valid.filter(x => Number(x.qty) > 0) : valid.map(x => ({ ...x, qty: uppEfektif(x) }));
+  const xs = pakai.map(x => ({ x, h: hitungProduk(x, aturan, levelRak, undefined, dimPalet) }));
   if (!xs.length) return null;
   const qty = xs.reduce((a, r) => a + Number(r.x.qty), 0), palet = xs.reduce((a, r) => a + r.h.palet, 0);
   if (!(qty > 0) || !(palet > 0)) return null;
@@ -310,7 +322,7 @@ export function turunanProduk(daftar: ProdukTender[], aturan: AturanBerat = ATUR
   const rak = xs.filter(r => r.h.caraSimpan === 'spr' || r.h.caraSimpan === 'ddr');
   const tinggiMaksMm = rak.reduce((a, r) => Math.max(a, r.h.tinggiMuatanMm), 0);
   const porsiLantai = xs.reduce((a, r) => a + (r.h.hanyaLantai || r.h.caraSimpan === 'floor' || r.h.caraSimpan === 'block' ? r.h.palet : 0), 0) / palet;
-  return { palet, qty, kgPerUnit, cbmPerUnit, upp: qty / palet, isiPcs, kgPerPalet, cbmPerPalet, tinggiMaksMm, porsiLantai };
+  return { palet, qty, kgPerUnit, cbmPerUnit, upp: qty / palet, isiPcs, kgPerPalet, cbmPerPalet, tinggiMaksMm, porsiLantai, adaQty };
 }
 
 /** Space (Warehouse Planning): tinggi produk di rak (bukaan) & porsi pallet floor untuk palet yang melebihi beam. */
@@ -384,7 +396,7 @@ export function terapkanProduk<A extends { volumes: VolumeInput[]; profilVolume?
     const baru = isCase(v.uom) ? k1.paletIsi : k1.per1;
     if ((isCase(v.uom) || isPalet(v.uom)) && Number(lama || 0) !== Number(baru || 0)) per.push({ bagian: 'Volume', item: `Isi per palet (${v.arus})`, dari: `${f(Number(lama || 0), 0)} ${isCase(v.uom) ? v.uom : k.uom1 || 'case'}`, ke: `${f(Number(baru || 0), 0)}` });
     let v1: VolumeInput = { ...v, konversi: k1 };
-    if (v.arus === 'storage' && isPalet(v.uom)) {
+    if (v.arus === 'storage' && isPalet(v.uom) && d.adaQty) {
       const pal = Math.round(d.palet);
       if (Number(v.peakBulan) !== pal) {
         per.push({ bagian: 'Volume', item: 'Stok storage (peak)', dari: `${f(Number(v.peakBulan), 0)} palet`, ke: `${f(pal, 0)} palet` });

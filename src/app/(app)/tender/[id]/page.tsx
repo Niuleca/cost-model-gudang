@@ -463,6 +463,18 @@ export default function TenderPage() {
       setT(y => y && ({ ...y, asumsi: { ...y.asumsi, space: { ...y.asumsi.space, excel: { ...lengkapiSpaceExcel(y.asumsi.space.excel), porsi: { spr: 0, ddr: 0, block: 0, floor: 0 } } } } })); setKotor(true);
     }
   }, [simple, t?.id, bisaEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Simple CM: produk = sumber data — saat dibuka, Parameter muatan / Volume / Space disamakan dengan produk bila belum
+  // (mis. produk tanpa qty stok yang dulu belum terbaca). Menunggu reset porsi bawaan di atas selesai dulu.
+  const sinkronProdukAwal = useRef<string | null>(null);
+  const porsiSiap = !(() => { const x = t?.asumsi.space?.excel; return !x?.porsiDiisi && porsiBawaan(x) && !!(x?.porsi?.spr || x?.porsi?.ddr || !x?.porsi); })();
+  useEffect(() => {
+    if (!simple || !t || !bisaEdit || !porsiSiap || sinkronProdukAwal.current === t.id) return;
+    sinkronProdukAwal.current = t.id;
+    if (!adaProdukNyata(t.asumsi.produk)) return;
+    const levelRak = Math.max(1, hitungLevelRak(lengkapiSpaceExcel(t.asumsi.space.excel).rak).level || 1);
+    const tetap = (t.asumsi.produk ?? []).map(x => (x.otomatis ? { ...x, otomatis: false } : x));
+    if (terapkanProduk(t.asumsi, tetap, t.asumsi.aturanBerat ?? ATURAN_BERAT_DEFAULT, levelRak).perubahan.length) ubahProduk(t.asumsi.produk, t.asumsi.aturanBerat, true);
+  }, [simple, t?.id, bisaEdit, porsiSiap]); // eslint-disable-line react-hooks/exhaustive-deps
   // Simple CM: security & cleaning masuk VSM sebagai peran tetap (bukan jasa di Lainnya) — jumlah orang dari aturan pos jaga & luas
   const luasScVsm = spaceH?.luasDipakai || spaceH?.spaceRent || 0;
   useEffect(() => {
