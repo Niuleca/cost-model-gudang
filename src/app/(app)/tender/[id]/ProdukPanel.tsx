@@ -17,6 +17,7 @@ import {
   ATURAN_BERAT_DEFAULT, KATEGORI_PRODUK, KELAS_RAK, beratPaletKandidatRak, kelasRakDari, saranKelasRak, SIMPAN, adaProdukNyata, dariTempel, hitungProduk, dimCm, paletDariSpace, paletUntuk, uppEfektif, type OpsiUpp, type SaranUpp, produkEfektif, produkOtomatis, ringkasZona, zonasiOtomatis,
   type AturanBerat, type PerubahanTender, type ProdukTender,
 } from '@/lib/produk';
+import { normalDesimal, bacaAngka } from '@/lib/bacaAngka';
 
 const LABEL_SIMPAN: Record<string, string> = Object.fromEntries(SIMPAN.map(s => [s.v, s.l]));
 const WARNA_ZONA = ['#2563eb', '#16a34a', '#d97706', '#9333ea', '#dc2626', '#0891b2', '#65a30d', '#db2777', '#4b5563'];
@@ -25,10 +26,10 @@ const WARNA_ZONA = ['#2563eb', '#16a34a', '#d97706', '#9333ea', '#dc2626', '#089
 function Angka({ value, onValue, bulat, ...rest }: { value: number | null | undefined; onValue: (v: number) => void; bulat?: boolean; 'aria-label': string; style?: CSSProperties; placeholder?: string; title?: string }) {
   const tampil = (v: number | null | undefined) => (v == null || !Number(v) ? '' : String(v));
   const [teks, setTeks] = useState(tampil(value));
-  useEffect(() => { const n = Number(teks.replace(',', '.')); if ((Number(value) || 0) !== (Number.isFinite(n) ? n : 0)) setTeks(tampil(value)); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const n = bacaAngka(teks) ?? 0; if ((Number(value) || 0) !== (Number.isFinite(n) ? n : 0)) setTeks(tampil(value)); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   return <input {...rest} inputMode="decimal" value={teks} onChange={e => {
     const x = e.target.value.replace(/[^\d.,]/g, ''); setTeks(x);
-    const n = Number(x.replace(/\./g, x.includes(',') ? '' : '.').replace(',', '.')); if (x === '' || Number.isFinite(n)) onValue(x === '' ? 0 : bulat ? Math.round(n) : n);
+    const n = bacaAngka(x) ?? NaN; if (x === '' || Number.isFinite(n)) onValue(x === '' ? 0 : bulat ? Math.round(n) : n);
   }} />;
 }
 
@@ -137,7 +138,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
       {pesan && <p className="small" role="status">{pesan}</p>}
       {tempel != null && <div className="card" style={{ background: 'var(--g50, #f8fafc)' }}>
         <label className="f" htmlFor="tempel-produk">Tempel baris dari Excel — urutan kolom: <b>Kode · Nama · UOM · P · L · T (cm) · Berat/UOM (kg) · UPP · Qty</b> · Kategori · Zona (opsional). Baris judul boleh ikut.
-          <textarea id="tempel-produk" rows={6} value={tempel} onChange={e => setTempel(e.target.value)} placeholder={'SKU-001\tMie goreng 40x85g\tkarton\t40\t30\t25\t3,6\t60\t1200'} /></label>
+          <textarea id="tempel-produk" rows={6} value={tempel} onChange={e => setTempel(e.target.value)} placeholder={'SKU-001\tMie goreng 40x85g\tkarton\t40\t30\t25\t3.6\t60\t1200'} /></label>
         {(() => { const hasil = dariTempel(tempel); return <div className="row">
           <span className="small muted">{hasil.length ? `${hasil.length} produk terbaca` : 'Belum ada baris yang terbaca'}</span>
           <button disabled={!hasil.length} onClick={() => { onChange([...daftar.filter(x => !(x.otomatis && hasil.length)), ...hasil]); setTempel(null); kabar(`${hasil.length} produk ditambahkan${daftar.some(x => x.otomatis) ? ' (baris otomatis diganti data SKU)' : ''}.`); }}>Tambahkan</button>
@@ -172,7 +173,7 @@ export default function ProdukPanel({ produk, aturan, volumes, profil, spaceExce
                 {(['p', 'l', 't'] as const).map(k => <InputPanjang key={k} aria-label={`${k.toUpperCase()} ${i + 1}`} placeholder={k.toUpperCase()} nilai={dc[k] || null} basis="cm" kosong onNilai={v => setDim(k, v)}
                   style={{ ...kecil, ...(x.dimEstimasi ? { fontStyle: 'italic', color: 'var(--muted, #64748b)' } : {}) }} />)}</div></div>; })()}
             <label>{lab('CBM / UOM')}{x.p > 0 && x.l > 0 && x.t > 0 ? <input readOnly value={h.cbmUnit.toFixed(4)} style={{ ...kecil, background: 'transparent', border: '1px dashed var(--g200, #e2e8f0)' }} aria-label={`CBM ${i + 1}`} />
-              : <Angka aria-label={`CBM ${i + 1}`} placeholder="0,04" value={x.cbm ?? 0} onValue={v => ubah(i, { cbm: v })} style={kecil} />}</label>
+              : <Angka aria-label={`CBM ${i + 1}`} placeholder="0.04" value={x.cbm ?? 0} onValue={v => ubah(i, { cbm: v })} style={kecil} />}</label>
             <label title={/^pal+et/i.test(x.uom) ? 'UOM palet: berat kotor 1 palet (barang + palet kayu)' : undefined}>{lab(/^pal+et/i.test(x.uom) ? 'Berat / palet kotor (kg)' : 'Berat / UOM (kg)')}<Angka aria-label={`Berat ${i + 1}`} value={x.beratKg} onValue={v => ubah(i, { beratKg: v })} style={kecil} /></label>
             {/^pal+et/i.test(x.uom) ? <label title="UOM palet: 1 UOM = 1 palet">{lab('UPP (unit/palet)')}<input readOnly value="1 (UOM palet)" aria-label={`UPP ${i + 1}`} style={{ ...kecil, background: 'transparent', border: '1px dashed var(--g200, #e2e8f0)' }} /></label>
               : <label title="Unit per palet">{lab('UPP (unit/palet)')}<Angka aria-label={`UPP ${i + 1}`} bulat value={x.upp} onValue={v => ubah(i, { upp: v, layer: null })} style={kecil} /></label>}

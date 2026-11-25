@@ -21,7 +21,7 @@ export default function AnalisisProyekDaftar() {
       .then(({ data, error }: { data: Baris[] | null; error: { message: string } | null }) => { if (error) setErr(error.message); else setRows(data ?? []); });
   }, []);
   const tampil = useMemo(() => rows.filter(r => (semua || MENANG.includes(r.status) || (r.analisis?.aktual?.length ?? 0) > 0) && (!jenis || r.jenis_tender === jenis)), [rows, semua, jenis]);
-  const gp = (x?: number | null) => (x == null ? '—' : `${(x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`);
+  const gp = (x?: number | null) => (x == null ? '—' : `${(x * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`);
   const gpAktual = (a: AnalisisProyek | null) => {
     const r = [...(a?.aktual ?? [])].sort((x, y) => x.periode.localeCompare(y.periode)).at(-1);
     return r && r.pendapatanBulan ? (Number(r.pendapatanBulan) - Number(r.biayaBulan ?? 0)) / Number(r.pendapatanBulan) : null;

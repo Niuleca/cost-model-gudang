@@ -75,7 +75,7 @@ export function ringkasStudi(siklus: SiklusStudi[]): RingkasStudi[] {
 
 export function csvStudi(siklus: SiklusStudi[]) {
   const kepala = ['No', 'Mode', 'Pekerjaan', 'Keterangan', 'Qty', 'Satuan', 'Jalan kosong (dtk)', 'Jalan kosong (m)', 'Jalan bermuatan (dtk)', 'Jalan bermuatan (m)', 'Aksi (dtk)', 'Rincian aksi', 'Diam (dtk)', 'Tinggi (m)', 'Total siklus (dtk)'];
-  const f = (v: number) => v.toFixed(1).replace('.', ',');
+  const f = (v: number) => v.toFixed(1);
   const baris = siklus.map(s => [s.no, MODE_PEMAIN[s.mode].label, s.jenis, s.ket, s.qty, s.satuan, f(s.jalan.s), f(s.jalan.m), f(s.bawa.s), f(s.bawa.m),
     f(Object.values(s.aksi).reduce((a, b) => a + b, 0)), Object.entries(s.aksi).map(([k, v]) => `${LABEL_AKSI[k] ?? k} ${f(v)}`).join(' | '), f(s.diam), f(s.tinggi), f(s.total)]);
   return [kepala, ...baris].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');

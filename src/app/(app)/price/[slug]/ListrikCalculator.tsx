@@ -58,7 +58,7 @@ export default function ListrikCalculator({ contoh }: { contoh?: DataListrik } =
   }
 
   const inp = (v: number, on: (x: number) => void, w = 80, step = 'any') =>
-    boleh ? <InputDesimal step={step} value={Number.isFinite(v) ? v : 0} onChange={e => on(n(e.target.value))} style={{ width: w, minWidth: w, background: 'var(--input)' }} /> : (v ? v.toLocaleString('id-ID', { maximumFractionDigits: 2 }) : '–');
+    boleh ? <InputDesimal step={step} value={Number.isFinite(v) ? v : 0} onChange={e => on(n(e.target.value))} style={{ width: w, minWidth: w, background: 'var(--input)' }} /> : (v ? v.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '–');
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -137,7 +137,7 @@ export default function ListrikCalculator({ contoh }: { contoh?: DataListrik } =
             <tr><td>Listrik terpasang (kVA)</td><td className="num">{inp(d.kvaTerpasang, v => set({ kvaTerpasang: v }), 80)}</td></tr>
             <tr><td>Power factor</td><td className="num">{inp(d.powerFactor, v => set({ powerFactor: v }), 70)}</td></tr>
           </tbody></table>
-          <p className="small muted">Industri &gt; 200 kVA (I-3/TM) dan raksasa ≥ 30.000 kVA (I-4/TT) memakai tarif yang sama untuk blok WBP dan LWBP. Tabel tarif resmi ada di tab Tarif PLN.</p>
+          <p className="small muted">Industri &gt; 200 kVA (I-3/TM) dan raksasa ≥ 30,000 kVA (I-4/TT) memakai tarif yang sama untuk blok WBP dan LWBP. Tabel tarif resmi ada di tab Tarif PLN.</p>
         </div>
 
         <div className="card">

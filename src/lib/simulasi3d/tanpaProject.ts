@@ -29,8 +29,8 @@ const TEMPLATE: TenderInput = {
   space: { metodeSimpan: 'spr', palletPanjangM: 1.2, palletLebarM: 1.0, levelSimpan: 5, faktorAisle: 0.6,
     stagingM2PerPalet: 1.8, sequencePerShift: 2, fasilitasM2: 40, allowancePersen: 0.1, tarifSewaM2Bulan: 55000, luasCadM2: 1500 },
   mhe: [
-    { tool: 'CBT', nama: 'Forklift Counterbalance 2,5T', mode: 'sewa', harga: 19000000, ketersediaan: 0.85, sparePersen: 0 },
-    { tool: 'RT', nama: 'Reach Truck 1,6T', mode: 'sewa', harga: 28000000, ketersediaan: 0.85, sparePersen: 0 },
+    { tool: 'CBT', nama: 'Forklift Counterbalance 2.5T', mode: 'sewa', harga: 19000000, ketersediaan: 0.85, sparePersen: 0 },
+    { tool: 'RT', nama: 'Reach Truck 1.6T', mode: 'sewa', harga: 28000000, ketersediaan: 0.85, sparePersen: 0 },
   ],
   costLines: [], listrik: [], tarifListrikKwh: 1114.74, advanceSewaBulan: 12, depositBulan: 1, stokTon: 0,
 };

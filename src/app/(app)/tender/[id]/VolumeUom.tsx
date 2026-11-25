@@ -80,7 +80,7 @@ export function SelKonversi({ v, onKonversi }: { v: VolumeInput; onKonversi: (k:
 }
 
 const ARUS_LABEL: Record<string, string> = { inbound: 'Inbound', outbound: 'Outbound', storage: 'Storage (stok)', vas: 'VAS' };
-const f = (x: number | null | undefined, d = 0) => (x == null ? '—' : x.toLocaleString('id-ID', { maximumFractionDigits: x !== 0 && Math.abs(x) < 10 ? Math.max(d, 1) : d }));
+const f = (x: number | null | undefined, d = 0) => (x == null ? '—' : x.toLocaleString('en-US', { maximumFractionDigits: x !== 0 && Math.abs(x) < 10 ? Math.max(d, 1) : d }));
 
 /** Ringkasan volume semua satuan — satu sumber konversi dengan mesin hitung (sizing gudang, tarif, profil order). */
 export function RingkasanVolumeSemuaUom({ volumes, muatan, basis, hariOps }: {
@@ -151,7 +151,7 @@ export function RingkasanOrder({ volumes, basis, hariOps, utama, onUtama, labelA
     const u = uraiUom(v, q, { ...MUATAN_DEFAULT, ...(muatan ?? {}) });
     return { palet: u.palet, case: u.case, pcs: u.pcs, cbm: u.cbm, ton: u.kg != null ? u.kg / 1000 : null };
   };
-  const fx = (x: number | null) => (x == null ? '—' : x.toLocaleString('id-ID', { maximumFractionDigits: Math.abs(x) < 100 && x % 1 ? (Math.abs(x) < 10 ? 2 : 1) : 0 }));
+  const fx = (x: number | null) => (x == null ? '—' : x.toLocaleString('en-US', { maximumFractionDigits: Math.abs(x) < 100 && x % 1 ? (Math.abs(x) < 10 ? 2 : 1) : 0 }));
   const sel = (v: VolumeInput, q: number) => {
     const n = nilai(v, q), kl = kelasUom(v.uom);
     const lain = (Object.keys(SAT_LABEL) as (keyof typeof SAT_LABEL)[]).filter(k => k !== utama);

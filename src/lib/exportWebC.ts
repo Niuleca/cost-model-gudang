@@ -165,7 +165,7 @@ export function tulisGudang(x: Ctx) {
   GD.field('Lebar tapak (manual)', Number(kk.lebarCm) > 0 ? kk.lebarCm! : null, 'n0', 'in', 'cm', 'kosong = frame + celah belakang', 'KkLebarMan');
   GD.field('Lebar tapak', { f: 'IF(N(KkLebarMan)>0,KkLebarMan,KkFrame+KkBelakang)' }, 'n0', 'out', 'cm', '', 'KkLebar');
   GD.field('Foot print per pallet', { f: 'KkPanjang*KkLebar/10000', v: kkH?.tapakM2 }, 'n2', 'out', 'm²', 'termasuk celah ke palet sebelah & rak belakang', 'KkTapak');
-  GD.field('Daya dukung lantai (floor capacity)', Number(kk.kapLantaiKgM2) > 0 ? kk.kapLantaiKgM2! : daya > 0 ? daya * 1000 : KAP_LANTAI_DEFAULT_KG_M2, 'n0', 'in', 'kg/m²', daya > 0 ? `gudang terpilih ${daya} ton/m²` : 'default 3.000 kg/m²', 'KkKapLantai');
+  GD.field('Daya dukung lantai (floor capacity)', Number(kk.kapLantaiKgM2) > 0 ? kk.kapLantaiKgM2! : daya > 0 ? daya * 1000 : KAP_LANTAI_DEFAULT_KG_M2, 'n0', 'in', 'kg/m²', daya > 0 ? `gudang terpilih ${daya} ton/m²` : 'default 3,000 kg/m²', 'KkKapLantai');
   GD.field('Beban per m² (workload)', { f: 'IF(KkTapak>0,KkTotal/KkTapak,0)', v: kkH?.bebanM2 }, 'n0', 'out', 'kg/m²', '', 'KkBebanM2');
   GD.field('Floor capacity usage', { f: 'IF(KkKapLantai>0,KkBebanM2/KkKapLantai,0)', v: kkH?.pakaiLantai }, 'pct', 'out', '', '', 'KkPakai');
   const st = (beban: string, kap: string) => `IF(N(${kap})<=0,"Belum diisi",IF(${beban}>${kap}+1E-9,"Melebihi",IF(${beban}>0.9*${kap},"Mendekati batas","OK")))`;
@@ -357,7 +357,7 @@ export function tulisBiayaLain(x: Ctx) {
       BL.field('Implementation cost — amortisasi / bln', { f: 'IF(StartupAktif="Ya",ROUND(NilaiImpl/Kontrak,0),0)' }, 'rp', 'out', 'Rp/bln', '', 'ImplBln');
       BL.r++;
     }
-    if (s.id === 'consumable') BL.note(`Galon minum bulanan (web): headcount × 1,5 L × ${x.pdIn.hariKerjaBulan ?? 25} hari ÷ 19 L — tambahkan sebagai baris "Air minum galon" bila perlu.`);
+    if (s.id === 'consumable') BL.note(`Galon minum bulanan (web): headcount × 1.5 L × ${x.pdIn.hariKerjaBulan ?? 25} hari ÷ 19 L — tambahkan sebagai baris "Air minum galon" bila perlu.`);
     BL.hdr([['Item', true], ['Deskripsi', true], ['Mode', true], ['Qty', true], ['Harga satuan', true], ['Umur ekonomis (bln)', true, 'Mode beli: disusutkan selama MIN(umur ekonomis, kontrak) — lihat kolom Depresiasi'], 'Nilai', 'Biaya/bln', ['Risiko', true], ['Alokasi', true], 'Harga DB', 'Seksi', 'Kelompok', 'Risiko ef.', 'Sto', 'HIn', 'HOut', 'VAS', 'Man', ['Depresiasi (bln)', false, 'Beli: MIN(umur ekonomis, kontrak) · Sekali: kontrak — sama dengan kolom Depresiasi di web']]);
     const sr: number[] = []; seksiRows[s.id] = sr;
     for (const z of [...rows, null, null]) {

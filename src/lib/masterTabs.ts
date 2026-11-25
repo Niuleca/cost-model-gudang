@@ -72,7 +72,7 @@ export const TABS: Tab[] = [
   { id: 'mhe', kelompok: 'mhe_tipe', label: 'MHE / forklift', pemilik: 'Procurement', table: 'price_items', view: 'price_items_status', editorRoles: ['procurement', 'it', 'hr', 'engineering', 'solution_design', 'commercial'],
     approval: true, filter: { kategori: 'MHE' }, defaults: { kategori: 'MHE', owner_role: 'procurement', satuan: 'unit' },
     orderBy: [{ col: 'mhe_tipe' }, { col: 'kapasitas_ton' }], cari: ['item', 'mhe_tipe', 'vendor', 'sumber_tenaga'],
-    catatan: 'Isi tipe & tonase supaya Solution Design bisa memilih unit yang sesuai beban (2,5 / 3 / 5 / 10 ton). Sewa/bln untuk skema sewa, harga beli + umur untuk skema beli.',
+    catatan: 'Isi tipe & tonase supaya Solution Design bisa memilih unit yang sesuai beban (2.5 / 3 / 5 / 10 ton). Sewa/bln untuk skema sewa, harga beli + umur untuk skema beli.',
     kolom: [
       { key: 'mhe_tipe', label: 'Tipe', type: 'select', options: ['Counter Balance', 'Reach Truck', 'Pallet Mover', 'Hand Pallet', 'Stacker', 'VNA', 'Order Picker', 'Clamp', 'Lainnya'] },
       { key: 'kapasitas_ton', label: 'Kapasitas (ton)', type: 'number', width: 70 },
@@ -124,7 +124,7 @@ export const TABS: Tab[] = [
     ] },
   { id: 'produktivitas', label: 'Produktivitas', pemilik: 'Operations', table: 'productivity', editorRoles: ['operations', 'solution_design', 'commercial'], approval: true,
     orderBy: [{ col: 'tahap' }, { col: 'aktivitas' }], cari: ['aktivitas', 'tahap', 'tool', 'role_name', 'uom', 'industri'],
-    catatan: 'Prod/jam = angka yang dipakai cost model (hasil time motion study atau benchmark). Kolom industri = rentang benchmark, mis. "30-40". Detik/UoM = 3.600 ÷ prod/jam (otomatis).',
+    catatan: 'Prod/jam = angka yang dipakai cost model (hasil time motion study atau benchmark). Kolom industri = rentang benchmark, mis. "30-40". Detik/UoM = 3,600 ÷ prod/jam (otomatis).',
     kolom: [
       { key: 'tahap', label: 'Tahap' }, { key: 'aktivitas', label: 'Aktivitas', width: 240 }, { key: 'tool', label: 'Tool', width: 90 },
       { key: 'role_name', label: 'Role' },

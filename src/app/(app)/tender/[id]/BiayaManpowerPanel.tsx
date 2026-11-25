@@ -4,7 +4,7 @@ import { rp, angka } from '@/lib/format';
 import { ringkasBiayaMp, LEVEL_JABATAN, LEVEL_GAJI_DEFAULT, levelDefault, type InputBiayaRole, type LevelJabatan, type ParamBiayaMp, type RincianBiayaRole } from '@/lib/engine/biayaMp';
 import InputDesimal from '@/components/InputDesimal';
 
-const r0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
+const r0 = (x: number) => (x ? Math.round(x).toLocaleString('en-US') : '–');
 const pct = (x: number) => Math.round(x * 100000) / 1000;
 
 /** Rincian biaya manpower — format sheet: gaji → sub total → BPJS/THR/kompensasi/supervisi → total × orang → Sub Total-1 → fee → Sub Total-2. */
@@ -35,7 +35,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
     <div className="card" style={{ gap: 10 }}>
       <h2><T>Rincian biaya manpower</T></h2>
       <p className="small muted">Jumlah orang dari Manpower Summary. Kotak kosong = default (gaji pokok = UMK area × % level jabatan; lisensi & insentif = tunjangan jabatan; hari kerja = Working Days Employee).
-        BPJS, THR & kompensasi dihitung dari gaji pokok; <b>Sharing</b> = biaya orang dibagi beberapa project (0,5 = pegang 2 project, 0,25 = 4 project); gaji dibayar = gaji pokok × actual hari kerja ÷ hari kerja.</p>
+        BPJS, THR & kompensasi dihitung dari gaji pokok; <b>Sharing</b> = biaya orang dibagi beberapa project (0.5 = pegang 2 project, 0.25 = 4 project); gaji dibayar = gaji pokok × actual hari kerja ÷ hari kerja.</p>
       <div className="umk-box">
         <div><div className="small muted">UMK area project</div><b style={{ fontSize: 18 }}>{umk ? rp(umk) : 'memuat…'}</b><span className="small muted"> /bln</span></div>
         <div><div className="small muted">Area</div><b>{lokasi || '—'}</b></div>
@@ -61,7 +61,7 @@ export default function BiayaManpowerPanel({ rows, param, input, onInput, onPara
       <details className="small muted">
         <summary>Dasar aturan default</summary>
         <ul style={{ margin: '4px 0 4px 18px', padding: 0 }}>
-          <li><b>BPJS TK 5,27%</b> (pemberi kerja) = JHT 3,7% (PP 46/2015) + JKK 1,27% + JKM 0,3% (PP 44/2015). Gudang/penimbunan barang termasuk <b>Kelompok IV – risiko tinggi</b> (Lampiran I PP 44/2015). 0,14% dari JKK direkomposisi ke JKP (PP 6/2025) tanpa menambah iuran.</li>
+          <li><b>BPJS TK 5.27%</b> (pemberi kerja) = JHT 3.7% (PP 46/2015) + JKK 1.27% + JKM 0.3% (PP 44/2015). Gudang/penimbunan barang termasuk <b>Kelompok IV – risiko tinggi</b> (Lampiran I PP 44/2015). 0.14% dari JKK direkomposisi ke JKP (PP 6/2025) tanpa menambah iuran.</li>
           <li><b>BPJS Kesehatan 4%</b> pemberi kerja, upah maksimal {rp(param.batasUpahKs ?? 0)} (Perpres 64/2020).</li>
           <li><b>BPJS Pensiun 2%</b> pemberi kerja, upah maksimal {rp(param.batasUpahPensiun ?? 0)} (PP 45/2015; batas diperbarui tiap Maret).</li>
           <li><b>THR 1/12</b> upah per bulan (Permenaker 6/2016) · <b>Kompensasi PKWT 1/12</b> = 1 bulan upah per 12 bulan kontrak (PP 35/2021 Pasal 15–16).</li>

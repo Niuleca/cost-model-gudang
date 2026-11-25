@@ -17,9 +17,9 @@ import InputDesimal from '@/components/InputDesimal';
 const Main3D = dynamic(() => import('./Main3D'), { ssr: false, loading: () => <div className="card sim3d-wadah sim3d-muat">Menyiapkan gudang 3D…</div> });
 
 interface T { id: string; kode: string | null; customer: string; status: string; updated_at: string }
-const rp = (v: number) => `Rp ${Math.round(v).toLocaleString('id-ID')}`;
-const jt = (v: number) => `${(v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
-const angka = (v: number, d = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d });
+const rp = (v: number) => `Rp ${Math.round(v).toLocaleString('en-US')}`;
+const jt = (v: number) => `${(v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 })} jt`;
+const angka = (v: number, d = 0) => v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
 const LABEL_TUGAS: Record<JenisTugas, string> = {
   admin_in: 'Admin inbound', bongkar: 'Bongkar', cek_in: 'Cek inbound', putaway: 'Putaway', admin_out: 'Admin outbound',
   pick_palet: 'Pick palet', pick_karton: 'Pick karton', pack: 'Packing', cek_out: 'Cek outbound', muat: 'Muat',

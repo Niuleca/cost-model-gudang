@@ -8,8 +8,8 @@ import InputDesimal from '@/components/InputDesimal';
 
 type Pj = (v: number | null | undefined, basis: SatuanPanjang, on: (n: number | null) => void, opt?: { w?: number; kosong?: boolean; ph?: number | null }) => React.ReactNode;
 
-const f1 = (x: number) => (x ? x.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–');
-const f0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
+const f1 = (x: number) => (x ? x.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–');
+const f0 = (x: number) => (x ? Math.round(x).toLocaleString('en-US') : '–');
 
 // Komponen baris di luar komponen utama supaya input tidak kehilangan fokus saat mengetik.
 function Baris({ l, v, u, input, tebal }: { l: string; v?: React.ReactNode; u?: string; input?: React.ReactNode; tebal?: boolean }) {
@@ -418,7 +418,7 @@ function KekuatanRak({ x, set, inp, pjn, o }: {
         <BarisK l={<b>Foot print per pallet</b>} v={<b>{angka(r.tapakM2, 2)}</b>} u="m² (termasuk celah ke palet sebelah & rak belakang)" />
         <tr className="sp-judul"><td>Lantai</td><td className="num" /><td /></tr>
         <BarisK l="Daya dukung lantai (floor capacity)" v={inp(Number(x.kekuatan?.kapLantaiKgM2) > 0 ? x.kekuatan!.kapLantaiKgM2 : null, v => setK({ kapLantaiKgM2: v }), { w: 90, kosong: true, ph: String(Math.round(r.kapLantai)) })}
-          u={<>kg/m² · {x.kekuatan?.kapLantaiKgM2 ? 'manual' : o.sumberLantai ?? 'default 3.000'}</>} />
+          u={<>kg/m² · {x.kekuatan?.kapLantaiKgM2 ? 'manual' : o.sumberLantai ?? 'default 3,000'}</>} />
         <BarisK l="Beban per m² (workload)" v={<b>{f0(r.bebanM2)}</b>} u="kg/m²" />
         <tr className="sp-hitam"><td>Floor capacity usage</td><td className="num">{angka(r.pakaiLantai * 100, 2)}%</td><td><Status s={r.statusLantai} /></td></tr>
         {(x.porsi?.block ?? 0) > 0 && <BarisK l={`Block stack (${r.tumpuk} tumpuk ÷ ${angka(r.luasPalet, 2)} m²)`} v={f0(r.bebanBlokM2)} u={<>kg/m² · <Status s={r.statusBlok} pct={r.kapLantai > 0 ? r.bebanBlokM2 / r.kapLantai : undefined} /></>} />}

@@ -354,7 +354,7 @@ export default function TenderPage() {
     return true;
   }
 
-  // Simpan otomatis 2,5 detik setelah perubahan terakhir + peringatan bila halaman ditutup sebelum tersimpan
+  // Simpan otomatis 2.5 detik setelah perubahan terakhir + peringatan bila halaman ditutup sebelum tersimpan
   const [simpanOto, setSimpanOto] = useState(false);
   useEffect(() => {
     if (!kotor || !t || !profile || !bisaEdit) return;
@@ -494,7 +494,7 @@ export default function TenderPage() {
     setT(y => y && ({ ...y, asumsi: { ...y.asumsi, securityCleaningVsm: true, peranTetap: [...y.asumsi.peranTetap, ...tambah],
       costLines: y.asumsi.costLines.filter(c => !jasaOrang(c)) } })); setKotor(true);
   }, [simple, t?.id, bisaEdit, luasScVsm > 0]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Simple CM: racking memakai skema sewa per posisi palet (default Rp25.000/PP/bln) bila belum pernah dipilih
+  // Simple CM: racking memakai skema sewa per posisi palet (default Rp25,000/PP/bln) bila belum pernah dipilih
   useEffect(() => {
     if (!simple || !t || !bisaEdit || t.asumsi.space?.rakSkema) return;
     setT(y => y && ({ ...y, asumsi: { ...y.asumsi, space: { ...y.asumsi.space, rakSkema: 'sewa', sewaRakPerPPBulan: y.asumsi.space.sewaRakPerPPBulan ?? 25000 } } })); setKotor(true);
@@ -601,7 +601,7 @@ export default function TenderPage() {
         <button className="ghost" onClick={undo} disabled={!riwayat.current.lalu.length} title="Undo (Ctrl+Z)" aria-label="Undo">↶ {tr('Undo')}</button>
         <button className="ghost" onClick={redo} disabled={!riwayat.current.depan.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷ {tr('Redo')}</button>
       </>}
-      {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor} title="Perubahan juga disimpan otomatis 2,5 detik setelah berhenti mengetik">{simpanOto ? 'Menyimpan…' : tr(kotor ? 'Simpan input' : 'Tersimpan')}</button>}
+      {bisaEdit && <button className="ghost" onClick={() => simpan()} disabled={!kotor} title="Perubahan juga disimpan otomatis 2.5 detik setelah berhenti mengetik">{simpanOto ? 'Menyimpan…' : tr(kotor ? 'Simpan input' : 'Tersimpan')}</button>}
       <button onClick={() => hitung(false)}>{tr('Hitung')}</button>
     </div>);
 
@@ -678,12 +678,12 @@ export default function TenderPage() {
     { ar: 'vas', l: 'VAS & lainnya', ket: 'Opsional' },
   ];
   const panelVolumeSpek = (grupDipakai: string[]) => <div className="card">
-    <p className="small muted"><b>Volume 1 bulan</b> wajib — menjadi dasar tarif (komitmen / MGV). <b>Max</b> dipakai untuk sizing gudang, manpower & MHE; <b>Max / Avg</b> yang dikosongkan otomatis sama dengan Volume 1 bulan. Ketik ribuan dengan titik (10.673).</p>
+    <p className="small muted"><b>Volume 1 bulan</b> wajib — menjadi dasar tarif (komitmen / MGV). <b>Max</b> dipakai untuk sizing gudang, manpower & MHE; <b>Max / Avg</b> yang dikosongkan otomatis sama dengan Volume 1 bulan. Ketik ribuan dengan titik (10,673).</p>
     {(() => { const xs = volumeSalahRibuan(a.volumes); if (!xs.length) return null;
       const kali = (x: number) => (x > 0 && x < 1000 && !Number.isInteger(x) ? Math.round(x * 1000) : x);
       return <p className="notice small" role="alert" style={{ borderColor: 'var(--bad, #c0392b)' }}>
         Volume {xs.map(({ v }) => `${v.arus} ${v.uom}`).join(' · ')} tercatat <b>desimal</b> — kemungkinan maksudnya ribuan.{' '}
-        <button className="ghost" onClick={() => setA({ volumes: a.volumes.map((v, i) => xs.some(x => x.i === i) ? { ...v, rataRataBulan: kali(v.rataRataBulan), peakBulan: kali(v.peakBulan), komitmenBulan: kali(v.komitmenBulan) } : v) })}>Perbaiki jadi ribuan (× 1.000)</button></p>; })()}
+        <button className="ghost" onClick={() => setA({ volumes: a.volumes.map((v, i) => xs.some(x => x.i === i) ? { ...v, rataRataBulan: kali(v.rataRataBulan), peakBulan: kali(v.peakBulan), komitmenBulan: kali(v.komitmenBulan) } : v) })}>Perbaiki jadi ribuan (× 1,000)</button></p>; })()}
     {GRUP_ARUS.filter(g => grupDipakai.includes(g.ar)).map(g => {
       const idx = a.volumes.map((v, i) => ({ v, i })).filter(({ v }) => (g.ar === 'vas' ? !['storage', 'inbound', 'outbound'].includes(v.arus) : v.arus === g.ar));
       const kurang = g.ar !== 'vas' && !idx.some(({ v }) => volSpek(v) > 0);
@@ -700,7 +700,7 @@ export default function TenderPage() {
               {g.ar === 'vas' && <td><select aria-label="Arus" value={v.arus} style={{ minWidth: 110 }} onChange={e => setA({ volumes: ubahArray(a.volumes, i, { arus: e.target.value as Arus }) })}>{ARUS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></td>}
               <td><PilihUom value={v.uom} onChange={u => setA({ volumes: ubahArray(a.volumes, i, gantiUom(v, u)) })} /></td>
               {KOLOM_SPEK.map(([k, l]) => <td key={k} className="num"><AngkaVolume aria-label={`${l} ${v.uom}`} value={tp[k]}
-                placeholder={k === 'max' || k === 'avg' ? (vol ? `= ${vol.toLocaleString('id-ID')}` : '') : k === 'min' ? '—' : ''}
+                placeholder={k === 'max' || k === 'avg' ? (vol ? `= ${vol.toLocaleString('en-US')}` : '') : k === 'min' ? '—' : ''}
                 style={{ width: k === 'vol' ? 104 : 92, minWidth: k === 'vol' ? 104 : 92, ...(k === 'vol' && !(vol > 0) ? { borderColor: 'var(--bad, #c0392b)' } : {}) }}
                 onValue={n => setA({ volumes: ubahArray(a.volumes, i, ubahSpek(v, k, n)) })} />
                 {k === 'vol' && cek.length > 0 && <div className="small" style={{ color: 'var(--bad, #b91c1c)' }}>{cek.join(' · ')}</div>}</td>)}
@@ -1198,9 +1198,9 @@ export default function TenderPage() {
           {(() => { const xs = volumeSalahRibuan(a.volumes); if (!xs.length) return null;
             const kali = (x: number) => (x > 0 && x < 1000 && !Number.isInteger(x) ? Math.round(x * 1000) : x);
             return <p className="notice small" role="alert" style={{ borderColor: 'var(--bad, #c0392b)' }}>
-              Volume {xs.map(({ v }) => `${v.arus} ${v.uom} ${String(v.peakBulan).replace('.', ',')}`).join(' · ')} tercatat <b>desimal</b> — kemungkinan maksudnya ribuan
-              ({xs.map(({ v }) => Math.round(v.peakBulan * 1000).toLocaleString('id-ID')).join(' · ')}). Inilah yang membuat tarif handling per unit sangat besar.{' '}
-              <button className="ghost" onClick={() => setA({ volumes: a.volumes.map((v, i) => xs.some(x => x.i === i) ? { ...v, rataRataBulan: kali(v.rataRataBulan), peakBulan: kali(v.peakBulan), komitmenBulan: kali(v.komitmenBulan) } : v) })}>Perbaiki jadi ribuan (× 1.000)</button></p>; })()}
+              Volume {xs.map(({ v }) => `${v.arus} ${v.uom} ${String(v.peakBulan)}`).join(' · ')} tercatat <b>desimal</b> — kemungkinan maksudnya ribuan
+              ({xs.map(({ v }) => Math.round(v.peakBulan * 1000).toLocaleString('en-US')).join(' · ')}). Inilah yang membuat tarif handling per unit sangat besar.{' '}
+              <button className="ghost" onClick={() => setA({ volumes: a.volumes.map((v, i) => xs.some(x => x.i === i) ? { ...v, rataRataBulan: kali(v.rataRataBulan), peakBulan: kali(v.peakBulan), komitmenBulan: kali(v.komitmenBulan) } : v) })}>Perbaiki jadi ribuan (× 1,000)</button></p>; })()}
           <div className="tablewrap"><table>
             <thead><tr><th>Arus</th><th>UoM</th><th className="num">Rata-rata/bln</th><th className="num">Peak/bln</th><th className="num">Komitmen/bln (MGV)</th><th className="num" title="Volume terendah per bulan (opsional) — dasar tarif Min">Min/bln</th><th className="num">Faktor peak</th><th title="Berapa satuan baris ini dalam 1 palet (atau isi 1 palet untuk baris palet)">Isi per palet</th><th title="Isi kecil per kemasan: 1 case = … pcs / kg / liter">Isi per kemasan</th><th></th></tr></thead>
             <tbody>{a.volumes.map((v, i) => (
@@ -1215,7 +1215,7 @@ export default function TenderPage() {
                       ? { rataRataBulan: n, ...(!(v.peakBulan > 0) || v.peakBulan === v.rataRataBulan ? { peakBulan: n } : {}), ...(!(v.komitmenBulan > 0) || v.komitmenBulan === v.rataRataBulan ? { komitmenBulan: n } : {}) }
                       : { [k]: n }) })} /></td>
                 ))}
-                <td className="num"><AngkaVolume aria-label="minBulan" value={v.minBulan || undefined} placeholder={(() => { const xs = [v.rataRataBulan, v.komitmenBulan, v.peakBulan].map(Number).filter(x => x > 0); return xs.length ? Math.min(...xs).toLocaleString('id-ID') : ''; })()}
+                <td className="num"><AngkaVolume aria-label="minBulan" value={v.minBulan || undefined} placeholder={(() => { const xs = [v.rataRataBulan, v.komitmenBulan, v.peakBulan].map(Number).filter(x => x > 0); return xs.length ? Math.min(...xs).toLocaleString('en-US') : ''; })()}
                   onValue={n => setA({ volumes: ubahArray(a.volumes, i, { minBulan: n > 0 ? n : undefined }) })} /></td>
                 <td className="num">{v.rataRataBulan > 0 ? (v.peakBulan / v.rataRataBulan).toFixed(2) + '×' : '—'}</td>
                 <SelKonversi v={volEfBaris[i] ?? v} onKonversi={konversi => setA({ volumes: ubahArray(a.volumes, i, { konversi }) })} />
@@ -1455,7 +1455,7 @@ export default function TenderPage() {
                   <td className="num db"><InputDesimal aria-label="Produktivitas" step="any" value={x.prodPerJam} onChange={e => ub({ prodPerJam: Number(e.target.value) })} style={{ width: 80, minWidth: 80 }} /></td>
                   <td><select aria-label="UoM" value={x.uom} style={{ minWidth: 100 }} onChange={e => ub({ uom: e.target.value })}>{(UOM.includes(x.uom) ? UOM : [x.uom, ...UOM]).map(u => <option key={u}>{u}</option>)}</select></td>
                   <td><select aria-label="Arus" value={x.arus} style={{ minWidth: 130 }} title="Alur barang: inbound (masuk), outbound (keluar), storage (penyimpanan), VAS" onChange={e => ub({ arus: e.target.value as Arus })}>{ARUS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select></td>
-                  <td className="num"><InputDesimal aria-label="Volume per bulan" step="any" placeholder={Math.round(vAuto).toLocaleString('id-ID')} value={x.volumeManual ?? ''}
+                  <td className="num"><InputDesimal aria-label="Volume per bulan" step="any" placeholder={Math.round(vAuto).toLocaleString('en-US')} value={x.volumeManual ?? ''}
                     onChange={e => ub({ volumeManual: e.target.value === '' ? null : Number(e.target.value) })} style={{ width: 96, minWidth: 96 }} />
                     {ef?.volumeDariProfil && <div className="small muted" title="Order admin dari Profil order (tab Volume): mobil/hari × input admin per mobil × hari operasional">auto dari profil order</div>}
                     {!ef?.volumeDariProfil && isAktivitasAdmin(x) && x.volumeManual == null && <div className="small muted" title="Isi Profil order di tab Volume agar volume admin terisi otomatis">isi profil order</div>}</td>
@@ -1757,7 +1757,7 @@ function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, be
             const r = m as typeof m & { skema?: string; porsi?: number };
             return <tr key={m.roleName + m.jenis} className={m.headcount ? undefined : 'muted'}><td>{m.roleName}</td><td>{m.jenis}</td><td className="num">{m.jenis === 'Direct' ? angka(m.jamPerShift, 2) : '—'}</td><td className="num">{m.mpPerShift || '—'}</td>
               <td className="num"><b>{m.headcount}</b>{!m.headcount && m.jenis === 'Direct' ? <span className="small"> (dirangkap)</span> : ''}</td><td className="num">{m.jenis === 'Direct' && m.headcount ? persen(m.utilisasi, 0) : '—'}</td>
-              <td className="small">{r.skema === 'sharing' ? `sharing ${(r.porsi ?? 1).toLocaleString('id-ID')}` : 'dedicated'}</td></tr>;
+              <td className="small">{r.skema === 'sharing' ? `sharing ${(r.porsi ?? 1).toLocaleString('en-US')}` : 'dedicated'}</td></tr>;
           })}
             <tr className="pd-sub"><td colSpan={4}><b>Total</b></td><td className="num"><b>{h.totalHeadcount}</b></td><td colSpan={2} /></tr></tbody>
         </table></div>
@@ -1794,14 +1794,14 @@ function HasilPanel({ langkah, onBukaKategori, ekstraManpower, drill = false, be
 }
 
 const PALET_PRESET: (Omit<PaletTipe, 'id' | 'porsi'> & { label: string })[] = [
-  { label: 'Standar kayu · 1.200 × 1.000 mm', nama: 'Standar kayu', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
-  { label: 'Jumbo · 1.200 × 1.200 mm', nama: 'Jumbo', panjang: 1.2, lebar: 1.2, tebalMm: 150 },
-  { label: 'Plastik · 1.200 × 1.000 mm', nama: 'Plastik', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
-  { label: 'JIS / Asia · 1.100 × 1.100 mm', nama: 'JIS', panjang: 1.1, lebar: 1.1, tebalMm: 150 },
-  { label: 'EUR · 1.200 × 800 mm', nama: 'EUR', panjang: 1.2, lebar: 0.8, tebalMm: 144 },
+  { label: 'Standar kayu · 1,200 × 1,000 mm', nama: 'Standar kayu', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
+  { label: 'Jumbo · 1,200 × 1,200 mm', nama: 'Jumbo', panjang: 1.2, lebar: 1.2, tebalMm: 150 },
+  { label: 'Plastik · 1,200 × 1,000 mm', nama: 'Plastik', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
+  { label: 'JIS / Asia · 1,100 × 1,100 mm', nama: 'JIS', panjang: 1.1, lebar: 1.1, tebalMm: 150 },
+  { label: 'EUR · 1,200 × 800 mm', nama: 'EUR', panjang: 1.2, lebar: 0.8, tebalMm: 144 },
   { label: 'Custom (isi sendiri)', nama: 'Palet custom', panjang: 1.2, lebar: 1.0, tebalMm: 150 },
 ];
-const fmtN = (x: number, d = 2) => x.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: d });
+const fmtN = (x: number, d = 2) => x.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: d });
 /** Jenis palet (Key Assumption) — satu sumber untuk semua ukuran palet: Produk (susunan per palet), block stack / pallet floor (luas rata-rata), racking (tebal terbesar), simulasi 3D. */
 function PaletTender({ excel, onChange, cbmPerPalet, onCbmPerPalet, tertanam = false, tinggiDariProduk = false }: { tinggiDariProduk?: boolean; excel: SpaceExcel; onChange: (x: SpaceExcel) => void; cbmPerPalet?: number; onCbmPerPalet?: (v: number) => void; tertanam?: boolean }) {
   const list = daftarPalet(excel), r = ringkasPalet(list);

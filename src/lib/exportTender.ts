@@ -187,7 +187,7 @@ async function susunWorkbook(p: DataExport) {
     'GP %': r.gpPersen, 'Harga/bln (Rp)': r.hargaBulan,
     'Tarif excl. PPN (Rp)': r.tarifPerUnit, 'PPN/unit (Rp)': r.ppnPerUnit, 'Tarif incl. PPN (Rp)': r.tarifInclPpn,
     'Tarif quotation (Rp)': r.tarifQuote,
-    'Pilihan satuan lain': Array.isArray(r.opsiUom) ? (r.opsiUom as Baris[]).map(o => `${o.uom}: Rp${Math.round(Number(o.tarifExcl ?? 0)).toLocaleString('id-ID')}`).join(' · ') : '',
+    'Pilihan satuan lain': Array.isArray(r.opsiUom) ? (r.opsiUom as Baris[]).map(o => `${o.uom}: Rp${Math.round(Number(o.tarifExcl ?? 0)).toLocaleString('en-US')}`).join(' · ') : '',
   }));
   const lebar = (ws: WS, w = 18) => { ws.columns.forEach((c, i) => { c.width = i === 0 ? Math.max(w + 10, 28) : w; }); };
   const hasilCell = (c: { fill: unknown; font: unknown }) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HASIL } }; c.font = { bold: true, color: { argb: HASIL_INK } }; };

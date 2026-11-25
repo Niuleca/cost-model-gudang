@@ -99,14 +99,14 @@ export default function TransportTender() {
                   <td>
                     <input aria-label="Origin" list="dl-tr-kota" value={r.origin} placeholder="Origin" onChange={e => setRute(i, { origin: e.target.value })} />
                     <input aria-label="Destination" list="dl-tr-kota" className="input-kecil" value={r.destination} placeholder="Destination" onChange={e => setRute(i, { destination: e.target.value })} />
-                    <div className="dasar-def">{km ? `±${km.toLocaleString('id-ID')} km (perkiraan)` : r.origin && r.destination ? 'jarak belum diketahui' : ''}
+                    <div className="dasar-def">{km ? `±${km.toLocaleString('en-US')} km (perkiraan)` : r.origin && r.destination ? 'jarak belum diketahui' : ''}
                       {lintas && <span style={{ color: 'var(--warn, #b45309)' }}> · beda pulau → pertimbangkan Intermodal</span>}</div>
                   </td>
                   <td>
                     <select aria-label="Armada" value={r.armada} onChange={e => setRute(i, { armada: e.target.value })}>
                       {ARMADA.filter(x => x.moda === 'darat').map(x => <option key={x.nama}>{x.nama}</option>)}</select>
                     <SelectBasis label="Buying basis" className="input-kecil" value={r.basis} pilihan={BASIS_DARAT} onChange={b => setRute(i, { basis: b })} />
-                    {a && <div className="dasar-def">{(a.kapKg / 1000).toLocaleString('id-ID')} t · {a.kapCbm} CBM · {a.kapPalet} palet{kap && r.basis !== 'trip' && r.basis !== 'shipment' ? ` · ±${kap.toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${r.basis}/trip` : ''}</div>}
+                    {a && <div className="dasar-def">{(a.kapKg / 1000).toLocaleString('en-US')} t · {a.kapCbm} CBM · {a.kapPalet} palet{kap && r.basis !== 'trip' && r.basis !== 'shipment' ? ` · ±${kap.toLocaleString('en-US', { maximumFractionDigits: 1 })} ${r.basis}/trip` : ''}</div>}
                   </td>
                   <td className="num"><InputDesimal aria-label="Volume per bulan" min={0} step="any" value={r.volumeBulan || ''} placeholder="0" onChange={e => setRute(i, { volumeBulan: Number(e.target.value) || 0 })} />
                     <div className="dasar-def">{labelBasis(r.basis).replace('per ', '')}/bln</div></td>
@@ -125,7 +125,7 @@ export default function TransportTender() {
                   </td>
                   <td className="num"><PersenInput label="Margin rute" nilai={r.marginPersen} placeholder={`${Math.round(tr.marginGlobal * 1000) / 10}`} onChange={v => setRute(i, { marginPersen: v })} />
                     <div className="dasar-def">{r.marginPersen == null ? 'global' : 'khusus rute'}</div></td>
-                  <td className="num"><b>{rp(h.jual)}</b><div className="dasar-def">{labelBasis(r.basis)} · GP {(h.gpPersen * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%</div></td>
+                  <td className="num"><b>{rp(h.jual)}</b><div className="dasar-def">{labelBasis(r.basis)} · GP {(h.gpPersen * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%</div></td>
                   <td className="num">{rp(h.biayaBulan)}<div className="dasar-def"><b>{rp(h.pendapatanBulan)}</b></div></td>
                   <td><button className="ghost" title="Duplikat rute" aria-label="Duplikat" onClick={() => setTr({ rute: [...tr.rute.slice(0, i + 1), { ...r, id: Math.random().toString(36).slice(2, 10) }, ...tr.rute.slice(i + 1)] })}>⧉</button>
                     <button className="danger" title="Hapus rute" aria-label="Hapus" onClick={() => setTr({ rute: tr.rute.filter((_, j) => j !== i) })}>×</button></td>
@@ -133,7 +133,7 @@ export default function TransportTender() {
             })}
           </tbody>
         </table></div>
-        <p className="small muted" style={{ margin: 0 }}>Jarak & estimasi harga memakai koordinat kota perkiraan × faktor jalan 1,3 dan tarif indikatif per km per armada (Deliveree) — hanya acuan bila Market Price belum ada; harga final dari quotation vendor.</p>
+        <p className="small muted" style={{ margin: 0 }}>Jarak & estimasi harga memakai koordinat kota perkiraan × faktor jalan 1.3 dan tarif indikatif per km per armada (Deliveree) — hanya acuan bila Market Price belum ada; harga final dari quotation vendor.</p>
         <DatalistLokasi id="dl-tr-kota" jenis={['kota', 'pelabuhan']} />
       </div>}
 

@@ -54,7 +54,7 @@ export function tulisHasil(x: Ctx) {
   HS.field('Margin default — risiko Tinggi', m.margin.Tinggi, 'pct', 'in', 'markup', '', 'MTinggi');
   HS.field('Overhead', m.finance.overheadPersen, 'pct', 'in', '', '× subtotal biaya (master Finance)', 'Overhead');
   HS.field('GP minimum (red flag)', m.finance.gpMinimum, 'pct', 'in', '', '', 'GpMin');
-  HS.field('Contoh harga Rp100.000', { f: '"tarif "&IF(GrossUp>0,"di-gross-up jadi "&FIXED(100000/(1-GrossUp),0),"tetap 100.000")&" → PPh 23 dipotong "&FIXED(100000/(1-GrossUp)*PPh,0)&" → diterima "&FIXED(100000/(1-GrossUp)*(1-PPh),0)' }, 'teks', 'out');
+  HS.field('Contoh harga Rp100,000', { f: '"tarif "&IF(GrossUp>0,"di-gross-up jadi "&FIXED(100000/(1-GrossUp),0),"tetap 100,000")&" → PPh 23 dipotong "&FIXED(100000/(1-GrossUp)*PPh,0)&" → diterima "&FIXED(100000/(1-GrossUp)*(1-PPh),0)' }, 'teks', 'out');
 
   // ===================== Rincian biaya per bulan — susun posisi baris lebih dulu (dirujuk rate card)
   const lines = x.lines;

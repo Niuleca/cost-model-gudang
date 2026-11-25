@@ -5,7 +5,7 @@ import { useSatuanPanjang, type SatuanPanjang } from '@/lib/satuanPanjang';
 import { pj } from '@/lib/satuanPanjangInti';
 import InputDesimal from '@/components/InputDesimal';
 
-const angka = (v: number, d = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d });
+const angka = (v: number, d = 0) => v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
 
 /** Isian angka; ditandai bila berbeda dari angka awal (Space tender). */
 function Isian({ l, v, a, set, u, step = 0.01, pct, basis }: { l: string; v: number | null; a: number | null; set: (x: number | null) => void; u?: string; step?: number; pct?: boolean; basis?: SatuanPanjang }) {

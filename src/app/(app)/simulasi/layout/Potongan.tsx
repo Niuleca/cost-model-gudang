@@ -8,7 +8,7 @@ import { dimRak, nBay, tinggiRak, uraiKomponen, type Komponen, type LayoutEdit }
 export type ArahPotong = 'kiri' | 'kanan' | 'depan';
 export interface PotonganApi { svgEkspor: () => string }
 
-const f2 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const f2 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Posisi potong awal: tengah baris rak terpanjang (supaya langsung memotong rak). */
 export function potongAwal(e: LayoutEdit, arah: ArahPotong): number {

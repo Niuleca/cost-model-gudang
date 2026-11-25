@@ -19,7 +19,7 @@ const kunci = (x: Item) => x.kategori === 'MHE' && x.mhe_tipe
   ? `MHE|${x.mhe_tipe}|${x.kapasitas_ton ?? ''}|${x.sumber_tenaga ?? ''}`
   : `${x.kategori}|${norm(x.item)}|${(x.satuan ?? '').toLowerCase()}`;
 const judulGrup = (x: Item) => x.kategori === 'MHE' && x.mhe_tipe
-  ? `${x.mhe_tipe}${x.kapasitas_ton ? ` ${String(x.kapasitas_ton).replace('.', ',')} ton` : ''}${x.sumber_tenaga ? ` · ${x.sumber_tenaga}` : ''}`
+  ? `${x.mhe_tipe}${x.kapasitas_ton ? ` ${String(x.kapasitas_ton)} ton` : ''}${x.sumber_tenaga ? ` · ${x.sumber_tenaga}` : ''}`
   : x.item;
 
 export default function PerbandinganHargaPage() {
@@ -73,7 +73,7 @@ export default function PerbandinganHargaPage() {
         <label className="f" htmlFor="pk-kat">Kategori<select id="pk-kat" value={kat} onChange={e => setKat(e.target.value)}><option value="">Semua</option>{kategori.map(k => <option key={k}>{k}</option>)}</select></label>
         <label className="f" htmlFor="pk-basis">Basis harga<select id="pk-basis" value={basis} onChange={e => setBasis(e.target.value as Basis)}>
           <option value="auto">Otomatis (sewa/bln bila ada, selain itu harga beli)</option><option value="sewa">Sewa / bulan</option><option value="beli">Harga beli</option></select></label>
-        <label className="f" htmlFor="pk-q">Cari item / vendor<input id="pk-q" value={q} onChange={e => setQ(e.target.value)} placeholder="mis. reach truck 2,5" /></label>
+        <label className="f" htmlFor="pk-q">Cari item / vendor<input id="pk-q" value={q} onChange={e => setQ(e.target.value)} placeholder="mis. reach truck 2.5" /></label>
       </div>
       <label className="row small" style={{ gap: 6 }}><input type="checkbox" style={{ width: 'auto' }} checked={minVendor} onChange={e => setMinVendor(e.target.checked)} /> Hanya tampilkan barang yang punya penawaran dari ≥ 2 vendor</label>
     </div>

@@ -4,8 +4,9 @@
 import { useEffect, useState } from 'react';
 import { rp } from '@/lib/format';
 import { BASIS, GRUP_BASIS, labelBasis, persen1, TIER_DEFAULT, type Basis, type CatatanReview, type HasilTier } from '@/lib/transport';
+import { normalDesimal, bacaAngka } from '@/lib/bacaAngka';
 
-const fmtQ = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 3 });
+const fmtQ = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 3 });
 
 const KELAS: Record<CatatanReview['level'], string> = { kritis: 'bad', perhatian: 'warn', info: 'info' };
 const LABEL: Record<CatatanReview['level'], string> = { kritis: 'Kritis', perhatian: 'Perhatian', info: 'Info' };
@@ -26,12 +27,12 @@ export function KartuReview({ review }: { review: CatatanReview[] }) {
     </div>);
 }
 
-/** Isian persen bebas (mis. 7,5); disimpan saat Enter / keluar kolom. */
+/** Isian persen bebas (mis. 7.5); disimpan saat Enter / keluar kolom. */
 function InputPersen({ nilai, set, label, lebar = 70 }: { nilai: number; set: (v: number) => void; label: string; lebar?: number }) {
-  const ke = (v: number) => String(Math.round(v * 10000) / 100).replace('.', ',');
+  const ke = (v: number) => String(Math.round(v * 10000) / 100);
   const [t, setT] = useState(ke(nilai));
   useEffect(() => { setT(ke(nilai)); }, [nilai]);
-  const simpan = () => { const v = Number(t.replace(',', '.')); if (t.trim() !== '' && isFinite(v) && v > -100 && v < 95) set(v / 100); else setT(ke(nilai)); };
+  const simpan = () => { const v = Number(normalDesimal(t)); if (t.trim() !== '' && isFinite(v) && v > -100 && v < 95) set(v / 100); else setT(ke(nilai)); };
   return <span className="row" style={{ gap: 2, flexWrap: 'nowrap', display: 'inline-flex' }}>
     <input aria-label={label} className="input-kecil" inputMode="decimal" style={{ width: lebar, textAlign: 'right' }} value={t} onChange={e => setT(e.target.value)}
       onBlur={simpan} onKeyDown={e => { if (e.key === 'Enter') { simpan(); (e.target as HTMLInputElement).blur(); } }} />%</span>;
@@ -53,7 +54,7 @@ export function PerbandinganMargin({ hasil, tiers, onTiers, onPakai, kontrakBula
   const [baru, setBaru] = useState('');
   const k = hasil.kolom.length;
   const terbaik = hasil.total.reduce((b, x, i) => (x.gp > hasil.total[b].gp ? i : b), 0);
-  const tambah = () => { const v = Number(baru.replace(',', '.')) / 100; if (isFinite(v) && v > -1 && v < 0.95 && !tiers.includes(v)) onTiers([...tiers, v].slice(0, 8)); setBaru(''); };
+  const tambah = () => { const v = Number(normalDesimal(baru)) / 100; if (isFinite(v) && v > -1 && v < 0.95 && !tiers.includes(v)) onTiers([...tiers, v].slice(0, 8)); setBaru(''); };
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -62,7 +63,7 @@ export function PerbandinganMargin({ hasil, tiers, onTiers, onPakai, kontrakBula
           {adaOverride ? ` + ${adaOverride} rute khusus` : ''} · margin = GP% atas harga jual</span>
       </div>
       <div className="row small" style={{ gap: 6 }}>
-        <span className="muted">Tier (isi bebas, mis. 7,5):</span>
+        <span className="muted">Tier (isi bebas, mis. 7.5):</span>
         {tiers.map((m, i) => <span key={i} className="pill info" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <InputPersen label={`Tier ${i + 1}`} nilai={m} set={v => ubahTier(i, v)} lebar={56} />
           <button className="link-kecil" aria-label={`Hapus tier ${persen1(m)}`} onClick={() => onTiers(tiers.filter((_, j) => j !== i))}>×</button></span>)}

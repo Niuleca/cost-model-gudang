@@ -206,7 +206,7 @@ function KartuContoh() {
       <div className="ld-kartu-kpi">
         <div><span>Selling / bulan</span><b>Rp 412 jt</b></div>
         <div><span>GP</span><b className="ok">18,4%</b></div>
-        <div><span>Posisi palet</span><b>1.212</b></div>
+        <div><span>Posisi palet</span><b>1,212</b></div>
       </div>
       <div className="ld-kartu-bar" role="img" aria-label="Komposisi biaya: space 46%, manpower 31%, MHE 14%, lainnya 9%">
         {biaya.map(b => <i key={b.l} style={{ flexBasis: `${b.v}%` }} title={`${b.l} ${b.v}%`} />)}
@@ -215,10 +215,10 @@ function KartuContoh() {
       <table className="ld-kartu-tabel">
         <thead><tr><th>Rate card</th><th>Satuan</th><th>Tarif</th></tr></thead>
         <tbody>
-          <tr><td>Storage</td><td>palet / hari</td><td>Rp 3.950</td></tr>
-          <tr><td>Handling in</td><td>palet</td><td>Rp 18.500</td></tr>
-          <tr><td>Handling out</td><td>karton</td><td>Rp 1.250</td></tr>
-          <tr><td>VAS banding strap</td><td>palet</td><td>Rp 9.000</td></tr>
+          <tr><td>Storage</td><td>palet / hari</td><td>Rp 3,950</td></tr>
+          <tr><td>Handling in</td><td>palet</td><td>Rp 18,500</td></tr>
+          <tr><td>Handling out</td><td>karton</td><td>Rp 1,250</td></tr>
+          <tr><td>VAS banding strap</td><td>palet</td><td>Rp 9,000</td></tr>
         </tbody>
       </table>
       <div className="ld-kartu-flag"><b>1 red flag</b> · Utilisasi reach truck 34%. Solusi: pakai bersama antar shift.</div>
@@ -284,7 +284,7 @@ function DenahMini() {
         {garis(DENAH.rak[0][1] + DENAH.rak[0][3], DENAH.rak[1][1], 33, 'm-ukur', '3,5 m')}
         <path d={`M${px(0) - 6} ${pz(3)} l6 3 -6 3z M${px(0) - 6} ${pz(10)} l6 3 -6 3z`} className="m-dock" />
       </svg>
-      <figcaption><span className="m-cmd">Perintah › M</span><span className="m-ket">Skala sebenarnya · rak 1,0 m · lorong 3,5 m · kolom di celah back-to-back</span><span className="m-st">ORTHO</span><span className="m-st on">OSNAP</span></figcaption>
+      <figcaption><span className="m-cmd">Perintah › M</span><span className="m-ket">Skala sebenarnya · rak 1.0 m · lorong 3.5 m · kolom di celah back-to-back</span><span className="m-st">ORTHO</span><span className="m-st on">OSNAP</span></figcaption>
     </figure>
   );
 }

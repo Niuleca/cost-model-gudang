@@ -258,7 +258,7 @@ export function aktivitasDenganOrderAdmin<T extends AktivitasInput>(aktivitas: T
   });
 }
 
-const f = (x: number) => (Math.round(x * 100) / 100).toLocaleString('id-ID');
+const f = (x: number) => (Math.round(x * 100) / 100).toLocaleString('en-US');
 
 /** Stok rata-rata dalam kg/ton, CBM, liter = stok palet (baris Storage, rata-rata) × parameter muatan per palet. */
 export function stokDariPalet(volumes: VolumeInput[], profil: ProfilVolume | undefined) {

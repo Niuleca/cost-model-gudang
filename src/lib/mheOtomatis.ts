@@ -34,7 +34,7 @@ export function pilihItemMhe(tool: string, items: ItemHargaMhe[], opsi: { tonPer
   const it = approved[0] ?? urut(cocok)[0];
   const h = perBulan(it)!;
   return { item: it, mode: h.mode, harga: h.harga, jumlahPilihan: cocok.length,
-    alasan: `termurah dari ${cocok.length} pilihan ${jenis}${beban > 0.05 ? ` (kapasitas ≥ ${beban.toLocaleString('id-ID', { maximumFractionDigits: 2 })} t)` : ''}${it.vendor ? ` · vendor ${it.vendor}` : ''}${it.status_efektif !== 'approved' ? ` · harga ${it.status_efektif}` : ''}` };
+    alasan: `termurah dari ${cocok.length} pilihan ${jenis}${beban > 0.05 ? ` (kapasitas ≥ ${beban.toLocaleString('en-US', { maximumFractionDigits: 2 })} t)` : ''}${it.vendor ? ` · vendor ${it.vendor}` : ''}${it.status_efektif !== 'approved' ? ` · harga ${it.status_efektif}` : ''}` };
 }
 
 /** Lengkapi / perbarui baris MHE otomatis untuk semua alat kebutuhan. null bila tidak ada perubahan. */

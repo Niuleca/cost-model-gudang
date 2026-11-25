@@ -69,7 +69,7 @@ export function hitungKalender(tahun: number, hariKerjaPerMinggu: number, holida
 // ---------------------------------------------------------------------------
 export function hitungTender(t0: TenderInput, m: MasterData) {
   const flags: RedFlag[] = [];
-  for (const { v } of volumeSalahRibuan(t0.volumes)) flags.push({ level: 'kritis', kode: 'VOLUME_DESIMAL', pesan: `Volume ${v.arus} ${v.uom} tercatat ${String(v.peakBulan).replace('.', ',')} per bulan (desimal) — kemungkinan maksudnya ${Math.round(v.peakBulan * 1000).toLocaleString('id-ID')}. Tarif per unit jadi sangat besar. Perbaiki di tab Volume.` });
+  for (const { v } of volumeSalahRibuan(t0.volumes)) flags.push({ level: 'kritis', kode: 'VOLUME_DESIMAL', pesan: `Volume ${v.arus} ${v.uom} tercatat ${String(v.peakBulan)} per bulan (desimal) — kemungkinan maksudnya ${Math.round(v.peakBulan * 1000).toLocaleString('en-US')}. Tarif per unit jadi sangat besar. Perbaiki di tab Volume.` });
   // beberapa baris per arus (karton + pail + drum …) → satu volume arus dalam palet ekuivalen
   const t: TenderInput = { ...t0, volumes: gabungPerArus(t0.volumes) };
   const kal = hitungKalender(t.tahun, t.hariKerjaPerMinggu, m.holidays, t.cutiTahunanHari);
@@ -244,7 +244,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     if (!(Object.values(alokasi).reduce((a2, c) => a2 + c, 0) > 1e-9)) alokasi = normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
     if (direvisi) {
       baris.push({ deskripsi, kelompok, kategoriRisiko: risiko ?? RISIKO_DEFAULT[kelompok], biayaBulan: bulat(rev), alokasi,
-        dasar: `direvisi manual (sistem: Rp${bulat(biayaBulan).toLocaleString('id-ID')} · ${dasar})`, biayaSistem: bulat(biayaBulan) });
+        dasar: `direvisi manual (sistem: Rp${bulat(biayaBulan).toLocaleString('en-US')} · ${dasar})`, biayaSistem: bulat(biayaBulan) });
       return;
     }
     baris.push({ deskripsi, kelompok, kategoriRisiko: risiko ?? RISIKO_DEFAULT[kelompok], biayaBulan: bulat(biayaBulan), alokasi, dasar });
@@ -255,7 +255,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     const u = umur && umur > 0 ? umur : n;
     const periode = Math.min(u, n);
     if (u > n) umurLebih.push(deskripsi);
-    tambah(`${deskripsi} — depresiasi`, kelompok, nilai / periode, alokasi, `Rp${bulat(nilai).toLocaleString('id-ID')} ÷ ${periode} bln`, risiko);
+    tambah(`${deskripsi} — depresiasi`, kelompok, nilai / periode, alokasi, `Rp${bulat(nilai).toLocaleString('en-US')} ÷ ${periode} bln`, risiko);
     nilaiModal.set(`${deskripsi} — depresiasi`, nilai);
     // bunga tidak otomatis — hanya lewat sheet Interest cost (dipilih user)
     return nilai;
@@ -266,14 +266,14 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
   const nilaiModal = new Map<string, number>();
 
   for (const p of payroll) tambah(`Manpower — ${p.roleName} (${p.headcount} org)`, 'Manpower', p.biayaBulan, p.alokasi,
-    `${p.headcount} org${p.porsi < 1 ? ` × sharing ${p.porsi.toLocaleString('id-ID')}` : ''} × Rp${Math.round(p.totalSebelumFee).toLocaleString('id-ID')} + fee ${(paramMp.feePersen * 100).toLocaleString('id-ID')}%${p.biayaManual ? ' (diubah)' : ''}${esk.faktor > 1.0000001 ? ` × eskalasi ${esk.faktor.toFixed(4)} (rata-rata kontrak)` : ''}`);
+    `${p.headcount} org${p.porsi < 1 ? ` × sharing ${p.porsi.toLocaleString('en-US')}` : ''} × Rp${Math.round(p.totalSebelumFee).toLocaleString('en-US')} + fee ${(paramMp.feePersen * 100).toLocaleString('en-US')}%${p.biayaManual ? ' (diubah)' : ''}${esk.faktor > 1.0000001 ? ` × eskalasi ${esk.faktor.toFixed(4)} (rata-rata kontrak)` : ''}`);
 
   // Fasilitas
   const alokStorage = normalisasi({ storage: 1 }, { storage: 1 });
   const sewaTetap = t.skenarioAset === 'Rental' && (s.sewaTetapBulan ?? 0) > 0;
   const sewaBulan = t.skenarioAset !== 'Rental' ? 0 : sewaTetap ? s.sewaTetapBulan! : space.totalM2 * s.tarifSewaM2Bulan;
   tambah(s.namaGudang ? `Sewa gudang — ${s.namaGudang}` : 'Sewa gudang', 'Fasilitas', sewaBulan, alokStorage,
-    sewaTetap ? `sewa utuh Rp${s.sewaTetapBulan!.toLocaleString('id-ID')}/bln (${s.luasTersediaM2 ?? '?'} m²)` : `${space.totalM2} m² × Rp${s.tarifSewaM2Bulan.toLocaleString('id-ID')}`);
+    sewaTetap ? `sewa utuh Rp${s.sewaTetapBulan!.toLocaleString('en-US')}/bln (${s.luasTersediaM2 ?? '?'} m²)` : `${space.totalM2} m² × Rp${s.tarifSewaM2Bulan.toLocaleString('en-US')}`);
   if (s.luasTersediaM2 && space.totalM2 > s.luasTersediaM2)
     flags.push({ level: 'kritis', kode: 'GUDANG_KURANG', pesan: `Kebutuhan ${space.totalM2} m² melebihi luas gudang terpilih ${s.luasTersediaM2} m².` });
   else if (s.luasTersediaM2 && sewaTetap && space.totalM2 < s.luasTersediaM2 * 0.7)
@@ -283,7 +283,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
   const rakLama = { harga: s.hargaRakPerPosisi ?? 0, umurBulan: s.umurRakBulan ?? 120 };
   const sewaRak = s.rakSkema === 'sewa', tarifSewaRak = Math.max(0, Number(s.sewaRakPerPPBulan) || 0);
   for (const [label, pos, h] of [['SPR', posSpr, s.rak?.spr ?? rakLama], ['DDR', posDdr, s.rak?.ddr ?? rakLama]] as const) {
-    if (sewaRak) { if (pos > 0 && tarifSewaRak > 0) tambah(`Sewa racking ${label} (${pos} posisi)`, 'Racking', pos * tarifSewaRak, alokStorage, `${pos} PP × Rp${tarifSewaRak.toLocaleString('id-ID')}/PP/bln`); }
+    if (sewaRak) { if (pos > 0 && tarifSewaRak > 0) tambah(`Sewa racking ${label} (${pos} posisi)`, 'Racking', pos * tarifSewaRak, alokStorage, `${pos} PP × Rp${tarifSewaRak.toLocaleString('en-US')}/PP/bln`); }
     else if (pos > 0 && h.harga > 0) investasi += capex(`Racking ${label} (${pos} posisi)`, 'Racking', pos * h.harga, h.umurBulan, alokStorage);
   }
 
@@ -291,16 +291,16 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
   const alokListrik = normalisasi(undefined, { storage: 0.6, handling_in: 0.2, handling_out: 0.2 });
   if (t.listrikSimulasi && t.listrikSimulasi.totalBulan > 0)
     tambah(`Listrik — ${t.listrikSimulasi.nama}`, 'Utilitas', t.listrikSimulasi.totalBulan, alokListrik,
-      `simulasi Utilities: ${bulat(t.listrikSimulasi.kwhBulan).toLocaleString('id-ID')} kWh/bln (energi + kVArh + beban)`);
+      `simulasi Utilities: ${bulat(t.listrikSimulasi.kwhBulan).toLocaleString('en-US')} kWh/bln (energi + kVArh + beban)`);
   else {
     const kwhBulan = t.listrik.reduce((sum, l) => sum + l.watt * l.qty * l.jamPerHari, 0) * kal.hariOperasionalBulan / 1000;
-    tambah('Listrik', 'Utilitas', kwhBulan * t.tarifListrikKwh, alokListrik, `${bulat(kwhBulan).toLocaleString('id-ID')} kWh × Rp${t.tarifListrikKwh}`);
+    tambah('Listrik', 'Utilitas', kwhBulan * t.tarifListrikKwh, alokListrik, `${bulat(kwhBulan).toLocaleString('en-US')} kWh × Rp${t.tarifListrikKwh}`);
   }
 
   // MHE
   for (const x of mhe) {
     if (x.unit === 0) continue;
-    if (x.mode === 'sewa') tambah(`${x.nama} — sewa (${x.unit} unit)`, 'MHE', x.unit * x.harga, x.alokasi, `${x.unit} unit × Rp${x.harga.toLocaleString('id-ID')}`);
+    if (x.mode === 'sewa') tambah(`${x.nama} — sewa (${x.unit} unit)`, 'MHE', x.unit * x.harga, x.alokasi, `${x.unit} unit × Rp${x.harga.toLocaleString('en-US')}`);
     else investasi += capex(`${x.nama} (${x.unit} unit)`, 'MHE', x.unit * x.harga, x.umurBulan, x.alokasi);
   }
 
@@ -308,10 +308,10 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
   for (const c of t.costLines) {
     const alok = normalisasi(c.alokasi, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
     const nilai = c.qty * c.hargaSatuan;
-    if (c.mode === 'bulanan' || c.mode === 'sewa') tambah(c.deskripsi, c.kelompok, nilai, alok, `${c.qty} × Rp${c.hargaSatuan.toLocaleString('id-ID')}${c.sumber ? ' · ' + c.sumber : ''}`, c.kategoriRisiko);
+    if (c.mode === 'bulanan' || c.mode === 'sewa') tambah(c.deskripsi, c.kelompok, nilai, alok, `${c.qty} × Rp${c.hargaSatuan.toLocaleString('en-US')}${c.sumber ? ' · ' + c.sumber : ''}`, c.kategoriRisiko);
     else if (c.mode === 'beli') investasi += capex(c.deskripsi, c.kelompok, nilai, c.umurBulan, alok, c.kategoriRisiko);
     else { // sekali (startup): amortisasi selama kontrak + bunga
-      tambah(`${c.deskripsi} — amortisasi`, c.kelompok, nilai / n, alok, `Rp${nilai.toLocaleString('id-ID')} ÷ ${n} bln`, c.kategoriRisiko ?? 'Tinggi');
+      tambah(`${c.deskripsi} — amortisasi`, c.kelompok, nilai / n, alok, `Rp${nilai.toLocaleString('en-US')} ÷ ${n} bln`, c.kategoriRisiko ?? 'Tinggi');
       nilaiModal.set(`${c.deskripsi} — amortisasi`, nilai);
       investasi += nilai;
     }
@@ -328,7 +328,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     ] as const) {
       const nilai = persen * dasar;
       if (nilai <= 0) continue;
-      tambah(`${nama} (otomatis) — amortisasi`, 'Startup', nilai / n, alokOps, `${(persen * 100).toFixed(0)}% × ${ket} Rp${bulat(dasar).toLocaleString('id-ID')} = Rp${bulat(nilai).toLocaleString('id-ID')} ÷ ${n} bln`);
+      tambah(`${nama} (otomatis) — amortisasi`, 'Startup', nilai / n, alokOps, `${(persen * 100).toFixed(0)}% × ${ket} Rp${bulat(dasar).toLocaleString('en-US')} = Rp${bulat(nilai).toLocaleString('en-US')} ÷ ${n} bln`);
       nilaiModal.set(`${nama} (otomatis) — amortisasi`, nilai);
       investasi += nilai;
     }
@@ -350,7 +350,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
   for (const it of interestItems) {
     if (!it.sumberDitemukan) { flags.push({ level: 'peringatan', kode: 'INTEREST_SUMBER', pesan: `Interest cost "${it.deskripsi}": baris sumber "${it.sumber}" tidak ada lagi di rincian biaya — pakai pokok manual atau pilih ulang.` }); }
     tambah(`Interest cost — ${it.deskripsi}`, 'Interest cost', it.biayaBulan, it.alokasi,
-      `pokok Rp${it.pokok.toLocaleString('id-ID')} × ${(bungaTahun * 100).toLocaleString('id-ID')}%/thn × ${it.tenorBulan} bln${ic?.metode === 'menurun' ? ' (pokok dicicil, bunga atas sisa)' : ' (flat)'} = Rp${it.totalBunga.toLocaleString('id-ID')} ÷ ${n} bln kontrak`);
+      `pokok Rp${it.pokok.toLocaleString('en-US')} × ${(bungaTahun * 100).toLocaleString('en-US')}%/thn × ${it.tenorBulan} bln${ic?.metode === 'menurun' ? ' (pokok dicicil, bunga atas sisa)' : ' (flat)'} = Rp${it.totalBunga.toLocaleString('en-US')} ÷ ${n} bln kontrak`);
   }
   const interestCost = { bungaTahun, metode: ic?.metode ?? 'flat', items: interestItems.map(({ alokasi: _a, ...x }) => x),
     totalPokok: bulat(interestItems.reduce((a, x) => a + x.pokok, 0)), totalBunga: bulat(interestItems.reduce((a, x) => a + x.totalBunga, 0)),
@@ -524,11 +524,11 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
         const o = rc?.opsiUom.find(o2 => o2.uom === x.uom) ?? rc?.opsiUom[0];
         biayaPU = rc && o && o.volume > 0 ? rc.biayaBulan / o.volume : 0;
         if (rc) gpDef = rc.gpPersen;
-        dasarTeks = rc && o ? `biaya ${x.bucket} Rp${bulat(rc.biayaBulan).toLocaleString('id-ID')} ÷ ${bulat(o.volume, 2).toLocaleString('id-ID')} ${o.uom}` : 'layanan dasar tidak dijual / tidak ada';
+        dasarTeks = rc && o ? `biaya ${x.bucket} Rp${bulat(rc.biayaBulan).toLocaleString('en-US')} ÷ ${bulat(o.volume, 2).toLocaleString('en-US')} ${o.uom}` : 'layanan dasar tidak dijual / tidak ada';
       } else if (x.dasar === 'aktivitas') {
         const menit = Math.max(0, Number(x.menit) || 0), orang = Math.max(0, Number(x.orang ?? 1) || 0), peng = Number(x.pengali) > 0 ? Number(x.pengali) : 1;
         biayaPU = (menit / 60) * (orang * tarifJamOrang * peng + (x.alat ? tarifJamAlat : 0)) + Math.max(0, Number(x.material) || 0);
-        dasarTeks = `${menit} mnt × (${orang} org × Rp${bulat(tarifJamOrang).toLocaleString('id-ID')}/jam${peng !== 1 ? ` × ${peng}` : ''}${x.alat ? ` + alat Rp${bulat(tarifJamAlat).toLocaleString('id-ID')}/jam` : ''}) + material Rp${(Number(x.material) || 0).toLocaleString('id-ID')}`;
+        dasarTeks = `${menit} mnt × (${orang} org × Rp${bulat(tarifJamOrang).toLocaleString('en-US')}/jam${peng !== 1 ? ` × ${peng}` : ''}${x.alat ? ` + alat Rp${bulat(tarifJamAlat).toLocaleString('en-US')}/jam` : ''}) + material Rp${(Number(x.material) || 0).toLocaleString('en-US')}`;
       } else if (x.dasar === 'tarif') { biayaPU = Math.max(0, Number(x.biaya) || 0); dasarTeks = 'tarif diisi manual' + (biayaPU > 0 ? '' : ' (isi biaya/unit bila ingin melihat GP)'); }
       else { biayaPU = Math.max(0, Number(x.biaya) || 0); dasarTeks = 'biaya per unit diisi manual'; }
       // Tarif diisi sendiri (dasar 'tarif', atau tarif override di dasar lain) → GP dihitung dari tarif
@@ -625,15 +625,15 @@ export function opsiUomRateCard(b: string, v: { uom: string; konversi?: { uom1: 
   const out: { uom: string; volume: number; dasar: string; tetap?: boolean }[] = [];
   const u = v?.uom ?? 'unit';
   const lb = dasarVol?.label ?? 'MGV (komitmen)', rinci = dasarVol && v?.rincianPer ? v.rincianPer[dasarVol.kunci] : v?.rincian;
-  out.push({ uom: u, volume: komitmen, dasar: rinci ? `${lb}: ${rinci} = ${komitmen.toLocaleString('id-ID', { maximumFractionDigits: 2 })} ${u}` : `volume ${lb} ${komitmen.toLocaleString('id-ID', { maximumFractionDigits: 2 })} ${u}` });
+  out.push({ uom: u, volume: komitmen, dasar: rinci ? `${lb}: ${rinci} = ${komitmen.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${u}` : `volume ${lb} ${komitmen.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${u}` });
   // baris gabungan: tarif per unit asli (karton / pail / drum dijumlah apa adanya)
-  if (v?.unitAsli && dasarVol) { const nu = v.unitAsli[dasarVol.kunci]; if (nu > 0) out.push({ uom: 'unit (campuran)', volume: nu, dasar: `${lb}: ${rinci} = ${nu.toLocaleString('id-ID')} unit` }); }
+  if (v?.unitAsli && dasarVol) { const nu = v.unitAsli[dasarVol.kunci]; if (nu > 0) out.push({ uom: 'unit (campuran)', volume: nu, dasar: `${lb}: ${rinci} = ${nu.toLocaleString('en-US')} unit` }); }
   const k = v?.konversi;
   if (k && k.per1 > 0 && k.uom1) out.push({ uom: k.uom1, volume: komitmen * k.per1, dasar: `${u} × ${k.per1} ${k.uom1}` });
   if (k && k.per1 > 0 && k.per2 > 0 && k.uom2 && kelasUom(u) === 'palet') out.push({ uom: k.uom2, volume: komitmen * k.per1 * k.per2, dasar: `${u} × ${k.per1} × ${k.per2} ${k.uom2}` });
   // konversi terpadu: palet ⇄ case ⇄ pcs ⇄ CBM ⇄ kg ⇄ liter (parameter muatan & isi per palet di tab Volume)
   const ur = v ? uraiUom(v, komitmen, kp ?? v.muatan) : null;
-  const f = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+  const f = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 2 });
   const tambah = (uom: string, vol: number | null | undefined, dasar: string) => { if (vol != null && vol > 0) out.push({ uom, volume: vol, dasar }); };
   if (b === 'storage') {
     if (luasM2 > 0) out.push({ uom: 'm²', volume: luasM2, dasar: 'luas gudang (m²)', tetap: true });

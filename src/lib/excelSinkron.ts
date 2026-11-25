@@ -285,7 +285,7 @@ export async function bacaUpload(file: File | Blob, t: TenderRow): Promise<Hasil
 
 export const ringkasNilai = (v: unknown) => {
   if (v == null) return '—';
-  if (typeof v === 'number') return v.toLocaleString('id-ID', { maximumFractionDigits: 4 });
+  if (typeof v === 'number') return v.toLocaleString('en-US', { maximumFractionDigits: 4 });
   if (typeof v === 'object') { const s = JSON.stringify(v); return s.length > 90 ? `${s.slice(0, 90)}…` : s; }
   return String(v);
 };

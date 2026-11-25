@@ -172,11 +172,11 @@ export default function BiayaLainPanel({ lines, items, kontrakBulan, onChange, s
       <div className="def-driver">
         {dv('Manpower', `${d.headcount} orang`, !(d.headcount > 0))}
         {dv('User kantor', `${d.userKantor} (SPV/manager ${d.manajer})`, !(d.userKantor > 0))}
-        {dv('Luas', `${Math.round(d.luasM2).toLocaleString('id-ID')} m²`, !(d.luasM2 > 0))}
-        {dv('Office', `${Math.round(d.officeM2).toLocaleString('id-ID')} m²`, !(d.officeM2 > 0))}
-        {dv('Posisi palet', Math.round(d.posisiPalet).toLocaleString('id-ID'), !(d.posisiPalet > 0))}
-        {dv('Palet in/out', `${Math.round(d.paletInBulan).toLocaleString('id-ID')} / ${Math.round(d.paletOutBulan).toLocaleString('id-ID')} per bln`, !(d.paletInBulan + d.paletOutBulan > 0))}
-        {dv('Order in/out', `${Math.round(d.orderInBulan).toLocaleString('id-ID')} / ${Math.round(d.orderOutBulan).toLocaleString('id-ID')} per bln`, !(d.orderInBulan + d.orderOutBulan > 0))}
+        {dv('Luas', `${Math.round(d.luasM2).toLocaleString('en-US')} m²`, !(d.luasM2 > 0))}
+        {dv('Office', `${Math.round(d.officeM2).toLocaleString('en-US')} m²`, !(d.officeM2 > 0))}
+        {dv('Posisi palet', Math.round(d.posisiPalet).toLocaleString('en-US'), !(d.posisiPalet > 0))}
+        {dv('Palet in/out', `${Math.round(d.paletInBulan).toLocaleString('en-US')} / ${Math.round(d.paletOutBulan).toLocaleString('en-US')} per bln`, !(d.paletInBulan + d.paletOutBulan > 0))}
+        {dv('Order in/out', `${Math.round(d.orderInBulan).toLocaleString('en-US')} / ${Math.round(d.orderOutBulan).toLocaleString('en-US')} per bln`, !(d.orderInBulan + d.orderOutBulan > 0))}
         {dv('Kategori', d.kategori, !d.kategori)}
         {dv('UMK', rp(d.umk), !(d.umk > 0))}
         {dv('Aset gedung', d.skenarioAset, !d.skenarioAset)}

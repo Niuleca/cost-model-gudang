@@ -6,7 +6,7 @@ export interface Solusi { solusi: string; tab?: string }
 
 /** Cara memperbaiki per kode red flag (tab = tempat memperbaikinya). */
 export const SOLUSI_FLAG: Record<string, Solusi> = {
-  PEAK_LT_AVG: { solusi: 'Peak harus ≥ rata-rata. Isi peak bulan tersibuk (biasanya 1,2–1,5 × rata-rata) atau samakan dengan rata-rata bila volume stabil.', tab: 'Volume' },
+  PEAK_LT_AVG: { solusi: 'Peak harus ≥ rata-rata. Isi peak bulan tersibuk (biasanya 1.2–1,5 × rata-rata) atau samakan dengan rata-rata bila volume stabil.', tab: 'Volume' },
   MGV_GT_PEAK: { solusi: 'Volume komitmen (MGV) biasanya ≤ rata-rata. Turunkan komitmen, atau naikkan peak bila customer memang menjamin volume setinggi itu.', tab: 'Volume' },
   KONVERSI_PALET: { solusi: 'Isi kolom "1 palet = … UoM" supaya volume bisa diubah ke posisi palet (dasar luas gudang, MHE & tarif storage).', tab: 'Volume' },
   PORSI_SPACE: { solusi: 'Jumlah porsi SPR + DDR + block stack + pallet floor harus 100%. Ubah salah satu porsi di bagian A Capacity Requirement.', tab: 'Warehouse Planning' },
@@ -62,7 +62,7 @@ export function saranGudang(h: HasilTender, a: Asumsi, jamEfektifPerShift = 7): 
   if (gp > 0 && gp < 0.1) s.push({ judul: 'Lindungi margin', isi: 'GP di bawah 10%: pasang klausul eskalasi tahunan (UMK & BBM), minimum charge storage, dan tarif tambahan untuk layanan di luar scope (VAS, lembur, handling loose).', tab: 'Result' });
   if ((a.tarifTambahan?.length ?? 0) === 0) s.push({ judul: 'Lengkapi layanan tambahan', isi: 'Belum ada layanan tambahan di rate card. Tambahkan yang sering muncul: labeling, wrapping, banding strap, unloading per container, stock opname per event.', tab: 'Result' });
   // 6. proses & kontrol
-  s.push({ judul: 'Kontrol inventori', isi: 'Jadwalkan cycle count mingguan untuk SKU fast moving (ABC) dan rekonsiliasi stok bulanan dengan customer; target akurasi stok ≥ 99,8%.', tab: 'Landmark VSM' });
+  s.push({ judul: 'Kontrol inventori', isi: 'Jadwalkan cycle count mingguan untuk SKU fast moving (ABC) dan rekonsiliasi stok bulanan dengan customer; target akurasi stok ≥ 99.8%.', tab: 'Landmark VSM' });
   if (!(a.aktivitas ?? []).some(x => /rf|scan/i.test(`${x.tool ?? ''} ${(x as { alatTambahan?: string[] }).alatTambahan?.join(' ') ?? ''}`)))
     s.push({ judul: 'Pakai barcode / RF', isi: 'Belum ada proses dengan RF / scanner. Scan barcode saat receiving, putaway & picking menekan salah kirim dan mempercepat stock opname.', tab: 'Value Stream Mapping' });
   return s.slice(0, 8);

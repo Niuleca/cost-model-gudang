@@ -286,7 +286,7 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
   const pm = d.paramMp;
   S4.o = 1;
   S4.bagian('Parameter (aturan pemerintah, bisa diubah)');
-  S4.param('BPJS TK (JHT 3,7% + JKK 1,27% + JKM 0,3%)', pm.bpjsTk, 'pct', 'input', '', 'PP 44/2015, PP 46/2015', 'BpjsTk');
+  S4.param('BPJS TK (JHT 3.7% + JKK 1.27% + JKM 0.3%)', pm.bpjsTk, 'pct', 'input', '', 'PP 44/2015, PP 46/2015', 'BpjsTk');
   S4.param('BPJS Kesehatan', pm.bpjsKs, 'pct', 'input', '', 'Perpres 64/2020', 'BpjsKs');
   S4.param('Batas upah BPJS Kesehatan', pm.batasUpahKs ?? 12000000, 'rp', 'input', 'Rp', '', 'BatasKs');
   S4.param('BPJS Pensiun (JP)', pm.bpjsPensiun, 'pct', 'input', '', 'PP 45/2015', 'BpjsJp');
@@ -393,7 +393,7 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
   const ls = h.biaya.find(b => b.kelompok === 'Utilitas');
   if (ls) {
     S5.bagian('Listrik');
-    if (inp.listrikSimulasi && inp.listrikSimulasi.totalBulan > 0) sumber.set(ls.deskripsi, S5.param(ls.deskripsi, inp.listrikSimulasi.totalBulan, 'rp', 'input', 'Rp/bln', `simulasi Utilities ${Math.round(inp.listrikSimulasi.kwhBulan).toLocaleString('id-ID')} kWh/bln`));
+    if (inp.listrikSimulasi && inp.listrikSimulasi.totalBulan > 0) sumber.set(ls.deskripsi, S5.param(ls.deskripsi, inp.listrikSimulasi.totalBulan, 'rp', 'input', 'Rp/bln', `simulasi Utilities ${Math.round(inp.listrikSimulasi.kwhBulan).toLocaleString('en-US')} kWh/bln`));
     else {
       const kwh = inp.listrik.reduce((s, l) => s + l.watt * l.qty * l.jamPerHari, 0) * h.kalender.hariOperasionalBulan / 1000;
       const aK = S5.param('Pemakaian listrik', kwh, 'n0', 'input', 'kWh/bln', 'Σ watt × qty × jam/hari × hari ops/bln ÷ 1000');
@@ -650,7 +650,7 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
     const rr = rowT.get(rc.bucket)!; const r = S0.r;
     const vM = (rc.tarifPerUnit ?? 0) * (rc.volumeTarif ?? 0); jualKotor += vM;
     baris(['', LAYANAN[rc.bucket], { f: `'${R9}'!H${rr}`, v: rc.uom }, { f: `'${R9}'!K${rr}`, v: rc.volumeTarif }, { f: `'${R9}'!L${rr}`, v: rc.tarifPerUnit },
-      { f: `D${r}*E${r}`, v: vM }, { f: `F${r}*Kontrak`, v: vM * n }, `Komitmen / MOQ per bulan · GP ${((rc.gpPersen ?? 0) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`],
+      { f: `D${r}*E${r}`, v: vM }, { f: `F${r}*Kontrak`, v: vM * n }, `Komitmen / MOQ per bulan · GP ${((rc.gpPersen ?? 0) * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`],
       [undefined, undefined, undefined, 'n0', 'rp', 'rp', 'rp']);
   }
   const rSum = sub('Sum (gross)', h.rateCard.length ? `SUM(F${sel0}:F${S0.r - 1})` : '0', jualKotor);

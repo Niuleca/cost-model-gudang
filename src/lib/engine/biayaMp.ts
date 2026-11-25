@@ -17,7 +17,7 @@ export interface ParamBiayaMp {
 /** Default sesuai aturan pemerintah untuk gudang:
  *  BPJS TK pemberi kerja = JHT 3,7% (PP 46/2015) + JKK 1,27% (PP 44/2015 Lampiran I: penimbunan barang/veem = Kelompok IV risiko tinggi)
  *  + JKM 0,3% = 5,27%  (0,14% JKK direkomposisi ke JKP — PP 6/2025 — tanpa tambahan iuran);
- *  BPJS Kesehatan 4% s.d. upah Rp12 jt (Perpres 64/2020); Jaminan Pensiun 2% s.d. batas upah JP (PP 45/2015; Rp10.547.400);
+ *  BPJS Kesehatan 4% s.d. upah Rp12 jt (Perpres 64/2020); Jaminan Pensiun 2% s.d. batas upah JP (PP 45/2015; Rp10,547,400);
  *  THR 1/12 (Permenaker 6/2016); kompensasi PKWT 1/12 (PP 35/2021 Pasal 15–16). */
 export const PARAM_BIAYA_MP_DEFAULT: ParamBiayaMp = {
   bpjsTk: 0.0527, bpjsKs: 0.04, bpjsPensiun: 0.02, thr: 1 / 12, kompensasi: 1 / 12, feePersen: 0.11,

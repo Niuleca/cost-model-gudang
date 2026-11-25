@@ -18,7 +18,7 @@ export interface SeriGrafik { nama: string; nilai: number[]; /** combo: digambar
 /** Angka ringkas untuk sumbu: 1,2 M · 350 jt · 12 rb */
 export function ringkas(v: number, awalan = '') {
   const a = Math.abs(v), s = v < 0 ? '−' : '';
-  const f = (x: number, d: number) => x.toLocaleString('id-ID', { maximumFractionDigits: d });
+  const f = (x: number, d: number) => x.toLocaleString('en-US', { maximumFractionDigits: d });
   if (a >= 1e12) return `${s}${awalan}${f(a / 1e12, 1)} T`;
   if (a >= 1e9) return `${s}${awalan}${f(a / 1e9, 1)} M`;
   if (a >= 1e6) return `${s}${awalan}${f(a / 1e6, 1)} jt`;
@@ -122,7 +122,7 @@ function TabelData({ kategori, seri, fmt = v => ringkas(v) }: Props) {
   return <div className="tablewrap gf-tabel"><table>
     <thead><tr><th>{' '}</th>{seri.map(s => <th key={s.nama} className="num">{s.nama}</th>)}{satu && <th className="num">%</th>}</tr></thead>
     <tbody>{kategori.map((k, i) => <tr key={k + i}><td>{k}</td>{seri.map(s => <td key={s.nama} className="num">{fmt(s.nilai[i] ?? 0)}</td>)}
-      {satu && <td className="num">{((Math.max(0, seri[0].nilai[i] ?? 0) / tot) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%</td>}</tr>)}</tbody>
+      {satu && <td className="num">{((Math.max(0, seri[0].nilai[i] ?? 0) / tot) * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%</td>}</tr>)}</tbody>
   </table></div>;
 }
 
@@ -173,10 +173,10 @@ function Kanvas({ kategori, seri, jenis, fmt = v => ringkas(v), fmtSumbu, tinggi
             {aktif ? `${Math.round((aktif.v / (tot || 1)) * 1000) / 10}%` : (tengah ?? fs(tot))}</text>}
           {r0 > 0 && <text x={d / 2} y={d / 2 + 14} textAnchor="middle" fontSize={11} fill={TINTA2}>{aktif ? potong(aktif.k, r0 * 1.6) : 'total'}</text>}
         </svg>
-        {aktif && r0 === 0 && <div className="gf-tip" style={{ left: d / 2, top: 6 }}><b>{aktif.k}</b><div>{fmt(aktif.v)} · {(Math.round((aktif.v / (tot || 1)) * 1000) / 10).toLocaleString('id-ID')}%</div></div>}
+        {aktif && r0 === 0 && <div className="gf-tip" style={{ left: d / 2, top: 6 }}><b>{aktif.k}</b><div>{fmt(aktif.v)} · {(Math.round((aktif.v / (tot || 1)) * 1000) / 10).toLocaleString('en-US')}%</div></div>}
       </div>
       {!tanpaLegenda && <ul className="gf-legenda-pie">{irisan.map((x, j) => <li key={x.k} className={hover === j ? 'on' : ''} onMouseEnter={() => setHover(j)} onMouseLeave={() => setHover(null)}>
-        <i style={{ background: x.warna }} /><span>{x.k}</span><b>{(Math.round((x.v / (tot || 1)) * 1000) / 10).toLocaleString('id-ID')}%</b><em>{fmt(x.v)}</em></li>)}</ul>}
+        <i style={{ background: x.warna }} /><span>{x.k}</span><b>{(Math.round((x.v / (tot || 1)) * 1000) / 10).toLocaleString('en-US')}%</b><em>{fmt(x.v)}</em></li>)}</ul>}
     </div>;
   }
 
@@ -215,7 +215,7 @@ function Kanvas({ kategori, seri, jenis, fmt = v => ringkas(v), fmtSumbu, tinggi
           })}
         </svg>
         {hover != null && <div className="gf-tip" style={{ left: Math.min(lebar - 100, Math.max(100, labW + (lebar - labW - kanan) / 2)), top: atas + hover * tinggiBaris + tinggiBaris }}>
-          <b>{kategori[hover]}</b>{ss.map(s => { const v = Math.max(0, s.nilai[hover] || 0); return <div key={s.nama}><i style={{ background: s.warna }} />{s.nama}: <b>{fmt(v)}</b> · {pctK(v, hover).toLocaleString('id-ID')}%</div>; })}
+          <b>{kategori[hover]}</b>{ss.map(s => { const v = Math.max(0, s.nilai[hover] || 0); return <div key={s.nama}><i style={{ background: s.warna }} />{s.nama}: <b>{fmt(v)}</b> · {pctK(v, hover).toLocaleString('en-US')}%</div>; })}
         </div>}
       </div></div>;
   }

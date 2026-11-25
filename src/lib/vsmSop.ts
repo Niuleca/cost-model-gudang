@@ -72,7 +72,7 @@ export function susunVsm(aktivitas: AktivitasInput[], fte: Map<number, FteAktivi
 
 // ---------------------------------------------------------------- SOP draft
 const ada = (re: RegExp, ...xs: string[]) => xs.some(x => re.test((x || '').toLowerCase()));
-const fmt = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+const fmt = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 1 });
 const NAMA_TOOL: Record<string, string> = {
   RT: 'Reach Truck', CBT: 'Forklift Counter Balance', CB: 'Forklift Counter Balance', HPT: 'Hand Pallet Truck', EPT: 'Electric Pallet Truck', RF: 'RF scanner / handheld terminal',
   PC: 'PC / laptop admin', VNA: 'VNA truck', OP: 'Order picker', Manual: 'Manual (tanpa alat)',
@@ -177,10 +177,10 @@ export const adaBuffer = (p: ProsesVsm, v?: VsmInput) => v?.buffer?.[p.tahap] ??
 function kpiDefault(p: ProsesVsm): string {
   const n = `${p.lane} ${p.tahap}`.toLowerCase();
   if (/return|retur/.test(n)) return 'Retur diproses ≤ 2 × 24 jam\nAkurasi disposisi retur 100%';
-  if (/vas/.test(n)) return 'VAS selesai sesuai cut-off 100%\nAkurasi label / packing ≥ 99,8%';
-  if (/count|opname|storage|inventory|replen/.test(n)) return 'Akurasi stok (IRA) ≥ 99,8%\nTidak ada stok-out di lokasi picking akibat telat replenishment';
-  if (/outbound|pick|pack|load|dispatch/.test(n)) return 'Order terkirim tepat waktu (OTIF) ≥ 98%\nAkurasi picking ≥ 99,8%\nStock to dock ≤ 24 jam';
-  if (/inbound|receiv|unload|put/.test(n)) return 'Dock to stock ≤ 24 jam\nAkurasi penerimaan ≥ 99,5%\nWaktu bongkar per truk sesuai SLA';
+  if (/vas/.test(n)) return 'VAS selesai sesuai cut-off 100%\nAkurasi label / packing ≥ 99.8%';
+  if (/count|opname|storage|inventory|replen/.test(n)) return 'Akurasi stok (IRA) ≥ 99.8%\nTidak ada stok-out di lokasi picking akibat telat replenishment';
+  if (/outbound|pick|pack|load|dispatch/.test(n)) return 'Order terkirim tepat waktu (OTIF) ≥ 98%\nAkurasi picking ≥ 99.8%\nStock to dock ≤ 24 jam';
+  if (/inbound|receiv|unload|put/.test(n)) return 'Dock to stock ≤ 24 jam\nAkurasi penerimaan ≥ 99.5%\nWaktu bongkar per truk sesuai SLA';
   return 'Target produktivitas tercapai ≥ 95%';
 }
 
@@ -243,7 +243,7 @@ export function leadTimeDefault(lane: string) {
   if (/outbound|pick|dispatch/.test(k)) return 'Stock to dock ≤ 24 jam';
   if (/return/.test(k)) return 'Retur diproses ≤ 2 × 24 jam';
   if (/vas/.test(k)) return 'VAS selesai sebelum cut-off';
-  if (/storage|inventory|replen/.test(k)) return 'Akurasi stok ≥ 99,8%';
+  if (/storage|inventory|replen/.test(k)) return 'Akurasi stok ≥ 99.8%';
   return '';
 }
 

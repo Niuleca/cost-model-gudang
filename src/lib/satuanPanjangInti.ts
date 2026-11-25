@@ -11,7 +11,7 @@ export const satuanAktif = () => aktif;
 /** Teks panjang dalam satuan aktif, mis. pj(1064, 'mm') → "1,064 m" bila satuan meter. */
 export function pj(nilai: number, basis: SatuanPanjang, desimal?: number) {
   const x = konversiPanjang(nilai, basis, aktif);
-  return `${x.toLocaleString('id-ID', { maximumFractionDigits: desimal ?? DESIMAL[aktif] })} ${aktif}`;
+  return `${x.toLocaleString('en-US', { maximumFractionDigits: desimal ?? DESIMAL[aktif] })} ${aktif}`;
 }
 /** Dua dimensi "a × b satuan". */
 export const pj2 = (a: number, b: number, basis: SatuanPanjang) => `${pj(a, basis).replace(/ \S+$/, '')} × ${pj(b, basis)}`;

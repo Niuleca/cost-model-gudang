@@ -96,7 +96,7 @@ export function hitungMetrik(r: Rencana, a: AktualBulan | null, ambang = { hijau
 
 export interface Temuan { kode: string; judul: string; bukti: string; akar: string[]; tindakan: string[]; tingkat: 'merah' | 'kuning' }
 
-const pct = (x: number | null) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`);
+const pct = (x: number | null) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(x * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`);
 
 /** Akar masalah & rekomendasi tindakan korektif dari pola variance (rule-based, perlu dikonfirmasi tim operasi). */
 export function analisisAkar(ms: Metrik[]): Temuan[] {

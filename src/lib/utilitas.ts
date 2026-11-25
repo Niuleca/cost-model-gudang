@@ -30,7 +30,7 @@ export function listrikDefault(d: DriverListrik): BarisListrik[] {
   // penerangan & ventilasi gudang
   const jarakLampu = d.tinggiM >= 10 ? 9 : 8;   // high bay: jarak antar titik ≈ 0,8–0,9 × tinggi pasang
   add('highbay', 'Lampu high bay LED 150 W', 150, ceil(gudangM2 / (jarakLampu * jarakLampu)), jamOps,
-    d.luasM2 > 0 ? `1 titik per ${jarakLampu}×${jarakLampu} m area gudang (${Math.round(gudangM2).toLocaleString('id-ID')} m²) · menyala selama jam operasi ${jamOps} jam` : 'Luas gudang belum ada (Warehouse Planning)', d.luasM2 <= 0);
+    d.luasM2 > 0 ? `1 titik per ${jarakLampu}×${jarakLampu} m area gudang (${Math.round(gudangM2).toLocaleString('en-US')} m²) · menyala selama jam operasi ${jamOps} jam` : 'Luas gudang belum ada (Warehouse Planning)', d.luasM2 <= 0);
   add('exhaust', 'Exhaust fan industri 370 W', 370, ceil(gudangM2 / 500), Math.min(jamOps, 12), '1 unit per 500 m² area gudang · ±12 jam/hari (siang; atap dibantu turbin ventilator)', d.luasM2 <= 0);
   add('flood', 'Lampu sorot area luar LED 100 W', 100, Math.max(4, ceil(Math.sqrt(Math.max(d.luasM2, 1)) * 4 / 25)), 12, 'keliling gedung, 1 titik per 25 m · 12 jam/malam', d.luasM2 <= 0);
   add('darurat', 'Lampu darurat & exit sign 10 W', 10, Math.max(4, ceil(d.luasM2 / 200)), 24, '1 per 200 m² (jalur evakuasi)', d.luasM2 <= 0);
@@ -53,7 +53,7 @@ export function listrikDefault(d: DriverListrik): BarisListrik[] {
   // MHE & dock
   add('charger', 'Charger baterai MHE (reach truck / stacker)', 4500, d.mheListrik ?? 0, 6,
     d.mheListrik == null ? 'Data MHE belum ada (Value Stream Mapping → Technology & Equipment)' : d.mheListrik ? `${d.mheListrik} unit MHE listrik, ±6 jam pengisian/hari` : 'Tidak ada MHE listrik', d.mheListrik == null);
-  add('leveler', 'Dock leveler hidrolik', 750, d.dock, 1.5, d.dock ? `${d.dock} pintu dock · ±1,5 jam/hari` : 'Jumlah dock belum diketahui (gudang / Price Inquiry)', !d.dock);
+  add('leveler', 'Dock leveler hidrolik', 750, d.dock, 1.5, d.dock ? `${d.dock} pintu dock · ±1.5 jam/hari` : 'Jumlah dock belum diketahui (gudang / Price Inquiry)', !d.dock);
   add('pompa', 'Pompa air bersih', 750, 1, 3, '1 unit per site', false);
   add('fire', 'Panel fire alarm & detektor', 60, 1, 24, '1 per site', false);
   return rows;

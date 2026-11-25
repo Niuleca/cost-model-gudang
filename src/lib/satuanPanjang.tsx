@@ -5,6 +5,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type CSSProperties, type InputHTMLAttributes } from 'react';
 
 import { DESIMAL, aturSatuanAktif, konversiPanjang, type SatuanPanjang } from '@/lib/satuanPanjangInti';
+import { normalDesimal, bacaAngka } from '@/lib/bacaAngka';
 export { DESIMAL, konversiPanjang, type SatuanPanjang };
 export const SATUAN_PANJANG: { v: SatuanPanjang; l: string }[] = [{ v: 'm', l: 'm' }, { v: 'cm', l: 'cm' }, { v: 'mm', l: 'mm' }];
 const bulat = (x: number, d: number) => { const f = 10 ** d; return Math.round(x * f) / f; };
@@ -26,10 +27,10 @@ export function useSatuanPanjang() {
   const tampil = useCallback((nilai: number, basis: SatuanPanjang, desimal = DESIMAL[satuan]) => bulat(konversiPanjang(nilai, basis, satuan), desimal), [satuan]);
   /** angka yang diketik (satuan aktif) → satuan dasar */
   const simpan = useCallback((nilai: number, basis: SatuanPanjang) => konversiPanjang(nilai, satuan, basis), [satuan]);
-  /** teks berformat Indonesia + satuan, mis. "1,2 m" / "1.200 mm" */
+  /** teks berformat Indonesia + satuan, mis. "1,2 m" / "1,200 mm" */
   const fmt = useCallback((nilai: number, basis: SatuanPanjang, opt: { tanpaSatuan?: boolean; desimal?: number } = {}) => {
     const x = konversiPanjang(nilai, basis, satuan);
-    const s = x.toLocaleString('id-ID', { maximumFractionDigits: opt.desimal ?? DESIMAL[satuan] });
+    const s = x.toLocaleString('en-US', { maximumFractionDigits: opt.desimal ?? DESIMAL[satuan] });
     return opt.tanpaSatuan ? s : `${s} ${satuan}`;
   }, [satuan]);
   return { satuan, setSatuan, tampil, simpan, fmt };
@@ -49,7 +50,7 @@ export function InputPanjang({ nilai, basis, onNilai, kosong, style, placeholder
   const [teks, setTeks] = useState(keTeks(nilai));
   // sinkron bila nilai berubah dari luar atau satuan diganti
   useEffect(() => {
-    const n = Number(teks.replace(',', '.'));
+    const n = Number(normalDesimal(teks));
     const dariTeks = teks === '' ? null : simpan(n, basis);
     const beda = nilai == null || (kosong && !Number(nilai)) ? teks !== '' : dariTeks == null || Math.abs(dariTeks - Number(nilai)) > 1e-9 * Math.max(1, Math.abs(Number(nilai)));
     if (beda && !(teks.trim() === '' && Number(nilai) === 0)) setTeks(keTeks(nilai));
@@ -61,9 +62,9 @@ export function InputPanjang({ nilai, basis, onNilai, kosong, style, placeholder
     onChange={e => {
       const x = e.target.value; if (!/^[-\d.,\s]*$/.test(x)) return; setTeks(x);
       if (x === '') { onNilai(kosong ? null : 0); return; }
-      const t = x.replace(/\s/g, ''), d = t.includes(',') && t.includes('.') ? t.replace(/\./g, '') : t;
-      if (/^-?[.,]?$/.test(d)) return;
-      const n = Number(d.replace(',', '.')); if (Number.isFinite(n)) onNilai(simpan(n, basis));
+      const d = normalDesimal(x);
+      if (/^-?\.?$/.test(d)) return;
+      const n = Number(d); if (Number.isFinite(n)) onNilai(simpan(n, basis));
     }} />;
 }
 

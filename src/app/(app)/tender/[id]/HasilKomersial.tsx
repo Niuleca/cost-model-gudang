@@ -85,7 +85,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
             onChange={e => onPajak({ ...pajak, ppnPersen: Number(e.target.value) / 100 })} style={{ width: 80 }} />%</span></label>
       </div>
       {(() => { const p = pphPersen, n = 100000, gu = pajak.pph === 'exclude' ? n / (1 - p) : n; const pot = gu * p, ppnV = gu * pajak.ppnPersen;
-        return <p className="small pajak-contoh"><b>Contoh harga Rp100.000:</b> tarif {pajak.pph === 'exclude' ? `di-gross-up jadi ${rp(gu)}` : `tetap ${rp(gu)}`} → customer memotong PPh 23 {rp(pot)} → <b>diterima {rp(gu - pot)}</b>{pajak.pph === 'exclude' ? ' (utuh)' : ` (kurang ${rp(pot)})`}.
+        return <p className="small pajak-contoh"><b>Contoh harga Rp100,000:</b> tarif {pajak.pph === 'exclude' ? `di-gross-up jadi ${rp(gu)}` : `tetap ${rp(gu)}`} → customer memotong PPh 23 {rp(pot)} → <b>diterima {rp(gu - pot)}</b>{pajak.pph === 'exclude' ? ' (utuh)' : ` (kurang ${rp(pot)})`}.
           {' '}PPN {rp(ppnV)} {pajak.ppn === 'include' ? 'sudah di dalam tarif yang ditulis' : 'ditambahkan di invoice'} lalu disetor ke negara — tidak memengaruhi GP.</p>; })()}
       <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
         {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>

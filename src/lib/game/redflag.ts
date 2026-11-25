@@ -11,7 +11,7 @@ const LABEL: Record<JenisTugas, string> = {
 };
 const PERAN: Record<Kemampuan, string> = { admin: 'Admin', checker: 'Checker', operator: 'Operator MHE', picker: 'Picker', tkbm: 'TKBM' };
 const pct = (v: number) => `${Math.round(v * 100)}%`;
-const ang = (v: number, k = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: k });
+const ang = (v: number, k = 0) => v.toLocaleString('en-US', { maximumFractionDigits: k });
 
 /** Fraksi jam kerja hari ini yang sudah lewat (0..1). */
 function fraksiHari(d: Dunia) {

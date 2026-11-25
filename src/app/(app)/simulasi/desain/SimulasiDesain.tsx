@@ -11,7 +11,7 @@ import { keLayoutGudang, ringkas, type LayoutEdit } from '@/lib/simulasi3d/edito
 import Main3D from '../game/Main3D';
 import InputDesimal from '@/components/InputDesimal';
 
-const angka = (v: number) => v.toLocaleString('id-ID');
+const angka = (v: number) => v.toLocaleString('en-US');
 
 export default function SimulasiDesain({ edit, data, kotor }: { edit: LayoutEdit; data: { t: TenderRow; h: HasilTender; auto: LayoutGudang }; kotor: boolean }) {
   const [hari, setHari] = useState(7);

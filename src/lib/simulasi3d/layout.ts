@@ -58,7 +58,7 @@ export interface LayoutGudang {
 
 const ceil = (v: number) => Math.max(0, Math.ceil(v - 1e-9));
 const num = (v: unknown, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
-const fmt = (v: number, d = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d });
+const fmt = (v: number, d = 0) => v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
 
 /** Pengacak deterministik (posisi palet terisi tersebar, tapi sama setiap kali dibuka). */
 function acak(seed: number) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -131,7 +131,7 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
   const asumsi: string[] = [];
   const luasRencana = num(h.space.totalM2);
   const W = Math.max(8, num(p.lebarM, 23));
-  if (!num(t.asumsi.space?.excel?.lebarGudangM, 0) && !o.param?.lebarM) asumsi.push(`Lebar gudang (L) belum diisi di Warehouse Planning → Dimensi gedung → otomatis ${fmt(W)} m (rasio panjang : lebar ± 1,6 : 1).`);
+  if (!num(t.asumsi.space?.excel?.lebarGudangM, 0) && !o.param?.lebarM) asumsi.push(`Lebar gudang (L) belum diisi di Warehouse Planning → Dimensi gedung → otomatis ${fmt(W)} m (rasio panjang : lebar ± 1.6 : 1).`);
   const lv = hitungLevelRak({ centerMm: p.centerMm, sideMm: p.sideMm, beamMm: p.beamMm, palletMm: p.palletMm, productMm: p.productMm, clearanceMm: p.clearanceMm, levelManual: p.levelManual, tinggiLevel: p.tinggiLevel });
   const level = Math.max(1, lv.level);
   const sideM = p.sideMm / 1000, centerM = Math.max(sideM, p.centerMm / 1000);

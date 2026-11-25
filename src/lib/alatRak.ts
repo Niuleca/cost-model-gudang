@@ -14,7 +14,7 @@ export function alatRak(sx: Partial<SpaceExcel> | null | undefined, batasMm = BA
   const p = x.porsi ?? { spr: 0, ddr: 0, block: 0, floor: 0 };
   const lv = hitungLevelRak(x.rak);
   const tinggiBeamMm = lv.dasar.length ? lv.dasar[lv.dasar.length - 1] : 0;   // permukaan beam level teratas
-  const fm = (mm: number) => `${(mm / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} m`;
+  const fm = (mm: number) => `${(mm / 1000).toLocaleString('en-US', { maximumFractionDigits: 2 })} m`;
   if ((p.spr ?? 0) + (p.ddr ?? 0) <= 0) return { tool: 'CBT' as const, tinggiBeamMm: 0, level: 0, alasan: 'tanpa rak (block stack / pallet floor) → forklift counterbalance' };
   if ((p.ddr ?? 0) > 0) return { tool: 'RT' as const, tinggiBeamMm, level: lv.level, alasan: 'ada double deep rack → reach truck (double deep)' };
   return tinggiBeamMm <= batasMm

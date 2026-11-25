@@ -177,7 +177,7 @@ export function hitungProcessDesign(aktivitas: AktivitasInput[], volumes: Volume
     const orang: { host: number; sisaKap: number }[] = [];
     const nShift = beban.filter(x => x > 0).length;
     const pre = nShift > 1 ? `Shift ${si + 1}: ` : '';
-    const f2 = (x: number) => x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const f2 = (x: number) => x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     // FTE role di shift ini = Σ per arus (FTE × porsi jam arus) × workload arus di shift ini
     const fteShift = (r: typeof mp[number]) => r.manHour > 0
       ? (Object.keys(r.jamPerArus) as Arus[]).reduce((x, a) => x + r.fte * (r.jamPerArus[a] / r.manHour) * (bebanArus[a][si] ?? 0), 0)

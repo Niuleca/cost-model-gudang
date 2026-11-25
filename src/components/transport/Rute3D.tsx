@@ -521,7 +521,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
     });
     ro.observe(el); for (const m of semuaMat()) m.resolution.set(lebar, tinggiEl);
 
-    const fmt = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+    const fmt = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 1 });
     const tmp = new THREE.Vector3();
     let id = 0, lalu = performance.now(), tampilLalu = 0, tileLalu = 0;
     const loop = (kini: number) => {
@@ -634,7 +634,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
           kotak(x0, y0, pw, ph, 14, 'rgba(255,255,255,0.96)', 1);
           g.textBaseline = 'alphabetic'; g.fillStyle = '#475569'; g.font = huruf(11, 700); g.fillText('RUTE DOOR TO DOOR', x0 + pad, y0 + pad + 10 * sk);
           g.fillStyle = '#0f172a'; g.font = huruf(17, 700); g.fillText(r0.nama, x0 + pad, y0 + pad + 32 * sk, pw - pad * 2);
-          g.fillStyle = '#64748b'; g.font = huruf(12); g.fillText(`±${r0.km.toLocaleString('id-ID')} km · lead time ${fmt(r0.total)} hari`, x0 + pad, y0 + pad + 52 * sk);
+          g.fillStyle = '#64748b'; g.font = huruf(12); g.fillText(`±${r0.km.toLocaleString('en-US')} km · lead time ${fmt(r0.total)} hari`, x0 + pad, y0 + pad + 52 * sk);
           r0.legs.forEach((l, i) => {
             const y = y0 + (88 + i * 44) * sk;
             g.fillStyle = l.sumber === 'gagal' && l.moda !== 'laut' && l.moda !== 'udara' ? '#ef4444' : WARNA[l.moda];
@@ -643,7 +643,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
             g.fillStyle = '#0f172a'; g.font = huruf(13, 700);
             g.fillText(`${IKON_MODA[l.moda]} Stage ${l.idx + 1}${l.label ? ` · ${l.label}` : ''} — ${l.armada ?? LABEL_MODA[l.moda]}`, x0 + pad + 28 * sk, y + 2 * sk, pw - pad * 2 - 28 * sk);
             g.fillStyle = '#64748b'; g.font = huruf(11.5);
-            g.fillText(`${l.a.nama} → ${l.b.nama} · ±${l.km.toLocaleString('id-ID')} km · ${fmt(l.hari)} hari${l.perkiraan ? '*' : ''}${l.ferry ? ' · via ferry' : ''}`, x0 + pad + 28 * sk, y + 20 * sk, pw - pad * 2 - 28 * sk);
+            g.fillText(`${l.a.nama} → ${l.b.nama} · ±${l.km.toLocaleString('en-US')} km · ${fmt(l.hari)} hari${l.perkiraan ? '*' : ''}${l.ferry ? ' · via ferry' : ''}`, x0 + pad + 28 * sk, y + 20 * sk, pw - pad * 2 - 28 * sk);
           });
         }
         // legenda & atribusi
@@ -681,7 +681,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
     };
   }, [kunci]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fmtHari = (h: number) => `${h.toLocaleString('id-ID', { maximumFractionDigits: 1 })} hari`;
+  const fmtHari = (h: number) => `${h.toLocaleString('en-US', { maximumFractionDigits: 1 })} hari`;
   const utama = data.find(d => d.legs.length);
   const legAktif = utama?.legs.find(l => l.idx === hud.stage) ?? null;
   const pilihStage = (s: number) => { setFokus(s); kontrol.current.t = s >= 0 ? 0 : 0; kontrol.current.fokus = s; kontrol.current.manualSampai = 0; setJalan(true); };
@@ -698,7 +698,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
           <button type="button" className={fokus === -1 ? 'on' : ''} onClick={() => pilihStage(-1)}>Semua stage</button>
           {Array.from({ length: nStage }, (_, s) => <button key={s} type="button" className={fokus === s ? 'on' : ''} onClick={() => pilihStage(s)}>Stage {s + 1}</button>)}
         </div>
-        <div className="tabs" role="group" aria-label="Kecepatan">{[0.5, 1, 2, 4].map(x => <button key={x} type="button" className={kec === x ? 'on' : ''} onClick={() => setKec(x)}>{x.toLocaleString('id-ID')}×</button>)}</div>
+        <div className="tabs" role="group" aria-label="Kecepatan">{[0.5, 1, 2, 4].map(x => <button key={x} type="button" className={kec === x ? 'on' : ''} onClick={() => setKec(x)}>{x.toLocaleString('en-US')}×</button>)}</div>
         <div className="tabs" role="group" aria-label="Tampilan">
           <button type="button" className={tampilan === 'atas' ? 'on' : ''} onClick={() => setTampilan('atas')}>Top view</button>
           <button type="button" className={tampilan === 'miring' ? 'on' : ''} onClick={() => setTampilan('miring')}>3D miring</button>
@@ -714,12 +714,12 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
         {utama && legAktif && <div className="rute3d-hud kiri">
           <div className="hud-eyebrow">{IKON_MODA[legAktif.moda]} {namaStage(legAktif)}</div>
           <div className="hud-judul">{legAktif.a.nama} → {legAktif.b.nama}</div>
-          <div className="hud-sub">{legAktif.armada ?? LABEL_MODA[legAktif.moda]} · ±{legAktif.km.toLocaleString('id-ID')} km</div>
+          <div className="hud-sub">{legAktif.armada ?? LABEL_MODA[legAktif.moda]} · ±{legAktif.km.toLocaleString('en-US')} km</div>
           <div className="hud-bar"><i style={{ width: `${Math.round(hud.u * 100)}%`, background: WARNA[legAktif.moda] }} /></div>
           <div className="hud-grid">
             <span>Lead time stage</span><b>{fmtHari(legAktif.hari)}{legAktif.perkiraan ? ' *' : ''}</b>
             <span>Berjalan</span><b>{fmtHari(hud.u * legAktif.hari)}</b>
-            <span>Door to door</span><b>hari ke-{(hud.hariRute[data.indexOf(utama)] ?? 0).toLocaleString('id-ID', { maximumFractionDigits: 1 })} / {fmtHari(utama.total)}</b>
+            <span>Door to door</span><b>hari ke-{(hud.hariRute[data.indexOf(utama)] ?? 0).toLocaleString('en-US', { maximumFractionDigits: 1 })} / {fmtHari(utama.total)}</b>
           </div>
           {data.length > 1 && <div className="hud-sub">{utama.nama} · +{data.length - 1} rute lain bergerak bersamaan</div>}
         </div>}
@@ -729,7 +729,7 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
             const st = l.idx < hud.stage || (l.idx === hud.stage && hud.u >= 1) ? 'selesai' : l.idx === hud.stage ? 'aktif' : 'menunggu';
             return <button key={l.idx} type="button" className={`hud-step ${st}`} onClick={() => pilihStage(l.idx)}>
               <span className="titik" style={{ background: st === 'menunggu' ? '#cbd5e1' : WARNA[l.moda] }}>{st === 'selesai' ? '✓' : l.idx + 1}</span>
-              <span><b>{namaStage(l)}</b><small>{IKON_MODA[l.moda]} {l.a.nama} → {l.b.nama}</small><small>{fmtHari(l.hari)}{l.perkiraan ? ' (perkiraan)' : ''} · ±{l.km.toLocaleString('id-ID')} km</small></span>
+              <span><b>{namaStage(l)}</b><small>{IKON_MODA[l.moda]} {l.a.nama} → {l.b.nama}</small><small>{fmtHari(l.hari)}{l.perkiraan ? ' (perkiraan)' : ''} · ±{l.km.toLocaleString('en-US')} km</small></span>
             </button>;
           })}
         </div>}
@@ -743,10 +743,10 @@ export default function Rute3D({ rute, tinggi = 560 }: { rute: RuteSim[]; tinggi
           const st = l.idx < hud.stage || (l.idx === hud.stage && hud.u >= 1) ? '✓ selesai' : l.idx === hud.stage ? `● ${LABEL_MODA[l.moda]} dalam perjalanan (${Math.round(hud.u * 100)}%)` : 'menunggu';
           return (
             <tr key={`${r.nama}-${i}`} className={l.idx === hud.stage ? 'aktif' : undefined}>
-              {i === 0 && <td rowSpan={r.legs.length}><b>{r.nama}</b><div className="small muted">{r.km.toLocaleString('id-ID')} km · {fmtHari(r.total)} · hari ke-{(hud.hariRute[ri] ?? 0).toLocaleString('id-ID', { maximumFractionDigits: 1 })}</div>{r.gagal.length > 0 && <div className="small" style={{ color: 'var(--bad)' }}>Lokasi belum dikenal: {r.gagal.join(', ')}</div>}</td>}
+              {i === 0 && <td rowSpan={r.legs.length}><b>{r.nama}</b><div className="small muted">{r.km.toLocaleString('en-US')} km · {fmtHari(r.total)} · hari ke-{(hud.hariRute[ri] ?? 0).toLocaleString('en-US', { maximumFractionDigits: 1 })}</div>{r.gagal.length > 0 && <div className="small" style={{ color: 'var(--bad)' }}>Lokasi belum dikenal: {r.gagal.join(', ')}</div>}</td>}
               <td><span style={{ color: WARNA[l.moda], fontWeight: 600 }}>{IKON_MODA[l.moda]} {namaStage(l)}</span> · {l.armada ? `${l.armada} · ` : ''}{l.a.nama} → {l.b.nama}
                 <div className="small" style={{ color: l.sumber === 'gagal' ? 'var(--bad)' : undefined }}>{l.sumber === 'gagal' && l.moda === 'laut' ? 'Alur laut tidak ditemukan — garis perkiraan' : LABEL_SUMBER[l.sumber]}{l.ferry ? ' + penyeberangan ferry (RoRo) — ruas di atas laut adalah kapal ferry' : ''}</div></td>
-              <td className="num">±{l.km.toLocaleString('id-ID')} km</td>
+              <td className="num">±{l.km.toLocaleString('en-US')} km</td>
               <td className="num">{fmtHari(l.hari)}{l.perkiraan ? <span className="small muted"> (perkiraan)</span> : ''}</td>
               <td className="small">{st}</td>
             </tr>);

@@ -760,7 +760,7 @@ export function ringkas(e0: LayoutEdit): Ringkasan {
   const pad = ks.filter(solid);
   for (let i = 0; i < pad.length; i++) for (let j = i + 1; j < pad.length; j++)
     if (tumpang(pad[i], pad[j])) peringatan.push({ level: 'kritis', pesan: `${pad[i].label} bertabrakan dengan ${pad[j].label}.`, id: pad[i].induk ?? pad[i].id });
-  if (totalRak > 0 && e.stokDesain > totalRak) peringatan.push({ level: 'kritis', pesan: `Kapasitas ${totalRak.toLocaleString('id-ID')} posisi < stok desain ${e.stokDesain.toLocaleString('id-ID')} palet.` });
+  if (totalRak > 0 && e.stokDesain > totalRak) peringatan.push({ level: 'kritis', pesan: `Kapasitas ${totalRak.toLocaleString('en-US')} posisi < stok desain ${e.stokDesain.toLocaleString('en-US')} palet.` });
   return { posisiSpr, posisiDdr, posisiBlock, posisiStaging, totalRak, luasGedung: luasGedung(g), luasRak: luas(k => !!k.rak), luasBlock: luas(k => k.jenis === 'block'),
     luasStaging: luas(k => k.jenis === 'stagingIn' || k.jenis === 'stagingOut'), luasFasilitas: luas(k => k.jenis === 'fasilitas'), luasJalur: luas(k => k.jenis === 'jalur'),
     okupansi, paletDitampilkan: Math.round(okupansi * totalRak), peringatan };
@@ -828,7 +828,7 @@ export function keLayoutGudang(e: LayoutEdit, dasar: LayoutGudang): LayoutGudang
   const stagingIn = (() => { const k = ks.find(c => c.jenis === 'stagingIn'); return k ? { x0: k.x, x1: k.x + k.w, z0: k.z, z1: k.z + k.d } : { x0: 0, x1: 6, z0: 0, z1: g.W / 2 }; })();
   const stagingOut = (() => { const k = ks.find(c => c.jenis === 'stagingOut'); return k ? { x0: k.x, x1: k.x + k.w, z0: k.z, z1: k.z + k.d } : { x0: 0, x1: 6, z0: g.W / 2, z1: g.W }; })();
   const ringkasan = [
-    { label: 'Gedung', nilai: g.trapesium ? `trapesium ${r2(g.L)} m × lebar ${r2(g.trapesium.lebarDepan)} → ${r2(g.trapesium.lebarBelakang)} m = ${Math.round(luasGedung(g)).toLocaleString('id-ID')} m²` : `${r2(g.L)} × ${r2(g.W)} m = ${Math.round(g.L * g.W).toLocaleString('id-ID')} m²` },
+    { label: 'Gedung', nilai: g.trapesium ? `trapesium ${r2(g.L)} m × lebar ${r2(g.trapesium.lebarDepan)} → ${r2(g.trapesium.lebarBelakang)} m = ${Math.round(luasGedung(g)).toLocaleString('en-US')} m²` : `${r2(g.L)} × ${r2(g.W)} m = ${Math.round(g.L * g.W).toLocaleString('en-US')} m²` },
     { label: 'Posisi SPR / DDR / block', nilai: `${rk.posisiSpr} / ${rk.posisiDdr} / ${rk.posisiBlock}` },
     { label: 'Okupansi', nilai: `${Math.round(rk.okupansi * 100)}%` },
   ];

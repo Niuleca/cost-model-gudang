@@ -20,7 +20,7 @@ export interface VolumeInput {
   /** Parameter muatan tender (runtime, tidak disimpan): disisipkan oleh volumeEfektif(…, muatan) supaya konversi CBM/ton/kg ↔ palet konsisten di semua hitungan. */
   muatan?: Partial<Muatan>;
   minBulan?: number;         // volume terendah per bulan (opsional) — dasar tarif "Min"
-  /** Baris gabungan (runtime): rincian baris asli, mis. "3.217 karton + 2.842 pail + 3.121 drum" */
+  /** Baris gabungan (runtime): rincian baris asli, mis. "3,217 karton + 2,842 pail + 3,121 drum" */
   rincian?: string;
   /** Baris gabungan (runtime): jumlah unit asli (karton + pail + drum …) per basis volume */
   unitAsli?: Record<KunciVolume, number>;
@@ -443,7 +443,7 @@ export function gabungPerArus<V extends VolumeInput>(vs: V[]): V[] {
   const urut: string[] = []; const g = new Map<string, V[]>();
   for (const v of vs ?? []) { if (!g.has(v.arus)) { g.set(v.arus, []); urut.push(v.arus); } g.get(v.arus)!.push(v); }
   const out: V[] = [];
-  const fm = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+  const fm = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 2 });
   for (const ar of urut) {
     const xs = g.get(ar)!;
     if (xs.length === 1) { out.push(xs[0]); continue; }

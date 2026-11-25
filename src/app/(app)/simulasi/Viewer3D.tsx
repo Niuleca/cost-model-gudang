@@ -24,7 +24,7 @@ export type TemaViewer = 'standar' | 'bersih';
 const WARNA_ZONA: Record<string, string> = {
   stagingIn: '#3b82f6', stagingOut: '#10b981', spr: '#64748b', ddr: '#475569', block: '#a16207', floor: '#b45309', fasilitas: '#8b5cf6', jalur: '#f59e0b', custom: '#0ea5e9',
 };
-const f1 = (v: number) => v.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+const f1 = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 1 });
 /** Posisi x tempat bak truk menempel: tepi luar platform loading dock di depan (bila ada) atau dinding depan (x = 0). */
 export function xSandar(layout: LayoutGudang, z: number) {
   const p = (layout.platform ?? []).filter(q => q.x1 <= 0.05 && z >= q.z0 - 0.5 && z <= q.z1 + 0.5);

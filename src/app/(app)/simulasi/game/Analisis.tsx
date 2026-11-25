@@ -9,7 +9,7 @@ import { LABEL_TUGAS } from './panel';
 import { areaMhe, gridStaging } from './areaMhe';
 
 const JAM = 3600;
-const angka = (v: number, k = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: k, minimumFractionDigits: k });
+const angka = (v: number, k = 0) => v.toLocaleString('en-US', { maximumFractionDigits: k, minimumFractionDigits: k });
 const pct = (v: number) => `${angka(v * 100, 1)}%`;
 type Lampu = 'hijau' | 'kuning' | 'merah' | 'abu';
 const lampuUtil = (u: number): Lampu => (u >= 0.9 ? 'merah' : u >= 0.75 ? 'kuning' : u < 0.35 ? 'abu' : 'hijau');

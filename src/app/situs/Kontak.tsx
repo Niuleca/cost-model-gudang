@@ -13,7 +13,7 @@ export default function Kontak() {
     <form className="ld-form" onSubmit={e => { e.preventDefault(); wa(); }}>
       <label>Nama<input value={f.nama} onChange={e => setF({ ...f, nama: e.target.value })} autoComplete="name" required /></label>
       <label>Perusahaan<input value={f.perusahaan} onChange={e => setF({ ...f, perusahaan: e.target.value })} autoComplete="organization" /></label>
-      <label>Pesan<textarea rows={4} value={f.pesan} onChange={e => setF({ ...f, pesan: e.target.value })} placeholder="Mis. tender gudang 5.000 m² di Cikarang, butuh cost model & layout" required /></label>
+      <label>Pesan<textarea rows={4} value={f.pesan} onChange={e => setF({ ...f, pesan: e.target.value })} placeholder="Mis. tender gudang 5,000 m² di Cikarang, butuh cost model & layout" required /></label>
       {salah && <p className="ld-salah" role="alert">{salah}</p>}
       <div className="ld-form-tombol">
         <button type="submit" className="ld-tombol utama">Kirim via WhatsApp</button>

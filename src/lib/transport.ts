@@ -26,26 +26,26 @@ export interface Armada { nama: string; moda: Moda; kapKg: number; kapCbm: numbe
 /** Armada & kapasitas tipikal. Darat: kapasitas & tarif indikatif per km dari Deliveree (deliveree.com, jenis truk & kapasitas, 2026);
  *  Fuso & reefer = perkiraan. Container: ukuran ISO standar. */
 export const ARMADA: Armada[] = [
-  { nama: 'Blind Van', moda: 'darat', kapKg: 720, kapCbm: 3.8, kapPalet: 2, rpPerKm: 3150, ket: '220×135×130 cm · Rp3.000–3.300/km' },
-  { nama: 'Pick Up', moda: 'darat', kapKg: 1000, kapCbm: 4.9, kapPalet: 2, rpPerKm: 3500, ket: '235×162×130 cm · mulai Rp3.500/km' },
-  { nama: 'CDE (Engkel Box)', moda: 'darat', kapKg: 2200, kapCbm: 9.2, kapPalet: 3, rpPerKm: 3400, ket: '320×170×170 cm · Rp3.300–3.500/km' },
-  { nama: 'CDD Box', moda: 'darat', kapKg: 5000, kapCbm: 16.7, kapPalet: 6, rpPerKm: 4100, ket: '440×200×190 cm · Rp4.000–4.200/km' },
-  { nama: 'CDD Long', moda: 'darat', kapKg: 6000, kapCbm: 22.3, kapPalet: 8, rpPerKm: 4000, ket: '530×200×210 cm · mulai Rp4.000/km' },
+  { nama: 'Blind Van', moda: 'darat', kapKg: 720, kapCbm: 3.8, kapPalet: 2, rpPerKm: 3150, ket: '220×135×130 cm · Rp3,000–3,300/km' },
+  { nama: 'Pick Up', moda: 'darat', kapKg: 1000, kapCbm: 4.9, kapPalet: 2, rpPerKm: 3500, ket: '235×162×130 cm · mulai Rp3,500/km' },
+  { nama: 'CDE (Engkel Box)', moda: 'darat', kapKg: 2200, kapCbm: 9.2, kapPalet: 3, rpPerKm: 3400, ket: '320×170×170 cm · Rp3,300–3,500/km' },
+  { nama: 'CDD Box', moda: 'darat', kapKg: 5000, kapCbm: 16.7, kapPalet: 6, rpPerKm: 4100, ket: '440×200×190 cm · Rp4,000–4,200/km' },
+  { nama: 'CDD Long', moda: 'darat', kapKg: 6000, kapCbm: 22.3, kapPalet: 8, rpPerKm: 4000, ket: '530×200×210 cm · mulai Rp4,000/km' },
   { nama: 'Fuso Box', moda: 'darat', kapKg: 8000, kapCbm: 32, kapPalet: 10, rpPerKm: 6000, ket: '±7–8 ton · tarif per km perkiraan' },
-  { nama: 'Tronton Wingbox', moda: 'darat', kapKg: 18000, kapCbm: 58.2, kapPalet: 18, rpPerKm: 8000, ket: '950×245×250 cm · mulai Rp8.000/km' },
-  { nama: 'Tronton Bak Terbuka', moda: 'darat', kapKg: 18000, kapCbm: 60.5, kapPalet: 18, rpPerKm: 8000, ket: '950×245×260 cm · mulai Rp8.000/km' },
-  { nama: 'Trailer 20 ft', moda: 'darat', kapKg: 25000, kapCbm: 33, kapPalet: 10, rpPerKm: 9000, ket: 'prime mover + chassis 20 ft · mulai Rp9.000/km' },
-  { nama: 'Trailer 40 ft', moda: 'darat', kapKg: 30000, kapCbm: 67, kapPalet: 20, rpPerKm: 9000, ket: 'prime mover + chassis 40 ft · mulai Rp9.000/km' },
+  { nama: 'Tronton Wingbox', moda: 'darat', kapKg: 18000, kapCbm: 58.2, kapPalet: 18, rpPerKm: 8000, ket: '950×245×250 cm · mulai Rp8,000/km' },
+  { nama: 'Tronton Bak Terbuka', moda: 'darat', kapKg: 18000, kapCbm: 60.5, kapPalet: 18, rpPerKm: 8000, ket: '950×245×260 cm · mulai Rp8,000/km' },
+  { nama: 'Trailer 20 ft', moda: 'darat', kapKg: 25000, kapCbm: 33, kapPalet: 10, rpPerKm: 9000, ket: 'prime mover + chassis 20 ft · mulai Rp9,000/km' },
+  { nama: 'Trailer 40 ft', moda: 'darat', kapKg: 30000, kapCbm: 67, kapPalet: 20, rpPerKm: 9000, ket: 'prime mover + chassis 40 ft · mulai Rp9,000/km' },
   { nama: 'Reefer CDD', moda: 'darat', kapKg: 4000, kapCbm: 14, kapPalet: 6, rpPerKm: 5500, ket: 'box berpendingin · tarif per km perkiraan' },
   { nama: 'Reefer Fuso', moda: 'darat', kapKg: 7000, kapCbm: 28, kapPalet: 10, rpPerKm: 7500, ket: 'box berpendingin · tarif per km perkiraan' },
-  { nama: 'Truk Tangki', moda: 'darat', kapKg: 16000, kapCbm: 16, kapPalet: 0, kapLiter: 16000, rpPerKm: 8500, ket: 'cairan curah ±16.000 L · tarif per km perkiraan' },
-  { nama: 'Container 20 ft', moda: 'laut', kapKg: 21700, kapCbm: 33, kapPalet: 10, ket: 'ISO 20 ft dry (5,9 × 2,35 × 2,39 m)' },
-  { nama: 'Container 40 ft', moda: 'laut', kapKg: 26500, kapCbm: 67, kapPalet: 20, ket: 'ISO 40 ft dry (12,0 × 2,35 × 2,39 m)' },
-  { nama: 'Container 40 ft HC', moda: 'laut', kapKg: 26500, kapCbm: 76, kapPalet: 24, ket: 'ISO 40 ft high cube (tinggi 2,70 m)' },
+  { nama: 'Truk Tangki', moda: 'darat', kapKg: 16000, kapCbm: 16, kapPalet: 0, kapLiter: 16000, rpPerKm: 8500, ket: 'cairan curah ±16,000 L · tarif per km perkiraan' },
+  { nama: 'Container 20 ft', moda: 'laut', kapKg: 21700, kapCbm: 33, kapPalet: 10, ket: 'ISO 20 ft dry (5.9 × 2.35 × 2.39 m)' },
+  { nama: 'Container 40 ft', moda: 'laut', kapKg: 26500, kapCbm: 67, kapPalet: 20, ket: 'ISO 40 ft dry (12.0 × 2.35 × 2.39 m)' },
+  { nama: 'Container 40 ft HC', moda: 'laut', kapKg: 26500, kapCbm: 76, kapPalet: 24, ket: 'ISO 40 ft high cube (tinggi 2.70 m)' },
   { nama: 'Reefer Container 20 ft', moda: 'laut', kapKg: 21000, kapCbm: 28, kapPalet: 10, ket: 'ISO 20 ft reefer' },
   { nama: 'Reefer Container 40 ft', moda: 'laut', kapKg: 26000, kapCbm: 59, kapPalet: 20, ket: 'ISO 40 ft reefer' },
   { nama: 'LCL (per CBM)', moda: 'laut', kapKg: 1000, kapCbm: 1, kapPalet: 0, ket: 'less than container load, ditagih per CBM / ton (W/M)' },
-  { nama: 'Air Cargo General', moda: 'udara', kapKg: 1, kapCbm: 0.006, kapPalet: 0, ket: 'per kg (chargeable weight = maks. berat aktual & volume ÷ 6.000)' },
+  { nama: 'Air Cargo General', moda: 'udara', kapKg: 1, kapCbm: 0.006, kapPalet: 0, ket: 'per kg (chargeable weight = maks. berat aktual & volume ÷ 6,000)' },
   { nama: 'Air Cargo Express', moda: 'udara', kapKg: 1, kapCbm: 0.006, kapPalet: 0, ket: 'per kg, layanan cepat' },
   { nama: 'Kereta Container 20 ft', moda: 'kereta', kapKg: 21700, kapCbm: 33, kapPalet: 10, ket: 'angkutan peti kemas KA (Jawa / Sumatra)' },
   { nama: 'Kereta Container 40 ft', moda: 'kereta', kapKg: 26500, kapCbm: 67, kapPalet: 20, ket: 'angkutan peti kemas KA (Jawa / Sumatra)' },
@@ -65,11 +65,11 @@ export function kapasitasBasis(a: Armada | undefined, basis: Basis, utilisasi = 
 export function estimasiHarga(namaArmada: string, origin: string, destination: string, basis: Basis): { harga: number; km: number; ket: string } | null {
   const a = armada(namaArmada); if (!a?.rpPerKm) return null;
   const km = jarakKm(origin, destination, 'darat'); if (!km) return null;
-  if (basis === 'km') return { harga: a.rpPerKm, km, ket: `tarif indikatif Rp${a.rpPerKm.toLocaleString('id-ID')}/km (${km.toLocaleString('id-ID')} km)` };
+  if (basis === 'km') return { harga: a.rpPerKm, km, ket: `tarif indikatif Rp${a.rpPerKm.toLocaleString('en-US')}/km (${km.toLocaleString('en-US')} km)` };
   const trip = Math.max(a.rpPerKm * km, a.rpPerKm * 40);       // minimal ±40 km (tarif dalam kota)
   const kap = kapasitasBasis(a, basis); if (!kap) return null;
   const harga = Math.round(trip / kap / 1000) * 1000;
-  return { harga, km, ket: `estimasi ${km.toLocaleString('id-ID')} km × Rp${a.rpPerKm.toLocaleString('id-ID')}/km${basis !== 'trip' ? ` ÷ ${kap.toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${basis}/trip` : ''}` };
+  return { harga, km, ket: `estimasi ${km.toLocaleString('en-US')} km × Rp${a.rpPerKm.toLocaleString('en-US')}/km${basis !== 'trip' ? ` ÷ ${kap.toLocaleString('en-US', { maximumFractionDigits: 1 })} ${basis}/trip` : ''}` };
 }
 
 // ---------------- Market price ----------------
@@ -233,7 +233,7 @@ export const titikIntermodal = (r: RuteIntermodal) => [r.origin, r.stage[0].ke |
 // ---------------- Review: perbandingan margin, catatan review, rate card quotation ----------------
 /** Tier margin default untuk perbandingan (GP% atas harga jual). */
 export const TIER_DEFAULT = [0.15, 0.10, 0.05];
-export const persen1 = (x: number) => `${(Math.round(x * 1000) / 10).toLocaleString('id-ID')}%`;
+export const persen1 = (x: number) => `${(Math.round(x * 1000) / 10).toLocaleString('en-US')}%`;
 
 /** Konversi harga per satuan dasar rute ke satuan lain: harga_lain = harga × faktor (null = data belum cukup). */
 export interface KonversiSatuan { basis: Basis; label: string; faktor: number | null; qty: number | null }
@@ -333,7 +333,7 @@ export function reviewIntermodal(t: TenderIntermodal, rates: RateTransport[] = [
       if (!s.dari || !s.ke) out.push({ level: 'perhatian', rute: nama, pesan: `${st}: titik dari / ke belum lengkap.` });
       if (s.leadTimeHari == null) out.push({ level: 'info', rute: nama, pesan: `${st}: lead time belum diisi.` });
       const kmDarat = k !== 1 && s.moda === 'darat' ? jarakKm(s.dari, s.ke, 'darat') : null;
-      if (kmDarat && kmDarat > 300) out.push({ level: 'perhatian', rute: nama, pesan: `${st}: truk ±${kmDarat.toLocaleString('id-ID')} km dari ${k === 0 ? 'origin ke port asal' : 'port tujuan ke destination'} — cek apakah bandara / pelabuhan yang lebih dekat lebih tepat.` });
+      if (kmDarat && kmDarat > 300) out.push({ level: 'perhatian', rute: nama, pesan: `${st}: truk ±${kmDarat.toLocaleString('en-US')} km dari ${k === 0 ? 'origin ke port asal' : 'port tujuan ke destination'} — cek apakah bandara / pelabuhan yang lebih dekat lebih tepat.` });
       if (s.moda === 'darat' && s.dari && s.ke && !bisaDarat(s.dari, s.ke)) out.push({ level: 'kritis', rute: nama, pesan: `${st}: ${s.dari} dan ${s.ke} beda pulau — truk tidak bisa lewat darat, ganti titik serah terima atau moda.` });
       cekRate(s.rateId, rates, `${nama} · ${st}`, out);
     });
@@ -344,7 +344,7 @@ export function reviewIntermodal(t: TenderIntermodal, rates: RateTransport[] = [
 }
 
 export interface BarisRateCard { layanan: string; satuan: string; tarif: number; catatan?: string }
-const fmtAngka = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+const fmtAngka = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 1 });
 /** Rate card quotation tender transport: satu baris per rute (tarif jual per basis). */
 export const rateCardTransport = (t: TenderTransport): BarisRateCard[] => t.rute.filter(r => r.hargaBeli > 0).map(r => {
   const h = hitungRute(r, t.marginGlobal);

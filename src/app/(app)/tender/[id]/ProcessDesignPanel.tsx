@@ -7,12 +7,12 @@ import { angka, rp } from '@/lib/format';
 import { hitungEskalasi } from '@/lib/engine/index.ts';
 import InputDesimal from '@/components/InputDesimal';
 
-const f2 = (x: number) => (x ? x.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
-const f0 = (x: number) => (x ? Math.round(x).toLocaleString('id-ID') : '–');
+const f2 = (x: number) => (x ? x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
+const f0 = (x: number) => (x ? Math.round(x).toLocaleString('en-US') : '–');
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 /** jam desimal → "X jam Y mnt" */
 const jamMenit = (jam: number) => { const m = Math.round(jam * 60); const j = Math.floor(m / 60), r = m % 60; return j ? `${j} jam${r ? ` ${r} mnt` : ''}` : `${r} mnt`; };
-const TIP_FTE = 'FTE = Full Time Equivalent (setara pekerja penuh waktu). 1,00 FTE = 1 orang bekerja penuh selama jam kerja tersedia per bulan. FTE = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan.';
+const TIP_FTE = 'FTE = Full Time Equivalent (setara pekerja penuh waktu). 1.00 FTE = 1 orang bekerja penuh selama jam kerja tersedia per bulan. FTE = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan.';
 
 /** Process Design & Resource Calculation (format Excel): kalender kerja MP/MHE, shift, rincian per task, ringkasan MP & MHE. */
 export interface BiayaMpProps {
@@ -178,7 +178,7 @@ export default function ProcessDesignPanel({ bagian, indirect, aktivitas, volume
               <tr style={{ background: 'var(--link)' }}><td colSpan={3}><b>Biaya manpower/bln dipakai di cost model</b><div className="small muted">total kontrak ÷ {esk.kontrakBulan} bulan (faktor {esk.faktor.toFixed(4)}×)</div></td>
                 <td className="num"><b>{rp(dasarBln * esk.faktor)}</b></td><td /></tr>
             </tbody></table></div>
-          <p className="small muted">Upah naik setiap Januari (UMK baru) sebesar {(esk.persenTahun * 100).toLocaleString('id-ID')}% dan bertingkat: indeks = (1 + {(esk.persenTahun * 100).toLocaleString('id-ID')}%)^(jumlah Januari yang sudah dilewati). Biaya/orang dari tabel Rincian biaya manpower di bawah (gaji pokok + lisensi + BPJS + THR + kompensasi + supervisi, ditambah management fee). Angka ini masuk ke Hasil setelah tekan Hitung.</p>
+          <p className="small muted">Upah naik setiap Januari (UMK baru) sebesar {(esk.persenTahun * 100).toLocaleString('en-US')}% dan bertingkat: indeks = (1 + {(esk.persenTahun * 100).toLocaleString('en-US')}%)^(jumlah Januari yang sudah dilewati). Biaya/orang dari tabel Rincian biaya manpower di bawah (gaji pokok + lisensi + BPJS + THR + kompensasi + supervisi, ditambah management fee). Angka ini masuk ke Hasil setelah tekan Hitung.</p>
         </div>}
         <p className="small muted"><b>FTE (Full Time Equivalent)</b> = man hour dibutuhkan ÷ jam kerja tersedia per orang per bulan ({Math.round(km.jamBulan)} jam MP · {Math.round(kh.jamBulan)} jam MHE).
           Contoh: 0,79 FTE = {jamMenit(0.79 * km.jamBulan / (km.hariBulan || 1))} kerja per hari dari {jamMenit(km.jamBulan / (km.hariBulan || 1))} jam tersedia. Angka kecil di bawah FTE = waktu kerja per hari & per bulan untuk menyelesaikan volume/order.</p>

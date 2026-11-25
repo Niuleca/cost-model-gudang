@@ -28,7 +28,7 @@ export default function AirPanel({ air, headcount, luasM2, hariKerjaBulan, onCha
         <label className="f">Tarif (Rp/m³)<InputDesimal min={0} step={500} value={a.tarifM3} onChange={e => set({ tarifM3: Number(e.target.value) })} disabled={!sumber.berbayar} /></label>
         <label className="f">Biaya beban / abonemen (Rp/bln)<InputDesimal min={0} step={10000} value={a.abonemenBulan} onChange={e => set({ abonemenBulan: Number(e.target.value) })} disabled={!sumber.berbayar} /></label>
       </div>
-      <p className="small muted">{sumber.ket} Dasar 50 L/orang/hari mengikuti kebutuhan air pekerja industri/kantor (SNI 03-7065-2005); cleaning ±0,2 L/m²/hari untuk lantai, toilet & area umum. Tarif kawasan industri umumnya Rp10.000–25.000/m³ — sesuaikan dengan tarif pengelola/PDAM setempat.</p>
+      <p className="small muted">{sumber.ket} Dasar 50 L/orang/hari mengikuti kebutuhan air pekerja industri/kantor (SNI 03-7065-2005); cleaning ±0,2 L/m²/hari untuk lantai, toilet & area umum. Tarif kawasan industri umumnya Rp10,000–25.000/m³ — sesuaikan dengan tarif pengelola/PDAM setempat.</p>
       <div className="tablewrap fit"><table className="tabel-fit"><tbody>
         <tr><td>Pekerja</td><td className="num">{angka(headcount)} orang × {angka(a.literOrangHari)} L × {angka(hariKerjaBulan)} hari</td><td className="num">{angka(h.m3Orang, 1)} m³</td></tr>
         <tr><td>Cleaning area</td><td className="num">{angka(luasM2)} m² × {angka(a.literM2Hari, 2)} L × {angka(hariKerjaBulan)} hari</td><td className="num">{angka(h.m3Area, 1)} m³</td></tr>

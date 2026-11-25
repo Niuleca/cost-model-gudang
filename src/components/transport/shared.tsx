@@ -100,7 +100,7 @@ export function KartuRingkas({ r, kontrakBulan }: { r: { biayaBulan: number; pen
       <div className="kpi"><span className="small muted">Rute</span><b>{r.jumlahRute}</b>{r.tanpaHarga > 0 && <span className="small" style={{ color: 'var(--bad)' }}>{r.tanpaHarga} belum ada harga beli</span>}</div>
       <div className="kpi"><span className="small muted">Biaya beli / bln</span><b>{rp(r.biayaBulan)}</b></div>
       <div className="kpi"><span className="small muted">Pendapatan / bln</span><b>{rp(r.pendapatanBulan)}</b></div>
-      <div className="kpi"><span className="small muted">Gross profit / bln</span><b>{rp(r.gp)}</b><span className="small muted">GP {(r.gpPersen * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%</span></div>
+      <div className="kpi"><span className="small muted">Gross profit / bln</span><b>{rp(r.gp)}</b><span className="small muted">GP {(r.gpPersen * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%</span></div>
       <div className="kpi"><span className="small muted">Nilai kontrak</span><b>{rp(r.pendapatanBulan * kontrakBulan)}</b><span className="small muted">{kontrakBulan} bulan</span></div>
     </div>);
 }
@@ -158,7 +158,7 @@ export function DaftarTenderTr({ jenis, asumsiAwal, basePath }: { jenis: JenisTe
             {tampil.map(r => { const s = ringkas(r); return (
               <tr key={r.id}><td><Link href={`${basePath}/${r.id}`}>{r.kode ?? r.id.slice(0, 8)}</Link></td><td>{r.customer}</td><td>{r.kab_kota}</td>
                 <td><span className={`pill ${pillStatus(r.status)}`}>{labelStatus(r.status)}</span></td>
-                <td className="num">{s ? rp(s.pendapatanBulan) : '—'}</td><td className="num">{s ? `${(s.gpPersen * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '—'}</td>
+                <td className="num">{s ? rp(s.pendapatanBulan) : '—'}</td><td className="num">{s ? `${(s.gpPersen * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%` : '—'}</td>
                 <td className="small">{tanggal(r.updated_at)}</td></tr>); })}
           </tbody>
         </table></div>

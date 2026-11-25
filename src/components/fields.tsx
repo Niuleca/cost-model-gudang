@@ -3,6 +3,7 @@
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { useT } from '@/lib/i18n';
 import InputDesimal from '@/components/InputDesimal';
+import { normalDesimal, bacaAngka } from '@/lib/bacaAngka';
 
 /** Input angka yang boleh dikosongkan sementara saat mengetik (tidak langsung jadi "0") */
 export function AngkaInput({ value, onValue, bulat, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
@@ -14,23 +15,14 @@ export function AngkaInput({ value, onValue, bulat, ...rest }: Omit<InputHTMLAtt
     onBlur={e => { if (e.target.value === '') onValue(0); rest.onBlur?.(e); }} />;
 }
 
-/** Baca angka gaya Indonesia: titik = pemisah ribuan ("10.673" → 10673, "1.250.000" → 1250000), koma = desimal ("2,5" → 2.5).
- *  Satu titik yang tidak diikuti tepat 3 angka tetap dibaca desimal ("1.5" → 1.5). */
-export function bacaAngkaId(x: string): number | null {
-  const t = x.trim().replace(/\s/g, '');
-  if (!t) return null;
-  let n: number;
-  if (/^-?[1-9]\d{0,2}(\.\d{3})+(,\d+)?$/.test(t)) n = Number(t.replace(/\./g, '').replace(',', '.'));
-  else if (/^-?\d+(,\d+)?$/.test(t)) n = Number(t.replace(',', '.'));
-  else n = Number(t.replace(/,/g, ''));
-  return Number.isFinite(n) ? n : null;
-}
+/** Baca angka isian (aturan bersama lib/bacaAngka): titik = desimal, koma + 3 angka = ribuan ("10,673" → 10673), koma lain = desimal ("2,5" → 2.5). */
+export function bacaAngkaId(x: string): number | null { return bacaAngka(x); }
 
-/** Input volume: tampil dengan pemisah ribuan (10.673), mengetik "10.673" dibaca sepuluh ribu enam ratus tujuh puluh tiga. */
+/** Input volume: tampil dengan pemisah ribuan (10,673), mengetik "10,673" dibaca sepuluh ribu enam ratus tujuh puluh tiga. */
 export function AngkaVolume({ value, onValue, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
   value: number | undefined; onValue: (v: number) => void;
 }) {
-  const fmt = (v: number | undefined) => (v == null || Number.isNaN(v) ? '' : v.toLocaleString('id-ID', { maximumFractionDigits: 3 }));
+  const fmt = (v: number | undefined) => (v == null || Number.isNaN(v) ? '' : v.toLocaleString('en-US', { maximumFractionDigits: 3 }));
   const [teks, setTeks] = useState(fmt(value));
   const [fokus, setFokus] = useState(false);
   useEffect(() => { if (!fokus) setTeks(fmt(value)); }, [value, fokus]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -48,7 +40,7 @@ export function AngkaBebas({ value, onValue, min, max, bulat, ...rest }: Omit<In
   const [teks, setTeks] = useState(String(value));
   const [fokus, setFokus] = useState(false);
   useEffect(() => { if (!fokus) setTeks(String(value)); }, [value, fokus]);
-  const baca = (x: string) => { const n = Number(x.trim().replace(',', '.')); return x.trim() === '' || !Number.isFinite(n) ? null : bulat ? Math.round(n) : n; };
+  const baca = (x: string) => { const n = bacaAngka(x) ?? NaN; return x.trim() === '' || !Number.isFinite(n) ? null : bulat ? Math.round(n) : n; };
   const dalam = (n: number) => (min == null || n >= min) && (max == null || n <= max);
   const n = baca(teks);
   const luar = fokus && n != null && !dalam(n);

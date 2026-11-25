@@ -26,7 +26,7 @@ export async function buatQuotationPdf(d: QuotationPdfData) {
   const autoTable = (await import('jspdf-autotable')).default;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const kiri = 18, kanan = 192, lebar = kanan - kiri, bawahAman = 272;
-  const rp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+  const rp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('en-US');
   const tgl = (s: string) => new Date(s).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   // Font standar PDF tidak punya glyph ² ³ → tulis m2 / m3 supaya tidak hilang
   const ascii = (t: string) => t.replace(/²/g, '2').replace(/³/g, '3').replace(/→/g, '->').replace(/≈/g, '~');
@@ -87,7 +87,7 @@ export async function buatQuotationPdf(d: QuotationPdfData) {
     y = judulBagian('Lokasi gudang', y);
     const pasang: [string, string][] = [
       ['Nama gudang', g.nama], ['Tipe', g.tipe],
-      ['Luas dialokasikan', `${g.luasDipakaiM2.toLocaleString('id-ID')} m2 dari ${g.luasM2.toLocaleString('id-ID')} m2`],
+      ['Luas dialokasikan', `${g.luasDipakaiM2.toLocaleString('en-US')} m2 dari ${g.luasM2.toLocaleString('en-US')} m2`],
       ...(g.tinggiM ? [['Tinggi bersih', `${g.tinggiM} m`] as [string, string]] : []),
       ...(g.dock ? [['Jumlah dock', String(g.dock)] as [string, string]] : []),
     ];

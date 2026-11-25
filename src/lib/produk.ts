@@ -6,6 +6,7 @@ import type { VolumeInput } from '@/lib/engine/types';
 import { PARAM_DEFAULT, type ProfilVolume } from '@/lib/profilVolume';
 import { daftarPalet, ringkasPalet, type SpaceExcel } from '@/lib/engine/space';
 import { pj, pj2 } from '@/lib/satuanPanjangInti';
+import { bacaAngka } from '@/lib/bacaAngka';
 
 export const UOM_PRODUK = ['karton', 'case', 'pcs', 'unit', 'roll', 'bag', 'sak', 'pail', 'drum', 'jerigen', 'botol', 'kaleng', 'pack', 'bundle', 'coil', 'ibc', 'palet'] as const;
 export const KATEGORI_PRODUK = ['Umum', 'Berat', 'Fragile / mudah pecah', 'B3 / kimia', 'Cair', 'Cold / chiller', 'High value'] as const;
@@ -67,13 +68,13 @@ export const ATURAN_BERAT_DEFAULT: AturanBerat = {
  * menahan 2 palet → kapasitas pasang = 2 × per posisi) dan batas berat → level tertinggi. Semua angka bisa diedit.
  */
 export const KELAS_RAK: { id: string; nama: string; ket: string; kapPosisiKg: number; batas: AturanBerat['batas'] }[] = [
-  { id: 'light', nama: 'Light duty (ringan)', ket: 'beam ± 1.000 kg/pasang · barang ringan, karton FMCG ringan',
+  { id: 'light', nama: 'Light duty (ringan)', ket: 'beam ± 1,000 kg/pasang · barang ringan, karton FMCG ringan',
     kapPosisiKg: 500, batas: [{ kgMaks: 300, levelMaks: 99 }, { kgMaks: 400, levelMaks: 3 }, { kgMaks: 500, levelMaks: 2 }] },
-  { id: 'medium', nama: 'Medium duty (standar)', ket: 'beam ± 2.000 kg/pasang · rak selective umum',
+  { id: 'medium', nama: 'Medium duty (standar)', ket: 'beam ± 2,000 kg/pasang · rak selective umum',
     kapPosisiKg: 1000, batas: [{ kgMaks: 500, levelMaks: 99 }, { kgMaks: 750, levelMaks: 3 }, { kgMaks: 900, levelMaks: 2 }] },
-  { id: 'heavy', nama: 'Heavy duty (berat)', ket: 'beam ± 3.000 kg/pasang · cairan, oli, kimia, minuman',
+  { id: 'heavy', nama: 'Heavy duty (berat)', ket: 'beam ± 3,000 kg/pasang · cairan, oli, kimia, minuman',
     kapPosisiKg: 1500, batas: [{ kgMaks: 1000, levelMaks: 99 }, { kgMaks: 1250, levelMaks: 3 }, { kgMaks: 1500, levelMaks: 2 }] },
-  { id: 'extra', nama: 'Extra heavy duty', ket: 'beam ± 4.000 kg/pasang · semen, logam, IBC, drum penuh',
+  { id: 'extra', nama: 'Extra heavy duty', ket: 'beam ± 4,000 kg/pasang · semen, logam, IBC, drum penuh',
     kapPosisiKg: 2000, batas: [{ kgMaks: 1500, levelMaks: 99 }, { kgMaks: 1800, levelMaks: 3 }, { kgMaks: 2000, levelMaks: 2 }] },
 ];
 /** Kelas rak yang angkanya persis sama dengan aturan (null = sudah diubah / custom). */
@@ -276,10 +277,7 @@ export function ringkasZona(daftar: ProdukTender[], aturan: AturanBerat = ATURAN
 /** Tempel dari Excel: kolom Kode, Nama, UOM, P, L, T (cm), Berat (kg), UPP, Qty[, Kategori, Zona]. Baris judul dilewati. */
 export function dariTempel(teks: string): ProdukTender[] {
   const baris = teks.split(/\r?\n/).map(r => r.split('\t').length > 1 ? r.split('\t') : r.split(/;|,(?=\s*\S)/)).filter(r => r.some(c => c.trim()));
-  const angka = (s: string) => { const t = (s ?? '').trim().replace(/\s/g, ''); if (!t) return 0;
-    // 1.234,5 (ID) atau 1,234.5 (EN)
-    const v = /,\d{1,3}$/.test(t) && t.includes('.') ? t.replace(/\./g, '').replace(',', '.') : /,\d{1,3}$/.test(t) && !t.includes('.') ? t.replace(',', '.') : t.replace(/,/g, '');
-    return Number(v) || 0; };
+  const angka = (s: string) => bacaAngka(s ?? '') ?? 0;   // 1,250.5 / 1.250,5 / 2,5 / 2.5
   const out: ProdukTender[] = [];
   for (const r of baris) {
     if (r.length < 3) continue;
@@ -327,7 +325,7 @@ export function turunanProduk(daftar: ProdukTender[], aturan: AturanBerat = ATUR
 
 /** Space (Warehouse Planning): tinggi produk di rak (bukaan) & porsi pallet floor untuk palet yang melebihi beam. */
 function spaceDariProduk(space: object, tinggiRakMm: number, porsiLantai: number, per: PerubahanTender[]): Record<string, unknown> | undefined {
-  const f = (x: number, n = 2) => (Math.round(x * 10 ** n) / 10 ** n).toLocaleString('id-ID');
+  const f = (x: number, n = 2) => (Math.round(x * 10 ** n) / 10 ** n).toLocaleString('en-US');
   // Space: tinggi produk di rak (bukaan) & porsi pallet floor untuk palet yang melebihi beam
   const sx = ((space as { excel?: unknown }).excel ?? {}) as Record<string, unknown> & { rak?: Record<string, number>; porsi?: Record<string, number> };
   let excel: Record<string, unknown> | undefined;
@@ -374,7 +372,7 @@ export function terapkanProduk<A extends { volumes: VolumeInput[]; profilVolume?
     const excel = tinggiRakMm > 0 ? spaceDariProduk(a.space, tinggiRakMm, 0, per) : undefined;
     return { patch: (excel && per.length ? { space: { ...a.space, excel } } : {}) as unknown as Partial<A>, perubahan: per };
   }
-  const f = (x: number, n = 2) => (Math.round(x * 10 ** n) / 10 ** n).toLocaleString('id-ID');
+  const f = (x: number, n = 2) => (Math.round(x * 10 ** n) / 10 ** n).toLocaleString('en-US');
   // Parameter muatan
   const p0 = { ...PARAM_DEFAULT, ...(a.profilVolume?.param ?? {}) };
   const p1 = { ...p0, kgPerCase: Math.round(d.kgPerUnit * 100) / 100, cbmPerCase: d.cbmPerUnit > 0 ? Math.round(d.cbmPerUnit * 1e5) / 1e5 : p0.cbmPerCase,

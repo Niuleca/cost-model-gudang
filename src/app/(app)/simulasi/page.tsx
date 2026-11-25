@@ -24,13 +24,14 @@ import { LAPISAN, LAPISAN_AWAL, lapisDari, type Lapisan } from './layout/lapisan
 import Potongan, { potongAwal, type ArahPotong, type PotonganApi } from './layout/Potongan';
 import ParamSpace from './ParamSpace';
 import type { Kamera, OpsiViewer, ViewerApi } from './Viewer3D';
+import { normalDesimal, bacaAngka } from '@/lib/bacaAngka';
 
 const Desain3D = dynamic(() => import('./desain/Desain3D'), { ssr: false, loading: () => <div className="sim3d-wadah sim3d-muat">Menyiapkan 3D…</div> });
 const SimulasiDesain = dynamic(() => import('./desain/SimulasiDesain'), { ssr: false, loading: () => <div className="card sim3d-wadah sim3d-muat">Menyiapkan simulasi…</div> });
 
 interface T { id: string; kode: string | null; customer: string; status: string }
 interface Versi { id: string; nama: string; updated_at: string; data: LayoutEdit }
-const angka = (v: number, d = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d });
+const angka = (v: number, d = 0) => v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 const PALET: { jenis: JenisKomp | 'pasSpr' | 'pasDdr' | 'areaAdaptif' | 'ramp' | 'gateIn' | 'gateOut'; label: string }[] = [
@@ -58,7 +59,7 @@ function Angka({ l, v, set, step = 0.1, min, u }: { l: string; v: number; set: (
   const [fokus, setFokus] = useState(false);
   // selama kolom aktif, ketikan tidak ditimpa (mis. editor membatasi ukuran minimum) — dirapikan saat keluar kolom
   useEffect(() => { if (fokus) return; const n = Number(teks); if (!Number.isFinite(n) || Math.abs((pjg ? sp.simpan(n, 'm') : n) - v) > 1e-9) setTeks(keTeks(v)); }, [v, sp.satuan, fokus]); // eslint-disable-line react-hooks/exhaustive-deps
-  const baca = (x: string) => { const n = Number(x.trim().replace(',', '.')); return x.trim() === '' || !Number.isFinite(n) || (min != null && n < min) ? null : n; };
+  const baca = (x: string) => { const n = bacaAngka(x) ?? NaN; return x.trim() === '' || !Number.isFinite(n) || (min != null && n < min) ? null : n; };
   return (
     <label className="f">{l}{u ? ` (${pjg ? sp.satuan : u})` : ''}
       <input type="text" inputMode="decimal" data-step={step} value={teks} onFocus={() => setFokus(true)}
@@ -220,8 +221,8 @@ export default function DesainGudang() {
     const h = tarikRak(edit, { ids, jarakDinding });
     if (!h.n) { setPesan('Tidak ada rak yang bisa ditarik — ujung rak sudah menempel rintangan atau dinding.'); return; }
     aksi(() => h.edit);
-    const sel = (a: number, b: number) => `${b - a >= 0 ? '+' : ''}${(b - a).toLocaleString('id-ID')}`;
-    setPesan(`${h.n} baris rak ditarik: ${h.bayAwal.toLocaleString('id-ID')} → ${h.bayAkhir.toLocaleString('id-ID')} bay (${sel(h.bayAwal, h.bayAkhir)}), kapasitas ${h.posAwal.toLocaleString('id-ID')} → ${h.posAkhir.toLocaleString('id-ID')} posisi (${sel(h.posAwal, h.posAkhir)}).`);
+    const sel = (a: number, b: number) => `${b - a >= 0 ? '+' : ''}${(b - a).toLocaleString('en-US')}`;
+    setPesan(`${h.n} baris rak ditarik: ${h.bayAwal.toLocaleString('en-US')} → ${h.bayAkhir.toLocaleString('en-US')} bay (${sel(h.bayAwal, h.bayAkhir)}), kapasitas ${h.posAwal.toLocaleString('en-US')} → ${h.posAkhir.toLocaleString('en-US')} posisi (${sel(h.posAwal, h.posAkhir)}).`);
   };
   const ubahK = (f: (k: Komponen) => Komponen) => { if (!pilih) return; aksi(e => ({ ...e, komponen: e.komponen.map(k => (k.id === pilih ? f(k) : k)) })); };
 
@@ -497,7 +498,7 @@ export default function DesainGudang() {
       const fk = hasil.satuanKeMeter ?? (hasil.lebar > 2000 ? 0.001 : 1);
       const garis = hasil.garis.map(([a, b, c, d]) => [a, b, c, d].map(v => Math.round(v * fk * 1000) / 1000) as [number, number, number, number]);
       aksi(e => ({ ...e, latar: { jenis: 'dxf', garis, x: 0, z: 0, w: 1, d: 1, opasitas: 0.7, nama: f.name } }));
-      setPesan(`DXF dimuat: ${garis.length.toLocaleString('id-ID')} garis, ${angka(hasil.lebar * fk, 1)} × ${angka(hasil.tinggi * fk, 1)} m (${hasil.satuanKeMeter ? 'satuan dari file' : fk === 0.001 ? 'dianggap mm' : 'dianggap m'}).`);
+      setPesan(`DXF dimuat: ${garis.length.toLocaleString('en-US')} garis, ${angka(hasil.lebar * fk, 1)} × ${angka(hasil.tinggi * fk, 1)} m (${hasil.satuanKeMeter ? 'satuan dari file' : fk === 0.001 ? 'dianggap mm' : 'dianggap m'}).`);
       return;
     }
     if (!f.type.startsWith('image/')) { setErr('Format latar: gambar (PNG/JPG) atau DXF. DWG perlu disimpan sebagai DXF dulu; PDF bisa di-screenshot / export ke PNG.'); return; }
@@ -562,13 +563,13 @@ export default function DesainGudang() {
               <label className="sim3d-cek" style={{ alignSelf: 'end' }}><input type="checkbox" checked={formBaru.isiRak} onChange={e => setFormBaru({ ...formBaru, isiRak: e.target.checked })} />Isi rak otomatis (area adaptif)</label>
               <div className="row" style={{ alignSelf: 'end' }}><button type="button" onClick={() => buatTanpaProject(formBaru)}>Buat gedung</button><button type="button" className="ghost" onClick={() => setFormBaru(null)}>Batal</button></div>
             </div>
-            <p className="small muted" style={{ margin: 0 }}>Luas {(formBaru.L * formBaru.W).toLocaleString('id-ID')} m². Dock, staging & jalur utama dibuat di sisi depan; semua bisa digeser, diubah, atau dihapus. Simulasi memakai volume, manpower & productivity contoh karena tidak ada data tender.</p>
+            <p className="small muted" style={{ margin: 0 }}>Luas {(formBaru.L * formBaru.W).toLocaleString('en-US')} m². Dock, staging & jalur utama dibuat di sisi depan; semua bisa digeser, diubah, atau dihapus. Simulasi memakai volume, manpower & productivity contoh karena tidak ada data tender.</p>
           </div>
         )}
         {err && <p className="error small" role="alert">{err}</p>}
         {pesan && !err && <p className="small muted">{pesan}{kotor ? ' · ada perubahan belum disimpan' : ''}</p>}
         {!pesan && kotor && <p className="small" style={{ color: 'var(--warn)' }}>Ada perubahan belum disimpan.</p>}
-        {pribadi && data && <p className="small muted">Desain pribadi tanpa project — hanya terlihat oleh akun Anda. Simulasi operasi memakai data contoh (1.200 palet/bulan in & out, 1 shift).</p>}
+        {pribadi && data && <p className="small muted">Desain pribadi tanpa project — hanya terlihat oleh akun Anda. Simulasi operasi memakai data contoh (1,200 palet/bulan in & out, 1 shift).</p>}
         {!id && <p className="small muted">Pilih project, atau buat <b>desain baru tanpa project</b> (tersimpan di akun Anda). Desain dimulai dari layout otomatis (parameter Space tender, bisa direvisi lalu disusun ulang); setiap komponen bisa digeser, diubah ukuran & tingginya, ditambah atau dihapus — 3D mengikuti. Versi yang disimpan dipakai sebagai gudang di Leca Game.</p>}
         {sibuk && <p className="small muted">Memuat…</p>}
       </div>
@@ -699,7 +700,7 @@ export default function DesainGudang() {
             <div className="eyebrow">Ekspor</div>
             <div className="row"><button className="ghost" onClick={unduhPng}>PNG denah</button><button className="ghost" onClick={unduhPdf}>PDF A3</button>
               <button className="ghost" onClick={() => { const u = api3.current?.screenshot(); if (u) { const a = document.createElement('a'); a.href = u; a.download = `${namaFile()}_3D.png`; a.click(); } }} disabled={tampil === '2d'}>PNG 3D</button></div>
-            <p className="small muted">Perintah cepat: ketik langsung di denah — <b>M</b> geser, <b>CO</b> salin, <b>RO</b> putar, <b>E</b> hapus, <b>DI</b> ukur, <b>X</b> pecah area, <b>Z</b> pas layar, <b>LA</b> layer; Enter / spasi = ulangi perintah terakhir; saat titik kedua ketik jarak (3,5) atau @dx;dz. F3 OSNAP · F8 ORTHO · F9 SNAP.</p>
+            <p className="small muted">Perintah cepat: ketik langsung di denah — <b>M</b> geser, <b>CO</b> salin, <b>RO</b> putar, <b>E</b> hapus, <b>DI</b> ukur, <b>X</b> pecah area, <b>Z</b> pas layar, <b>LA</b> layer; Enter / spasi = ulangi perintah terakhir; saat titik kedua ketik jarak (3.5) atau @dx;dz. F3 OSNAP · F8 ORTHO · F9 SNAP.</p>
             <p className="small muted">Pintasan: Seleksi blok / Shift + seret = pilih banyak (seret ke kanan = yang masuk penuh, ke kiri = yang tersentuh) · Shift/Ctrl + klik tambah/buang · Ctrl+A pilih semua · Delete hapus · R putar · Ctrl+D gandakan · panah geser (Shift = 1 m; dock & gate bergeser sepanjang dinding) · Ctrl+Z / Ctrl+Y · scroll zoom · seret area kosong = pan.</p>
           </div>
 

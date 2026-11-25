@@ -127,7 +127,7 @@ export function BarisTambahan({ h, nilai, onUbah, ppnInclude }: { h: HasilTender
             {x.dasar === 'aktivitas' && <>
               <label>menit/unit <InputDesimal aria-label="Menit per unit" step="0.05" value={x.menit ?? ''} onChange={e => ubah(x.id, { menit: num(e.target.value) })} {...inp(64)} /></label>
               <label>orang <InputDesimal aria-label="Orang" step="1" value={x.orang ?? ''} onChange={e => ubah(x.id, { orang: num(e.target.value) })} {...inp(52)} /></label>
-              <label title="Pengali upah, mis. 1,5 untuk lembur">pengali <InputDesimal aria-label="Pengali" step="0.1" value={x.pengali ?? ''} placeholder="1" onChange={e => ubah(x.id, { pengali: num(e.target.value) })} {...inp(52)} /></label>
+              <label title="Pengali upah, mis. 1.5 untuk lembur">pengali <InputDesimal aria-label="Pengali" step="0.1" value={x.pengali ?? ''} placeholder="1" onChange={e => ubah(x.id, { pengali: num(e.target.value) })} {...inp(52)} /></label>
               <label className="row" style={{ gap: 2 }}><input type="checkbox" style={{ width: 'auto' }} checked={!!x.alat} onChange={e => ubah(x.id, { alat: e.target.checked })} />pakai alat (MHE)</label>
               <label>material Rp <InputDesimal aria-label="Material per unit" value={x.material ?? ''} onChange={e => ubah(x.id, { material: num(e.target.value) })} {...inp(90)} /></label></>}
             {(x.dasar === 'manual' || x.dasar === 'tarif') && <label>biaya/unit Rp <InputDesimal aria-label="Biaya per unit" value={x.biaya ?? ''} placeholder={x.dasar === 'tarif' ? 'opsional' : ''} onChange={e => ubah(x.id, { biaya: num(e.target.value) })} {...inp(100)} /></label>}

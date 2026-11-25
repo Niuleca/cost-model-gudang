@@ -163,7 +163,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.nmR('LvLabel', 1, lv0, AK.r - 1); AK.nmR('LvPct', 3, lv0, AK.r - 1);
   AK.r++;
   AK.h3('Parameter (aturan pemerintah, bisa diubah)');
-  AK.field('BPJS TK (JHT 3,7% + JKK 1,27% + JKM 0,3%)', pm.bpjsTk, 'pct', 'in', '', 'PP 44/2015, PP 46/2015', 'BpjsTk');
+  AK.field('BPJS TK (JHT 3.7% + JKK 1.27% + JKM 0.3%)', pm.bpjsTk, 'pct', 'in', '', 'PP 44/2015, PP 46/2015', 'BpjsTk');
   AK.field('BPJS Kesehatan', pm.bpjsKs, 'pct', 'in', '', 'Perpres 64/2020', 'BpjsKs');
   AK.field('Batas upah BPJS Kesehatan', pm.batasUpahKs ?? 12000000, 'rp', 'in', 'Rp', '', 'BatasKs');
   AK.field('BPJS Pensiun (JP)', pm.bpjsPensiun, 'pct', 'in', '', 'PP 45/2015', 'BpjsJp');
@@ -296,7 +296,7 @@ export function tulisAktivitas(x: Ctx) {
   AK.r++;
   AK.h2('Matriks multi-skill (siapa boleh merangkap siapa)', 'Gunanya: menentukan jumlah orang per shift. Sisa FTE (pecahan) sebuah role boleh dikerjakan orang role lain yang masih punya sisa waktu HANYA bila di matriks ini "boleh". Makin banyak "Ya", makin sedikit orang (lebih efisien) — sesuaikan dengan kompetensi & SOP.');
   AK.note('Isi sel: Default = aturan khusus per role (bila ada) atau aturan standar · hasil akhirnya di "Matriks efektif" (kanan) · Ya = boleh · Tidak = tidak boleh. Default: Checker ↔ Picker ↔ Operator RT/CB; Admin hanya Picker & Checker; Operator hanya sesama operator; TKBM & Helper (non-karyawan) tidak merangkap dan tidak dirangkap.');
-  AK.note('Contoh: Picker FTE 0,85 di satu shift → 0 orang tetap + sisa 0,85. Bila Operator Reach Truck masih punya sisa waktu ≥ 0,85 dan boleh merangkap Picker → Picker dirangkap (0 orang). Bila tidak → +1 orang Picker.');
+  AK.note('Contoh: Picker FTE 0.85 di satu shift → 0 orang tetap + sisa 0.85. Bila Operator Reach Truck masih punya sisa waktu ≥ 0.85 dan boleh merangkap Picker → Picker dirangkap (0 orang). Bila tidak → +1 orang Picker.');
   // Aturan khusus per nama role (sama dengan matriks yang disimpan di web). Role yang punya aturan di sini HANYA boleh merangkap role yang terdaftar.
   AK.h3('Aturan khusus per role (dari web, berdasarkan nama — tetap benar walau urutan role berubah)');
   AK.hdr([['Role yang merangkap', true], ['Boleh merangkap role', true], 'Keterangan']);

@@ -25,7 +25,7 @@ const KET: Record<string, string> = {
 /** Sheet yang saling dirujuk rumus — selalu ikut diunduh. */
 const WAJIB = ['0 Ringkasan', 'Key Assumption', 'Volume', 'Produk', 'Value Stream Mapping', 'Warehouse Planning', 'Loan & Interest Calculator', 'Technology & Equipment', 'Utilities Management', 'Cost Allocation', 'Result', 'Quotation', 'Daftar', 'Data Input'];
 const kolom = (c: number) => { let s = ''; c++; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
-const fmt = (v: string | number | null) => v == null ? '' : typeof v === 'number' ? (Math.abs(v) >= 10000 ? Math.round(v).toLocaleString('id-ID') : Number.isInteger(v) ? String(v) : v.toLocaleString('id-ID', { maximumFractionDigits: 4 })) : String(v);
+const fmt = (v: string | number | null) => v == null ? '' : typeof v === 'number' ? (Math.abs(v) >= 10000 ? Math.round(v).toLocaleString('en-US') : Number.isInteger(v) ? String(v) : v.toLocaleString('en-US', { maximumFractionDigits: 4 })) : String(v);
 
 /** Tab Export: siapkan data → review isi tiap sheet → pilih sheet → unduh .xlsx. */
 export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Promise<DataExport>; namaFile: string }) {
@@ -77,7 +77,7 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
             <th>Sheet</th><th>Isi</th><th className="num">Baris</th><th /></tr></thead>
           <tbody>{pv.map((x, i) => <tr key={x.nama} style={i === aktif ? { background: 'var(--res)' } : undefined}>
             <td><input type="checkbox" aria-label={`Sertakan ${x.nama}`} checked={pilih.includes(x.nama) || WAJIB.includes(x.nama)} disabled={WAJIB.includes(x.nama)} title={WAJIB.includes(x.nama) ? 'Wajib — dirujuk rumus sheet lain' : undefined} onChange={e => setPilih(e.target.checked ? [...pilih, x.nama] : pilih.filter(n => n !== x.nama))} /></td>
-            <td><b>{x.nama}</b></td><td className="small muted">{KET[x.nama] ?? ''}</td><td className="num">{x.baris.toLocaleString('id-ID')}</td>
+            <td><b>{x.nama}</b></td><td className="small muted">{KET[x.nama] ?? ''}</td><td className="num">{x.baris.toLocaleString('en-US')}</td>
             <td><button className="ghost" onClick={() => setAktif(i)} disabled={i === aktif}>{i === aktif ? 'Sedang direview' : 'Review'}</button></td>
           </tr>)}</tbody>
         </table></div>
@@ -86,14 +86,14 @@ export default function ExportPanel({ siapkan, namaFile }: { siapkan: () => Prom
           <div className="tabs" role="tablist" style={{ marginBottom: 8 }}>
             {pv.map((x, i) => <button key={x.nama} role="tab" aria-selected={i === aktif} className={i === aktif ? 'on' : ''} onClick={() => setAktif(i)}>{x.nama}</button>)}
           </div>
-          <p className="small muted">Pratinjau sheet <b>{sh.nama}</b>{sh.baris > sh.rows.length ? ` — ${sh.rows.length} dari ${sh.baris.toLocaleString('id-ID')} baris pertama` : ''}. Warna & angka sama seperti di file Excel (header rumus/hasil silver · header input abu-abu muda · isi input putih tulang · isi hasil abu-abu).</p>
+          <p className="small muted">Pratinjau sheet <b>{sh.nama}</b>{sh.baris > sh.rows.length ? ` — ${sh.rows.length} dari ${sh.baris.toLocaleString('en-US')} baris pertama` : ''}. Warna & angka sama seperti di file Excel (header rumus/hasil silver · header input abu-abu muda · isi input putih tulang · isi hasil abu-abu).</p>
           <div className="tablewrap xl-prev" style={{ maxHeight: '65vh' }}><table>
             <thead><tr><th className="num">#</th>{Array.from({ length: Math.min(sh.kolom, 40) }, (_, c) => <th key={c} className="num">{kolom(c)}</th>)}</tr></thead>
             <tbody>{sh.rows.map((r, i) => <tr key={i}>
               <td className="num muted small">{i + 1}</td>
               {Array.from({ length: Math.min(sh.kolom, 40) }, (_, c) => { const v = r[c] ?? null; const g = sh.gaya?.[i]?.[c];
                 return <td key={c} className={typeof v === 'number' ? 'num' : undefined} style={g ? { background: g.bg, fontWeight: g.b ? 700 : undefined, color: g.c && g.c.toUpperCase() !== '#1F1F1F' ? g.c : undefined, textAlign: g.al } : undefined}>
-                  {g?.pct && typeof v === 'number' ? `${(v * 100).toLocaleString('id-ID', { maximumFractionDigits: 2 })}%` : fmt(v)}</td>; })}
+                  {g?.pct && typeof v === 'number' ? `${(v * 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%` : fmt(v)}</td>; })}
             </tr>)}</tbody>
           </table></div>
         </div>}

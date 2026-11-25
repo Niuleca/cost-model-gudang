@@ -20,13 +20,13 @@ const idBaru = () => Math.random().toString(36).slice(2, 10);
 
 function fmt(m: Metrik, v: number | null) {
   if (v == null) return '—';
-  if (m.satuan === '%') return `${(v * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
+  if (m.satuan === '%') return `${(v * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
   if (m.satuan.startsWith('Rp')) return rp(v);
   return angka(v, v < 100 ? 1 : 0);
 }
 function fmtSelisih(m: Metrik) {
   if (m.selisih == null) return '—';
-  if (m.satuan === '%') return `${m.selisih >= 0 ? '+' : ''}${(m.selisih * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })} poin`;
+  if (m.satuan === '%') return `${m.selisih >= 0 ? '+' : ''}${(m.selisih * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })} poin`;
   return `${m.selisih >= 0 ? '+' : ''}${m.satuan.startsWith('Rp') ? rp(m.selisih) : angka(m.selisih, Math.abs(m.selisih) < 100 ? 1 : 0)}`;
 }
 
@@ -163,7 +163,7 @@ export default function AnalisisProyekDetail() {
             <tr key={m.kode} className={m.status === 'merah' ? 'baris-merah' : undefined}>
               <td><b>{m.label}</b><div className="small muted">{m.satuan}</div></td>
               <td className="num">{fmt(m, m.rencana)}</td><td className="num"><b>{fmt(m, m.aktual)}</b></td>
-              <td className="num">{fmtSelisih(m)}</td><td className="num">{m.persen == null || m.satuan === '%' ? '—' : `${m.persen >= 0 ? '+' : ''}${(m.persen * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`}</td>
+              <td className="num">{fmtSelisih(m)}</td><td className="num">{m.persen == null || m.satuan === '%' ? '—' : `${m.persen >= 0 ? '+' : ''}${(m.persen * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`}</td>
               <td><span className={`pill ${WARNA[m.status]}`}>{LABEL_ST[m.status]}</span></td><td className="small">{m.ket}</td>
             </tr>))}</tbody>
         </table></div>

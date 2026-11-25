@@ -20,7 +20,7 @@ export function waktu(d: Dunia, t: number) {
 }
 const tanggalHari = (d: Dunia, hari: number) => { const tgl = new Date(`${d.sk.mulai}T00:00:00Z`); tgl.setUTCDate(tgl.getUTCDate() + hari); return tgl.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }); };
 const durasi = (det: number) => { const m = Math.max(0, Math.round(det / 60)); return m >= 60 ? `${Math.floor(m / 60)} j ${m % 60} m` : `${m} m`; };
-const angka = (v: number, k = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: k });
+const angka = (v: number, k = 0) => v.toLocaleString('en-US', { maximumFractionDigits: k });
 
 /** Ikon garis sederhana (24×24). */
 export function Ikon({ n }: { n: 'palet' | 'truk' | 'jam' | 'mhe' | 'orang' | 'order' | 'tutup' | 'dock' }) {

@@ -241,8 +241,8 @@ export default function TableEditor(p: Props) {
     const set = (v: unknown) => id ? ubah(id, k.key, v) : setBaru(b => ({ ...(b ?? {}), [k.key]: v }));
     const editable = bolehEdit && !k.readonly;
     if (!editable) {
-      if (k.type === 'percent') return nilai == null ? '—' : (Number(nilai) * 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + '%';
-      if (k.type === 'number') return nilai == null ? '—' : Number(nilai).toLocaleString('id-ID', { maximumFractionDigits: 2 });
+      if (k.type === 'percent') return nilai == null ? '—' : (Number(nilai) * 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + '%';
+      if (k.type === 'number') return nilai == null ? '—' : Number(nilai).toLocaleString('en-US', { maximumFractionDigits: 2 });
       if (k.type === 'bool') return nilai ? 'Ya' : 'Tidak';
       return String(nilai ?? '—');
     }

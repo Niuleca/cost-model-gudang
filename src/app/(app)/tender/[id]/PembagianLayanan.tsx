@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import type { HasilTender, Bucket, TenderInput } from '@/lib/engine/index.ts';
 import { rp, persen, BUCKET_LABEL, labelKelompok } from '@/lib/format';
 import { uraiUom } from '@/lib/engine/types';
+import { normalDesimal, bacaAngka } from '@/lib/bacaAngka';
 
 export type AlokasiKategori = NonNullable<TenderInput['alokasiKategori']>;
 const OPS: Bucket[] = ['storage', 'handling_in', 'handling_out', 'vas'];
@@ -27,10 +28,10 @@ const DASAR: Record<string, string> = {
 
 
 function InputPorsi({ nilai, set, label, lebar = 70 }: { nilai: number; set: (v: number) => void; label: string; lebar?: number }) {
-  const ke = (v: number) => String(Math.round(v * 1000) / 10).replace('.', ',');
+  const ke = (v: number) => String(Math.round(v * 1000) / 10);
   const [t, setT] = useState(ke(nilai));
   useEffect(() => { setT(ke(nilai)); }, [nilai]);
-  const simpan = () => { const v = Number(t.replace(',', '.')); if (t.trim() === '') set(0); else if (isFinite(v) && v >= 0 && v <= 100) set(v / 100); else setT(ke(nilai)); };
+  const simpan = () => { const v = Number(normalDesimal(t)); if (t.trim() === '') set(0); else if (isFinite(v) && v >= 0 && v <= 100) set(v / 100); else setT(ke(nilai)); };
   return <span className="row" style={{ gap: 2, flexWrap: 'nowrap', display: 'inline-flex' }}>
     <input aria-label={label} className="input-kecil" inputMode="decimal" style={{ width: lebar, textAlign: 'right' }} value={t} onChange={e => setT(e.target.value)}
       onBlur={simpan} onKeyDown={e => { if (e.key === 'Enter') { simpan(); (e.target as HTMLInputElement).blur(); } }} />%</span>;
@@ -92,7 +93,7 @@ export function MatriksKategori({ h, nilai, onUbah, tenderId, setara, onSetara }
           const vin = pal('inbound'), vout = pal('outbound');
           if (hs || !(vin > 0 && vout > 0)) return null;
           const ri = vin / (vin + vout);
-          return <button className="ghost" title={`Biaya handling dibagi sesuai volume: in ${Math.round(vin).toLocaleString('id-ID')} : out ${Math.round(vout).toLocaleString('id-ID')} palet eq. → tarif per palet in & out setara`}
+          return <button className="ghost" title={`Biaya handling dibagi sesuai volume: in ${Math.round(vin).toLocaleString('en-US')} : out ${Math.round(vout).toLocaleString('en-US')} palet eq. → tarif per palet in & out setara`}
             onClick={() => onUbah(Object.fromEntries(mx.map(r => { const p = r.porsi as Record<Bucket, number>; const hd = (p.handling_in ?? 0) + (p.handling_out ?? 0);
               return [r.kelompok, Object.fromEntries(kol.map(k => [k, k === 'handling_in' ? hd * ri : k === 'handling_out' ? hd * (1 - ri) : (p[k] ?? 0)]))]; })))}>
             Handling in/out sesuai volume ({Math.round(ri * 100)}:{100 - Math.round(ri * 100)})</button>;
@@ -103,7 +104,7 @@ export function MatriksKategori({ h, nilai, onUbah, tenderId, setara, onSetara }
       {onSetara && <label className="notice small" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: 0 }}>
         <input type="checkbox" checked={!!setara} onChange={e => onSetara(e.target.checked)} style={{ marginTop: 3 }} />
         <span><b>Tarif handling in & out setara per palet</b> — biaya handling tiap kategori dibagi menurut volume
-          {hs ? <> in {hs.paletIn.toLocaleString('id-ID')} : out {hs.paletOut.toLocaleString('id-ID')} palet eq. (<b>{Math.round(hs.porsiIn * 100)} : {100 - Math.round(hs.porsiIn * 100)}</b>)</> : ' in : out'}.
+          {hs ? <> in {hs.paletIn.toLocaleString('en-US')} : out {hs.paletOut.toLocaleString('en-US')} palet eq. (<b>{Math.round(hs.porsiIn * 100)} : {100 - Math.round(hs.porsiIn * 100)}</b>)</> : ' in : out'}.
           {' '}Matikan bila ingin membagi in/out sendiri (mis. sesuai beban kerja); porsi storage tetap mengikuti isian.</span></label>}
       <div className="tablewrap fit"><table className="tabel-fit tabel-matriks">
         <thead><tr><th>Kategori</th><th className="num">Biaya/bln</th>{kol.map(b => <th key={b} className="num">{BUCKET_LABEL[b]}</th>)}<th className="num">Total</th><th>Sumber</th>{lihatDasar && <th>Dasar default (simulasi)</th>}</tr></thead>

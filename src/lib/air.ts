@@ -38,5 +38,5 @@ export function airKeCostLines(a?: AirInput | null): CostLineInput[] {
   const h = hitungAir(a); if (!h.berbayar || h.biayaBulan <= 0) return [];
   const sumber = SUMBER_AIR[a.sumber].l;
   return [{ deskripsi: `Water — ${sumber} (${Math.round(h.m3Bulan)} m³/bln)`, kelompok: 'Utilitas', mode: 'bulanan', qty: 1, hargaSatuan: Math.round(h.biayaBulan),
-    kategoriRisiko: 'Sedang', sumber: `${Math.round(h.m3Bulan)} m³ × Rp${a.tarifM3.toLocaleString('id-ID')} + beban Rp${a.abonemenBulan.toLocaleString('id-ID')}` }];
+    kategoriRisiko: 'Sedang', sumber: `${Math.round(h.m3Bulan)} m³ × Rp${a.tarifM3.toLocaleString('en-US')} + beban Rp${a.abonemenBulan.toLocaleString('en-US')}` }];
 }

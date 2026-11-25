@@ -13,7 +13,7 @@ import InputDesimal from '@/components/InputDesimal';
 const PROFIL_KOSONG: ProfilVolume = { inbound: [], outbound: [], param: PARAM_DEFAULT };
 const BASIS: { v: BasisVolume; l: string }[] = [
   { v: 'peakBulan', l: 'Peak/bln (sizing)' }, { v: 'rataRataBulan', l: 'Rata-rata/bln' }, { v: 'komitmenBulan', l: 'Komitmen/bln' }];
-const pct = (x: number) => `${(x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
+const pct = (x: number) => `${(x * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
 
 /** Profil order inbound/outbound: volume/bln dari tabel Volume ÷ hari operasional → dipecah per moda (%) → mobil per hari. */
 export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onChange, ringkas = false, judul, pakaiJalur = false }: {
@@ -70,7 +70,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                         set(i, tipe === 'cont' ? { jalur: jl, moda: v as BarisProfil['moda'], muatan: mu } : { jalur: jl, moda: mu, kendaraan: v });
                       }}>
                         <optgroup label="Kontainer">{MODA.filter(o => o.v.startsWith('cont')).map(o => <option key={o.v} value={`cont:${o.v}`}>{o.l}</option>)}</optgroup>
-                        {!hanyaKont && <optgroup label="Truk">{truk.map(k => <option key={k.nama} value={`trk:${k.nama}`}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('id-ID')} kg</option>)}</optgroup>}
+                        {!hanyaKont && <optgroup label="Truk">{truk.map(k => <option key={k.nama} value={`trk:${k.nama}`}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('en-US')} kg</option>)}</optgroup>}
                       </select></label>
                     <label className="f small" style={{ marginTop: 4 }}>Jenis muat
                       <select aria-label={`Jenis muat ${labelJalur(jl)}`} value={mu} style={{ minWidth: 190 }} onChange={e => {
@@ -101,10 +101,10 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
                   {m && <div className="small muted" title="Tonase & volume per hari">{angka(m.tonTrip * (m.bulat || 1), 1)} ton · {angka(m.cbmTrip * (m.bulat || 1), 1)} CBM</div>}</td>
                 <td>{isKont ? <><span className="small">{m?.kendaraan ?? MODA.find(o => o.v === r.moda)?.l ?? 'kontainer'}</span>
                     <div className="row small" style={{ flexWrap: 'nowrap', gap: 4, marginTop: 4 }}>{n(r.tonPerKontainer ? r.tonPerKontainer * 1000 : undefined, v => set(i, { tonPerKontainer: v ? v / 1000 : undefined }), 70, String(Math.round((m ? m.kap.ton : TON_KONTAINER[r.moda as 'cont20' | 'cont40' | 'cont40hc']) * 1000)))}<span className="muted">kg maks/kont</span></div>
-                    {!r.tonPerKontainer && <div className="small" style={{ color: 'var(--accent-ink, #0f766e)' }}>otomatis {((m ? m.kap.ton : TON_KONTAINER[r.moda as 'cont20' | 'cont40' | 'cont40hc']) * 1000).toLocaleString('id-ID')} kg (data kendaraan)</div>}</>
+                    {!r.tonPerKontainer && <div className="small" style={{ color: 'var(--accent-ink, #0f766e)' }}>otomatis {((m ? m.kap.ton : TON_KONTAINER[r.moda as 'cont20' | 'cont40' | 'cont40hc']) * 1000).toLocaleString('en-US')} kg (data kendaraan)</div>}</>
                   : pakaiJalur ? <span className="small">{kendaraan.some(x => x.nama === r.kendaraan) ? r.kendaraan : kendaraanAwal(kendaraan).nama}</span>
                   : <select aria-label="Kendaraan" value={kendaraan.some(x => x.nama === r.kendaraan) ? r.kendaraan : kendaraanAwal(kendaraan).nama} onChange={e => set(i, { kendaraan: e.target.value })} style={{ minWidth: 150 }}>
-                    {kendaraan.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('id-ID')} kg</option>)}</select>}</td>
+                    {kendaraan.map(k => <option key={k.nama} value={k.nama}>{k.nama} · {k.palet} plt · {k.cbm} m³ · {(k.ton * 1000).toLocaleString('en-US')} kg</option>)}</select>}</td>
                 <td className="num">{m ? <><b>{m.bulat}</b>{isKont && <div className="small">kontainer</div>}<div className="small muted">({angka(m.perHari, 2)}) / hari</div><div className="small"><b>{angka(m.bulatBulan)}</b> / bln</div></> : '–'}</td>
                 <td className="small">{m && <>
                   {mu !== 'palet' && m.casePerMobil > 0 && <div><b>{angka(m.casePerMobil)} case/{isKont ? 'kont' : 'mobil'}</b> <span className="muted">({m.kap.cbm} m³ × {Math.round(m.util * 100)}% ÷ {p.param.cbmPerCase})</span></div>}
@@ -190,8 +190,8 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
         <label className="f">Basis volume
           <select value={basis} onChange={e => onChange({ ...p, basis: e.target.value as BasisVolume })} style={{ minWidth: 170 }}>
             {BASIS.map(b => <option key={b.v} value={b.v}>{b.l}</option>)}</select></label>
-        <span className="small muted" style={{ alignSelf: 'center' }}>Muatan: <b>{(p.param.tonPerPalet * 1000).toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerPalet.toLocaleString('id-ID')} CBM</b> per palet ·
-          {' '}<b>{p.param.kgPerCase.toLocaleString('id-ID')} kg</b> & <b>{p.param.cbmPerCase.toLocaleString('id-ID')} CBM</b> per case — {pakaiJalur ? <>dihitung dari <b>Product input (1.4)</b></> : <>diatur di <b>Parameter muatan</b> di atas</>}</span>
+        <span className="small muted" style={{ alignSelf: 'center' }}>Muatan: <b>{(p.param.tonPerPalet * 1000).toLocaleString('en-US')} kg</b> & <b>{p.param.cbmPerPalet.toLocaleString('en-US')} CBM</b> per palet ·
+          {' '}<b>{p.param.kgPerCase.toLocaleString('en-US')} kg</b> & <b>{p.param.cbmPerCase.toLocaleString('en-US')} CBM</b> per case — {pakaiJalur ? <>dihitung dari <b>Product input (1.4)</b></> : <>diatur di <b>Parameter muatan</b> di atas</>}</span>
         <label className="f" title="Inbound: barang masuk + put away; outbound: picking + barang keluar">Input admin per mobil {n(p.param.inputAdminPerMobil ?? 2, v => setParam('inputAdminPerMobil', v), 90)}</label>
         <label className="f" title="CBM efektif = CBM kendaraan × pemakaian; sisanya toleransi (ruang tidak terpakai)">Pemakaian ruang muat (CBM)
           <span className="row" style={{ flexWrap: 'nowrap', gap: 2 }}>{n(Math.round((p.param.utilCbm ?? 0.9) * 1000) / 10, v => setParam('utilCbm', Math.min(100, Math.max(1, v)) / 100), 70)}%
@@ -218,7 +218,7 @@ export default function ProfilVolumePanel({ profil: pIn, volumes, hariBulan, onC
       })()}
       {!ringkas && <details>
         <summary className="small">Kapasitas kendaraan (bisa diubah / ditambah) · {kendaraan.length} jenis</summary>
-        <p className="small muted">Kapasitas default adalah perkiraan umum di Indonesia (palet standar 1,2 × 1,0 m); sesuaikan dengan armada vendor. Nama kontainer (20ft / 40ft / 40HC) dipakai otomatis untuk moda kontainer.</p>
+        <p className="small muted">Kapasitas default adalah perkiraan umum di Indonesia (palet standar 1.2 × 1.0 m); sesuaikan dengan armada vendor. Nama kontainer (20ft / 40ft / 40HC) dipakai otomatis untuk moda kontainer.</p>
         <div className="tablewrap"><table>
           <thead><tr><th>Kendaraan</th><th className="num">Palet</th><th className="num">CBM</th><th className="num">Berat (kg)</th><th /></tr></thead>
           <tbody>{kendaraan.map((k, i) => {

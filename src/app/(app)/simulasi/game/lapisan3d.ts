@@ -732,7 +732,7 @@ export function buatLapisanGame(d: Dunia, layout: LayoutGudang, kontrol: { curre
     let tinggiSiklus = 0; let catatTaruh: (() => void) | null = null;
     /** Petunjuk kontekstual (apa yang terjadi bila E ditekan). */
     const petunjukP = (sp: StudiPemain): string => {
-      const m = sp.mode; const f1 = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+      const m = sp.mode; const f1 = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 1 });
       if (m === 'bebas') return 'Jalan bebas — dekati pekerja / MHE untuk mengamati.';
       if (aksiP) return `${LABEL_AKSI[aksiP.nama] ?? aksiP.nama}…`;
       if (m === 'cbt' || m === 'reach' || m === 'hpt') {

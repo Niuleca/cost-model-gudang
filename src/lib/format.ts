@@ -1,11 +1,11 @@
 export const rp = (n: number | null | undefined, desimal = 0) =>
-  n == null || !isFinite(Number(n)) ? '—' : 'Rp' + Number(n).toLocaleString('id-ID', { minimumFractionDigits: desimal, maximumFractionDigits: desimal });
+  n == null || !isFinite(Number(n)) ? '—' : 'Rp' + Number(n).toLocaleString('en-US', { minimumFractionDigits: desimal, maximumFractionDigits: desimal });
 
 export const angka = (n: number | null | undefined, desimal = 0) =>
-  n == null || !isFinite(Number(n)) ? '—' : Number(n).toLocaleString('id-ID', { minimumFractionDigits: desimal, maximumFractionDigits: desimal });
+  n == null || !isFinite(Number(n)) ? '—' : Number(n).toLocaleString('en-US', { minimumFractionDigits: desimal, maximumFractionDigits: desimal });
 
 export const persen = (n: number | null | undefined, desimal = 1) =>
-  n == null || !isFinite(Number(n)) ? '—' : (Number(n) * 100).toLocaleString('id-ID', { minimumFractionDigits: desimal, maximumFractionDigits: desimal }) + '%';
+  n == null || !isFinite(Number(n)) ? '—' : (Number(n) * 100).toLocaleString('en-US', { minimumFractionDigits: desimal, maximumFractionDigits: desimal }) + '%';
 
 export const tanggal = (s: string | null | undefined) =>
   !s ? '—' : new Date(s).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });

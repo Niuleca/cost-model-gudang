@@ -20,7 +20,7 @@ export interface DriverIt {
 export interface KatalogIt { id: number; kelompok: string; item: string; cost_type: string; harga: number | string; slab_min?: number | null; slab_max?: number | null }
 
 const ceil = (v: number) => Math.ceil(Math.max(0, v) - 1e-9);
-const rb = (v: number) => Math.round(v).toLocaleString('id-ID');
+const rb = (v: number) => Math.round(v).toLocaleString('en-US');
 
 /** Slab WMS yang rentangnya memuat volume transaksi (semua transaksi memakai tarif slab tersebut). */
 export function slabWms(katalog: KatalogIt[], transaksi: number) {
@@ -59,8 +59,8 @@ export function aturanIt(d: DriverIt, katalog: KatalogIt[] = []): { kunci: strin
     { kunci: 'pc', cari: /^PC Desktop$/i, qty: pc, ket: d.unitPc ? 'unit PC di MHE Summary' : `staf kantor ${stafKantor} ÷ ${shift} shift + 10% (PC dipakai bergantian antar shift)` },
     { kunci: 'laptop', cari: /Laptop Operasional/i, qty: laptop, ket: d.unitLaptop ? 'unit laptop di MHE Summary' : 'per SPV / manager' },
     { kunci: 'dotmatrix', cari: /Printer Dot Matrix/i, qty: 1, ket: '1 per site (surat jalan)' },
-    { kunci: 'aio', cari: /Printer All-in-One/i, qty: printerAio, ket: '1 per 5.000 m² (min. 1)' },
-    { kunci: 'barcode', cari: /Printer Barcode/i, qty: printerBc, ket: '1 per 5.000 m² (min. 1)' },
+    { kunci: 'aio', cari: /Printer All-in-One/i, qty: printerAio, ket: '1 per 5,000 m² (min. 1)' },
+    { kunci: 'barcode', cari: /Printer Barcode/i, qty: printerBc, ket: '1 per 5,000 m² (min. 1)' },
     { kunci: 'tv', cari: /^TV Display$/i, qty: 1, ket: '1 per site (dashboard KPI)' },
     { kunci: 'ups', cari: /^UPS$/i, qty: pc, ket: '1 per PC' },
     { kunci: 'ap', cari: /Access Point/i, qty: ap, ket: d.luasM2 > 0 ? `gudang ${rb(gudangM2)} m² ÷ 600 m² (cakupan RF di antara rak, min. 2) + office ${officeM2 ? `${rb(officeM2)} m² ÷ 150 m²` : '1 unit'}` : 'luas gudang belum ada (Warehouse Planning)' },

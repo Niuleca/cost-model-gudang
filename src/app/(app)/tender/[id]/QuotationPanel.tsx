@@ -88,7 +88,7 @@ export default function QuotationPanel({ tender, profile, sumber }: { tender: Te
   function dariHasil(h: HasilTender) {
     const inclPpn = (tender.asumsi.pajak?.ppn ?? 'exclude') === 'include';
     const rate: RateRow[] = h.rateCard.map(r => ({ layanan: BUCKET_LABEL[r.bucket], satuan: (SATUAN[r.bucket] ?? (u => u))(r.uom), tarif: inclPpn ? (r.tarifInclPpn ?? r.tarifPerUnit) : r.tarifPerUnit,
-      catatan: /\/hari$/i.test(r.uom) ? `Minimum ${r.volumeKomitmen.toLocaleString('id-ID')} ${r.uom.replace(/\/hari$/i, '')}-hari per bulan (${(tender.asumsi.hariTarifHarian || 30)} hari)` : `Minimum ${r.volumeKomitmen.toLocaleString('id-ID')} ${r.uom}/bulan` }));
+      catatan: /\/hari$/i.test(r.uom) ? `Minimum ${r.volumeKomitmen.toLocaleString('en-US')} ${r.uom.replace(/\/hari$/i, '')}-hari per bulan (${(tender.asumsi.hariTarifHarian || 30)} hari)` : `Minimum ${r.volumeKomitmen.toLocaleString('en-US')} ${r.uom}/bulan` }));
     for (const alt of h.storageAlternatif.slice(1))
       rate.push({ layanan: 'Storage (alternatif)', satuan: `per ${alt.uom} per bulan`, tarif: alt.tarif, catatan: 'Pilih salah satu basis storage' });
     // Layanan utama yang tidak ditagih terpisah
@@ -256,7 +256,7 @@ export default function QuotationPanel({ tender, profile, sumber }: { tender: Te
             <label className="f" htmlFor="qkpd">Kepada<input id="qkpd" value={draft.kepada ?? ''} onChange={e => setDraft({ ...draft, kepada: e.target.value, nomor: nomorAuto ? susunNomor(draft.tanggal, e.target.value, nomorAuto.pembuatan, nomorAuto.urutan) : draft.nomor })} /></label>
             <label className="f" htmlFor="qbs">Berlaku sampai<input id="qbs" type="date" value={draft.berlaku_sampai} onChange={e => setDraft({ ...draft, berlaku_sampai: e.target.value })} /></label>
           </div>
-          {draft.revisi > 0 && <label className="f" htmlFor="qrev">Catatan revisi (wajib)<input id="qrev" value={draft.catatan_revisi ?? ''} onChange={e => setDraft({ ...draft, catatan_revisi: e.target.value })} placeholder="mis. volume komitmen naik 1.200 → 1.500 palet; payment term 45 hari" /></label>}
+          {draft.revisi > 0 && <label className="f" htmlFor="qrev">Catatan revisi (wajib)<input id="qrev" value={draft.catatan_revisi ?? ''} onChange={e => setDraft({ ...draft, catatan_revisi: e.target.value })} placeholder="mis. volume komitmen naik 1,200 → 1,500 palet; payment term 45 hari" /></label>}
           <div className="tablewrap"><table>
             <thead><tr><th>Layanan</th><th>Satuan</th><th className="num">Tarif</th><th>Keterangan</th><th></th></tr></thead>
             <tbody>{draft.rate_card.map((r, i) => (

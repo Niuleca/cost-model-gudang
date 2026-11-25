@@ -14,7 +14,7 @@ export function dasarKekuatan(a: Asumsi, customer?: string) {
     beratDefaultKg: maks ?? param.tonPerPalet * 1000,
     sumberBerat: maks != null ? 'palet rak terberat (tab Produk)' : 'berat per palet (Volume → Parameter muatan)',
     kapLantaiDefaultKgM2: daya > 0 ? daya * 1000 : null,
-    sumberLantai: daya > 0 ? `gudang terpilih ${daya.toLocaleString('id-ID')} ton/m²` : 'default 3.000',
+    sumberLantai: daya > 0 ? `gudang terpilih ${daya.toLocaleString('en-US')} ton/m²` : 'default 3,000',
     kapPosisiKg: at.kapPosisiKg,
   };
 }

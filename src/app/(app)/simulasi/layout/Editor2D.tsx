@@ -5,6 +5,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import { BLOK_DEFAULT, aturSisiGate, dindingMiring, poligonLuar, rentangZ, celahArea, dimRak, jarakBebas, lorongArea, nBay, ringkasArea, uraiArea, uraiBlok, uraiGridKolom, denganKolom, asGridKolom,
   uraiKomponen, celahBaris, geserBarisArea, unitBaris, uid, type Komponen, type LayoutEdit } from '@/lib/simulasi3d/editor';
 import { LAPISAN_AWAL, lapisDari, type Lapisan } from './lapisan';
+import { normalDesimal, bacaAngka } from '@/lib/bacaAngka';
 
 export type Mode = 'pilih' | 'blok' | 'ukur' | 'geser' | 'kolom';
 export interface Editor2DApi { pasFit: () => void; svgEkspor: () => string; pusatLayar: () => { x: number; z: number } }
@@ -28,7 +29,7 @@ function seretGate(k: Komponen, px: number, pz: number, g: { L: number; W: numbe
   const pos = snap((sejajarZ ? pz : px) - lebar / 2);
   return aturSisiGate({ ...k, sisi, ...(sejajarZ ? { z: pos, d: lebar } : { x: pos, w: lebar }) }, sisi, g);
 }
-const f1 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('id-ID');
+const f1 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('en-US');
 
 type Seret =
   | { jenis: 'geser'; id: string; ax: number; az: number; x0: number; z0: number }
@@ -49,7 +50,7 @@ const PERINTAH: Record<string, string> = {
   X: 'explode', EXPLODE: 'explode', OR: 'ortho', ORTHO: 'ortho', OS: 'osnap', OSNAP: 'osnap', SN: 'snap', SNAP: 'snap', S: 'select', SELECT: 'select', W: 'select',
 };
 const BANTUAN = 'Perintah: M geser · CO salin · RO putar · E hapus · DI ukur · X pecah area · Z pas layar · LA layer · U undo · F3 OSNAP · F8 ORTHO · F9 SNAP';
-const angkaKetik = (t: string) => Number(t.trim().replace(',', '.'));
+const angkaKetik = (t: string) => bacaAngka(t) ?? NaN;
 function bacaJarak(t: string): { rel?: Pt; jarak?: number; abs?: Pt } | null {
   const s = t.trim(); if (!s) return null;
   const pasang = (x: string) => { const b = x.includes(';') ? x.split(';') : x.split(','); if (b.length !== 2) return null; const a = angkaKetik(b[0]), c = angkaKetik(b[1]); return Number.isFinite(a) && Number.isFinite(c) ? { x: a, z: c } : null; };
@@ -254,9 +255,9 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
   const jalankan = (teks: string) => {
     const t = teks.trim();
     if (cmd && cmd.tahap !== 'pilih' && t) {
-      const b = bacaJarak(t); if (!b) { tulis(`"${t}" tidak dikenali — ketik jarak (mis. 3,5), @dx;dz, atau x;z.`); return; }
+      const b = bacaJarak(t); if (!b) { tulis(`"${t}" tidak dikenali — ketik jarak (mis. 3.5), @dx;dz, atau x;z.`); return; }
       if (cmd.tahap === 'dasar') { const q = b.abs ?? (b.rel ? b.rel : null); if (!q) { tulis('Titik dasar: klik di denah atau ketik x;z.'); return; }
-        setCmd({ ...cmd, tahap: 'tujuan', dasar: q }); tulis('Titik kedua: klik, atau ketik jarak arah kursor (mis. 3,5) / @dx;dz.'); return; }
+        setCmd({ ...cmd, tahap: 'tujuan', dasar: q }); tulis('Titik kedua: klik, atau ketik jarak arah kursor (mis. 3.5) / @dx;dz.'); return; }
       const d0 = cmd.dasar!;
       if (b.rel) { terapkan(cmd, b.rel.x, b.rel.z); return; }
       if (b.abs) { terapkan(cmd, b.abs.x - d0.x, b.abs.z - d0.z); return; }
@@ -354,7 +355,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     // perintah MOVE / COPY: klik = titik dasar / titik kedua
     if (cmd && cmd.tahap !== 'pilih' && e.button === 0) {
       const q = titik(p, cmd.tahap === 'tujuan' ? cmd.dasar : null);
-      if (cmd.tahap === 'dasar') { setCmd({ ...cmd, tahap: 'tujuan', dasar: q }); tulis('Titik kedua: klik, atau ketik jarak arah kursor (mis. 3,5) / @dx;dz.'); }
+      if (cmd.tahap === 'dasar') { setCmd({ ...cmd, tahap: 'tujuan', dasar: q }); tulis('Titik kedua: klik, atau ketik jarak arah kursor (mis. 3.5) / @dx;dz.'); }
       else terapkan(cmd, q.x - cmd.dasar!.x, q.z - cmd.dasar!.z);
       return;
     }
@@ -566,13 +567,13 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
         el.push(<rect key={`bl${i}`} x={l.x} y={l.z} width={l.w} height={l.d} fill="#fef9c3" fillOpacity={0.7} stroke="none" />);
         const cx = l.x + l.w / 2, cz = l.z + l.d / 2;
         el.push(<text key={`blt${i}`} x={cx} y={cz} fontSize={fs * 0.7} textAnchor="middle" dominantBaseline="middle" fill="#a16207" transform={ax ? undefined : `rotate(-90 ${cx} ${cz})`}
-          style={{ pointerEvents: 'none' }}>lorong {l.lebar.toLocaleString('id-ID')} m</text>);
+          style={{ pointerEvents: 'none' }}>lorong {l.lebar.toLocaleString('en-US')} m</text>);
       });
       ub.gangway.forEach((g0, i) => {
         el.push(<rect key={`bg${i}`} x={g0.x} y={g0.z} width={g0.w} height={g0.d} fill="url(#arsir)" fillOpacity={0.9} stroke="#ca8a04" strokeWidth={fs * 0.04} strokeDasharray={`${fs * 0.3} ${fs * 0.2}`} />);
         const cx = g0.x + g0.w / 2, cz = g0.z + g0.d / 2;
         el.push(<text key={`bgt${i}`} x={cx} y={cz} fontSize={fs * 0.7} textAnchor="middle" dominantBaseline="middle" fill="#854d0e" transform={ax ? `rotate(-90 ${cx} ${cz})` : undefined}
-          style={{ paintOrder: 'stroke', stroke: '#fffbeb', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>gangway {g0.lebar.toLocaleString('id-ID')} m</text>);
+          style={{ paintOrder: 'stroke', stroke: '#fffbeb', strokeWidth: fs * 0.2, pointerEvents: 'none' }}>gangway {g0.lebar.toLocaleString('en-US')} m</text>);
       });
       ub.baris.forEach((r, i) => {
         el.push(<rect key={`br${i}`} x={r.x} y={r.z} width={r.w} height={r.d} fill="#fde68a" stroke="#b45309" strokeWidth={fs * 0.05} />);
@@ -607,7 +608,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
     }
     if (k.jenis === 'dock') el.push(<path key="p" d={`M ${k.x + k.w} ${k.z + k.d / 2} l ${fs * 0.9} ${-fs * 0.5} l 0 ${fs} z`} fill={k.arus === 'outbound' ? '#059669' : '#2563eb'} />);
     const ra = k.area ? ringkasArea(k, edit) : null;
-    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('id-ID')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? (k.blok ? (() => { const ub = uraiBlok(k); return `${k.label} · ${ub.nBaris} baris × ${ub.nPaletBaris} plt × ${k.blok.deep} deep × ${k.tumpuk ?? 1} tumpuk = ${(ub.tapak * (k.tumpuk ?? 1)).toLocaleString('id-ID')} posisi`; })() : `${k.label} · tumpuk ${k.tumpuk ?? 1}`) : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.jenis === 'gate' ? `${k.label} ${f1((k.sisi ?? 'depan') === 'depan' || k.sisi === 'belakang' ? k.d : k.w)} m` : k.jenis === 'platform' ? `${k.label} ${f1(k.d)} × ${f1(k.w)} m · ${f1(k.tinggi)} m` : k.label;
+    const label = ra ? `${k.label} · ${ra.baris} baris · ${ra.bay} bay × ${k.area!.rak.level} lv · ${ra.posisi.toLocaleString('en-US')} posisi` : k.rak ? `${k.label} · ${nBay(k)} bay × ${k.rak.level} lv` : k.jenis === 'block' ? (k.blok ? (() => { const ub = uraiBlok(k); return `${k.label} · ${ub.nBaris} baris × ${ub.nPaletBaris} plt × ${k.blok.deep} deep × ${k.tumpuk ?? 1} tumpuk = ${(ub.tapak * (k.tumpuk ?? 1)).toLocaleString('en-US')} posisi`; })() : `${k.label} · tumpuk ${k.tumpuk ?? 1}`) : k.jenis === 'dock' ? (k.arus === 'outbound' ? 'OUT' : 'IN') : k.jenis === 'gate' ? `${k.label} ${f1((k.sisi ?? 'depan') === 'depan' || k.sisi === 'belakang' ? k.d : k.w)} m` : k.jenis === 'platform' ? `${k.label} ${f1(k.d)} × ${f1(k.w)} m · ${f1(k.tinggi)} m` : k.label;
     const muat = Math.max(k.w, k.d) > label.length * fs * 0.45 || dipilih;
     if (muat && k.jenis !== 'kolom') {
       const tegak = k.d > k.w * 1.6 && k.jenis !== 'dock' && !k.area && !k.blok;
@@ -825,7 +826,7 @@ const Editor2D = forwardRef<Editor2DApi, Props>(function Editor2D({ edit, pilih,
       <div className="cad-baris">
         <label className="cad-input">
           <span>{cmd ? (cmd.tahap === 'pilih' ? 'Pilih objek ›' : cmd.tahap === 'dasar' ? 'Titik dasar ›' : 'Titik kedua ›') : 'Perintah ›'}</span>
-          <input ref={cmdInput} value={cmdTeks} spellCheck={false} placeholder={cmd ? (cmd.tahap === 'tujuan' ? 'jarak (3,5) atau @dx;dz' : cmd.tahap === 'dasar' ? 'klik atau x;z' : 'Enter = lanjut') : 'M, CO, RO, E, DI, X, Z, LA…'}
+          <input ref={cmdInput} value={cmdTeks} spellCheck={false} placeholder={cmd ? (cmd.tahap === 'tujuan' ? 'jarak (3.5) atau @dx;dz' : cmd.tahap === 'dasar' ? 'klik atau x;z' : 'Enter = lanjut') : 'M, CO, RO, E, DI, X, Z, LA…'}
             onChange={e => setCmdTeks(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' || (e.key === ' ' && !cmdTeks.includes('@'))) { e.preventDefault(); const t = cmdTeks; setCmdTeks(''); jalankan(t); if (!t || !cmd) cmdInput.current?.blur(); return; }

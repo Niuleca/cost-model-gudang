@@ -25,7 +25,7 @@ const TABS = ['Input rute', 'Result & margin', 'Quotation', 'Simulasi 3D'] as co
 const ambilIm = (t: TenderTr): TenderIntermodal => ({ ...INTERMODAL_DEFAULT, ...((t.asumsi?.intermodal as TenderIntermodal | undefined) ?? {}) });
 /** Basis default saat moda diganti (semua satuan tetap bisa dipilih di setiap stage). */
 const BASIS_AWAL: Record<Moda, Basis> = { darat: 'trip', laut: 'container', udara: 'kg', kereta: 'container' };
-const fmtQ = (x: number) => x.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+const fmtQ = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
 /** Satu stage: moda, armada, basis, qty per shipment, vendor & harga dari market price. Di level modul supaya input tidak kehilangan fokus. */
 function BarisStage({ s, idx, rates, q, onUbah }: { s: StageIntermodal; idx: number; rates: RateTransport[]; q: { qty: number; auto: boolean }; onUbah: (p: Partial<StageIntermodal>) => void }) {
@@ -40,7 +40,7 @@ function BarisStage({ s, idx, rates, q, onUbah }: { s: StageIntermodal; idx: num
       <td>
         <input aria-label="Dari" list={`dl-im-${s.moda}`} value={s.dari} placeholder="Dari" onChange={e => onUbah({ dari: e.target.value, rateId: null })} />
         <input aria-label="Ke" list={`dl-im-${s.moda}`} className="input-kecil" value={s.ke} placeholder="Ke" onChange={e => onUbah({ ke: e.target.value, rateId: null })} />
-        {km ? <div className="dasar-def">±{km.toLocaleString('id-ID')} km</div> : null}
+        {km ? <div className="dasar-def">±{km.toLocaleString('en-US')} km</div> : null}
       </td>
       <td>
         <select aria-label="Armada" value={s.armada} onChange={e => onUbah({ armada: e.target.value, rateId: null })}>{armadaModa(s.moda).map(a => <option key={a.nama}>{a.nama}</option>)}</select>
@@ -49,7 +49,7 @@ function BarisStage({ s, idx, rates, q, onUbah }: { s: StageIntermodal; idx: num
       <td className="num"><InputDesimal aria-label="Qty per shipment" min={0} step="any" value={q.auto ? q.qty : (s.qty || '')} className={q.auto ? 'input-auto' : undefined}
         title={q.auto ? 'Otomatis dari profil muatan — ketik untuk isi manual' : undefined} onChange={e => onUbah({ qty: Number(e.target.value) || 0, qtyAuto: false })} />
         <div className="dasar-def">{labelBasis(s.basis).replace('per ', '')}/shipment
-          {q.auto ? <span className="chip-auto" title={s.moda === 'udara' && s.basis === 'kg' ? 'chargeable weight = maks. berat aktual vs CBM × 166,67' : s.moda === 'laut' && s.basis === 'ton' && /lcl/i.test(s.armada) ? 'W/M LCL = maks. ton vs CBM' : 'dari profil muatan'}> auto</span>
+          {q.auto ? <span className="chip-auto" title={s.moda === 'udara' && s.basis === 'kg' ? 'chargeable weight = maks. berat aktual vs CBM × 166.67' : s.moda === 'laut' && s.basis === 'ton' && /lcl/i.test(s.armada) ? 'W/M LCL = maks. ton vs CBM' : 'dari profil muatan'}> auto</span>
             : <> · <button className="link-kecil" title="hitung dari profil muatan rute" onClick={() => onUbah({ qtyAuto: true })}>auto</button></>}</div></td>
       <td>
         {pilihan.length > 0 && <select aria-label="Pilih dari market price" value={s.rateId ?? ''} onChange={e => {
@@ -135,7 +135,7 @@ export default function IntermodalTender() {
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <h3 style={{ margin: 0 }}>Rute {i + 1}: {r.origin || '…'} → {r.destination || '…'}</h3>
               <div className="row small">
-                <span className="pill info">lead time ±{h.leadTimeHari.toLocaleString('id-ID')} hari</span>
+                <span className="pill info">lead time ±{h.leadTimeHari.toLocaleString('en-US')} hari</span>
                 <button className="ghost" onClick={() => setIm({ rute: [...im.rute.slice(0, i + 1), { ...r, id: Math.random().toString(36).slice(2, 10) }, ...im.rute.slice(i + 1)] })}>Duplikat</button>
                 <button className="danger" onClick={() => setIm({ rute: im.rute.filter((_, j) => j !== i) })}>Hapus rute</button>
               </div>
@@ -161,9 +161,9 @@ export default function IntermodalTender() {
             <div className="tablewrap fit"><table className="tabel-fit">
               <tbody>
                 <tr><td>Harga beli gabungan per shipment <span className="small muted">({h.perStage.map(x => rp(x)).join(' + ')}{r.biayaLain ? ` + lain ${rp(r.biayaLain)}` : ''})</span></td><td className="num"><b>{rp(h.beliShipment)}</b></td></tr>
-                <tr><td>Harga jual per shipment · margin {(h.margin * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%{r.marginPersen == null ? ' (global)' : ''}</td><td className="num"><b>{rp(h.jualShipment)}</b></td></tr>
+                <tr><td>Harga jual per shipment · margin {(h.margin * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%{r.marginPersen == null ? ' (global)' : ''}</td><td className="num"><b>{rp(h.jualShipment)}</b></td></tr>
                 <tr><td>Harga jual {labelBasis(r.satuanJual)} <span className="small muted">(÷ {fmtQ(h.qtyJual)})</span></td><td className="num"><b>{rp(h.jualPerSatuan)}</b> <span className="small muted">beli {rp(h.beliPerSatuan)}</span></td></tr>
-                <tr className="pd-sub"><td>Per bulan ({r.shipmentBulan || 0} shipment): biaya {rp(h.biayaBulan)} · GP {(h.gpPersen * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%</td><td className="num"><b>{rp(h.pendapatanBulan)}</b></td></tr>
+                <tr className="pd-sub"><td>Per bulan ({r.shipmentBulan || 0} shipment): biaya {rp(h.biayaBulan)} · GP {(h.gpPersen * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%</td><td className="num"><b>{rp(h.pendapatanBulan)}</b></td></tr>
               </tbody>
             </table></div>
 
@@ -179,7 +179,7 @@ export default function IntermodalTender() {
           onJadikanSatuan={(idR, b) => setIm({ rute: im.rute.map(r => (r.id === idR ? { ...r, satuanJual: b, qtyJualAuto: true } : r)) })} />
         <details className="card" style={{ display: 'grid', gap: 8 }}>
           <summary style={{ cursor: 'pointer' }}><b>Konversi satuan (opsional)</b> <span className="small muted">— isi hanya bila ingin melihat harga per kg / CBM / pallet / case dll.</span></summary>
-          <p className="small muted" style={{ margin: 0 }}>Isi yang diketahui (mis. 1 shipment = 20.000 kg = 40 CBM = 20 pallet = 1.600 case). Dropdown satuan di tabel atas otomatis menghitung harga all-in per kg, ton, CBM, pallet, pcs, case, liter, container. Udara per kg memakai chargeable weight (maks. berat vs CBM × 166,67); laut LCL per ton memakai W/M.</p>
+          <p className="small muted" style={{ margin: 0 }}>Isi yang diketahui (mis. 1 shipment = 20,000 kg = 40 CBM = 20 pallet = 1,600 case). Dropdown satuan di tabel atas otomatis menghitung harga all-in per kg, ton, CBM, pallet, pcs, case, liter, container. Udara per kg memakai chargeable weight (maks. berat vs CBM × 166.67); laut LCL per ton memakai W/M.</p>
           <div className="tablewrap fit"><table className="tabel-fit">
             <thead><tr><th>Rute</th>{FIELD_MUATAN.map(f => <th key={f.k} className="num">{f.l}</th>)}</tr></thead>
             <tbody>{im.rute.map((r, i) => <tr key={r.id}><td>{r.origin || '…'} → {r.destination || '…'}</td>

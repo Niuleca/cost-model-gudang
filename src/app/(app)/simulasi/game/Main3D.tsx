@@ -19,9 +19,9 @@ const Viewer3D = dynamic(() => import('../Viewer3D'), { ssr: false, loading: () 
 const KECEPATAN = [1, 10, 60, 300, 1200, 3600];
 const labelKec = (k: number) => (k < 60 ? `${k}×` : k < 3600 ? `${k / 60} mnt/dtk` : '1 jam/dtk');
 const LABEL_KEMAMPUAN: Record<string, string> = { admin: 'Admin', checker: 'Checker', operator: 'Operator MHE', picker: 'Picker', tkbm: 'TKBM' };
-const jt = (v: number) => `${(v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
+const jt = (v: number) => `${(v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 })} jt`;
 const hariId = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-const angka = (v: number, k = 0) => v.toLocaleString('id-ID', { maximumFractionDigits: k });
+const angka = (v: number, k = 0) => v.toLocaleString('en-US', { maximumFractionDigits: k });
 const durasiTeks = (det: number) => { const s = Math.max(0, Math.round(det)); return s >= 3600 ? `${Math.floor(s / 3600)} j ${Math.floor((s % 3600) / 60)} m` : s >= 60 ? `${Math.floor(s / 60)} m ${s % 60} d` : `${s} d`; };
 type TabBawah = 'tugas' | 'flag' | 'analisis' | 'prod' | 'kejadian' | 'tampilan';
 export type TampilSim = '3d' | '2d' | 'split';
@@ -287,7 +287,7 @@ export default function Main3D({ dunia, layout, hariMaks, onTick, tampilAwal = '
                       {sp.siklus.slice(-8).reverse().map(c => <tr key={c.no}><td>{c.no}</td><td>{LABEL_TUGAS[c.jenis]}</td><td className="num">{angka(c.jalan.s, 0)}s · {angka(c.jalan.m, 0)}m</td><td className="num">{angka(c.bawa.s, 0)}s · {angka(c.bawa.m, 0)}m</td><td className="num">{angka(Object.values(c.aksi).reduce((a, b) => a + b, 0), 0)}s</td><td className="num"><b>{angka(c.total, 0)}s</b></td></tr>)}
                     </tbody></table>
                   </details>
-                  <p className="small muted" style={{ margin: 0 }}>Output /jam = 3.600 ÷ (siklus × {1 + PFD}) — sudah termasuk allowance PF&D {PFD * 100}%; "murni" tanpa allowance. Jalan diukur nyata (kecepatan {MODE_PEMAIN[sp.mode].kec.kosong} m/dtk kosong, {MODE_PEMAIN[sp.mode].kec.bawa} bermuatan); aksi memakai waktu elemen standar (mis. posisi {ELEMEN.posisi} dtk, scan {ELEMEN.scan} dtk, input dokumen {ELEMEN.dokInput} dtk).</p>
+                  <p className="small muted" style={{ margin: 0 }}>Output /jam = 3,600 ÷ (siklus × {1 + PFD}) — sudah termasuk allowance PF&D {PFD * 100}%; "murni" tanpa allowance. Jalan diukur nyata (kecepatan {MODE_PEMAIN[sp.mode].kec.kosong} m/dtk kosong, {MODE_PEMAIN[sp.mode].kec.bawa} bermuatan); aksi memakai waktu elemen standar (mis. posisi {ELEMEN.posisi} dtk, scan {ELEMEN.scan} dtk, input dokumen {ELEMEN.dokInput} dtk).</p>
                   <div className="row"><button type="button" className="ghost" onClick={unduhStudi}>⬇ CSV</button><button type="button" className="ghost danger" onClick={() => { sp.siklus = []; sp.berjalan = null; setVersi(x => x + 1); }}>Reset studi</button></div>
                 </div>
               )}
