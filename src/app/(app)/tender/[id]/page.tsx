@@ -732,42 +732,47 @@ export default function TenderPage() {
   const panelProdukSimple = <ProdukPanel wajibSinkron produk={a.produk} aturan={a.aturanBerat} volumes={volEf} profil={a.profilVolume} spaceExcel={a.space.excel} spaceH={spaceH}
     namaCustomer={t.customer} sinkron dampak={dampakProduk}
     onChange={produk => ubahProduk(produk, a.aturanBerat, true)} onAturan={aturanBerat => ubahProduk(a.produk, aturanBerat, true)} onSinkron={() => ubahProduk(a.produk, a.aturanBerat, true)} />;
-  const panelBiayaSpace = <BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+  const panelBiayaSpace = <BiayaSpacePanel space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.luasDipakai ?? spaceH?.spaceRent ?? 0}
     posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
     posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
     skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
     onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />;
   const panelSummaryLayout = (() => {
     if (!spaceH) return <div className="card"><p className="muted">Lengkapi langkah 3.2–3.6 terlebih dahulu.</p></div>;
-    const kg = pvSimple.param.tonPerPalet * 1000, cbm = pvSimple.param.cbmPerPalet, tot = Math.max(1, spaceH.spaceRent);
+    // total = luas yang dipakai: ukuran CAD (P × L) bila dasar luas = CAD, selain itu Space Rent hasil kalkulasi
+    const luasTot = spaceH.luasDipakai || spaceH.spaceRent, selisihCad = spaceH.dimensi.dasar === 'cad' ? luasTot - spaceH.spaceRent : 0;
+    const kg = pvSimple.param.tonPerPalet * 1000, cbm = pvSimple.param.cbmPerPalet, tot = Math.max(1, luasTot);
     const baris: [string, number, number | null][] = [
       ['Rak SPR', spaceH.sd.footprint, spaceH.sd.ppReq], ['Rak DDR', spaceH.dd.footprint, spaceH.dd.ppReq],
       ['Block stack', spaceH.block.footprint, spaceH.block.ppReq], ['Pallet floor', spaceH.floor.footprint, spaceH.floor.ppReq],
       ['Staging inbound', spaceH.inbound.footprint, spaceH.inbound.perSequence ?? null], ['Staging outbound', spaceH.outbound.footprint, spaceH.outbound.perSequence ?? null],
       ['Fasilitas (office, MHE area, dll.)', spaceH.fasilitasM2, null], ['Pembulatan', spaceH.spaceRent - spaceH.subtotal, null],
+      ['Lebih luas dari kebutuhan (ukuran CAD)', selisihCad, null],
     ];
     const isi = baris.filter(([, m2]) => m2 > 0.05);
     const pp = isi.reduce((x, [, , n]) => x + (n ?? 0), 0);
     // urut dari luas terbesar; pembulatan tetap paling bawah
-    const urut = [...isi].sort((x, y) => (x[0] === 'Pembulatan' ? 1 : 0) - (y[0] === 'Pembulatan' ? 1 : 0) || y[1] - x[1]);
+    const urut = [...isi].sort((x, y) => (/^(Pembulatan|Lebih luas)/.test(x[0]) ? 1 : 0) - (/^(Pembulatan|Lebih luas)/.test(y[0]) ? 1 : 0) || y[1] - x[1]);
     return <div className="card">
       <div className="sc-atas">
         <div className="sc-total">
-          <div className="utama"><span>Total space</span><b>{angka(spaceH.spaceRent)} m²</b></div>
+          <div className="utama"><span>Total space{spaceH.dimensi.dasar === 'cad' ? ' · ukuran CAD' : ''}</span><b>{angka(luasTot)} m²</b></div>
           <div><span>Posisi palet</span><b>{angka(Math.ceil(pp))}</b></div>
           <div><span>Volume · berat</span><b>{angka(pp * cbm, 0)} CBM · {angka(pp * kg / 1000, 0)} ton</b></div>
         </div>
         <Grafik judul="Komposisi space" keterangan="luas per area (m²)" kategori={urut.map(([l]) => l)} seri={[{ nama: 'Luas (m²)', nilai: urut.map(([, m2]) => m2) }]}
-          jenis="donut" pilihan={['donut', 'pie', 'batang', 'kolom']} fmt={v => `${angka(v)} m²`} fmtSumbu={v => angka(v)} warnaPerKategori tinggi={200} tengah={`${angka(spaceH.spaceRent)} m²`} />
+          jenis="donut" pilihan={['donut', 'pie', 'batang', 'kolom']} fmt={v => `${angka(v)} m²`} fmtSumbu={v => angka(v)} warnaPerKategori tinggi={200} tengah={`${angka(luasTot)} m²`} />
       </div>
       <div className="tablewrap"><table>
         <thead><tr><th>Area</th><th className="num">Luas (m²)</th><th className="num">Posisi palet</th><th className="num">CBM</th><th className="num">Ton</th><th className="num">% space</th></tr></thead>
         <tbody>{urut.map(([l, m2, n]) => <tr key={l}><td>{l}</td><td className="num">{angka(m2)}</td>
           <td className="num">{n != null ? angka(Math.ceil(n - 1e-9)) : '—'}</td><td className="num">{n != null ? angka(n * cbm, 1) : '—'}</td><td className="num">{n != null ? angka(n * kg / 1000, 1) : '—'}</td>
           <td className="num">{angka(m2 / tot * 100, 1)}%</td></tr>)}
-          <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{angka(spaceH.spaceRent)}</b></td><td className="num"><b>{angka(Math.ceil(pp))}</b></td><td className="num"><b>{angka(pp * cbm, 1)}</b></td><td className="num"><b>{angka(pp * kg / 1000, 1)}</b></td><td className="num"><b>100%</b></td></tr>
+          <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{angka(luasTot)}</b></td><td className="num"><b>{angka(Math.ceil(pp))}</b></td><td className="num"><b>{angka(pp * cbm, 1)}</b></td><td className="num"><b>{angka(pp * kg / 1000, 1)}</b></td><td className="num"><b>100%</b></td></tr>
         </tbody></table></div>
       <p className="small muted">CBM & ton = posisi palet × {angka(cbm, 2)} CBM & {angka(kg)} kg per palet (dari Product input). Posisi palet staging = kapasitas staging per sequence.</p>
+      {spaceH.dimensi.dasar === 'cad' && <p className="small">Dasar luas: <b>ukuran CAD</b> {angka(spaceH.dimensi.panjangM, 1)} × {angka(spaceH.dimensi.lebarM, 1)} m = {angka(luasTot)} m² (kebutuhan hasil kalkulasi {angka(spaceH.spaceRent)} m²).
+        {selisihCad < -0.5 && <b style={{ color: 'var(--bad, #c0392b)' }}> CAD lebih kecil {angka(-selisihCad)} m² dari kebutuhan — cek layout.</b>}</p>}
     </div>;
   })();
   const panelManpowerSimple = <><ProcessDesignPanel bagian="ringkasan" indirect={{ spanOfControl: a.spanOfControl, roleSupervisor: a.roleSupervisor, alatSupervisor: a.alatSupervisor, peranTetap: a.peranTetap }} aktivitas={aktEfAktif} volumes={volEf} pd={a.processDesign} faktorProduktivitas={a.faktorProduktivitas} efisiensi={a.efisiensi}
@@ -935,7 +940,7 @@ export default function TenderPage() {
                   <tr className="pd-sub"><td><b>Total sewa racking</b></td><td className="num"><b>{angka(totPos)}</b></td><td /><td className="num"><b>{rp(totPos * tarif)}</b></td><td className="num"><b>{rp(totPos * tarif * 12)}</b></td></tr></tbody>
               </table></div>
               <p className="small muted">Posisi palet dari Block stack / racking space (3.2). Block stack & pallet floor tidak memakai rak.</p></>;
-          })() : <BiayaSpacePanel hanyaRak space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+          })() : <BiayaSpacePanel hanyaRak space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.luasDipakai ?? spaceH?.spaceRent ?? 0}
             posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
             posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
             skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan} onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />}
@@ -1490,7 +1495,7 @@ export default function TenderPage() {
           kebutuhan={true
             ? pdMhe.map(r => ({ nama: r.nama, fte: r.fte, unit: r.resources }))
             : toolsDipakai.map(tl => { const r = hasil?.mhe.find(x => x.tool === tl); return { nama: tl, fte: null, unit: r ? r.unitDasar : null }; })} />
-        <BiayaSpacePanel hanyaRak space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.spaceRent ?? 0}
+        <BiayaSpacePanel hanyaRak space={a.space} gudang={a.gudang} items={items} spaceRentM2={spaceH?.luasDipakai ?? spaceH?.spaceRent ?? 0}
           posSpr={Math.ceil((spaceH?.sd.ppReq ?? 0) - 1e-9)} posDdr={Math.ceil((spaceH?.dd.ppReq ?? 0) - 1e-9)}
           posBlock={Math.ceil(spaceH?.block.ppReq ?? 0)} posFloor={Math.ceil(spaceH?.floor.ppReq ?? 0)}
           skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan} onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />
