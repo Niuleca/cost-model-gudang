@@ -746,13 +746,14 @@ export default function TenderPage() {
       ['Rak SPR', spaceH.sd.footprint, spaceH.sd.ppReq], ['Rak DDR', spaceH.dd.footprint, spaceH.dd.ppReq],
       ['Block stack', spaceH.block.footprint, spaceH.block.ppReq], ['Pallet floor', spaceH.floor.footprint, spaceH.floor.ppReq],
       ['Staging inbound', spaceH.inbound.footprint, spaceH.inbound.perSequence ?? null], ['Staging outbound', spaceH.outbound.footprint, spaceH.outbound.perSequence ?? null],
-      ['Fasilitas (office, MHE area, dll.)', spaceH.fasilitasM2, null], ['Pembulatan', spaceH.spaceRent - spaceH.subtotal, null],
-      ['Lebih luas dari kebutuhan (ukuran CAD)', selisihCad, null],
+      ['Fasilitas (office, MHE area, dll.)', spaceH.fasilitasM2, null], // ukuran CAD lebih luas dari kebutuhan → sisa luas (termasuk pembulatan) dimasukkan ke gangway & pedestrian
+      ...(selisihCad > 0.05 ? [['Gangway & pedestrian', luasTot - spaceH.subtotal, null] as [string, number, number | null]]
+        : [['Pembulatan', spaceH.spaceRent - spaceH.subtotal, null] as [string, number, number | null]]),
     ];
     const isi = baris.filter(([, m2]) => m2 > 0.05);
     const pp = isi.reduce((x, [, , n]) => x + (n ?? 0), 0);
     // urut dari luas terbesar; pembulatan tetap paling bawah
-    const urut = [...isi].sort((x, y) => (/^(Pembulatan|Lebih luas)/.test(x[0]) ? 1 : 0) - (/^(Pembulatan|Lebih luas)/.test(y[0]) ? 1 : 0) || y[1] - x[1]);
+    const urut = [...isi].sort((x, y) => (/^(Pembulatan|Gangway)/.test(x[0]) ? 1 : 0) - (/^(Pembulatan|Gangway)/.test(y[0]) ? 1 : 0) || y[1] - x[1]);
     return <div className="card">
       <div className="sc-atas">
         <div className="sc-total">
@@ -771,7 +772,7 @@ export default function TenderPage() {
           <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{angka(luasTot)}</b></td><td className="num"><b>{angka(Math.ceil(pp))}</b></td><td className="num"><b>{angka(pp * cbm, 1)}</b></td><td className="num"><b>{angka(pp * kg / 1000, 1)}</b></td><td className="num"><b>100%</b></td></tr>
         </tbody></table></div>
       <p className="small muted">CBM & ton = posisi palet × {angka(cbm, 2)} CBM & {angka(kg)} kg per palet (dari Product input). Posisi palet staging = kapasitas staging per sequence.</p>
-      {spaceH.dimensi.dasar === 'cad' && <p className="small">Dasar luas: <b>ukuran CAD</b> {angka(spaceH.dimensi.panjangM, 1)} × {angka(spaceH.dimensi.lebarM, 1)} m = {angka(luasTot)} m² (kebutuhan hasil kalkulasi {angka(spaceH.spaceRent)} m²).
+      {spaceH.dimensi.dasar === 'cad' && <p className="small">Dasar luas: <b>ukuran CAD</b> {angka(spaceH.dimensi.panjangM, 1)} × {angka(spaceH.dimensi.lebarM, 1)} m = {angka(luasTot)} m² (kebutuhan hasil kalkulasi {angka(spaceH.spaceRent)} m²){selisihCad > 0.05 && <> — sisa {angka(luasTot - spaceH.subtotal)} m² dimasukkan ke <b>Gangway & pedestrian</b></>}.
         {selisihCad < -0.5 && <b style={{ color: 'var(--bad, #c0392b)' }}> CAD lebih kecil {angka(-selisihCad)} m² dari kebutuhan — cek layout.</b>}</p>}
     </div>;
   })();
