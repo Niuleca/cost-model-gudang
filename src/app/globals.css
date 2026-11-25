@@ -1317,3 +1317,12 @@ td.td-isian { background: #fffaf0; }
 .ttd-garis { position: absolute; left: 18px; right: 18px; top: 72%; border-bottom: 1px solid var(--line-strong); color: var(--muted); font-size: 14px; line-height: 1; padding-bottom: 2px; pointer-events: none; }
 .ttd-petunjuk { position: absolute; left: 0; right: 0; top: 38%; text-align: center; color: var(--muted); font-size: 13px; pointer-events: none; }
 .ttd-tinta { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+/* HP: tabel space (Capacity requirement dll.) muat di layar — kolom isian tidak terpotong di kanan */
+@media (max-width: 640px) {
+  .sp-tabel td { padding: 4px 6px; font-size: 12.5px; white-space: normal !important; }
+  .sp-tabel td.num { white-space: nowrap; width: 1%; }
+  .sp-tabel td.num input { width: 60px !important; min-width: 60px !important; }
+  .sp-tabel td.small { font-size: 11px; overflow-wrap: anywhere; }
+  .sp-satu, .sp-kartu, .sp-tabel { max-width: 100%; }
+  .sp-tabel td.small button { display: block; margin: 4px 0 0 !important; padding: 2px 8px !important; min-height: 0; font-size: 11.5px; white-space: normal; }
+}
