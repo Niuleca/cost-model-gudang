@@ -50,3 +50,16 @@ test('IT: depresiasi perangkat, amortisasi OTC, bunga modal → total per bulan'
   assert.equal(cl.find(c => c.deskripsi.includes('Printer'))?.mode, 'beli');
   assert.equal(cl.find(c => c.deskripsi.includes('Cabling'))?.mode, 'sekali');
 });
+
+test('IT sewa: biaya = qty × sewa per unit per bulan, tidak masuk OTC / depresiasi', () => {
+  const s: ItSheet = { kursUsd: 16000, lines: [{ kelompok: 'Networking Device', item: 'WiFi AP', costType: 'OTC/Unit', qty: 2, hargaBudget: 300000, perlakuanSekali: 'sewa', hargaSewaBulan: 50000 }] };
+  const r = ringkasIt(s);
+  assert.equal(r.sewaBulan, 100000);
+  assert.equal(r.sekali, 0);
+  assert.equal(r.nilaiAset, 0);
+  assert.equal(r.totalBulan, 100000);
+  const cl = itKeCostLines(s);
+  assert.equal(cl.length, 1);
+  assert.equal(cl[0].mode, 'bulanan');
+  assert.equal(cl[0].qty * cl[0].hargaSatuan, 100000);
+});

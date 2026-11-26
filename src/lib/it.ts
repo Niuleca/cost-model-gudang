@@ -30,15 +30,17 @@ export interface ItLine {
   hargaAktual?: number | null; // diisi setelah realisasi (BAP)
   mataUang?: 'IDR' | 'USD';
   /** Biaya sekali: 'depresiasi' = aset, disusutkan selama umur ekonomis (maks. kontrak);
-   *  'amortisasi' = dibagi rata selama kontrak; 'tagih' = ditagih terpisah di quotation */
+   *  'amortisasi' = dibagi rata selama kontrak; 'tagih' = ditagih terpisah di quotation; 'sewa' = perangkat disewa, biaya sewa per unit per bulan */
   perlakuanSekali?: PerlakuanSekali;
+  /** perlakuan 'sewa': harga sewa per unit per bulan (mata uang baris) */
+  hargaSewaBulan?: number | null;
   umurBulan?: number;          // umur ekonomis untuk depresiasi
   catatan?: string;
   kunci?: string;              // baris dari default otomatis (lib/itDefault)
   qtyDefault?: number;         // qty hasil hitungan default terakhir; qty = qtyDefault → ikut data tender
 }
 
-export type PerlakuanSekali = 'depresiasi' | 'amortisasi' | 'tagih';
+export type PerlakuanSekali = 'depresiasi' | 'amortisasi' | 'tagih' | 'sewa';
 /** Kelompok berupa perangkat fisik → default didepresiasi; lainnya (development, cabling, connection) diamortisasi. */
 export const KELOMPOK_ASET = ['Hardware & Device', 'Networking Device', 'Other Devices', 'CCTV', 'Hardware TMS', 'Mobile Devices TMS'];
 export const UMUR_IT_DEFAULT = 36;
@@ -54,7 +56,8 @@ export interface RingkasIt {
   bulananAktual: number; tahunanAktual: number; sekaliAktual: number;
   setaraBulan: number;                                  // bulanan + tahunan/12 (budget)
   depresiasiBulan: number; amortisasiBulan: number; bungaBulan: number;
-  totalBulan: number;                                   // setara bulan + depresiasi + amortisasi + bunga modal
+  sewaBulan: number;                                    // perangkat sewa: qty × sewa per unit per bulan
+  totalBulan: number;                                   // setara bulan + depresiasi + amortisasi + bunga modal + sewa
   nilaiAset: number; nilaiAmortisasi: number; nilaiTagih: number;
   tagihSekali: { deskripsi: string; nilai: number }[];  // OTC yang ditagih terpisah
 }
@@ -73,6 +76,7 @@ export function biayaBulanIt(l: ItLine, kurs: number, o: OpsiIt = OPSI_IT_DEFAUL
   if (b === 'Tahunan') return { jenis: 'Tahunan ÷ 12', nilai, pokok: nilai / 12, bunga: 0, total: nilai / 12, periode: 12 };
   const p = perlakuanDari(l);
   if (p === 'tagih') return { jenis: 'Tagih terpisah', nilai, pokok: 0, bunga: 0, total: 0, periode: 0 };
+  if (p === 'sewa') { const sewa = l.qty * rupiah(l, Number(l.hargaSewaBulan) || 0, kurs); return { jenis: 'Sewa', nilai: sewa, pokok: sewa, bunga: 0, total: sewa, periode: 1 }; }
   const periode = p === 'depresiasi' ? Math.min(Math.max(1, l.umurBulan || UMUR_IT_DEFAULT), n) : n;
   const pokok = nilai / periode, bunga = (nilai / 2) * r;
   return { jenis: p === 'depresiasi' ? 'Depresiasi' : 'Amortisasi', nilai, pokok, bunga, total: pokok + bunga, periode };
@@ -80,13 +84,14 @@ export function biayaBulanIt(l: ItLine, kurs: number, o: OpsiIt = OPSI_IT_DEFAUL
 
 export function ringkasIt(s: ItSheet, o: OpsiIt = OPSI_IT_DEFAULT): RingkasIt {
   const r: RingkasIt = { bulanan: 0, tahunan: 0, sekali: 0, bulananAktual: 0, tahunanAktual: 0, sekaliAktual: 0, setaraBulan: 0,
-    depresiasiBulan: 0, amortisasiBulan: 0, bungaBulan: 0, totalBulan: 0, nilaiAset: 0, nilaiAmortisasi: 0, nilaiTagih: 0, tagihSekali: [] };
+    depresiasiBulan: 0, amortisasiBulan: 0, bungaBulan: 0, sewaBulan: 0, totalBulan: 0, nilaiAset: 0, nilaiAmortisasi: 0, nilaiTagih: 0, tagihSekali: [] };
   for (const l of s.lines) {
     const b = basisDari(l.costType);
     const nb = l.qty * rupiah(l, l.hargaBudget, s.kursUsd);
     const na = l.hargaAktual == null ? 0 : l.qty * rupiah(l, l.hargaAktual, s.kursUsd);
     if (b === 'Bulanan' || b === 'Transaksi') { r.bulanan += nb; r.bulananAktual += na; }
     else if (b === 'Tahunan') { r.tahunan += nb; r.tahunanAktual += na; }
+    else if (perlakuanDari(l) === 'sewa') r.sewaBulan += biayaBulanIt(l, s.kursUsd, o).total;
     else {
       r.sekali += nb; r.sekaliAktual += na;
       const p = perlakuanDari(l), c = biayaBulanIt(l, s.kursUsd, o);
@@ -96,7 +101,7 @@ export function ringkasIt(s: ItSheet, o: OpsiIt = OPSI_IT_DEFAULT): RingkasIt {
     }
   }
   r.setaraBulan = r.bulanan + r.tahunan / 12;
-  r.totalBulan = r.setaraBulan + r.depresiasiBulan + r.amortisasiBulan + r.bungaBulan;
+  r.totalBulan = r.setaraBulan + r.depresiasiBulan + r.amortisasiBulan + r.bungaBulan + r.sewaBulan;
   return r;
 }
 
@@ -105,8 +110,13 @@ export function itKeCostLines(s: ItSheet, risiko: KategoriRisiko = 'Rendah'): Co
   const out: CostLineInput[] = [];
   const alokasi = { manajemen: 1 };                       // IT = biaya bersama, disebar ke bucket operasi
   for (const l of s.lines) {
-    if (!(l.qty > 0) || !(l.hargaBudget > 0)) continue;
     const b = basisDari(l.costType);
+    if (b === 'Sekali' && perlakuanDari(l) === 'sewa') {
+      const sewa = rupiah(l, Number(l.hargaSewaBulan) || 0, s.kursUsd);
+      if (l.qty > 0 && sewa > 0) out.push({ deskripsi: `IT — ${l.item}`, kelompok: 'IT', mode: 'bulanan', qty: l.qty, hargaSatuan: sewa, kategoriRisiko: risiko, alokasi, sumber: `IT sewa per unit/bln${l.mataUang === 'USD' ? ` · USD×${s.kursUsd}` : ''}` });
+      continue;
+    }
+    if (!(l.qty > 0) || !(l.hargaBudget > 0)) continue;
     const harga = rupiah(l, l.hargaBudget, s.kursUsd);
     const sumber = `IT ${l.costType}${l.mataUang === 'USD' ? ` · USD×${s.kursUsd}` : ''}`;
     if (b === 'Bulanan' || b === 'Transaksi')

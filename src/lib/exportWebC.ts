@@ -284,7 +284,10 @@ export function tulisIt(x: Ctx) {
   IT.hdr([['Kelompok', true], ['Item', true], ['Cost type', true], ['Qty', true], ['Mata uang', true], ['Harga budget', true], 'Total budget', ['Harga aktual', true], 'Total aktual', ['Perlakuan (OTC)', true], ['Umur (bln)', true], 'Biaya/bln', ['Catatan', true], 'Basis', 'Harga (Rp)', 'Mode', 'Nilai investasi']);
   const r0 = IT.r;
   const aset = KELOMPOK_ASET.map(k => `A{r}=${q(k)}`);
-  for (const l of [...it.lines, ...Array.from({ length: 5 }, () => null)]) {
+  // perangkat sewa = biaya per device per bulan (PDPM) dengan harga sewa per unit per bulan
+  const lineExcel = (l: (typeof it.lines)[number]) => basisDari(l.costType) === 'Sekali' && perlakuanDari(l) === 'sewa'
+    ? { ...l, costType: 'PDPM', hargaBudget: Number(l.hargaSewaBulan) || 0, hargaAktual: null, perlakuanSekali: undefined, catatan: `Sewa perangkat (${l.costType})${l.catatan ? ` · ${l.catatan}` : ''}` } : l;
+  for (const l of [...it.lines.map(lineExcel), ...Array.from({ length: 5 }, () => null)]) {
     const r = IT.r;
     IT.put(1, l?.kelompok ?? null, { j: 'in' }); IT.dd(1, 'L_KelompokIT', false);
     IT.put(2, l?.item ?? null, { j: 'in' }); IT.dd(2, 'L_ItKatalog', false);
@@ -298,7 +301,7 @@ export function tulisIt(x: Ctx) {
     IT.put(8, l?.hargaAktual ?? null, { j: 'in', fmt: 'rp' });
     IT.put(9, { f: `IF(H${r}="","—",N(D${r})*H${r}*IF(E${r}="USD",KursUsd,1))` }, { j: 'out', fmt: 'rp' });
     const sekali = l && basisDari(l.costType) === 'Sekali';
-    IT.put(10, sekali ? ({ depresiasi: 'Depresiasi', amortisasi: 'Amortisasi', tagih: 'Tagih terpisah' } as const)[perlakuanDari(l)] : null, { j: 'in' }); IT.dd(10, 'L_Perlakuan');
+    IT.put(10, sekali ? ({ depresiasi: 'Depresiasi', amortisasi: 'Amortisasi', tagih: 'Tagih terpisah' } as Record<string, string>)[perlakuanDari(l)] : null, { j: 'in' }); IT.dd(10, 'L_Perlakuan');
     IT.put(11, sekali ? (l!.umurBulan ?? UMUR_IT_DEFAULT) : null, { j: 'in', fmt: 'n0' });
     const pl = `IF(J${r}<>"",J${r},IF(OR(${aset.map(s => s.replace('{r}', String(r))).join(',')}),"Depresiasi","Amortisasi"))`;
     IT.put(16, { f: `IF(N${r}="","",IF(OR(N${r}="Bulanan",N${r}="Transaksi",N${r}="Tahunan"),"bulanan",IF(${pl}="Depresiasi","beli",IF(${pl}="Amortisasi","sekali","tagih"))))` }, { j: 'out' });

@@ -119,11 +119,12 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
                 return <>
                   <td className="td-lebar">{sekali
                     ? <><select aria-label="Perlakuan OTC" value={p} onChange={e => set(ubahArray(sheet.lines, i, { perlakuanSekali: e.target.value as PerlakuanSekali, umurBulan: l.umurBulan ?? UMUR_IT_DEFAULT }))}>
-                        <option value="depresiasi">Depresiasi</option><option value="amortisasi">Amortisasi</option><option value="tagih">Tagih terpisah</option></select>
+                        <option value="depresiasi">Depresiasi</option><option value="amortisasi">Amortisasi</option><option value="tagih">Tagih terpisah</option><option value="sewa">Sewa (per bulan)</option></select>
+                        {p === 'sewa' && <label className="small muted row" style={{ gap: 4, flexWrap: 'nowrap' }}>sewa <InputDesimal aria-label="Sewa per unit per bulan" step="any" value={l.hargaSewaBulan ?? ''} placeholder="isi" onChange={e => set(ubahArray(sheet.lines, i, { hargaSewaBulan: e.target.value === '' ? null : Number(e.target.value) }))} style={{ width: 96, minWidth: 96, textAlign: 'right' }} /> {l.mataUang ?? 'IDR'}/unit/bln</label>}
                         {p === 'depresiasi' && <label className="small muted row" style={{ gap: 4, flexWrap: 'nowrap' }}>umur <UmurKontrak label="Umur ekonomis" umur={l.umurBulan ?? UMUR_IT_DEFAULT} kontrak={kontrakBulan} lebar={56} onChange={v => set(ubahArray(sheet.lines, i, { umurBulan: v }))} /> bln</label>}
                         {p === 'amortisasi' && <div className="small muted">{kontrakBulan} bln kontrak</div>}</>
                     : <span className="small muted">{basisDari(l.costType)}</span>}</td>
-                  <td className="num" title={c.bunga ? `pokok ${rp(c.pokok)} + bunga ${rp(c.bunga)} · ${c.jenis} ${c.periode} bln` : c.jenis}>{c.total ? <b>{rp(c.total)}</b> : <span className="small muted">{p === 'tagih' && sekali ? 'di quotation' : '–'}</span>}</td>
+                  <td className="num" title={c.bunga ? `pokok ${rp(c.pokok)} + bunga ${rp(c.bunga)} · ${c.jenis} ${c.periode} bln` : c.jenis}>{c.total ? <b>{rp(c.total)}</b> : <span className="small muted">{p === 'tagih' && sekali ? 'di quotation' : p === 'sewa' && sekali ? 'isi harga sewa' : '–'}</span>}</td>
                 </>;
               })()}
               <td><button className="danger" title="Hapus baris" aria-label="Hapus" onClick={() => { const k = sheet.lines[i]?.kunci; onChange({ ...sheet, lines: sheet.lines.filter((_, j) => j !== i), ...(k ? { defaultDibuang: [...new Set([...(sheet.defaultDibuang ?? []), k])] } : {}) }); }}>×</button></td>
@@ -141,6 +142,7 @@ export default function ItPanel({ sheet, onChange, kontrakBulan, driver }: { she
           <tr><td>Bulanan + tahunan ÷ 12</td><td className="num">{rp(r.setaraBulan)}</td><td></td><td></td></tr>
           <tr><td>Depresiasi perangkat (nilai aset {rp(r.nilaiAset)})</td><td className="num">{rp(r.depresiasiBulan)}</td><td></td><td></td></tr>
           <tr><td>Amortisasi OTC / mandays (nilai {rp(r.nilaiAmortisasi)} ÷ {kontrakBulan} bln)</td><td className="num">{rp(r.amortisasiBulan)}</td><td></td><td></td></tr>
+          {r.sewaBulan > 0 && <tr><td>Sewa perangkat (per bulan)</td><td className="num">{rp(r.sewaBulan)}</td><td></td><td></td></tr>}
           <tr><td><b>Total IT per bulan</b></td><td className="num out"><b>{rp(r.totalBulan)}</b></td><td></td><td></td></tr>
           {r.tagihSekali.length > 0 && <tr><td>Ditagih terpisah di quotation</td><td className="num">{rp(r.tagihSekali.reduce((s, x) => s + x.nilai, 0))}</td><td></td><td></td></tr>}
         </tbody>
