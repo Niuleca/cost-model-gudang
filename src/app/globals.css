@@ -1276,7 +1276,7 @@ td.td-isian { background: #fffaf0; }
 .rk-atur > summary { cursor: pointer; padding: 6px 10px; font-size: 13px; font-weight: 600; }
 .rk-atur[open] > summary { border-bottom: 1px solid var(--line); }
 .rk-atur-isi { display: grid; gap: 10px; padding: 10px; }
-.rk-tabel .k-unit, .rk-tabel .k-harga, .rk-tabel .k-ppn { display: none; }
+.rk-tabel .k-harga, .rk-tabel .k-ppn { display: none; }
 .rk-grafik { align-items: start; }
 .gf-pie.samping .gf-legenda-pie { max-width: 440px; }
 .rk-tabel td.td-isian .small.muted, .rk-tabel td.td-isian > div.small.muted { display: none; }

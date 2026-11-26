@@ -115,7 +115,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
           <div className="rk-atur-isi">{pengaturan}</div></details>
       </> : <><h2>Rate card & margin</h2>{pengaturan}</>}
       <div className="tablewrap"><table className={rk ? 'rk-tabel' : undefined}>
-        <thead><tr><th>Layanan</th><th className="th-isian">Satuan tarif / UoM</th><th className="num">Volume {h.rateCard[0]?.basisVolume ?? 'komitmen'}</th><th className="num">Biaya/bln</th><th className="num k-unit">Biaya/unit</th><th className="num th-isian">GP% (isian)</th><th className="num k-harga">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num k-ppn">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
+        <thead><tr><th>Layanan</th><th className="th-isian">Satuan tarif / UoM</th><th className="num">Volume {h.rateCard[0]?.basisVolume ?? 'komitmen'}</th><th className="num">Biaya/bln</th><th className="num k-unit" title="Biaya per unit sebelum margin (GP) & pajak = Biaya/bln ÷ volume">Biaya/unit<br /><span className="small muted">sebelum margin</span></th><th className="num th-isian">GP% (isian)</th><th className="num k-harga">Harga/bln</th><th className="num">Tarif excl. PPN</th><th className="num k-ppn">PPN</th><th className="num">Tarif incl. PPN</th></tr></thead>
         <tbody>
           {h.rateCard.map(r => {
             const b = r.bucket as Bucket, v = marginManual[b];
@@ -165,7 +165,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
               <td className={`num${pajak.ppn === 'include' ? ' out' : ''}`}>{rp(r.tarifInclPpn ?? r.tarifPerUnit)}</td></tr>;
           })}
           {onTambahan && <BarisTambahan h={h} nilai={tambahan ?? []} onUbah={onTambahan} ppnInclude={pajak.ppn === 'include'} />}
-          {mt && rk && <tr className="pd-sub"><td colSpan={3}><b>{tambahan?.length ? 'Total layanan utama' : 'Total (gabungan semua layanan)'}</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td>
+          {mt && rk && <tr className="pd-sub"><td colSpan={3}><b>{tambahan?.length ? 'Total layanan utama' : 'Total (gabungan semua layanan)'}</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td><td className="k-unit"></td>
             <td className="num"><b>{persen(mt.gpPersen ?? 0)}</b></td><td colSpan={2} className="small">harga {rp(mt.hargaBulan)}/bln · tarif tebal dipakai di quotation</td></tr>}
           {mt && !rk && <tr className="pd-sub"><td colSpan={3}><b>{tambahan?.length ? 'Total layanan utama' : 'Total (gabungan semua layanan)'}</b></td><td className="num"><b>{rp(mt.biayaBulan)}</b></td><td></td>
             <td className="num"><b>{persen(mt.gpPersen ?? 0)}</b></td><td className="num"><b>{rp(mt.hargaBulan)}</b></td><td colSpan={3} className="small muted">kolom tebal = tarif yang dipakai di quotation ({pajak.ppn === 'include' ? 'incl.' : 'excl.'} PPN)</td></tr>}
