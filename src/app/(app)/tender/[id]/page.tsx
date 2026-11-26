@@ -201,6 +201,8 @@ export default function TenderPage() {
     setPop(null); setPopKat(null); setLangkahS(id); window.scrollTo({ top: 0 });
     // layout 2D / 3D dibaca dari data tersimpan → simpan dulu input terbaru, lalu muat ulang iframe
     if (id === '3.5') { if (bisaEdit && kotorAkhir.current) void simpan().then(() => setKunciLayout(k => k + 1)); else setKunciLayout(k => k + 1); }
+    // Simple CM: masuk langkah Result → hitung ulang dari input terbaru supaya semua revisi langsung terlihat (simpan versi tetap manual)
+    if (simple && id.startsWith('4.')) void hitung(false);
   };
   const keTab = (x: string) => {
     if (!simple) { setTab(x as (typeof TABS)[number]); return; }
@@ -522,6 +524,17 @@ export default function TenderPage() {
     setT(y => y && ({ ...y, asumsi: { ...y.asumsi, securityCleaningVsm: true, peranTetap: [...y.asumsi.peranTetap, ...tambah],
       costLines: y.asumsi.costLines.filter(c => !jasaOrang(c)) } })); setKotor(true);
   }, [simple, t?.id, bisaEdit, luasScVsm > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Simple CM: security & cleaning sudah di Manpower → baris jasa satpam / danru / cleaning di Lainnya dibuang & tidak direkomendasikan lagi
+  useEffect(() => {
+    if (!simple || !t || !bisaEdit || !t.asumsi.securityCleaningVsm) return;
+    const kunciOf = (c: (typeof t.asumsi.costLines)[number]) => (c as typeof c & { kunci?: string }).kunci;
+    const ganda = t.asumsi.costLines.filter(c => { const k = kunciOf(c); return !!k && KUNCI_GANDA_MANPOWER.includes(k); });
+    const sudahDibuang = KUNCI_GANDA_MANPOWER.every(k => (t.asumsi.biayaDefaultDibuang ?? []).includes(k));
+    if (!ganda.length && sudahDibuang) return;
+    setT(y => y && ({ ...y, asumsi: { ...y.asumsi,
+      costLines: y.asumsi.costLines.filter(c => { const k = kunciOf(c); return !(k && KUNCI_GANDA_MANPOWER.includes(k)); }),
+      biayaDefaultDibuang: [...new Set([...(y.asumsi.biayaDefaultDibuang ?? []), ...KUNCI_GANDA_MANPOWER])] } })); setKotor(true);
+  }, [simple, t?.id, bisaEdit, t?.asumsi.securityCleaningVsm, t?.asumsi.costLines]); // eslint-disable-line react-hooks/exhaustive-deps
   // Simple CM: racking memakai skema sewa per posisi palet (default Rp25,000/PP/bln) bila belum pernah dipilih
   useEffect(() => {
     if (!simple || !t || !bisaEdit || t.asumsi.space?.rakSkema) return;
@@ -599,7 +612,9 @@ export default function TenderPage() {
     paletInBulan: paletEkuivalen(volArus('inbound')).palet, paletOutBulan: paletEkuivalen(volArus('outbound')).palet,
     orderInBulan: orderIn, orderOutBulan: orderOut, hariKerjaBulan: hariOps, kategori: kategoriDari(t.industri) ?? KATEGORI_UMUM,
     umk: masterMp?.upahMinimum ?? 0, skenarioAset: t.skenario_aset, tipeGudang: t.tipe_gudang ?? '', nilaiStokRp: a.nilaiStokRp ?? 0,
-    securityInhouse: jumlahRole(RE_SECURITY), cleaningInhouse: jumlahRole(RE_CLEANING) };
+    // Simple CM: security & cleaning ditentukan di Manpower (VSM) — jumlahnya boleh 0, jasa outsourcing tidak ditambahkan lagi ke Lainnya
+    securityInhouse: a.securityCleaningVsm ? Math.max(1, jumlahRole(RE_SECURITY)) : jumlahRole(RE_SECURITY),
+    cleaningInhouse: a.securityCleaningVsm ? Math.max(1, jumlahRole(RE_CLEANING)) : jumlahRole(RE_CLEANING) };
   const fasilitasGudang = lengkapiSpaceExcel(a.space.excel).fasilitas.map(f => ({ nama: f.nama, m2: Number(f.m2) || 0 })).filter(f => f.m2 > 0);
 
   /** Data lengkap untuk tab Export: hitung ulang dengan master terbaru. */
