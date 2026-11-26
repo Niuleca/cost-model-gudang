@@ -95,10 +95,9 @@ const MENU_SIMPLE: MenuSimple[] = [
     { id: '3.1', nama: 'List gudang per area', ke: 'Harga sewa per m² / sewa utuh → Rental space (Summary cost 4.2)' },
     { id: '3.2', nama: 'Block stack / racking space', ke: 'Porsi dari Capacity requirement (1.9) → footprint per tipe, jumlah bay & level → biaya racking' },
     { id: '3.3', nama: 'Staging inbound & outbound', ke: 'Footprint staging → footprint total' },
-    { id: '3.4', nama: 'Footprint requirement (total)', ke: 'Luas acuan (kalkulasi atau CAD) → layout & Rental space' },
-    { id: '3.5', nama: 'Building dimension', ke: 'P × L × T, gate, loading dock, trapesium, kekuatan lantai → layout 2D / 3D' },
-    { id: '3.6', nama: 'Layout 2D & simulasi 3D', ke: 'Dibuat otomatis dari langkah 1.3–3.5; bisa digeser & diatur, lalu disimpan' },
-    { id: '3.7', nama: 'Summary layout', ke: 'Komposisi luas per area: m², posisi palet, CBM, ton, % space' },
+    { id: '3.4', nama: 'Footprint requirement (total)', ke: 'Luas acuan (kalkulasi atau CAD) & dimensi gedung P × L → layout & Rental space' },
+    { id: '3.5', nama: 'Layout 2D & simulasi 3D', ke: 'Gangway, gate, loading dock & bentuk gedung · layout dibuat otomatis dari langkah 1.3–3.4; bisa digeser & diatur, lalu disimpan' },
+    { id: '3.6', nama: 'Summary layout', ke: 'Komposisi luas per area: m², posisi palet, CBM, ton, % space' },
   ] },
   { no: 4, nama: 'Result', tab: 'Result', langkah: [
     { id: '4.1', nama: 'Tarif per layanan', ke: 'Storage, handling in / out (+ VAS): satuan, MGV, biaya per bulan, GP, tarif · ubah GP % & cost allocation' },
@@ -197,11 +196,11 @@ export default function TenderPage() {
   /** Simple CM: sub-langkah wizard yang sedang tampil */
   const di = (id: string) => !simple || (!pop && langkah === id);
   const [kunciLayout, setKunciLayout] = useState(0);
-  useEffect(() => { if (simple && langkah === '3.6' && kunciLayout === 0) setKunciLayout(1); }, [simple, langkah, kunciLayout]);
+  useEffect(() => { if (simple && langkah === '3.5' && kunciLayout === 0) setKunciLayout(1); }, [simple, langkah, kunciLayout]);
   const keLangkah = (id: string) => {
     setPop(null); setPopKat(null); setLangkahS(id); window.scrollTo({ top: 0 });
     // layout 2D / 3D dibaca dari data tersimpan → simpan dulu input terbaru, lalu muat ulang iframe
-    if (id === '3.6') { if (bisaEdit && kotorAkhir.current) void simpan().then(() => setKunciLayout(k => k + 1)); else setKunciLayout(k => k + 1); }
+    if (id === '3.5') { if (bisaEdit && kotorAkhir.current) void simpan().then(() => setKunciLayout(k => k + 1)); else setKunciLayout(k => k + 1); }
   };
   const keTab = (x: string) => {
     if (!simple) { setTab(x as (typeof TABS)[number]); return; }
@@ -767,7 +766,7 @@ export default function TenderPage() {
     skenarioAset={t.skenario_aset} kontrakBulan={t.durasi_kontrak_bulan}
     onSpace={space => setA({ space })} onGudang={gudang => setA({ gudang })} />;
   const panelSummaryLayout = (() => {
-    if (!spaceH) return <div className="card"><p className="muted">Lengkapi langkah 3.2–3.6 terlebih dahulu.</p></div>;
+    if (!spaceH) return <div className="card"><p className="muted">Lengkapi langkah 3.2–3.5 terlebih dahulu.</p></div>;
     // total = luas yang dipakai: ukuran CAD (P × L) bila dasar luas = CAD, selain itu Space Rent hasil kalkulasi
     const luasTot = spaceH.luasDipakai || spaceH.spaceRent, selisihCad = spaceH.dimensi.dasar === 'cad' ? luasTot - spaceH.spaceRent : 0;
     const kg = pvSimple.param.tonPerPalet * 1000, cbm = pvSimple.param.cbmPerPalet, tot = Math.max(1, luasTot);
@@ -1047,8 +1046,9 @@ export default function TenderPage() {
         if (t.skenario_aset === 'Rental' && !a.gudang && !((a.space.tarifSewaM2Bulan ?? 0) > 0)) k.push('Gudang belum dipilih dan harga sewa per m² belum ada (database harga pasar di area ini kosong)'); break;
       case '3.2': if (!porsiSudahDiisi || Math.abs(porsiTotal - 1) > 0.0005) k.push('Porsi SPR / DDR / block stack belum lengkap (langkah 1.9)'); break;
       case '3.3': if (!adaVolume('inbound') || !adaVolume('outbound')) k.push('Throughput inbound / outbound belum diisi (langkah 2.2)'); break;
-      case '3.4': if (!((spaceH?.spaceRent ?? 0) > 0)) k.push('Luas belum bisa dihitung — lengkapi langkah 1.9 & 2.1'); break;
-      case '3.5': if (!(Number(a.space.excel?.lebarGudangM) > 0)) k.push('Lebar gudang (L)'); break;
+      case '3.4':
+        if (!((spaceH?.spaceRent ?? 0) > 0)) k.push('Luas belum bisa dihitung — lengkapi langkah 1.9 & 2.1');
+        if (!(Number(a.space.excel?.lebarGudangM) > 0)) k.push('Lebar gudang (L)'); break;
       case '4.1': case '4.2': case '4.4': case '4.5':
         if (!hasil) { k.push('Belum dihitung — klik Hitung'); break; }
         if (id === '4.2' && t.skenario_aset === 'Rental' && !((hasil.perKelompok?.Fasilitas ?? 0) > 0)) k.push('Sewa gudang Rp0 — pilih gudang (3.1) atau isi harga sewa per m² di Rental Space');
@@ -1056,7 +1056,7 @@ export default function TenderPage() {
     }
     return k;
   };
-  const OPSIONAL_SIMPLE = ['3.6', '3.7', '4.3', '4.6', '4.7'];
+  const OPSIONAL_SIMPLE = ['3.5', '3.6', '4.3', '4.6', '4.7'];
   const statusLangkah = (id: string): 'ok' | 'kurang' | 'opsional' => (kurangLangkah(id).length ? 'kurang' : OPSIONAL_SIMPLE.includes(id) ? 'opsional' : 'ok');
   const barisLangkah = (m: MenuSimple) => <ol>{m.langkah.map(l => { const st = statusLangkah(l.id); return <li key={l.id}>
     <button type="button" aria-current={!pop && langkah === l.id ? 'step' : undefined} className={!pop && langkah === l.id ? 'on' : undefined} onClick={() => keLangkah(l.id)}>
@@ -1306,13 +1306,14 @@ export default function TenderPage() {
           jumlahShift={t.jumlah_shift} onChange={ubahSpaceExcel}
           kekuatan={dasarKekuatan(a, t.customer)}
           komersial={panelBiayaSpace} />}
-        {simple && di('3.6') && <div className="wiz-layout">
-          <p className="small muted" style={{ margin: 0 }}>Layout dibuat dari input langkah 1.3–3.5 (palet, produk, volume, porsi rak, staging, footprint, gate, loading dock, trapesium) yang sudah disimpan.
+        {simple && di('3.5') && <div className="wiz-layout">
+          <p className="small muted" style={{ margin: 0 }}>Layout dibuat dari input langkah 1.3–3.4 (palet, produk, volume, porsi rak, staging, footprint, dimensi gedung) dan isian gangway, gate, loading dock & bentuk gedung di atas yang sudah disimpan.
             Bila input diubah sesudah layout terakhir disimpan, layout dibuat ulang otomatis. Komponen bisa digeser & diatur di sini, lalu klik Simpan di dalam editor.</p>
+          {bisaEdit && <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="ghost" style={{ padding: '4px 12px' }} onClick={() => keLangkah('3.5')}>Perbarui layout dari isian di atas</button></div>}
           {kunciLayout > 0 ? <iframe key={kunciLayout} className="wiz-frame" title="Layout 2D & simulasi 3D" src={`/simulasi?id=${t.id}&embed=1&dari=simple`} />
             : <p className="small">Menyimpan input & menyiapkan layout…</p>}
         </div>}
-        {simple && di('3.7') && panelSummaryLayout}
+        {simple && di('3.6') && panelSummaryLayout}
       </>)}
 
       {lihat('Volume') && di('2.3') && <ProfilVolumePanel pakaiJalur={simple} judul={simple ? 'Moda & volume transport per hari' : undefined} profil={a.profilVolume} volumes={volEf} hariBulan={a.processDesign?.hariKerjaBulan ?? 25}

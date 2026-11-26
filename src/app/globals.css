@@ -1326,3 +1326,5 @@ td.td-isian { background: #fffaf0; }
   .sp-satu, .sp-kartu, .sp-tabel { max-width: 100%; }
   .sp-tabel td.small button { display: block; margin: 4px 0 0 !important; padding: 2px 8px !important; min-height: 0; font-size: 11.5px; white-space: normal; }
 }
+/* Simple CM: isi card (tabel lebar, catatan panjang) tidak boleh mendorong card keluar kolom — tabel menggulung di .tablewrap */
+.simple-cm .card > * { min-width: 0; }

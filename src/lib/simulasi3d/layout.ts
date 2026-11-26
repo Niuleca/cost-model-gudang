@@ -131,7 +131,7 @@ export function susunLayout(t: TenderRow, h: HasilTender, o: OpsiLayout = {}): L
   const asumsi: string[] = [];
   const luasRencana = num(h.space.totalM2);
   const W = Math.max(8, num(p.lebarM, 23));
-  if (!num(t.asumsi.space?.excel?.lebarGudangM, 0) && !o.param?.lebarM) asumsi.push(`Lebar gudang (L) belum diisi di Warehouse Planning → Dimensi gedung → otomatis ${fmt(W)} m (rasio panjang : lebar ± 1.6 : 1).`);
+  if (!num(t.asumsi.space?.excel?.lebarGudangM, 0) && !o.param?.lebarM) asumsi.push(`Lebar gudang (L) belum diisi di Footprint requirement (3.4) → Dimensi gedung → otomatis ${fmt(W)} m (rasio panjang : lebar ± 1.6 : 1).`);
   const lv = hitungLevelRak({ centerMm: p.centerMm, sideMm: p.sideMm, beamMm: p.beamMm, palletMm: p.palletMm, productMm: p.productMm, clearanceMm: p.clearanceMm, levelManual: p.levelManual, tinggiLevel: p.tinggiLevel });
   const level = Math.max(1, lv.level);
   const sideM = p.sideMm / 1000, centerM = Math.max(sideM, p.centerMm / 1000);

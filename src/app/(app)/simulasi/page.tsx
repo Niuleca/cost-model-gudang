@@ -191,7 +191,7 @@ export default function DesainGudang() {
         const u = new URL(window.location.href); u.searchParams.set('id', id); window.history.replaceState(null, '', u);
         return;
       }
-      // Dibuka dari Simple CM (langkah 3.7): input tender yang lebih baru dari versi tersimpan → layout dibuat ulang dari input terbaru
+      // Dibuka dari Simple CM (langkah 3.5): input tender yang lebih baru dari versi tersimpan → layout dibuat ulang dari input terbaru
       const dariSimple = new URLSearchParams(window.location.search).get('dari') === 'simple';
       const usang = dariSimple && r.vs.length > 0 && !!r.t?.updated_at && new Date(r.t.updated_at).getTime() > new Date(r.vs[0].updated_at).getTime();
       if (r.vs.length && !usang) { setVersiId(r.vs[0].id); setNama(r.vs[0].nama); setEditS(r.vs[0].data); }
@@ -513,7 +513,7 @@ export default function DesainGudang() {
   }
 
   const tersaring = daftar;
-  // Ditanam di Simple CM (langkah 3.7): tanpa judul halaman, pilihan project & tombol pindah halaman
+  // Ditanam di Simple CM (langkah 3.5): tanpa judul halaman, pilihan project & tombol pindah halaman
   const [tertanam, setTertanam] = useState(false);
   useEffect(() => { setTertanam(new URLSearchParams(window.location.search).get('dari') === 'simple'); }, []);
   return (

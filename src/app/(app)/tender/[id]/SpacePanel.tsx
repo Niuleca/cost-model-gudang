@@ -21,7 +21,7 @@ const Judul = ({ t }: { t: string }) => <tr className="sp-judul"><td colSpan={3}
 export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan, uomIn, uomOut, jumlahShift, onChange, komersial, kekuatan, bagian, porsiKosong = false }: {
   /** Simple CM: porsi belum diisi pengguna → kolom porsi kosong (tidak diisi nilai bawaan) */
   porsiKosong?: boolean;
-  /** Simple CM: tampilkan satu bagian saja — a capacity · b racking/block stack · c staging · d footprint total · e building dimension */
+  /** Simple CM: tampilkan satu bagian saja — a capacity · b racking/block stack (+ kekuatan rak & lantai) · c staging · d footprint total + dimensi gedung · e gangway, gate, dock & bentuk gedung (di atas layout) */
   bagian?: 'a' | 'b' | 'c' | 'd' | 'e';
   excel?: Partial<SpaceExcel> | null; ppTotal: number; inboundBulan: number; outboundBulan: number; uomIn: string; uomOut: string; jumlahShift: number;
   onChange: (x: SpaceExcel) => void; komersial: React.ReactNode;
@@ -148,7 +148,8 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
             {p.block > 0 && <><Judul t="B  Block stack" />{LantaiRows('block', h.block)}</>}
             {p.floor > 0 && <><Judul t="B  Pallet floor" />{LantaiRows('floor', h.floor)}</>}
 </>)}
-      {p.spr + p.ddr + p.block + p.floor <= 0 && <p className="muted">Isi porsi SPR / DDR / block stack di langkah Capacity requirement.</p>}</div>{kartuRak}</>;
+      {p.spr + p.ddr + p.block + p.floor <= 0 && <p className="muted">Isi porsi SPR / DDR / block stack di langkah Capacity requirement.</p>}</div>{kartuRak}
+      {kekuatan && <KekuatanRak x={x} set={set} inp={inp} pjn={pjn} o={kekuatan} />}</>;
     if (bagian === 'c') return <div className="card">{tabel(<>            <Judul t="C  Staging inbound (receiving)" />{StgRows('inbound', h.inbound, uomIn)}
             <Judul t="C  Staging outbound" />{StgRows('outbound', h.outbound, uomOut)}
 </>)}</div>;
@@ -183,23 +184,23 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
                 {([['spaceRent', 'Space Rent (kalkulasi)'], ['cad', 'Ukuran CAD']] as const).map(([v, l]) =>
                   <button key={v} type="button" role="tab" aria-selected={(x.dasarLuas ?? 'spaceRent') === v} className={(x.dasarLuas ?? 'spaceRent') === v ? 'on' : ''} onClick={() => set({ dasarLuas: v })}>{l}</button>)}
               </div></td></tr>
-      </>)}</div>{kartuKomposisi}</>;
-    return <><div className="card">{tabel(<>            {(x.dasarLuas ?? 'spaceRent') === 'cad' && !(h.cadTotal > 0)
+            <Judul t="Dimensi gedung" />
+            <Baris l="Lebar (L) — kiri-kanan" input={pjn(x.lebarGudangM ?? null, 'm', v => set({ lebarGudangM: v ?? undefined }), { kosong: true, ph: h.dimensi.lebarM })} u={U} />
+            {(x.dasarLuas ?? 'spaceRent') === 'cad' && !(h.cadTotal > 0)
               ? <Baris l="Panjang (P) — dari CAD" input={pjn(x.panjangGudangM ?? null, 'm', v => set({ panjangGudangM: v ?? undefined }), { kosong: true })} u={U} />
               : <Baris l={h.dimensi.dasar === 'cad' ? 'Panjang (P) = luas CAD ÷ L' : 'Panjang (P) = luas ÷ L'} v={sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true, desimal: U === 'm' ? 1 : 0 })} u={`${U} (otomatis)`} />}
-            <Baris l="Lebar (L) — kiri-kanan" input={pjn(x.lebarGudangM ?? null, 'm', v => set({ lebarGudangM: v ?? undefined }), { kosong: true, ph: h.dimensi.lebarM })} u={U} />
-            <Baris l="Tinggi sisi (T)" input={pjn(x.rak.sideMm, 'mm', v => set({ rak: { ...x.rak, sideMm: Math.round(v ?? 0) } }), { w: 80 })} u={`${U} · sama dengan Side height`} />
-            <Baris l="Tinggi tengah / puncak" input={pjn(x.rak.centerMm, 'mm', v => set({ rak: { ...x.rak, centerMm: Math.round(v ?? 0) } }), { w: 80 })} u={`${U} · sama dengan Center height`} />
-            <Baris l="Gangway (lebar jalur utama MHE)" input={pjn(x.gangwayM != null && x.gangwayM <= 8 ? x.gangwayM : null, 'm', v => set({ gangwayM: v ?? undefined }), { kosong: true, ph: 3.5 })} u={`${U} · dipakai layout simulasi`} />
             <tr className="sp-hitam"><td>Luas dipakai cost model</td><td className="num">{f0(h.luasDipakai)}</td><td>m² · {h.dimensi.dasar === 'cad' ? `CAD ${sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true })} × ${sp.fmt(h.dimensi.lebarM, 'm')}` : 'Space Rent'}
               {h.dimensi.dasar === 'cad' && h.spaceRent > 0 && <span className={`pill ${Math.abs(h.luasDipakai / h.spaceRent - 1) > 0.05 ? 'warn' : 'ok'}`} style={{ marginLeft: 6 }}>vs kalkulasi {f0(h.spaceRent)} m² ({angka((h.luasDipakai / h.spaceRent - 1) * 100, 1)}%)</span>}</td></tr>
-            <Baris l="Jumlah gate inbound" input={inp(x.gateIn ?? null, v => set({ gateIn: v && v > 0 ? Math.round(v) : undefined }), { w: 80, kosong: true, ph: '2' })} u="pintu · dipakai layout 2D / 3D" />
-            <Baris l="Jumlah gate outbound" input={inp(x.gateOut ?? null, v => set({ gateOut: v && v > 0 ? Math.round(v) : undefined }), { w: 80, kosong: true, ph: '2' })} u="pintu · dipakai layout 2D / 3D" />
+      </>)}</div>{kartuKomposisi}</>;
+    return <div className="card">{tabel(<>            <Judul t="Gangway, gate & bentuk gedung (untuk layout)" />
+            <Baris l="Gangway (lebar jalur utama MHE)" input={pjn(x.gangwayM != null && x.gangwayM <= 8 ? x.gangwayM : null, 'm', v => set({ gangwayM: v ?? undefined }), { kosong: true, ph: 3.5 })} u={U} />
+            <Baris l="Jumlah gate inbound" input={inp(x.gateIn ?? null, v => set({ gateIn: v && v > 0 ? Math.round(v) : undefined }), { w: 80, kosong: true, ph: '2' })} u="pintu" />
+            <Baris l="Jumlah gate outbound" input={inp(x.gateOut ?? null, v => set({ gateOut: v && v > 0 ? Math.round(v) : undefined }), { w: 80, kosong: true, ph: '2' })} u="pintu" />
             <tr><td>Loading dock</td><td colSpan={2}><div className="tabs" role="tablist" aria-label="Loading dock" style={{ display: 'inline-flex' }}>
               {([[true, 'Ada'], [false, 'Tidak ada']] as const).map(([v, l]) => <button key={l} type="button" role="tab" aria-selected={!!x.loadingDock === v} className={!!x.loadingDock === v ? 'on' : ''} onClick={() => set({ loadingDock: v })}>{l}</button>)}
               </div> <span className="small muted">platform beton digambar di layout</span></td></tr>
             <Baris l="Lebar belakang (bentuk trapesium)" input={pjn(x.lebarBelakangM ?? null, 'm', v => set({ lebarBelakangM: v && v > 0 ? v : null }), { kosong: true })} u={`${U} · kosong = persegi panjang (lebar depan = belakang)`} />
-</>)}</div>{kekuatan && <KekuatanRak x={x} set={set} inp={inp} pjn={pjn} o={kekuatan} />}</>;
+</>)}</div>;
   }
 
   return (
