@@ -96,3 +96,14 @@ test('produk tanpa qty tetap jadi sumber data per palet; stok storage dari Volum
   assert.equal(p.space?.excel.porsi.floor, 1);           // 100% pallet floor
   assert.equal(p.space?.excel.porsi.spr, 0);
 });
+
+test('dasar luas CAD: area "Based on CAD" (3.4) dipakai, bukan P × L dimensi gedung', async () => {
+  const { hitungSpaceExcel, SPACE_EXCEL_DEFAULT } = await import('../src/lib/engine/space.ts');
+  const x = { ...SPACE_EXCEL_DEFAULT, dasarLuas: 'cad' as const, panjangGudangM: 154, lebarGudangM: 16, cad: [{ nama: 'PM', m2: 1900 }] };
+  const h = hitungSpaceExcel(x, 500, 500, 500, 2);
+  assert.equal(h.luasDipakai, 1900);
+  assert.equal(h.dimensi.dasar, 'cad');
+  assert.ok(Math.abs(h.dimensi.panjangM * h.dimensi.lebarM - 1900) < 0.01);
+  const tanpaArea = hitungSpaceExcel({ ...x, cad: [] }, 500, 500, 500, 2);
+  assert.equal(tanpaArea.luasDipakai, 154 * 16);
+});

@@ -208,12 +208,13 @@ export function hitungSpaceExcel(x: SpaceExcel, ppTotal: number, inboundBulan: n
   const kelipatan = x.pembulatan > 0 ? x.pembulatan : 1;
   const spaceRent = Math.ceil(denganAllowance / kelipatan - 1e-9) * kelipatan;
   const cadTotal = x.cad.reduce((s, c) => s + Number(c.m2 || 0), 0);
-  // dimensi gedung: CAD → luas = P × L (atau jumlah area CAD bila P/L kosong); Space Rent → L diisi, P = luas / L
+  // dimensi gedung: CAD → luas = jumlah area "Based on CAD" (Footprint requirement); bila area CAD kosong baru P × L.
+  // Space Rent / CAD dengan area terisi → L diisi, P = luas / L (P × L selalu sama dengan luas yang dipakai)
   const Pin = Number(x.panjangGudangM) || 0, Lin = Number(x.lebarGudangM) || 0;
-  const luasCad = x.dasarLuas === 'cad' ? (Pin > 0 && Lin > 0 ? Pin * Lin : cadTotal) : 0;
+  const luasCad = x.dasarLuas === 'cad' ? (cadTotal > 0 ? cadTotal : Pin > 0 && Lin > 0 ? Pin * Lin : 0) : 0;
   const luasDipakai = x.dasarLuas === 'cad' && luasCad > 0 ? luasCad : spaceRent;
   const lebarM = Lin > 0 ? Lin : Math.max(15, Math.round(Math.sqrt(Math.max(luasDipakai, 150) / 1.6)));
-  const panjangM = x.dasarLuas === 'cad' && Pin > 0 ? Pin : luasDipakai / lebarM;
+  const panjangM = x.dasarLuas === 'cad' && cadTotal <= 0 && Pin > 0 ? Pin : luasDipakai / lebarM;
   const dimensi = { dasar: (x.dasarLuas === 'cad' && luasCad > 0 ? 'cad' : 'spaceRent') as 'cad' | 'spaceRent', panjangM, lebarM, sisiM: x.rak.sideMm / 1000, tengahM: x.rak.centerMm / 1000, luasCad };
   return { luasDipakai, dimensi, level: lv, ppTotal, porsi: pr, totalPorsi, porsiOk: Math.abs(totalPorsi - 1) < 0.0005, posisiRak: Math.ceil(sd.ppReq + dd.ppReq - 1e-9), sd, dd, block, floor, inbound, outbound, fasilitasM2, subtotal, allowanceM2: denganAllowance - subtotal, spaceRent, cadTotal };
 }

@@ -96,6 +96,7 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
   };
 
   // ---- Visual komposisi luas ----
+  const cadDipakai = h.dimensi.dasar === 'cad';
   const komp = [
     { l: 'SPR', v: h.sd.footprint, c: '#1f1f1f' },
     { l: 'DDR', v: h.dd.footprint, c: '#4a4a4a' },
@@ -104,8 +105,12 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
     { l: 'Receiving & staging', v: h.inbound.footprint, c: '#a0a0a0' },
     { l: 'Outbound & staging', v: h.outbound.footprint, c: '#b0b0b0' },
     { l: 'Fasilitas', v: h.fasilitasM2, c: '#d9d9d9' },
-    { l: 'Pembulatan', v: h.spaceRent - h.subtotal, c: '#f0f0f0' },
+    // dasar luas CAD: sisa luas CAD (termasuk pembulatan) = Gangway & pedestrian — sama dengan 3.7 Summary layout
+    cadDipakai && h.luasDipakai - h.spaceRent > 0.05
+      ? { l: 'Gangway & pedestrian', v: h.luasDipakai - h.subtotal, c: '#f0f0f0' }
+      : { l: 'Pembulatan', v: h.spaceRent - h.subtotal, c: '#f0f0f0' },
   ].filter(k => k.v > 0.05);
+  const totKomp = komp.reduce((t, k) => t + k.v, 0);
 
 
   // ---- Simple CM: satu bagian per langkah wizard
@@ -124,9 +129,9 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
       </tbody></table>
     </div>;
     const kartuKomposisi = <div className="card sp-kartu" style={{ gap: 8 }}>
-      <h3>Komposisi luas · {f0(h.spaceRent)} m²</h3>
+      <h3>Komposisi luas · {f0(totKomp)} m²{cadDipakai ? ' · ukuran CAD' : ''}</h3>
       <div className="sp-bar" role="img" aria-label="Komposisi luas gudang">{komp.map(k => <div key={k.l} title={`${k.l}: ${f0(k.v)} m²`} style={{ flexGrow: k.v, background: k.c }} />)}</div>
-      <div className="sp-legend">{komp.map(k => <span key={k.l}><i style={{ background: k.c }} />{k.l} <b>{f0(k.v)} m²</b> <span className="muted">({angka(k.v / Math.max(1, h.spaceRent) * 100, 0)}%)</span></span>)}</div>
+      <div className="sp-legend">{komp.map(k => <span key={k.l}><i style={{ background: k.c }} />{k.l} <b>{f0(k.v)} m²</b> <span className="muted">({angka(k.v / Math.max(1, totKomp) * 100, 0)}%)</span></span>)}</div>
     </div>;
     if (bagian === 'a') return <div className="card">{tabel(<>            <Judul t="A  Capacity Requirement" />
             <Baris l="Total posisi palet (dari Volume storage peak)" v={<b>{f0(ppTotal)}</b>} u="PP" />
@@ -179,9 +184,9 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
                   <button key={v} type="button" role="tab" aria-selected={(x.dasarLuas ?? 'spaceRent') === v} className={(x.dasarLuas ?? 'spaceRent') === v ? 'on' : ''} onClick={() => set({ dasarLuas: v })}>{l}</button>)}
               </div></td></tr>
       </>)}</div>{kartuKomposisi}</>;
-    return <><div className="card">{tabel(<>            {(x.dasarLuas ?? 'spaceRent') === 'cad'
+    return <><div className="card">{tabel(<>            {(x.dasarLuas ?? 'spaceRent') === 'cad' && !(h.cadTotal > 0)
               ? <Baris l="Panjang (P) — dari CAD" input={pjn(x.panjangGudangM ?? null, 'm', v => set({ panjangGudangM: v ?? undefined }), { kosong: true })} u={U} />
-              : <Baris l="Panjang (P) = luas ÷ L" v={sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true, desimal: U === 'm' ? 1 : 0 })} u={`${U} (otomatis)`} />}
+              : <Baris l={h.dimensi.dasar === 'cad' ? 'Panjang (P) = luas CAD ÷ L' : 'Panjang (P) = luas ÷ L'} v={sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true, desimal: U === 'm' ? 1 : 0 })} u={`${U} (otomatis)`} />}
             <Baris l="Lebar (L) — kiri-kanan" input={pjn(x.lebarGudangM ?? null, 'm', v => set({ lebarGudangM: v ?? undefined }), { kosong: true, ph: h.dimensi.lebarM })} u={U} />
             <Baris l="Tinggi sisi (T)" input={pjn(x.rak.sideMm, 'mm', v => set({ rak: { ...x.rak, sideMm: Math.round(v ?? 0) } }), { w: 80 })} u={`${U} · sama dengan Side height`} />
             <Baris l="Tinggi tengah / puncak" input={pjn(x.rak.centerMm, 'mm', v => set({ rak: { ...x.rak, centerMm: Math.round(v ?? 0) } }), { w: 80 })} u={`${U} · sama dengan Center height`} />
@@ -249,9 +254,9 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
                 {([['spaceRent', 'Space Rent (kalkulasi)'], ['cad', 'Ukuran CAD']] as const).map(([v, l]) =>
                   <button key={v} type="button" role="tab" aria-selected={(x.dasarLuas ?? 'spaceRent') === v} className={(x.dasarLuas ?? 'spaceRent') === v ? 'on' : ''} onClick={() => set({ dasarLuas: v })}>{l}</button>)}
               </div></td></tr>
-            {(x.dasarLuas ?? 'spaceRent') === 'cad'
+            {(x.dasarLuas ?? 'spaceRent') === 'cad' && !(h.cadTotal > 0)
               ? <Baris l="Panjang (P) — dari CAD" input={pjn(x.panjangGudangM ?? null, 'm', v => set({ panjangGudangM: v ?? undefined }), { kosong: true })} u={U} />
-              : <Baris l="Panjang (P) = luas ÷ L" v={sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true, desimal: U === 'm' ? 1 : 0 })} u={`${U} (otomatis)`} />}
+              : <Baris l={h.dimensi.dasar === 'cad' ? 'Panjang (P) = luas CAD ÷ L' : 'Panjang (P) = luas ÷ L'} v={sp.fmt(h.dimensi.panjangM, 'm', { tanpaSatuan: true, desimal: U === 'm' ? 1 : 0 })} u={`${U} (otomatis)`} />}
             <Baris l="Lebar (L) — kiri-kanan" input={pjn(x.lebarGudangM ?? null, 'm', v => set({ lebarGudangM: v ?? undefined }), { kosong: true, ph: h.dimensi.lebarM })} u={U} />
             <Baris l="Tinggi sisi (T)" input={pjn(x.rak.sideMm, 'mm', v => set({ rak: { ...x.rak, sideMm: Math.round(v ?? 0) } }), { w: 80 })} u={`${U} · sama dengan Side height`} />
             <Baris l="Tinggi tengah / puncak" input={pjn(x.rak.centerMm, 'mm', v => set({ rak: { ...x.rak, centerMm: Math.round(v ?? 0) } }), { w: 80 })} u={`${U} · sama dengan Center height`} />
@@ -305,12 +310,12 @@ export default function SpacePanel({ excel, ppTotal, inboundBulan, outboundBulan
           {kekuatan && <KekuatanRak x={x} set={set} inp={inp} pjn={pjn} o={kekuatan} />}
 
           <div className="card" style={{ gap: 8, padding: 12 }}>
-            <h3>Komposisi luas · {f0(h.spaceRent)} m²{h.dimensi.dasar === 'cad' ? ` (dasar sewa CAD ${f0(h.luasDipakai)} m²)` : ''}</h3>
+            <h3>Komposisi luas · {f0(totKomp)} m²{cadDipakai ? ` · ukuran CAD (kalkulasi ${f0(h.spaceRent)} m²)` : ''}</h3>
             <div className="sp-bar" role="img" aria-label="Komposisi luas gudang">
               {komp.map(k => <div key={k.l} title={`${k.l}: ${f0(k.v)} m²`} style={{ flexGrow: k.v, background: k.c }} />)}
             </div>
             <div className="sp-legend">
-              {komp.map(k => <span key={k.l}><i style={{ background: k.c }} />{k.l} <b>{f0(k.v)} m²</b> <span className="muted">({angka(k.v / Math.max(1, h.spaceRent) * 100, 0)}%)</span></span>)}
+              {komp.map(k => <span key={k.l}><i style={{ background: k.c }} />{k.l} <b>{f0(k.v)} m²</b> <span className="muted">({angka(k.v / Math.max(1, totKomp) * 100, 0)}%)</span></span>)}
             </div>
           </div>
 

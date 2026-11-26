@@ -801,7 +801,7 @@ export default function TenderPage() {
           <tr className="pd-sub"><td><b>Total</b></td><td className="num"><b>{angka(luasTot)}</b></td><td className="num"><b>{angka(Math.ceil(pp))}</b></td><td className="num"><b>{angka(pp * cbm, 1)}</b></td><td className="num"><b>{angka(pp * kg / 1000, 1)}</b></td><td className="num"><b>100%</b></td></tr>
         </tbody></table></div>
       <p className="small muted">CBM & ton = posisi palet × {angka(cbm, 2)} CBM & {angka(kg)} kg per palet (dari Product input). Posisi palet staging = kapasitas staging per sequence.</p>
-      {spaceH.dimensi.dasar === 'cad' && <p className="small">Dasar luas: <b>ukuran CAD</b> {angka(spaceH.dimensi.panjangM, 1)} × {angka(spaceH.dimensi.lebarM, 1)} m = {angka(luasTot)} m² (kebutuhan hasil kalkulasi {angka(spaceH.spaceRent)} m²){selisihCad > 0.05 && <> — sisa {angka(luasTot - spaceH.subtotal)} m² dimasukkan ke <b>Gangway & pedestrian</b></>}.
+      {spaceH.dimensi.dasar === 'cad' && <p className="small">Dasar luas: <b>ukuran CAD</b> {spaceH.cadTotal > 0 ? <>{angka(luasTot)} m² (area Based on CAD di 3.4)</> : <>{angka(spaceH.dimensi.panjangM, 1)} × {angka(spaceH.dimensi.lebarM, 1)} m = {angka(luasTot)} m²</>} (kebutuhan hasil kalkulasi {angka(spaceH.spaceRent)} m²){selisihCad > 0.05 && <> — sisa {angka(luasTot - spaceH.subtotal)} m² dimasukkan ke <b>Gangway & pedestrian</b></>}.
         {selisihCad < -0.5 && <b style={{ color: 'var(--bad, #c0392b)' }}> CAD lebih kecil {angka(-selisihCad)} m² dari kebutuhan — cek layout.</b>}</p>}
     </div>;
   })();
