@@ -371,9 +371,9 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
       const jenis = nm?.[1] === 'DDR' ? 'ddr' : 'spr';
       const hr = (inp.space as any).rak?.[jenis] ?? { harga: inp.space.hargaRakPerPosisi ?? 0, umurBulan: inp.space.umurRakBulan ?? 120 };
       const r = S5.r;
-      S5.baris(kr, [b.deskripsi.replace(' — depresiasi', ''), Number(nm?.[2] ?? 0), hr.harga, hr.umurBulan || n, { f: `B${r}*C${r}`, v: Number(nm?.[2] ?? 0) * hr.harga }, { f: `E${r}/MIN(D${r},Kontrak)`, v: b.biayaBulan }]);
+      S5.baris(kr, [b.deskripsi.replace(' — depresiasi', ''), Number(nm?.[2] ?? 0), hr.harga, hr.umurBulan || n, { f: `B${r}*C${r}`, v: Number(nm?.[2] ?? 0) * hr.harga }, { f: hr.umurManual ? `E${r}/D${r}` : `E${r}/MIN(D${r},Kontrak)`, v: b.biayaBulan }]);
       sumber.set(b.deskripsi, ref(S5.nama, 6, r)); nilaiCapex.set(b.deskripsi, ref(S5.nama, 5, r));
-      rinci.set(b.deskripsi, { qty: { f: ref(S5.nama, 2, r) }, harga: { f: ref(S5.nama, 3, r) }, umur: { f: `MIN(${ref(S5.nama, 4, r)},Kontrak)` }, uom: 'posisi' });
+      rinci.set(b.deskripsi, { qty: { f: ref(S5.nama, 2, r) }, harga: { f: ref(S5.nama, 3, r) }, umur: { f: hr.umurManual ? ref(S5.nama, 4, r) : `MIN(${ref(S5.nama, 4, r)},Kontrak)` }, uom: 'posisi' });
     }
   }
   S5.bagian('MHE', 'Unit diambil dari MHE Summary (sheet 3)');
@@ -385,10 +385,10 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
     const u = unitTool.get(x.tool);
     const desk = x.mode === 'sewa' ? `${x.nama} — sewa (${x.unit} unit)` : `${x.nama} (${x.unit} unit) — depresiasi`;
     S5.baris(kmh, [x.nama, x.tool, x.mode, u ? { f: u, v: x.unit } : x.unit, x.harga, x.umurBulan || n,
-      { f: x.mode === 'sewa' ? `D${r}*E${r}` : `D${r}*E${r}/MIN(F${r},Kontrak)`, v: h.biaya.find(b => b.deskripsi === desk)?.biayaSistem ?? h.biaya.find(b => b.deskripsi === desk)?.biayaBulan }, x.mode === 'sewa' ? '' : { f: `D${r}*E${r}`, v: x.unit * x.harga }]);
+      { f: x.mode === 'sewa' ? `D${r}*E${r}` : x.umurManual ? `D${r}*E${r}/F${r}` : `D${r}*E${r}/MIN(F${r},Kontrak)`, v: h.biaya.find(b => b.deskripsi === desk)?.biayaSistem ?? h.biaya.find(b => b.deskripsi === desk)?.biayaBulan }, x.mode === 'sewa' ? '' : { f: `D${r}*E${r}`, v: x.unit * x.harga }]);
     sumber.set(desk, ref(S5.nama, 7, r));
     if (x.mode !== 'sewa') nilaiCapex.set(desk, ref(S5.nama, 8, r));
-    rinci.set(desk, { qty: { f: ref(S5.nama, 4, r), v: x.unit }, harga: { f: ref(S5.nama, 5, r), v: x.harga }, umur: x.mode === 'sewa' ? '' : { f: `MIN(${ref(S5.nama, 6, r)},Kontrak)` }, uom: x.mode === 'sewa' ? 'unit · sewa/bln' : 'unit · beli' });
+    rinci.set(desk, { qty: { f: ref(S5.nama, 4, r), v: x.unit }, harga: { f: ref(S5.nama, 5, r), v: x.harga }, umur: x.mode === 'sewa' ? '' : { f: x.umurManual ? ref(S5.nama, 6, r) : `MIN(${ref(S5.nama, 6, r)},Kontrak)` }, uom: x.mode === 'sewa' ? 'unit · sewa/bln' : 'unit · beli' });
   }
   const ls = h.biaya.find(b => b.kelompok === 'Utilitas');
   if (ls) {
@@ -418,10 +418,10 @@ export function tulisModelRumus(wb: WB, d: DataRumus) {
     const bb = h.biaya.find(b => b.deskripsi === desk);
     S7.baris(kc, [c.deskripsi, c.kelompok, c.mode, c.qty, c.hargaSatuan, c.mode === 'beli' ? (c.umurBulan || n) : '',
       c.mode === 'beli' || c.mode === 'sekali' ? { f: `D${r}*E${r}`, v: c.qty * c.hargaSatuan } : '',
-      { f: c.mode === 'beli' ? `G${r}/MIN(F${r},Kontrak)` : c.mode === 'sekali' ? `G${r}/Kontrak` : `D${r}*E${r}`, v: bb?.biayaBulan }]);
+      { f: c.mode === 'beli' ? (c.umurManual ? `G${r}/F${r}` : `G${r}/MIN(F${r},Kontrak)`) : c.mode === 'sekali' ? `G${r}/Kontrak` : `D${r}*E${r}`, v: bb?.biayaBulan }]);
     if (bb) sumber.set(desk, ref(S7.nama, 8, r));
     rinci.set(desk, { qty: { f: ref(S7.nama, 4, r), v: c.qty }, harga: { f: ref(S7.nama, 5, r), v: c.hargaSatuan },
-      umur: c.mode === 'beli' ? { f: `MIN(${ref(S7.nama, 6, r)},Kontrak)` } : c.mode === 'sekali' ? { f: 'Kontrak', v: n } : '', uom: c.mode });
+      umur: c.mode === 'beli' ? { f: c.umurManual ? ref(S7.nama, 6, r) : `MIN(${ref(S7.nama, 6, r)},Kontrak)` } : c.mode === 'sekali' ? { f: 'Kontrak', v: n } : '', uom: c.mode });
     if (c.mode === 'beli' || c.mode === 'sekali') nilaiCapex.set(desk, ref(S7.nama, 7, r));
   }
   const RB = '8 Rincian Biaya';

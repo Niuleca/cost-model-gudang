@@ -35,6 +35,7 @@ export interface ItLine {
   /** perlakuan 'sewa': harga sewa per unit per bulan (mata uang baris) */
   hargaSewaBulan?: number | null;
   umurBulan?: number;          // umur ekonomis untuk depresiasi
+  umurManual?: boolean;        // true = periode depresiasi diisi manual (boleh > kontrak)
   catatan?: string;
   kunci?: string;              // baris dari default otomatis (lib/itDefault)
   qtyDefault?: number;         // qty hasil hitungan default terakhir; qty = qtyDefault → ikut data tender
@@ -77,7 +78,7 @@ export function biayaBulanIt(l: ItLine, kurs: number, o: OpsiIt = OPSI_IT_DEFAUL
   const p = perlakuanDari(l);
   if (p === 'tagih') return { jenis: 'Tagih terpisah', nilai, pokok: 0, bunga: 0, total: 0, periode: 0 };
   if (p === 'sewa') { const sewa = l.qty * rupiah(l, Number(l.hargaSewaBulan) || 0, kurs); return { jenis: 'Sewa', nilai: sewa, pokok: sewa, bunga: 0, total: sewa, periode: 1 }; }
-  const periode = p === 'depresiasi' ? Math.min(Math.max(1, l.umurBulan || UMUR_IT_DEFAULT), n) : n;
+  const periode = p === 'depresiasi' ? (l.umurManual ? Math.max(1, l.umurBulan || UMUR_IT_DEFAULT) : Math.min(Math.max(1, l.umurBulan || UMUR_IT_DEFAULT), n)) : n;
   const pokok = nilai / periode, bunga = (nilai / 2) * r;
   return { jenis: p === 'depresiasi' ? 'Depresiasi' : 'Amortisasi', nilai, pokok, bunga, total: pokok + bunga, periode };
 }
@@ -124,7 +125,7 @@ export function itKeCostLines(s: ItSheet, risiko: KategoriRisiko = 'Rendah'): Co
     else if (b === 'Tahunan')
       out.push({ deskripsi: `IT — ${l.item} (tahunan ÷ 12)`, kelompok: 'IT', mode: 'bulanan', qty: l.qty, hargaSatuan: harga / 12, kategoriRisiko: risiko, alokasi, sumber });
     else if (perlakuanDari(l) === 'depresiasi')
-      out.push({ deskripsi: `IT — ${l.item}`, kelompok: 'IT', mode: 'beli', qty: l.qty, hargaSatuan: harga, umurBulan: l.umurBulan || UMUR_IT_DEFAULT, kategoriRisiko: risiko, alokasi, sumber });
+      out.push({ deskripsi: `IT — ${l.item}`, kelompok: 'IT', mode: 'beli', qty: l.qty, hargaSatuan: harga, umurBulan: l.umurBulan || UMUR_IT_DEFAULT, umurManual: l.umurManual, kategoriRisiko: risiko, alokasi, sumber });
     else if (perlakuanDari(l) === 'amortisasi')
       out.push({ deskripsi: `IT — ${l.item}`, kelompok: 'IT', mode: 'sekali', qty: l.qty, hargaSatuan: harga, kategoriRisiko: risiko, alokasi, sumber });
   }

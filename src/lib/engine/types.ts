@@ -241,7 +241,7 @@ export interface SpaceInput {
   /** Sewa racking per posisi palet (PP) per bulan, mis. 25.000 */
   sewaRakPerPPBulan?: number;
 }
-export interface RakHarga { priceItemId?: number; nama?: string; harga: number; umurBulan: number }
+export interface RakHarga { priceItemId?: number; nama?: string; harga: number; umurBulan: number; umurManual?: boolean }
 
 export interface MheInput {
   tool: string;                   // harus sama dengan AktivitasInput.tool
@@ -249,6 +249,8 @@ export interface MheInput {
   mode: 'sewa' | 'beli';
   harga: number;                  // sewa per bulan atau harga beli
   umurBulan?: number;
+  /** true = periode depresiasi diisi manual (boleh melebihi kontrak); kosong = MIN(umur ekonomis, kontrak) */
+  umurManual?: boolean;
   ketersediaan: number;           // 0.85 = 85% jam efektif bisa dipakai (charging, servis)
   sparePersen: number;
   /** true = item harga dipilih otomatis (termurah yang memenuhi kapasitas) dan ikut berubah bila data berubah */
@@ -263,6 +265,8 @@ export interface CostLineInput {
   qty: number;
   hargaSatuan: number;
   umurBulan?: number;
+  /** true = periode depresiasi diisi manual (boleh melebihi kontrak); kosong = MIN(umur ekonomis, kontrak) */
+  umurManual?: boolean;
   kategoriRisiko?: KategoriRisiko;
   alokasi?: Partial<Record<Bucket, number>>;
   sumber?: string;

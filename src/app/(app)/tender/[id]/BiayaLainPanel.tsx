@@ -69,7 +69,7 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
                   const mode: ModeBiaya = x.harga_sewa_bulan && !x.harga_beli ? 'sewa' : b.mode;
                   const h = hargaUntukMode(x, mode);
                   const m2 = /m²|m2/i.test(x.satuan) ? m2Fasilitas(x.item) : 0;
-                  onUbah(i, { priceItemId: x.id, deskripsi: x.item, kelompok: s.kelompok, seksi: s.id, mode, hargaSatuan: h, hargaDb: h, umurBulan: x.umur_ekonomis_bulan ?? b.umurBulan,
+                  onUbah(i, { priceItemId: x.id, deskripsi: x.item, kelompok: s.kelompok, seksi: s.id, mode, hargaSatuan: h, hargaDb: h, umurBulan: x.umur_ekonomis_bulan ?? b.umurBulan, umurManual: false,
                     kunci: undefined, qtyDefault: undefined, hargaDefault: undefined, belumDiketahui: undefined,
                     ...(m2 > 0 ? { qty: Math.round(m2), dasar: `qty = luas fasilitas di Warehouse Planning (${Math.round(m2)} m²)` } : { dasar: undefined }) });
                 }}>
@@ -93,7 +93,7 @@ function KartuSeksi({ s, rows, items, kontrak, onUbah, onUbahBanyak, onHapus, on
               }}>{MODE.map(m => <option key={m.v} value={m.v} title={m.t}>{m.l}</option>)}</select></td>
               <td className="num"><InputDesimal aria-label="Qty" step="any" value={b.qty} onChange={e => onUbah(i, { qty: Number(e.target.value) })} /></td>
               <td className="num db"><InputDesimal aria-label="Harga satuan" value={b.hargaSatuan} onChange={e => onUbah(i, { hargaSatuan: Number(e.target.value) })} /></td>
-              <td className="num">{b.mode === 'beli' ? <UmurKontrak umur={b.umurBulan} kontrak={kontrak} onChange={v => onUbah(i, { umurBulan: v })} lebar={80} /> : <span className="small muted">{b.mode === 'sekali' ? kontrak : '–'}</span>}</td>
+              <td className="num">{b.mode === 'beli' ? <UmurKontrak umur={b.umurBulan} manual={b.umurManual} kontrak={kontrak} onChange={v => onUbah(i, { umurBulan: v, umurManual: true })} onReset={() => onUbah(i, { umurManual: false })} lebar={80} /> : <span className="small muted">{b.mode === 'sekali' ? kontrak : '–'}</span>}</td>
               <td className="num" title={`nilai ${rp(c.nilai)}${c.periode > 1 ? ` ÷ ${c.periode} bln` : ''}`}><b>{rp(c.total)}</b>{c.periode > 1 && <div className="small muted">nilai {rp(c.nilai)}</div>}</td>
               <td><select aria-label="Risiko" value={b.kategoriRisiko ?? ''} onChange={e => onUbah(i, { kategoriRisiko: (e.target.value || undefined) as KategoriRisiko | undefined })}><option value="">Default</option>{RISIKO.map(r => <option key={r}>{r}</option>)}</select>
                 <select aria-label="Alokasi" className="input-kecil" value={namaAlokasi(b.alokasi)} onChange={e => onUbah(i, { alokasi: ALOKASI[e.target.value] })}>{Object.keys(ALOKASI).map(k => <option key={k}>{k}</option>)}</select></td>

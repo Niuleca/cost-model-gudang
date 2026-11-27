@@ -212,12 +212,12 @@ export function tulisGudang(x: Ctx) {
     GD.put(4, hr.harga || 0, { j: 'in', fmt: 'rp' }); GD.put(5, hr.umurBulan || 0, { j: 'in', fmt: 'n0' });
     GD.put(6, { f: `IFERROR(INDEX(D_ItBeli,MATCH(B${r},D_ItItem,0)),"")` }, { j: 'out', fmt: 'rp' });
     GD.put(7, { f: `IF(AND(C${r}>0,D${r}>0),C${r}*D${r},0)` }, { j: 'out', fmt: 'rp' });
-    GD.put(8, { f: `IF(G${r}>0,G${r}/MIN(IF(N(E${r})>0,E${r},Kontrak),Kontrak),0)` }, { j: 'out', fmt: 'rp', b: true });
+    GD.put(8, { f: `IF(G${r}>0,G${r}/MIN(IF(N(E${r})>0,E${r},Kontrak),${hr.umurManual ? "1E9" : "Kontrak"}),0)` }, { j: 'out', fmt: 'rp', b: true });
     const lab = j === 'spr' ? 'SPR' : 'DDR';
     const eng = h.biaya.find(b => b.deskripsi.startsWith(`Racking ${lab} (`));
     x.lines.push({ kel: 'Racking', tahap: 1, desk: { f: `"Racking ${lab} ("&${SN}C${r}&" posisi) — depresiasi"`, v: eng?.deskripsi }, deskKey: eng?.deskripsi ?? `Racking ${lab}`,
       jenis: 'Capex', risk: 'Tinggi', sistem: `${SN}$H$${r}`, alok: [1, 0, 0, 0, 0], dasar: eng?.dasar ?? '', v: eng?.biayaBulan, nilai: `${SN}$G$${r}`,
-      qty: { f: `${SN}C${r}` }, harga: { f: `${SN}D${r}` }, umur: { f: `MIN(IF(N(${SN}E${r})>0,${SN}E${r},Kontrak),Kontrak)` }, uom: 'posisi', capex: true });
+      qty: { f: `${SN}C${r}` }, harga: { f: `${SN}D${r}` }, umur: { f: `MIN(IF(N(${SN}E${r})>0,${SN}E${r},Kontrak),${hr.umurManual ? "1E9" : "Kontrak"})` }, uom: 'posisi', capex: true });
     GD.r++;
   }
 
@@ -248,7 +248,7 @@ export function tulisMhe(x: Ctx) {
     GD.put(6, mi?.harga ?? null, { j: 'in', fmt: 'rp' }); GD.put(7, mi?.umurBulan ?? null, { j: 'in', fmt: 'n0' }); GD.put(8, mi?.sparePersen ?? 0, { j: 'in', fmt: 'pct' });
     GD.put(9, { f: `IF(C${r}>0,MAX(0,ROUNDUP(C${r}*N(H${r})-1E-9,0)),0)` }, { j: 'out', fmt: 'n0' });
     GD.put(10, { f: `C${r}+I${r}`, v: tl ? h.mhe.find(m => m.tool === tl)?.unit : undefined }, { j: 'out', fmt: 'n0', b: true });
-    GD.put(11, { f: `IF(OR(A${r}="",N(F${r})<=0),0,IF(E${r}="sewa",J${r}*F${r},J${r}*F${r}/MIN(IF(N(G${r})>0,G${r},Kontrak),Kontrak)))` }, { j: 'out', fmt: 'rp', b: true });
+    GD.put(11, { f: `IF(OR(A${r}="",N(F${r})<=0),0,IF(E${r}="sewa",J${r}*F${r},J${r}*F${r}/MIN(IF(N(G${r})>0,G${r},Kontrak),${mi?.umurManual ? "1E9" : "Kontrak"})))` }, { j: 'out', fmt: 'rp', b: true });
     GD.put(12, { f: `IF(AND(A${r}<>"",E${r}="beli"),J${r}*N(F${r}),0)` }, { j: 'out', fmt: 'rp' });
     GD.put(13, { f: `IFERROR(INDEX(IF(E${r}="sewa",D_ItSewa,D_ItBeli),MATCH(D${r},D_ItItem,0)),"")` }, { j: 'out', fmt: 'rp' });
     GD.put(14, { f: `IF(A${r}="",0,SUMPRODUCT(EXACT(VSM_Tool,A${r})*VSM_Bobot))` }, { j: 'out', fmt: 'n2' });
@@ -264,7 +264,7 @@ export function tulisMhe(x: Ctx) {
     const nm = `IF(${SN}D${r}="—","",${SN}D${r})`;
     x.lines.push({ kel: 'MHE', tahap: 1, desk: { f: `IF(OR(${SN}A${r}="",${nm}=""),"",IF(${SN}E${r}="sewa",${nm}&" — sewa ("&${SN}J${r}&" unit)",${nm}&" ("&${SN}J${r}&" unit) — depresiasi"))`, v: eng?.deskripsi ?? '' }, deskKey: eng?.deskripsi ?? `${mi?.nama ?? tl ?? ''}`,
       jenis: { f: `IF(${SN}E${r}="beli","Capex","Opex")` }, risk: 'Sedang', sistem: `${SN}$K$${r}`, alok: BUCKETS.map((_, k) => ({ f: `${SN}${R(15 + k, r)}` })), dasar: eng?.dasar ?? '', v: eng?.biayaBulan,
-      nilai: `${SN}$L$${r}`, qty: { f: `${SN}J${r}` }, harga: { f: `${SN}F${r}` }, umur: { f: `IF(${SN}E${r}="beli",MIN(IF(N(${SN}G${r})>0,${SN}G${r},Kontrak),Kontrak),"")` }, uom: 'unit', capex: mi?.mode === 'beli' });
+      nilai: `${SN}$L$${r}`, qty: { f: `${SN}J${r}` }, harga: { f: `${SN}F${r}` }, umur: { f: `IF(${SN}E${r}="beli",MIN(IF(N(${SN}G${r})>0,${SN}G${r},Kontrak),${mi?.umurManual ? "1E9" : "Kontrak"}),"")` }, uom: 'unit', capex: mi?.mode === 'beli' });
     GD.r++;
   }
   GD.nmR('MheHarga_Tool', 1, m0, GD.r - 1); GD.nmR('MheHarga_Biaya', 11, m0, GD.r - 1); GD.nmR('MheHarga_Unit', 10, m0, GD.r - 1);
@@ -305,14 +305,14 @@ export function tulisIt(x: Ctx) {
     IT.put(11, sekali ? (l!.umurBulan ?? UMUR_IT_DEFAULT) : null, { j: 'in', fmt: 'n0' });
     const pl = `IF(J${r}<>"",J${r},IF(OR(${aset.map(s => s.replace('{r}', String(r))).join(',')}),"Depresiasi","Amortisasi"))`;
     IT.put(16, { f: `IF(N${r}="","",IF(OR(N${r}="Bulanan",N${r}="Transaksi",N${r}="Tahunan"),"bulanan",IF(${pl}="Depresiasi","beli",IF(${pl}="Amortisasi","sekali","tagih"))))` }, { j: 'out' });
-    IT.put(12, { f: `IF(OR(N(D${r})<=0,N(F${r})<=0),0,IF(OR(N${r}="Bulanan",N${r}="Transaksi"),D${r}*O${r},IF(N${r}="Tahunan",D${r}*O${r}/12,IF(P${r}="beli",D${r}*O${r}/MIN(IF(N(K${r})>0,K${r},${UMUR_IT_DEFAULT}),Kontrak),IF(P${r}="sekali",D${r}*O${r}/Kontrak,0)))))` }, { j: 'out', fmt: 'rp', b: true });
+    IT.put(12, { f: `IF(OR(N(D${r})<=0,N(F${r})<=0),0,IF(OR(N${r}="Bulanan",N${r}="Transaksi"),D${r}*O${r},IF(N${r}="Tahunan",D${r}*O${r}/12,IF(P${r}="beli",D${r}*O${r}/MIN(IF(N(K${r})>0,K${r},${UMUR_IT_DEFAULT}),${l?.umurManual ? "1E9" : "Kontrak"}),IF(P${r}="sekali",D${r}*O${r}/Kontrak,0)))))` }, { j: 'out', fmt: 'rp', b: true });
     IT.put(13, l?.catatan ?? null, { j: 'in', size: 9 });
     IT.put(17, { f: `IF(AND(N(D${r})>0,N(F${r})>0,OR(P${r}="beli",P${r}="sekali")),D${r}*O${r},0)` }, { j: 'out', fmt: 'rp' });
     const key = l ? (basisDari(l.costType) === 'Tahunan' ? `IT — ${l.item} (tahunan ÷ 12)` : basisDari(l.costType) === 'Sekali' ? `IT — ${l.item} — ${perlakuanDari(l) === 'depresiasi' ? 'depresiasi' : 'amortisasi'}` : `IT — ${l.item}`) : '';
     const eng = d0(x).find(b => b.deskripsi === key);
     x.lines.push({ kel: 'IT', tahap: 1, desk: { f: `IF(${SN}B${r}="","",\"IT — \"&${SN}B${r}&IF(${SN}N${r}="Tahunan"," (tahunan ÷ 12)","")&IF(${SN}P${r}="beli"," — depresiasi",IF(${SN}P${r}="sekali"," — amortisasi","")))`, v: eng?.deskripsi ?? '' }, deskKey: key,
       jenis: { f: `IF(OR(${SN}P${r}="beli",${SN}P${r}="sekali"),"Capex","Opex")` }, risk: 'Rendah', sistem: `${SN}$L$${r}`, alok: [0, 0, 0, 0, 1], dasar: eng?.dasar ?? '', v: eng?.biayaBulan,
-      nilai: `${SN}$Q$${r}`, qty: { f: `${SN}D${r}` }, harga: { f: `${SN}O${r}` }, umur: { f: `IF(${SN}P${r}="beli",MIN(IF(N(${SN}K${r})>0,${SN}K${r},${UMUR_IT_DEFAULT}),Kontrak),IF(${SN}P${r}="sekali",Kontrak,""))` }, uom: 'IT', capex: !!l && basisDari(l.costType) === 'Sekali' && perlakuanDari(l) !== 'tagih' });
+      nilai: `${SN}$Q$${r}`, qty: { f: `${SN}D${r}` }, harga: { f: `${SN}O${r}` }, umur: { f: `IF(${SN}P${r}="beli",MIN(IF(N(${SN}K${r})>0,${SN}K${r},${UMUR_IT_DEFAULT}),${l?.umurManual ? "1E9" : "Kontrak"}),IF(${SN}P${r}="sekali",Kontrak,""))` }, uom: 'IT', capex: !!l && basisDari(l.costType) === 'Sekali' && perlakuanDari(l) !== 'tagih' });
     IT.r++;
   }
   const r1 = IT.r - 1;
@@ -373,7 +373,7 @@ export function tulisBiayaLain(x: Ctx) {
       BL.put(4, c?.qty ?? null, { j: 'in', fmt: 'n2' }); BL.put(5, c?.hargaSatuan ?? null, { j: 'in', fmt: 'rp' });
       BL.put(6, c?.umurBulan ?? (s.mode === 'beli' && !c ? 60 : null), { j: 'in', fmt: 'n0' });
       BL.put(7, { f: `N(D${r})*N(E${r})` }, { j: 'out', fmt: 'rp' });
-      BL.put(8, { f: `IF(OR(C${r}="bulanan",C${r}="sewa"),G${r},IF(C${r}="beli",IF(G${r}>0,G${r}/MIN(IF(N(F${r})>0,F${r},Kontrak),Kontrak),0),IF(C${r}="sekali",G${r}/Kontrak,0)))` }, { j: 'out', fmt: 'rp', b: true });
+      BL.put(8, { f: `IF(OR(C${r}="bulanan",C${r}="sewa"),G${r},IF(C${r}="beli",IF(G${r}>0,G${r}/MIN(IF(N(F${r})>0,F${r},Kontrak),${c?.umurManual ? "1E9" : "Kontrak"}),0),IF(C${r}="sekali",G${r}/Kontrak,0)))` }, { j: 'out', fmt: 'rp', b: true });
       BL.put(9, c?.kategoriRisiko ?? 'Default', { j: 'in' }); BL.dd(9, 'L_Risiko');
       const nmA = c ? namaAlok(c.alokasi, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 }) : 'Merata';
       BL.put(10, nmA ?? 'Kustom (dari web)', { j: 'in' }); BL.dd(10, 'L_Alokasi');
@@ -383,13 +383,13 @@ export function tulisBiayaLain(x: Ctx) {
       const kus = normAlok(c?.alokasi, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
       const kolAl = ['Storage', 'HIn', 'HOut', 'Vas', 'Man'];
       BUCKETS.forEach((b, k) => BL.put(15 + k, { f: `IF(J${r}="Kustom (dari web)",${+kus[b].toFixed(6)},IFERROR(INDEX(D_Al${kolAl[k]},MATCH(J${r},D_AlNama,0)),${MERATA[k]}))` }, { j: 'out', fmt: 'pct', size: 8 }));
-      BL.put(20, { f: `IF(C${r}="beli",MIN(IF(N(F${r})>0,F${r},Kontrak),Kontrak),IF(C${r}="sekali",Kontrak,""))` }, { j: 'out', fmt: 'n0' });
+      BL.put(20, { f: `IF(C${r}="beli",MIN(IF(N(F${r})>0,F${r},Kontrak),${c?.umurManual ? "1E9" : "Kontrak"}),IF(C${r}="sekali",Kontrak,""))` }, { j: 'out', fmt: 'n0' });
       const key = c ? (c.mode === 'beli' ? `${c.deskripsi} — depresiasi` : c.mode === 'sekali' ? `${c.deskripsi} — amortisasi` : c.deskripsi) : '';
       const eng = d.h.biaya.find(b => b.deskripsi === key);
       x.lines.push({ kel, tahap: 1, desk: { f: `IF(${SN}B${r}="","",${SN}B${r}&IF(${SN}C${r}="beli"," — depresiasi",IF(${SN}C${r}="sekali"," — amortisasi","")))`, v: key }, deskKey: key,
         jenis: { f: `IF(OR(${SN}C${r}="beli",${SN}C${r}="sekali"),"Capex","Opex")` }, risk: { f: `${SN}N${r}` }, sistem: `${SN}$H$${r}`,
         alok: BUCKETS.map((_, k) => ({ f: `${SN}${R(15 + k, r)}` })), dasar: eng?.dasar ?? '', v: eng?.biayaBulan, nilai: `IF(OR(${SN}C${r}="beli",${SN}C${r}="sekali"),${SN}$G$${r},0)`,
-        qty: { f: `${SN}D${r}` }, harga: { f: `${SN}E${r}` }, umur: { f: `IF(${SN}C${r}="beli",MIN(IF(N(${SN}F${r})>0,${SN}F${r},Kontrak),Kontrak),IF(${SN}C${r}="sekali",Kontrak,""))` }, uom: c?.mode ?? s.mode,
+        qty: { f: `${SN}D${r}` }, harga: { f: `${SN}E${r}` }, umur: { f: `IF(${SN}C${r}="beli",MIN(IF(N(${SN}F${r})>0,${SN}F${r},Kontrak),${c?.umurManual ? "1E9" : "Kontrak"}),IF(${SN}C${r}="sekali",Kontrak,""))` }, uom: c?.mode ?? s.mode,
         capex: !!c && (c.mode === 'beli' || c.mode === 'sekali') });
       BL.r++;
     }

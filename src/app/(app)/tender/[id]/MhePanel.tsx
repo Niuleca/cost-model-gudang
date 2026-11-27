@@ -1,5 +1,5 @@
 'use client';
-import UmurKontrak from '@/components/UmurKontrak';
+import UmurKontrak, { periodeDepresiasi } from '@/components/UmurKontrak';
 import type { MheInput } from '@/lib/engine/types';
 import { rp, angka } from '@/lib/format';
 
@@ -51,7 +51,7 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange,
             const m = mhe.find(x => x.tool === b.nama);
             const spare = b.unit && m ? Math.ceil(b.unit * (m.sparePersen || 0) - 1e-9) : 0;
             const unitTot = (b.unit ?? 0) + spare;
-            const biaya = m && m.harga ? (m.mode === 'sewa' ? unitTot * m.harga : unitTot * m.harga / Math.max(1, m.umurBulan ?? 60)) : 0;
+            const biaya = m && m.harga ? (m.mode === 'sewa' ? unitTot * m.harga : unitTot * m.harga / periodeDepresiasi(m.umurBulan, kontrakBulan, m.umurManual)) : 0;
             total += biaya;
             return (
               <tr key={b.nama} style={b.yatim ? { opacity: 0.7 } : undefined}>
@@ -62,7 +62,7 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange,
                   const it = pilihan.find(x => x.id === Number(e.target.value));
                   if (!it) { ubah(b.nama, { priceItemId: undefined, nama: '', harga: 0, otomatis: false, vendor: null }); return; }
                   const mode = m?.mode ?? (Number(it.harga_sewa_bulan) > 0 ? 'sewa' : 'beli');
-                  ubah(b.nama, { priceItemId: it.id, nama: it.item, harga: hargaDari(it, mode), mode, umurBulan: it.umur_ekonomis_bulan ?? m?.umurBulan ?? 60, otomatis: false, vendor: it.vendor ?? null });
+                  ubah(b.nama, { priceItemId: it.id, nama: it.item, harga: hargaDari(it, mode), mode, umurBulan: it.umur_ekonomis_bulan ?? m?.umurBulan ?? 60, umurManual: false, otomatis: false, vendor: it.vendor ?? null });
                 }}>
                   <option value="">— tanpa biaya —</option>
                   {['MHE', 'IT'].map(kat => <optgroup key={kat} label={kat}>{pilihan.filter(x => x.kategori === kat).map(x => (
@@ -79,7 +79,7 @@ export default function MhePanel({ kebutuhan, mhe, items, metodeExcel, onChange,
                   ubah(b.nama, { mode, harga: it ? hargaDari(it, mode) : m?.harga ?? 0 });
                 }}><option value="sewa">Sewa</option><option value="beli">Beli</option></select></td>
                 <td className="num db"><InputDesimal aria-label="Harga" value={m?.harga ?? ''} disabled={!m} onChange={e => ubah(b.nama, { harga: Number(e.target.value) })} style={{ width: 120, minWidth: 120 }} /></td>
-                <td className="num"><UmurKontrak umur={m?.umurBulan} kontrak={kontrakBulan} disabled={!m || m.mode === 'sewa'} onChange={v => ubah(b.nama, { umurBulan: v })} /></td>
+                <td className="num"><UmurKontrak umur={m?.umurBulan} manual={m?.umurManual} kontrak={kontrakBulan} disabled={!m || m.mode === 'sewa'} onChange={v => ubah(b.nama, { umurBulan: v, umurManual: true })} onReset={() => ubah(b.nama, { umurManual: false })} /></td>
                 {!metodeExcel && <td className="num"><InputDesimal aria-label="Ketersediaan" value={m ? +(m.ketersediaan * 100).toFixed(1) : ''} disabled={!m} onChange={e => ubah(b.nama, { ketersediaan: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>}
                 <td className="num"><InputDesimal aria-label="Spare" value={m ? +(m.sparePersen * 100).toFixed(1) : ''} disabled={!m} onChange={e => ubah(b.nama, { sparePersen: Number(e.target.value) / 100 })} style={{ width: 70, minWidth: 70 }} /></td>
                 <td className="num"><b>{b.unit != null ? unitTot : '–'}</b></td>

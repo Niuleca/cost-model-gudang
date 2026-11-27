@@ -5,7 +5,7 @@
 
 import { hitungProcessDesign, PD_DEFAULT } from './processDesign';
 import { hitungSpaceExcel, lengkapiSpaceExcel } from './space';
-import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, volumeDasarTarif, type Muatan, type KunciVolume } from './types';
+import { pengaliEfektif, headcountTetap, isRoleSupervisor, paletEkuivalen, uraiUom, kelasUom, volumeSalahRibuan, gabungPerArus, volumeDasarTarif, type Muatan, type KunciVolume, type RakHarga } from './types';
 import { PARAM_BIAYA_MP_DEFAULT, rincianBiayaRole } from './biayaMp';
 import type {
   Arus, Bucket, KategoriRisiko, Kelompok, TenderInput, MasterData, RedFlag, BiayaBaris, JobLevel,
@@ -249,12 +249,13 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     }
     baris.push({ deskripsi, kelompok, kategoriRisiko: risiko ?? RISIKO_DEFAULT[kelompok], biayaBulan: bulat(biayaBulan), alokasi, dasar });
   };
-  const umurLebih: string[] = [];
+  const umurLebih: string[] = [], umurManualLebih: string[] = [];
   // biaya beli: depresiasi selama min(umur, kontrak) + bunga atas rata-rata nilai buku
-  const capex = (deskripsi: string, kelompok: Kelompok, nilai: number, umur: number | undefined, alokasi: Record<Bucket, number>, risiko?: KategoriRisiko) => {
+  const capex = (deskripsi: string, kelompok: Kelompok, nilai: number, umur: number | undefined, alokasi: Record<Bucket, number>, risiko?: KategoriRisiko, manual?: boolean) => {
     const u = umur && umur > 0 ? umur : n;
-    const periode = Math.min(u, n);
-    if (u > n) umurLebih.push(deskripsi);
+    // default: disusutkan penuh selama kontrak (MIN umur, kontrak); diisi manual → periode sesuai isian (boleh > kontrak)
+    const periode = manual ? Math.max(1, u) : Math.min(u, n);
+    if (u > n) (manual ? umurManualLebih : umurLebih).push(deskripsi);
     tambah(`${deskripsi} — depresiasi`, kelompok, nilai / periode, alokasi, `Rp${bulat(nilai).toLocaleString('en-US')} ÷ ${periode} bln`, risiko);
     nilaiModal.set(`${deskripsi} — depresiasi`, nilai);
     // bunga tidak otomatis — hanya lewat sheet Interest cost (dipilih user)
@@ -280,11 +281,11 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     flags.push({ level: 'peringatan', kode: 'GUDANG_LONGGAR', pesan: `Gudang disewa utuh ${s.luasTersediaM2} m² tetapi kebutuhan hanya ${space.totalM2} m² (<70%) — biaya sewa idle dibebankan ke customer.` });
   // Racking: posisi SPR & DDR dari sheet Space × harga per jenis (Price Inquiry Racking). Data lama: satu harga untuk semua posisi.
   const posSpr = Math.ceil(sx.sd.ppReq - 1e-9), posDdr = Math.ceil(sx.dd.ppReq - 1e-9);
-  const rakLama = { harga: s.hargaRakPerPosisi ?? 0, umurBulan: s.umurRakBulan ?? 120 };
+  const rakLama: RakHarga = { harga: s.hargaRakPerPosisi ?? 0, umurBulan: s.umurRakBulan ?? 120 };
   const sewaRak = s.rakSkema === 'sewa', tarifSewaRak = Math.max(0, Number(s.sewaRakPerPPBulan) || 0);
   for (const [label, pos, h] of [['SPR', posSpr, s.rak?.spr ?? rakLama], ['DDR', posDdr, s.rak?.ddr ?? rakLama]] as const) {
     if (sewaRak) { if (pos > 0 && tarifSewaRak > 0) tambah(`Sewa racking ${label} (${pos} posisi)`, 'Racking', pos * tarifSewaRak, alokStorage, `${pos} PP × Rp${tarifSewaRak.toLocaleString('en-US')}/PP/bln`); }
-    else if (pos > 0 && h.harga > 0) investasi += capex(`Racking ${label} (${pos} posisi)`, 'Racking', pos * h.harga, h.umurBulan, alokStorage);
+    else if (pos > 0 && h.harga > 0) investasi += capex(`Racking ${label} (${pos} posisi)`, 'Racking', pos * h.harga, h.umurBulan, alokStorage, undefined, h.umurManual);
   }
 
   // Listrik
@@ -301,7 +302,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
   for (const x of mhe) {
     if (x.unit === 0) continue;
     if (x.mode === 'sewa') tambah(`${x.nama} — sewa (${x.unit} unit)`, 'MHE', x.unit * x.harga, x.alokasi, `${x.unit} unit × Rp${x.harga.toLocaleString('en-US')}`);
-    else investasi += capex(`${x.nama} (${x.unit} unit)`, 'MHE', x.unit * x.harga, x.umurBulan, x.alokasi);
+    else investasi += capex(`${x.nama} (${x.unit} unit)`, 'MHE', x.unit * x.harga, x.umurBulan, x.alokasi, undefined, x.umurManual);
   }
 
   // Baris lain (IT, office, HSE, asuransi, pest control, consumable, startup)
@@ -309,7 +310,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     const alok = normalisasi(c.alokasi, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 });
     const nilai = c.qty * c.hargaSatuan;
     if (c.mode === 'bulanan' || c.mode === 'sewa') tambah(c.deskripsi, c.kelompok, nilai, alok, `${c.qty} × Rp${c.hargaSatuan.toLocaleString('en-US')}${c.sumber ? ' · ' + c.sumber : ''}`, c.kategoriRisiko);
-    else if (c.mode === 'beli') investasi += capex(c.deskripsi, c.kelompok, nilai, c.umurBulan, alok, c.kategoriRisiko);
+    else if (c.mode === 'beli') investasi += capex(c.deskripsi, c.kelompok, nilai, c.umurBulan, alok, c.kategoriRisiko, c.umurManual);
     else { // sekali (startup): amortisasi selama kontrak + bunga
       tambah(`${c.deskripsi} — amortisasi`, c.kelompok, nilai / n, alok, `Rp${nilai.toLocaleString('en-US')} ÷ ${n} bln`, c.kategoriRisiko ?? 'Tinggi');
       nilaiModal.set(`${c.deskripsi} — amortisasi`, nilai);
@@ -362,6 +363,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     tambah('Interest cost — working capital (payment term)', 'Interest cost', subtotalOperasi * (selisihHari / 30) * r,
       normalisasi(undefined, { storage: 0.4, handling_in: 0.3, handling_out: 0.3 }), `biaya bulanan × (${t.paymentTermHari} − ${m.finance.apHari}) hari ÷ 30 × bunga`);
 
+  if (umurManualLebih.length) flags.push({ level: 'info', kode: 'UMUR_MANUAL_GT_KONTRAK', pesan: `${umurManualLebih.length} aset beli disusutkan lebih lama dari kontrak ${n} bln (diisi manual) — sisa nilai buku di akhir kontrak tidak tertagih ke customer: ${umurManualLebih.slice(0, 6).join(', ')}${umurManualLebih.length > 6 ? ', …' : ''}.` });
   if (umurLebih.length) flags.push({ level: 'info', kode: 'UMUR_GT_KONTRAK', pesan: `${umurLebih.length} aset beli punya umur ekonomis > kontrak ${n} bln — disusutkan penuh selama kontrak (customer menanggung seluruh nilai): ${umurLebih.slice(0, 6).join(', ')}${umurLebih.length > 6 ? ', …' : ''}.` });
   // ---- 9. Overhead ----
   const subtotal = baris.reduce((sum, b) => sum + b.biayaBulan, 0);

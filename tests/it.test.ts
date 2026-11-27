@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ringkasIt, itKeCostLines, type ItSheet } from '../src/lib/it.ts';
+import { ringkasIt, itKeCostLines, biayaBulanIt, type ItSheet, type ItLine } from '../src/lib/it.ts';
 import { hitungTender } from '../src/lib/engine/index.ts';
 import { contohTender, contohMaster } from './engine.test.ts';
 
@@ -62,4 +62,10 @@ test('IT sewa: biaya = qty × sewa per unit per bulan, tidak masuk OTC / depresi
   assert.equal(cl.length, 1);
   assert.equal(cl[0].mode, 'bulanan');
   assert.equal(cl[0].qty * cl[0].hargaSatuan, 100000);
+});
+
+test('umur depresiasi: default = MIN(umur, kontrak); diisi manual → berapa pun bulannya (boleh > kontrak)', () => {
+  const l: ItLine = { kelompok: 'CCTV', item: 'Kamera', costType: 'OTC/Unit', qty: 2, hargaBudget: 2500000, umurBulan: 36, perlakuanSekali: 'depresiasi' };
+  assert.equal(biayaBulanIt(l, 16000, { kontrakBulan: 12, bungaTahun: 0 }).pokok, 5000000 / 12);
+  assert.equal(biayaBulanIt({ ...l, umurManual: true }, 16000, { kontrakBulan: 12, bungaTahun: 0 }).pokok, 5000000 / 36);
 });
