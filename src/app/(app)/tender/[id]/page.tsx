@@ -846,8 +846,24 @@ export default function TenderPage() {
     { k: 'loan', l: 'Loan & Interest cost', kel: ['Interest cost', 'Finance'], isi: 'Bunga pinjaman / modal kerja', tab: 'Loan & Interest Calculator' },
     { k: 'lainnya', l: 'Lainnya', kel: ['Asuransi', 'Startup', 'Lainnya'], isi: 'Services (pest control, chemical & sampah), asuransi, startup + item manual — security & cleaning ada di Manpower (VSM)', seksi: ['services', 'asuransi', 'startup', 'lainnya'] },
   ];
-  const katBaris = (b: { kelompok: Kelompok; deskripsi: string }) =>
-    /cctv/i.test(b.deskripsi) || (b.kelompok === 'Consumable' && /pal+et/i.test(b.deskripsi)) ? 'storage' : KAT_SC.find(x => x.kel.includes(b.kelompok))?.k ?? 'lainnya';
+  // kategori baris hasil = seksi baris biaya yang direvisi (pop-up Revisi) — sama persis dengan tempat item diubah;
+  // baris hasil bisa bersufiks " — depresiasi / amortisasi / sewa (…)" → cocokkan ke deskripsi baris biaya terpanjang
+  const seksiKat: Record<string, string> = { palet: 'storage', atk: 'consumable', consumable: 'consumable', hse: 'hse', office: 'office',
+    services: 'lainnya', asuransi: 'lainnya', startup: 'lainnya', lainnya: 'lainnya', rental: 'rental' };
+  const seksiDari = (deskripsi: string) => {
+    let best: { d: string; s?: string } | null = null;
+    for (const c of a.costLines) {
+      const d = c.deskripsi?.trim(); if (!d) continue;
+      if ((deskripsi === d || deskripsi.startsWith(`${d} — `)) && (!best || d.length > best.d.length)) best = { d, s: (c as typeof c & { seksi?: string }).seksi };
+    }
+    return best?.s;
+  };
+  const katBaris = (b: { kelompok: Kelompok; deskripsi: string }) => {
+    if (/cctv/i.test(b.deskripsi)) return 'storage';
+    const s = seksiDari(b.deskripsi);
+    if (s && seksiKat[s]) return seksiKat[s];
+    return KAT_SC.find(x => x.kel.includes(b.kelompok))?.k ?? 'lainnya';
+  };
   const luasSewa = hasil?.space.totalM2 ?? spaceH?.luasDipakai ?? 0;
   const tarifSewaPakai = a.gudang && !a.space.tarifManual ? Math.round(Number(a.gudang.harga_sewa_m2_bulan ?? (a.gudang.harga_per_bulan ?? 0) / Math.max(1, Number(a.gudang.luas_m2)))) : (a.space.tarifSewaM2Bulan ?? 0);
   const sewaUtuh = !!a.gudang?.sewaUtuh;
@@ -900,7 +916,11 @@ export default function TenderPage() {
     const semuaBuka = kats.every(k => bukaKat[k.c.k]);
     const param = (k: (typeof kats)[number]) => k.c.k === 'rental' ? (sewaUtuh ? 'sewa utuh gudang' : `${angka(luasSewa)} m² × ${rp(tarifSewaPakai)}/m²/bln`)
       : k.c.k === 'manpower' ? `${hasil.totalHeadcount} orang · ${k.xs.length} role`
-      : k.xs.length === 1 ? k.xs[0].dasar : k.xs.length ? `${k.xs.length} item` : '—';
+      : k.xs.length === 1 ? k.xs[0].dasar
+      : k.xs.length ? (() => {   // nama item terbesar (sesuai revisi) supaya parameter terbaca, bukan sekadar "n item"
+        const nama = (d: string) => d.replace(/^IT — /, '').replace(/ — (depresiasi|amortisasi|bulanan|sewa.*)$/i, '').replace(/\s*\(.*?\)\s*/g, ' ').trim();
+        const top = k.xs.slice(0, 3).map(r => nama(r.deskripsi));
+        return `${top.join(', ')}${k.xs.length > 3 ? ` +${k.xs.length - 3} lainnya` : ''}`; })() : '—';
     const pct = (v: number) => `${angka(v / tot * 100, 1)}%`;
     return <div className="card">
       <div className="sc-kepala">
