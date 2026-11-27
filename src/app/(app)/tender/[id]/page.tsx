@@ -932,7 +932,14 @@ export default function TenderPage() {
       </div>
       <div className="sc-atas">
         <div className="sc-total">
-          <div className="utama"><span>Total biaya / bulan</span><b>{rp(total)}</b></div>
+          <div className="utama"><span>Total biaya / bulan</span><b>{rp(total)}</b>
+            {/* tarif jual per unit (sudah termasuk margin, excl. PPN) per layanan — sama dengan 4.1 Tarif per layanan */}
+            {(hasil.rateCard ?? []).filter(r => r.tarifPerUnit > 0).length > 0 && <div className="sc-tarif">
+              {(hasil.rateCard ?? []).filter(r => r.tarifPerUnit > 0).map(r => <div key={r.bucket}>
+                <span>{BUCKET_LABEL[r.bucket] ?? r.bucket}</span>
+                <b>{rp(r.tarifPerUnit)}<small>/{r.uom}</small></b>
+                <small>GP {persen(r.gpPersen ?? 0)} · biaya {rp(r.biayaPerUnit)}</small></div>)}
+              <small className="sc-tarif-ket">tarif per unit sudah termasuk margin · excl. PPN</small></div>}</div>
           <div><span>Total biaya / tahun</span><b>{rp(total * 12)}</b></div>
           {isi[0] && <div><span>Biaya terbesar</span><b>{isi[0].c.l} · {pct(isi[0].sub)}</b></div>}
           {isi[1] && <div><span>Terbesar ke-2</span><b>{isi[1].c.l} · {pct(isi[1].sub)}</b></div>}

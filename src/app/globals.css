@@ -1328,3 +1328,12 @@ td.td-isian { background: #fffaf0; }
 }
 /* Simple CM: isi card (tabel lebar, catatan panjang) tidak boleh mendorong card keluar kolom — tabel menggulung di .tablewrap */
 .simple-cm .card > * { min-width: 0; }
+
+/* Summary cost: tarif per unit (sudah margin) di dalam kotak total */
+.sc-total > div.utama .sc-tarif { display: grid; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.25); }
+.sc-total > div.utama .sc-tarif > div { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: baseline; }
+.sc-total > div.utama .sc-tarif span { font-size: 12px; }
+.sc-total > div.utama .sc-tarif b { font-size: 15px; }
+.sc-total > div.utama .sc-tarif b small { font-size: 11px; font-weight: 400; opacity: .85; margin-left: 2px; }
+.sc-total > div.utama .sc-tarif > div > small { grid-column: 1 / -1; font-size: 10.5px; color: rgba(255,255,255,.75); }
+.sc-total > div.utama .sc-tarif-ket { font-size: 10.5px; color: rgba(255,255,255,.7); }
