@@ -16,8 +16,8 @@ test('kalender 2026: 261 hari kerja Senin–Jumat, libur di hari kerja dikurangi
 });
 
 test('roundup harga', () => {
-  assert.equal(roundupHarga(321.2), 330);
-  assert.equal(roundupHarga(45318.4), 45400);
+  assert.equal(roundupHarga(321.2), 321);      // ke rupiah terdekat — GP 0% → tarif = biaya
+  assert.equal(roundupHarga(84782.4), 84782);
   assert.equal(roundupHarga(0), 0);
 });
 

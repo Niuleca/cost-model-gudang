@@ -44,9 +44,10 @@ export function tulisHasil(x: Ctx) {
   HS.r++;
   const pj = h.pajak;
   HS.h2('Rate card & margin', 'Margin = GP% atas pendapatan per layanan: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko (master Finance). PPN bukan pendapatan; PPh 23 dipotong customer.');
-  HS.field('PPh 23', pj.pph === 'include' ? 'Include PPh — ditanggung kita' : 'Exclude PPh — ditanggung customer', 'teks', 'in', '', 'Exclude = tarif di-gross-up, pendapatan bersih tetap', 'PphMode', 'L_Pph');
+  HS.field('PPh 23', pj.pph === 'include' ? 'Include PPh — ditanggung kita' : 'Exclude PPh — ditanggung customer', 'teks', 'in', '', 'Exclude = PPh 23 ditanggung customer di luar tarif · Include = ditanggung kita (mengurangi pendapatan)', 'PphMode', 'L_Pph');
   HS.field('Tarif PPh 23 (master Finance)', m.finance.pphGrossUp, 'pct', 'in', '', '', 'PPh');
-  HS.field('Gross-up PPh dipakai', { f: 'IF(LEFT(PphMode,7)="Exclude",PPh,0)' }, 'pct', 'out', '', '', 'GrossUp');
+  HS.field('Gross-up PPh dipakai', { f: '0' }, 'pct', 'out', '', 'tarif tidak di-gross-up: GP 0% → tarif = biaya', 'GrossUp');
+  HS.field('Potongan PPh ke pendapatan', { f: 'IF(LEFT(PphMode,7)="Exclude",0,PPh)' }, 'pct', 'out', '', '', 'PPhPotong');
   HS.field('PPN / VAT', pj.ppn === 'include' ? 'Include PPN — sudah termasuk tarif' : 'Exclude PPN — ditambah di invoice', 'teks', 'in', '', '', 'PpnMode', 'L_Ppn');
   HS.field('Tarif PPN efektif', pj.ppnPersen ?? 0.11, 'pct', 'in', '', 'PPN 12% × DPP 11/12 = 11%', 'PPN');
   HS.field('Margin default — risiko Rendah', m.margin.Rendah, 'pct', 'in', 'markup', 'master Finance', 'MRendah');
@@ -54,7 +55,7 @@ export function tulisHasil(x: Ctx) {
   HS.field('Margin default — risiko Tinggi', m.margin.Tinggi, 'pct', 'in', 'markup', '', 'MTinggi');
   HS.field('Overhead', m.finance.overheadPersen, 'pct', 'in', '', '× subtotal biaya (master Finance)', 'Overhead');
   HS.field('GP minimum (red flag)', m.finance.gpMinimum, 'pct', 'in', '', '', 'GpMin');
-  HS.field('Contoh harga Rp100,000', { f: '"tarif "&IF(GrossUp>0,"di-gross-up jadi "&FIXED(100000/(1-GrossUp),0),"tetap 100,000")&" → PPh 23 dipotong "&FIXED(100000/(1-GrossUp)*PPh,0)&" → diterima "&FIXED(100000/(1-GrossUp)*(1-PPh),0)' }, 'teks', 'out');
+  HS.field('Contoh harga Rp100,000', { f: '"tarif 100,000 → "&IF(PPhPotong>0,"PPh 23 dipotong "&FIXED(100000*PPh,0)&" → diterima "&FIXED(100000*(1-PPh),0),"PPh 23 ditanggung customer di luar tarif → diterima 100,000")' }, 'teks', 'out');
 
   // ===================== Rincian biaya per bulan — susun posisi baris lebih dulu (dirujuk rate card)
   const lines = x.lines;
@@ -287,7 +288,7 @@ export function tulisHasil(x: Ctx) {
       HS.put(16, { f: `IF(OR(C${r}="tarif",N(U${r})>0),N(U${r}),IF(L${r}>0,${fRoundup(`O${r}/(1-GrossUp)`)},0))`, v: c?.tarifPerUnit }, { j: 'out', fmt: 'rp', b: true });
       HS.put(17, { f: fRoundup(`P${r}*(1+PPN)`), v: c?.tarifInclPpn }, { j: 'out', fmt: 'rp' });
       HS.put(18, it?.volumeBulan ?? null, { j: 'in', fmt: 'n0' });
-      HS.put(19, { f: `P${r}*N(R${r})*(1-PPh)`, v: c?.pendapatanBulan }, { j: 'out', fmt: 'rp' });
+      HS.put(19, { f: `P${r}*N(R${r})*(1-PPhPotong)`, v: c?.pendapatanBulan }, { j: 'out', fmt: 'rp' });
       HS.put(20, { f: `S${r}-L${r}*N(R${r})`, v: c?.gpBulan }, { j: 'out', fmt: 'rp' });
       HS.put(21, it?.dasar === 'tarif' || Number(it?.tarif) > 0 ? (it?.tarif ?? 0) : null, { j: 'in', fmt: 'rp' });
       HS.r++;
@@ -307,7 +308,7 @@ export function tulisHasil(x: Ctx) {
     const pend = rcList.map(rc => { const z = rcRef[rc.bucket]; return `${z.tarif}*IF(${z.tetap}=1,${z.vol},${key}_${ARUS_B[rc.bucket]}*${z.rasio})`; }).join('+') || '0';
     const sim = h.simulasi.find(x => x.skenario === l) ?? h.simulasi[i];
     HS.put(1, l, { j: 'txt', b: true });
-    HS.put(2, { f: `(${pend})*(1-PPh)`, v: sim?.pendapatanBulan }, { j: 'out', fmt: 'rp' });
+    HS.put(2, { f: `(${pend})*(1-PPhPotong)`, v: sim?.pendapatanBulan }, { j: 'out', fmt: 'rp' });
     HS.put(3, { f: 'TotalBiaya', v: h.totalBiayaBulan }, { j: 'out', fmt: 'rp' });
     HS.put(4, { f: `B${r}-C${r}`, v: sim?.gp }, { j: 'out', fmt: 'rp' });
     HS.put(5, { f: `IF(B${r}>0,D${r}/B${r},0)`, v: sim?.gpPersen }, { j: 'out', fmt: 'pct', b: true });
@@ -574,7 +575,7 @@ export function tulisRingkasan(x: Ctx) {
   }
   const rSum = sub('Sum (gross)', (x.rcList as HasilRc[]).length ? `SUM(F${sel0}:F${S0.r - 1})` : '0', jualKotor);
   const rPph = S0.r;
-  baris(['', 'Potongan PPh 23 (dipotong customer)', '%', { f: 'PPh', v: m.finance.pphGrossUp }, '', { f: `-F${rSum}*PPh` }, { f: `F${rPph}*Kontrak` }, 'Tarif sudah di-gross-up bila PPh exclude'], [undefined, undefined, undefined, 'pct', undefined, 'rp', 'rp']);
+  baris(['', 'Potongan PPh 23 (bila ditanggung kita)', '%', { f: 'PPhPotong', v: h.pajak?.pph === 'include' ? m.finance.pphGrossUp : 0 }, '', { f: `-F${rSum}*PPhPotong` }, { f: `F${rPph}*Kontrak` }, 'PPh exclude = ditanggung customer di luar tarif (0)'], [undefined, undefined, undefined, 'pct', undefined, 'rp', 'rp']);
   const rNet = sub('Selling bersih', `F${rSum}+F${rPph}`, s0?.pendapatanBulan ?? 0, '= sheet Result · simulasi volume komitmen', C.KPI);
   gabung(sel0, rNet, 'Selling');
   const INDIRECT = ['Overhead', 'Interest cost'];

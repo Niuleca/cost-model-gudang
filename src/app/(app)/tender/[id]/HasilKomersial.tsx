@@ -72,8 +72,8 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
       <div className="pajak-bar">
         <label className="f" htmlFor="pj-pph">PPh 23 ({(pphPersen * 100).toFixed(1)}%)
           <select id="pj-pph" value={pajak.pph} onChange={e => onPajak({ ...pajak, pph: e.target.value as Pajak['pph'] })}>
-            <option value="exclude">Exclude PPh — ditanggung customer (tarif di-gross-up, pendapatan bersih tetap)</option>
-            <option value="include">Include PPh — ditanggung kita (tarif tidak dinaikkan, PPh mengurangi pendapatan)</option>
+            <option value="exclude">Exclude PPh — ditanggung customer di luar tarif (pendapatan bersih = tarif)</option>
+            <option value="include">Include PPh — ditanggung kita (PPh mengurangi pendapatan)</option>
           </select></label>
         <label className="f" htmlFor="pj-ppn">PPN / VAT
           <select id="pj-ppn" value={pajak.ppn} onChange={e => onPajak({ ...pajak, ppn: e.target.value as Pajak['ppn'] })}>
@@ -84,10 +84,10 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
           <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><InputDesimal id="pj-ppnp" step="0.1" value={Math.round(pajak.ppnPersen * 1000) / 10}
             onChange={e => onPajak({ ...pajak, ppnPersen: Number(e.target.value) / 100 })} style={{ width: 80 }} />%</span></label>
       </div>
-      {(() => { const p = pphPersen, n = 100000, gu = pajak.pph === 'exclude' ? n / (1 - p) : n; const pot = gu * p, ppnV = gu * pajak.ppnPersen;
-        return <p className="small pajak-contoh"><b>Contoh harga Rp100,000:</b> tarif {pajak.pph === 'exclude' ? `di-gross-up jadi ${rp(gu)}` : `tetap ${rp(gu)}`} → customer memotong PPh 23 {rp(pot)} → <b>diterima {rp(gu - pot)}</b>{pajak.pph === 'exclude' ? ' (utuh)' : ` (kurang ${rp(pot)})`}.
+      {(() => { const p = pphPersen, gu = 100000; const pot = pajak.pph === 'exclude' ? 0 : gu * p, ppnV = gu * pajak.ppnPersen;
+        return <p className="small pajak-contoh"><b>Contoh tarif Rp100,000:</b> tarif tidak dinaikkan (GP 0% → tarif = biaya) → {pajak.pph === 'exclude' ? `PPh 23 ${(p * 100).toFixed(1)}% ditanggung customer di luar tarif` : `PPh 23 ${rp(pot)} ditanggung kita`} → <b>diterima {rp(gu - pot)}</b>{pajak.pph === 'exclude' ? ' (utuh)' : ` (kurang ${rp(pot)})`}.
           {' '}PPN {rp(ppnV)} {pajak.ppn === 'include' ? 'sudah di dalam tarif yang ditulis' : 'ditambahkan di invoice'} lalu disetor ke negara — tidak memengaruhi GP.</p>; })()}
-      <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN, dikurangi PPh 23 yang dipotong customer.
+      <p className="small muted">Margin = <b>GP% atas pendapatan</b> per layanan, diisi sendiri: harga = biaya ÷ (1 − GP%). Kosong = default per kategori risiko. PPN bukan pendapatan: GP dihitung dari tarif sebelum PPN (dikurangi PPh 23 hanya bila PPh ditanggung kita). Tarif = biaya ÷ (1 − GP%), dibulatkan ke rupiah.
         {' '}Default PPN efektif 11% (PPN 12% × DPP 11/12) — sesuaikan bila berbeda.</p>
       {onLayananJual && <LayananDijual h={h} nilai={layananJual ?? {}} onUbah={onLayananJual} />}
       {onBasisTarif && (() => { const bt = { ...BASIS_TARIF_DEFAULT, ...(basisTarif ?? {}) };
@@ -172,7 +172,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
         </tbody>
       </table></div>
       {mt && <p className={rk ? 'small muted' : 'small'}>Total GP {persen(mt.gpPersen ?? 0)} = 1 − Σ biaya {rp(mt.biayaBulan)} ÷ Σ harga sebelum PPh {rp(mt.hargaSebelumPph)} (tertimbang). Setara markup {persen(mt.margin)} atas biaya.
-        {' '}{pajak.pph === 'exclude' ? 'PPh exclude (ditanggung customer): tarif di-gross-up, jadi GP di simulasi ≈ GP input (sedikit lebih tinggi karena tarif dibulatkan ke atas).' : <b>PPh include (ditanggung kita): potongan PPh {(pphPersen * 100).toFixed(1)}% mengurangi pendapatan, jadi GP di simulasi lebih rendah dari GP input. Pilih PPh Exclude agar GP = input.</b>}</p>}
+        {' '}{pajak.pph === 'exclude' ? 'PPh exclude (ditanggung customer di luar tarif): tarif = biaya ÷ (1 − GP), jadi GP di simulasi = GP input.' : <b>PPh include (ditanggung kita): potongan PPh {(pphPersen * 100).toFixed(1)}% mengurangi pendapatan, jadi GP di simulasi lebih rendah dari GP input. Pilih PPh Exclude agar GP = input.</b>}</p>}
       {mt && h.simulasi[0] && h.simulasi[0].biayaBulan - mt.biayaBulan > 1000 && <p className="small notice">Ada biaya {rp(h.simulasi[0].biayaBulan - mt.biayaBulan)}/bln yang tidak masuk tarif mana pun (mis. biaya VAS tanpa volume) — GP% jadi lebih rendah dari margin.</p>}
       {h.storageAlternatif.length > 0 && <p className="small">Storage alternatif: {h.storageAlternatif.map(s => `${rp(s.tarif)}/${s.uom}`).join(' · ')}</p>}
 
@@ -197,7 +197,7 @@ export default function HasilKomersial({ h, marginManual, onMargin, kurs, onKurs
           <td className="num">{rp(s.gp)}</td><td className="num"><b>{persen(s.gpPersen)}</b></td><td className="num">{rp(s.ppnBulan ?? 0)}</td><td className="num">{rp(s.invoiceInclPpn ?? 0)}</td>
           <td className="num">{rp(s.pendapatanBulan * 12)}</td><td className="num">{rp(s.biayaBulan * 12)}</td><td className="num">{rp(s.gp * 12)}</td><td className="num">{rp(s.gp * kontrakBulan)}</td></tr>)}</tbody>
       </table></div>}
-      <p className="small muted">Pendapatan = tarif sebelum PPN × volume, dikurangi PPh 23 {(pphPersen * 100).toFixed(1)}% (PPh {pajak.pph === 'exclude' ? 'ditanggung customer, sudah di-gross-up di tarif' : 'ditanggung kita → GP turun'}). Per tahun = per bulan × 12.</p>
+      <p className="small muted">Pendapatan = tarif sebelum PPN × volume{pajak.pph === 'exclude' ? ' (PPh 23 ditanggung customer di luar tarif)' : `, dikurangi PPh 23 ${(pphPersen * 100).toFixed(1)}% (ditanggung kita → GP turun)`}. Per tahun = per bulan × 12.</p>
     </div>}
 
     {(bagian === 'harga' || bagian === 'semua' || bagian === 'kurs') && <div className="card">

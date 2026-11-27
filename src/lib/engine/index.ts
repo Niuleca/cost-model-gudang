@@ -34,11 +34,10 @@ function normalisasi(a: Partial<Record<Bucket, number>> | undefined, fallback: P
   return out;
 }
 
-/** Pembulatan harga jual: ke atas ke 10 (di bawah 1.000) atau 100 (di atasnya). */
+/** Pembulatan harga jual: ke rupiah terdekat (tanpa pembulatan ke atas) — GP 0% → tarif = biaya per unit. */
 export function roundupHarga(x: number): number {
   if (!isFinite(x) || x <= 0) return 0;
-  const step = x < 100 ? 1 : x < 1000 ? 10 : 100;  // tarif kecil (per pcs/case) dibulatkan halus agar tidak melonjak
-  return Math.ceil(x / step - 1e-9) * step;   // toleransi floating point (500,00000000000006 → 500, sama dengan Excel)
+  return Math.round(x + 1e-9);
 }
 
 // ---------------------------------------------------------------------------
@@ -446,11 +445,13 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     handlingSetara: setara ? { porsiIn: bulat(vIn / (vIn + vOut), 4), paletIn: bulat(vIn), paletOut: bulat(vOut) } : null };
 
   // ---- 11. Harga & rate card ----
-  // Pajak (istilah komersial): PPh EXCLUDE = harga belum termasuk PPh → ditanggung customer → tarif di-gross-up;
-  // PPh INCLUDE = harga sudah termasuk PPh → ditanggung kita → tarif tidak dinaikkan, potongan PPh mengurangi pendapatan.
+  // Tarif = biaya ÷ (1 − GP) — tidak di-gross-up PPh (GP 0% → tarif = biaya per unit).
+  // PPh EXCLUDE = PPh 23 ditanggung customer di luar tarif (pendapatan bersih = tarif);
+  // PPh INCLUDE = PPh 23 ditanggung kita → potongan PPh mengurangi pendapatan.
   const pajak = t.pajak ?? { pph: 'exclude', ppn: 'exclude', ppnPersen: 0.11 };
   const pphRate = m.finance.pphGrossUp;
-  const g = pajak.pph === 'exclude' ? pphRate : 0;
+  const g = 0;   // tarif tidak di-gross-up
+  const pphPotong = pajak.pph === 'include' ? pphRate : 0;   // potongan PPh yang mengurangi pendapatan kita
   const ppn = Math.max(0, pajak.ppnPersen ?? 0.11);
   const bucketKeArus: Record<string, Arus> = { storage: 'storage', handling_in: 'inbound', handling_out: 'outbound', vas: 'vas' };
   // Layanan yang tidak dijual terpisah ("termasuk"): biayanya dipindah ke layanan yang dijual, proporsional biaya masing-masing
@@ -544,7 +545,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
       const tarifX = pakaiTarif ? tarifManual : tarifDefault;
       const tarifI = roundupHarga(tarifX * (1 + ppn));
       const vol = Math.max(0, Number(x.volumeBulan) || 0);
-      const pend = tarifX * vol * (1 - pphRate), bya = biayaPU * vol;
+      const pend = tarifX * vol * (1 - pphPotong), bya = biayaPU * vol;
       return { ...x, biayaPerUnit: bulat(biayaPU, 2), gpDipakai: bulat(gp, 4), gpManual: x.gp != null || pakaiTarif, tarifDiubah: pakaiTarif, tarifDefault, dasarTeks, tarifPerUnit: tarifX, tarifInclPpn: tarifI, ppnPerUnit: tarifI - tarifX,
         tarifQuote: pajak.ppn === 'include' ? tarifI : tarifX, pendapatanBulan: bulat(pend), biayaBulan: bulat(bya), gpBulan: bulat(pend - bya) };
     }),
@@ -570,7 +571,7 @@ export function hitungTender(t0: TenderInput, m: MasterData) {
     return sum + rc.tarifPerUnit * vol;
   }, 0);
   const simulasi = (['komitmenBulan', 'minBulan', 'rataRataBulan', 'peakBulan'] as const).map(sk => {
-    const rev = pendapatan(sk) * (1 - pphRate);          // pendapatan bersih setelah PPh 23 dipotong customer (PPN bukan pendapatan)
+    const rev = pendapatan(sk) * (1 - pphPotong);       // pendapatan bersih: PPh include → dikurangi PPh 23; exclude → ditanggung customer di luar tarif
     return { skenario: sk === 'komitmenBulan' ? 'Volume komitmen' : sk === 'minBulan' ? 'Volume min' : sk === 'rataRataBulan' ? 'Volume rata-rata' : 'Volume peak',
       pendapatanBulan: bulat(rev), invoiceInclPpn: bulat(pendapatan(sk) * (1 + ppn)), ppnBulan: bulat(pendapatan(sk) * ppn), biayaBulan: bulat(totalBiaya), gp: bulat(rev - totalBiaya), gpPersen: rev > 0 ? bulat((rev - totalBiaya) / rev, 4) : 0 };
   });

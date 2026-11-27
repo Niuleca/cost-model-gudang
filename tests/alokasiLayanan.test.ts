@@ -69,8 +69,8 @@ test('layanan termasuk: biaya dipindah ke layanan yang dijual, total & simulasi 
   const mv = tt.items[0];
   assert.ok(Math.abs(mv.biayaPerUnit - 0.1 * (tt.tarifJamOrang + tt.tarifJamAlat)) < 0.05);
   const lb = tt.items[1];
-  assert.equal(lb.tarifPerUnit, 520);   // 350 ÷ 0,7 = 500 → gross-up PPh 2% (exclude) = 510,2 → dibulatkan 10 ke atas = 520
-  assert.ok(Math.abs(lb.pendapatanBulan - 520 * 1000 * 0.98) <= 1);
+  assert.equal(lb.tarifPerUnit, 500);   // 350 ÷ 0,7 = 500 — tanpa gross-up PPh & tanpa pembulatan ke atas
+  assert.ok(Math.abs(lb.pendapatanBulan - 500 * 1000) <= 1);   // PPh exclude = ditanggung customer di luar tarif
 });
 
 test('Handling in & out setara per palet (default): biaya handling dibagi menurut volume palet', () => {
