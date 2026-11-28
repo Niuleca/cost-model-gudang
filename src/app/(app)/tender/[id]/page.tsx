@@ -34,6 +34,7 @@ import GudangPicker from './GudangPicker';
 import ItPanel from './ItPanel';
 import BiayaLainPanel from './BiayaLainPanel';
 import HapusTender from './HapusTender';
+import DuplikatTender from './DuplikatTender';
 import ListrikTender from './ListrikTender';
 import { KATEGORI_UMUM, kategoriDari } from '@/lib/kategoriBisnis';
 import AirPanel from './AirPanel';
@@ -1147,6 +1148,7 @@ export default function TenderPage() {
         <div className="row" style={{ margin: 0 }}>
           {profile && <BagikanTender tenderId={t.id} bolehKelola={bolehKelolaAkses} bolehContoh={!!profile.is_master || profile.role === 'admin'}
             contohPublik={!!t.contoh_publik} onContoh={v => setT(x => x && ({ ...x, contoh_publik: v }))} />}
+          {profile && <DuplikatTender t={t} simple={simple} />}
           {profile && bisaEdit && (profile.role === 'admin' || profile.role === 'manager' || (t.created_by === profile.id && STATUS_DRAFT.includes(t.status))) && <HapusTender id={t.id} kode={t.kode ?? t.customer} customer={t.customer} />}
         </div>
       </div>
